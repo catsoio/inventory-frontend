@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand: var(--mat-sys-primary);
+  --color-brand-soft: color-mix(in srgb, var(--mat-sys-primary) 10%, white);
+}
