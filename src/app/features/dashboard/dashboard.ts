@@ -102,14 +102,20 @@ const day = (offset: number) => new Date(Date.now() + offset * 864e5).toLocaleDa
         <section class="shrink-0">
           <h2 class="mb-2 text-xl font-semibold">Genvägar</h2>
           <div class="flex flex-wrap gap-2">
-            <a mat-flat-button color="primary" routerLink="/inventory/new"><mat-icon>add</mat-icon> Ny artikel</a>
+            <a mat-flat-button color="primary" routerLink="/inventory/new"
+              ><mat-icon>add</mat-icon> Ny artikel</a
+            >
             <a mat-stroked-button routerLink="/sales"><mat-icon>point_of_sale</mat-icon> Sälj</a>
-            <a mat-stroked-button routerLink="/purchases"><mat-icon>local_shipping</mat-icon> Inköp</a>
+            <a mat-stroked-button routerLink="/purchases"
+              ><mat-icon>local_shipping</mat-icon> Inköp</a
+            >
           </div>
         </section>
         <section class="flex min-h-0 flex-1 flex-col">
           <div class="mb-1 flex shrink-0 items-center justify-between">
-            <h2 class="flex items-center gap-2 text-xl font-semibold"><mat-icon>history</mat-icon> Senaste händelser</h2>
+            <h2 class="flex items-center gap-2 text-xl font-semibold">
+              <mat-icon>history</mat-icon> Senaste händelser
+            </h2>
             <a mat-button routerLink="/reports">Visa logg</a>
           </div>
           <mat-card class="min-h-0 flex-1 overflow-y-auto p-3">
@@ -128,10 +134,20 @@ export class Dashboard {
   readonly lowCols: DtCol<Article>[] = [
     { key: 'size', label: 'Storlek', value: (a) => a.tyre.sizeLabel ?? '' },
     { key: 'article', label: 'Artikel', value: (a) => `${a.brand} ${a.model}` },
-    { key: 'location', label: 'Hyllplats', value: (a) => a.location ?? '', fmt: (a) => a.location || '–' },
+    {
+      key: 'location',
+      label: 'Hyllplats',
+      value: (a) => a.location ?? '',
+      fmt: (a) => a.location || '–',
+    },
     { key: 'qty', label: 'Lager', right: true, value: (a) => a.quantity },
     { key: 'reorder', label: 'Best.punkt', right: true, value: (a) => a.reorderLevel },
-    { key: 'supplier', label: 'Leverantör', value: (a) => a.supplier ?? '', fmt: (a) => a.supplier || '–' },
+    {
+      key: 'supplier',
+      label: 'Leverantör',
+      value: (a) => a.supplier ?? '',
+      fmt: (a) => a.supplier || '–',
+    },
     { key: 'status', label: 'Status', value: (a) => a.quantity },
   ];
 

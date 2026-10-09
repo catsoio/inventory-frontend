@@ -12,6 +12,10 @@ const MESSAGES: Record<string, string> = {
   INVALID_QUANTITY: 'Ogiltigt antal. Ange ett heltal på minst 1.',
   INVALID_ARTICLE: 'Ogiltig artikel. Kontrollera uppgifterna.',
   INVALID_CREDENTIALS: 'Fel e-post/telefon eller lösenord.',
+  NO_GARAGE: 'Skapa eller gå med i ett garage först.',
+  INVALID_INVITE: 'Inbjudningskoden är ogiltig eller har gått ut.',
+  ALREADY_IN_GARAGE: 'Du tillhör redan ett garage.',
+  OWNER_CANNOT_LEAVE: 'Ägaren kan inte tas bort.',
   ACCOUNT_NOT_ACTIVE: 'Kontot är inte aktiverat. Verifiera med engångskod först.',
 };
 
@@ -34,7 +38,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                 : err.status === 400 && e?.message
                   ? `Ogiltiga uppgifter: ${e.message}`
                   : 'Något gick fel. Försök igen.');
-      if (err.status !== 401) snack.open(message, 'Stäng', { duration: 6000 });
+      if (err.status !== 401 && code !== 'NO_GARAGE')
+        snack.open(message, 'Stäng', { duration: 6000 });
       const apiError: ApiError = { code, message, status: err.status, details: e?.details };
       return throwError(() => apiError);
     }),

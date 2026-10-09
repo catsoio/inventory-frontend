@@ -195,7 +195,12 @@ const stamp = () => {
     <h2 class="mt-4 mb-1 shrink-0 text-xl font-semibold">
       {{ sell ? 'Senaste försäljningar' : 'Senaste inköp' }}
     </h2>
-    <app-movement-list class="h-64 shrink-0" [type]="sell ? 'sale' : 'purchase'" [pageSize]="10" [reloadKey]="done()" />
+    <app-movement-list
+      class="h-64 shrink-0"
+      [type]="sell ? 'sale' : 'purchase'"
+      [pageSize]="10"
+      [reloadKey]="done()"
+    />
   `,
 })
 export class Trade {

@@ -1,7 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { SEASON_LABELS } from '../../core/models';
+import { InventoryApi } from '../../core/api/inventory-api';
+import { Auth } from '../../core/auth/auth';
+import { GarageMember, SEASON_LABELS } from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
 
 @Component({
@@ -72,11 +74,43 @@ import { AppSettings, Settings } from '../../core/settings';
         <button mat-button type="button" (click)="reset()">Återställ standard</button>
       </div>
     </form>
+
+    @if (auth.isAdmin()) {
+      <section class="mt-4 max-w-4xl rounded-lg border bg-white">
+        <h2 class="border-b px-4 py-3 font-semibold">Personal i {{ auth.garage()?.name }}</h2>
+        <div class="flex flex-col gap-3 p-4">
+          @for (m of members(); track m.userId) {
+            <div class="flex items-center gap-2">
+              <span class="flex-1 truncate text-sm">{{ m.userId }}</span>
+              <span class="text-xs text-gray-500">{{
+                m.role === 'owner' ? 'Ägare' : 'Personal'
+              }}</span>
+              @if (m.role !== 'owner') {
+                <button mat-button type="button" (click)="remove(m)">Ta bort</button>
+              }
+            </div>
+          }
+          <div class="flex items-center gap-3">
+            <button mat-stroked-button type="button" (click)="invite()">
+              Skapa inbjudningskod
+            </button>
+            @if (inviteCode()) {
+              <code class="rounded bg-gray-100 px-2 py-1 select-all">{{ inviteCode() }}</code>
+              <span class="text-xs text-gray-500">Gäller 7 dagar, kan användas en gång</span>
+            }
+          </div>
+        </div>
+      </section>
+    }
   `,
 })
 export class SettingsPage {
   private readonly settings = inject(Settings);
   private readonly snack = inject(MatSnackBar);
+  private readonly api = inject(InventoryApi);
+  protected readonly auth = inject(Auth);
+  readonly members = signal<GarageMember[]>([]);
+  readonly inviteCode = signal<string | null>(null);
   readonly seasons = Object.entries(SEASON_LABELS);
 
   readonly form = inject(FormBuilder).nonNullable.group({
@@ -91,6 +125,22 @@ export class SettingsPage {
     ],
     markupPercent: [this.settings.value().markupPercent, [Validators.required, Validators.min(0)]],
   });
+
+  constructor() {
+    if (this.auth.isAdmin()) this.loadMembers();
+  }
+
+  private loadMembers() {
+    this.api.members().subscribe((m) => this.members.set(m));
+  }
+
+  invite() {
+    this.api.createInvite().subscribe((i) => this.inviteCode.set(i.code));
+  }
+
+  remove(m: GarageMember) {
+    this.api.removeMember(m.userId).subscribe(() => this.loadMembers());
+  }
 
   save() {
     this.settings.save(this.form.getRawValue() as AppSettings);

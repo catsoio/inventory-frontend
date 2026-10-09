@@ -49,7 +49,12 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
         }
       </div>
     }
-    <app-movement-list class="min-h-64 flex-1" [type]="applied().type" [from]="applied().from" [to]="applied().to" />
+    <app-movement-list
+      class="min-h-64 flex-1"
+      [type]="applied().type"
+      [from]="applied().from"
+      [to]="applied().to"
+    />
   `,
 })
 export class Reports {

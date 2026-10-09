@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth-guard';
+import { authGuard, garageGuard } from './core/auth/auth-guard';
 import { Shell } from './core/layout/shell/shell';
 
 const routes: Routes = [
@@ -9,9 +9,15 @@ const routes: Routes = [
     loadChildren: () => import('./features/auth/auth-module').then((m) => m.AuthModule),
   },
   {
+    path: 'onboarding',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/onboarding/onboarding-module').then((m) => m.OnboardingModule),
+  },
+  {
     path: '',
     component: Shell,
-    canActivate: [authGuard],
+    canActivate: [authGuard, garageGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {

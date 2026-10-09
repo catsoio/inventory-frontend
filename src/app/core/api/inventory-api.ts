@@ -1,12 +1,16 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import {
   Article,
   ArticleInput,
   ArticleQuery,
   ArticleUpdate,
   Facets,
+  Garage,
+  GarageInvite,
+  GarageMember,
   Movement,
   MovementQuery,
   Page,
@@ -15,7 +19,7 @@ import {
   Summary,
 } from '../models';
 
-export const API_URL = 'http://localhost:3000/api';
+export const API_URL = environment.apiUrl;
 
 function toParams(obj: object): HttpParams {
   let p = new HttpParams();
@@ -74,6 +78,30 @@ export class InventoryApi {
 
   movements(query: MovementQuery = {}): Observable<Page<Movement>> {
     return this.http.get<Page<Movement>>(`${this.base}/movements`, { params: toParams(query) });
+  }
+
+  garage(): Observable<Garage> {
+    return this.http.get<Garage>(`${this.base}/garage`);
+  }
+
+  createGarage(name: string): Observable<Garage> {
+    return this.http.post<Garage>(`${this.base}/garage`, { name });
+  }
+
+  joinGarage(code: string): Observable<Garage> {
+    return this.http.post<Garage>(`${this.base}/garage/join`, { code });
+  }
+
+  createInvite(): Observable<GarageInvite> {
+    return this.http.post<GarageInvite>(`${this.base}/garage/invites`, {});
+  }
+
+  members(): Observable<GarageMember[]> {
+    return this.http.get<GarageMember[]>(`${this.base}/garage/members`);
+  }
+
+  removeMember(userId: string): Observable<unknown> {
+    return this.http.delete(`${this.base}/garage/members/${userId}`);
   }
 
   report(from?: string, to?: string): Observable<Report> {

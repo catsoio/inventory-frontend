@@ -7,7 +7,7 @@ import { Auth } from '../../auth/auth';
   host: { class: 'flex h-dvh flex-col bg-gray-50' },
   template: `
     <header class="flex h-14 shrink-0 items-center gap-4 bg-brand px-4 text-white">
-      <span class="text-lg font-semibold">Däcklager</span>
+      <span class="text-lg font-semibold">{{ auth.garage()?.name ?? 'Däcklager' }}</span>
       <span class="flex-1"></span>
       <span class="hidden text-sm lg:inline">{{ who() }}</span>
       <a mat-icon-button routerLink="/settings" aria-label="Inställningar"

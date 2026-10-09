@@ -177,3 +177,23 @@ export interface Report {
 }
 
 export type StockAction = 'receive' | 'sell' | 'return' | 'write-off' | 'adjust';
+
+export type GarageRole = 'owner' | 'staff';
+
+export interface Garage {
+  id: string;
+  name: string;
+  role: GarageRole;
+}
+
+export interface GarageMember {
+  userId: string;
+  garageId: string;
+  role: GarageRole;
+  createdAt: string;
+}
+
+export interface GarageInvite {
+  code: string;
+  expiresAt: string;
+}

@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
-import { API_URL } from '../api/inventory-api';
-import { AuthTokens, AuthUser, Role } from '../models';
+import { API_URL, InventoryApi } from '../api/inventory-api';
+import { AuthTokens, AuthUser, Garage, Role } from '../models';
 
 const KEY = 'garagestock.auth';
 
@@ -28,6 +28,7 @@ function jwtPayload(token: string): Record<string, any> {
 export class Auth {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly api = inject(InventoryApi);
   private readonly url = `${API_URL}/auth`;
   private refreshing$?: Observable<AuthTokens>;
 
@@ -42,7 +43,10 @@ export class Auth {
     if (!s) return [];
     return s.user?.roles ?? jwtPayload(s.accessToken)['roles'] ?? [];
   });
-  readonly isAdmin = computed(() => this.roles().includes('admin'));
+  /** The garage (tenant) the user works in; null until loaded or if none. */
+  readonly garage = signal<Garage | null>(null);
+  /** Garage owner: may archive articles and edit shared settings. */
+  readonly isAdmin = computed(() => this.garage()?.role === 'owner');
 
   get accessToken(): string | null {
     return this.state()?.accessToken ?? null;
@@ -62,6 +66,14 @@ export class Auth {
   }
   verifyEmailOtp(email: string, code: string) {
     return this.authenticate('email/otp/verify', { email, code });
+  }
+
+  loadGarage(): Observable<Garage> {
+    return this.api.garage().pipe(tap((g) => this.garage.set(g)));
+  }
+
+  setGarage(g: Garage): void {
+    this.garage.set(g);
   }
 
   refresh(): Observable<AuthTokens> {
@@ -86,6 +98,7 @@ export class Auth {
   clear(): void {
     localStorage.removeItem(KEY);
     this.state.set(null);
+    this.garage.set(null);
     this.router.navigate(['/login']);
   }
 
