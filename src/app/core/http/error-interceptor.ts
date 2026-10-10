@@ -16,6 +16,10 @@ const MESSAGES: Record<string, string> = {
   INVALID_INVITE: 'Inbjudningskoden är ogiltig eller har gått ut.',
   ALREADY_IN_GARAGE: 'Du tillhör redan ett garage.',
   OWNER_CANNOT_LEAVE: 'Ägaren kan inte tas bort.',
+  INVALID_CURRENT_PASSWORD: 'Nuvarande lösenord stämmer inte.',
+  INVALID_MEMBER_ACTION: 'Det går inte att göra så med den användaren.',
+  INVALID_DEPOSIT: 'Ogiltig inlämning. Kontrollera uppgifterna.',
+  INVALID_DEPOSIT_STATE: 'Åtgärden passar inte inlämningens status.',
   ACCOUNT_NOT_ACTIVE: 'Kontot är inte aktiverat. Verifiera med engångskod först.',
 };
 

@@ -1,9 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
-import { Article, Report } from '../../core/models';
+import { StorageApi } from '../../core/api/storage-api';
+import { Article, Report, itemKind } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { Settings } from '../../core/settings';
 import { KrPipe } from '../../shared/kr-pipe';
@@ -22,7 +23,8 @@ interface Card {
   delta?: Delta;
   link: string;
   params: Record<string, string | number | boolean>;
-  border: string;
+  /** Ljus bakgrund. */
+  tone: string;
 }
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toLocaleDateString('sv-SE');
@@ -30,30 +32,21 @@ const day = (offset: number) => new Date(Date.now() + offset * 864e5).toLocaleDa
 @Component({
   selector: 'app-dashboard',
   standalone: false,
-  host: { class: 'flex h-full flex-col' },
+  host: { class: 'block' },
   template: `
-    <div class="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2">
-      <h1 class="text-2xl font-semibold">Översikt</h1>
-      <mat-button-toggle-group
-        hideSingleSelectionIndicator
-        [value]="days()"
-        (change)="setDays($event.value)"
-      >
-        <mat-button-toggle [value]="7">7 dagar</mat-button-toggle>
-        <mat-button-toggle [value]="30">30 dagar</mat-button-toggle>
-        <mat-button-toggle [value]="90">90 dagar</mat-button-toggle>
-      </mat-button-toggle-group>
-    </div>
+    <div class="mx-auto max-w-[1600px]">
+      <h1 class="mb-6 text-2xl font-semibold">Översikt</h1>
 
-    <div class="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-      @for (c of cards(); track c.label) {
-        <a [routerLink]="c.link" [queryParams]="c.params" class="block">
-          <mat-card class="h-full border-t-4 p-4 transition hover:shadow-md" [class]="c.border">
-            <div class="flex items-center justify-between text-gray-500">
-              <span class="text-sm">{{ c.label }}</span>
-              <mat-icon>{{ c.icon }}</mat-icon>
+      <ng-template #kpi let-c>
+        <a [routerLink]="c.link" [queryParams]="c.params" class="block h-full">
+          <div class="h-full rounded-xl p-5 transition hover:brightness-[0.97]" [class]="c.tone">
+            <div class="flex items-start justify-between">
+              <span class="text-sm text-gray-600">{{ c.label }}</span>
+              <span class="grid h-9 w-9 place-items-center rounded-full bg-white/70 text-gray-600"
+                ><mat-icon>{{ c.icon }}</mat-icon></span
+              >
             </div>
-            <div class="mt-1 text-2xl font-semibold">{{ c.value }}</div>
+            <div class="mt-1 text-3xl font-semibold tracking-tight">{{ c.value }}</div>
             <div class="mt-1 flex min-h-5 items-center gap-2 text-sm">
               @if (c.delta; as d) {
                 <span class="flex items-center font-medium" [class]="d.cls">
@@ -63,76 +56,157 @@ const day = (offset: number) => new Date(Date.now() + offset * 864e5).toLocaleDa
               }
               <span class="text-gray-500">{{ c.sub }}</span>
             </div>
-          </mat-card>
-        </a>
-      }
-    </div>
-    <div class="mt-1 shrink-0 text-xs text-gray-500">
-      Kort med period visar de senaste {{ days() }} dagarna, jämfört med de {{ days() }} dagarna
-      före.
-    </div>
-
-    <div class="mt-6 grid min-h-0 flex-1 gap-6 xl:grid-cols-3">
-      <section class="flex min-h-72 min-w-0 flex-col xl:col-span-2">
-        <div class="mb-1 flex shrink-0 items-center justify-between">
-          <h2 class="flex items-center gap-2 text-xl font-semibold">
-            <mat-icon class="text-amber-500">warning</mat-icon> Behöver beställas
-          </h2>
-          <a mat-button routerLink="/inventory" [queryParams]="{ lowStock: true }">Visa alla</a>
-        </div>
-        <app-data-table
-          class="min-h-0 flex-1"
-          [columns]="lowCols"
-          [rows]="low()?.items"
-          [clickable]="true"
-          emptyText="Inga artiklar med lågt lager."
-          (rowClick)="router.navigate(['/inventory', $event.id])"
-        >
-          <ng-template #cell let-a="row" let-c="col" let-text="text">
-            @if (c.key === 'status') {
-              <app-stock-badge [level]="a.stockLevel" />
-            } @else {
-              {{ text }}
-            }
-          </ng-template>
-        </app-data-table>
-      </section>
-
-      <aside class="flex min-h-72 min-w-0 flex-col gap-4">
-        <section class="shrink-0">
-          <h2 class="mb-2 text-xl font-semibold">Genvägar</h2>
-          <div class="flex flex-wrap gap-2">
-            <a mat-flat-button color="primary" routerLink="/inventory/new"
-              ><mat-icon>add</mat-icon> Ny artikel</a
-            >
-            <a mat-stroked-button routerLink="/sales"><mat-icon>point_of_sale</mat-icon> Sälj</a>
-            <a mat-stroked-button routerLink="/purchases"
-              ><mat-icon>local_shipping</mat-icon> Inköp</a
-            >
           </div>
-        </section>
-        <section class="flex min-h-0 flex-1 flex-col">
-          <div class="mb-1 flex shrink-0 items-center justify-between">
-            <h2 class="flex items-center gap-2 text-xl font-semibold">
-              <mat-icon>history</mat-icon> Senaste händelser
+        </a>
+      </ng-template>
+
+      <div class="grid gap-x-10 gap-y-10 xl:grid-cols-3">
+        <div class="flex min-w-0 flex-col gap-8 xl:col-span-2">
+          <section>
+            <h2 class="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+              Lagret just nu
+            </h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              @for (c of stockCards(); track c.label) {
+                <ng-container
+                  [ngTemplateOutlet]="kpi"
+                  [ngTemplateOutletContext]="{ $implicit: c }"
+                />
+              }
+            </div>
+          </section>
+
+          <section>
+            <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                Senaste {{ days() }} dagarna
+              </h2>
+              <a routerLink="/settings" class="text-xs text-gray-500 hover:underline"
+                >Jämfört med föregående period · ändra period</a
+              >
+            </div>
+            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              @for (c of periodCards(); track c.label) {
+                <ng-container
+                  [ngTemplateOutlet]="kpi"
+                  [ngTemplateOutletContext]="{ $implicit: c }"
+                />
+              }
+            </div>
+          </section>
+        </div>
+
+        <section class="flex min-w-0 flex-col">
+          <div class="mb-3 flex items-center justify-between">
+            <h2 class="flex items-center gap-2 text-lg font-semibold">
+              <mat-icon class="text-gray-400">history</mat-icon> Senaste händelser
             </h2>
             <a mat-button routerLink="/reports">Visa logg</a>
           </div>
-          <mat-card class="min-h-0 flex-1 overflow-y-auto p-3">
-            <app-movement-list [compact]="true" [pageSize]="15" />
-          </mat-card>
+          <div class="flex-1 rounded-xl bg-white px-4 py-2 shadow-sm">
+            <app-movement-list [compact]="true" [pageSize]="5" />
+          </div>
         </section>
-      </aside>
+
+        <section class="min-w-0 xl:col-span-2">
+          <div class="mb-3 flex items-center justify-between">
+            <h2 class="flex items-center gap-2 text-lg font-semibold">
+              <mat-icon class="text-amber-500">warning</mat-icon> Behöver beställas
+            </h2>
+            <a mat-button routerLink="/inventory" [queryParams]="{ lowStock: true }"
+              >Visa alla{{ lowTotal() > lowRows().length ? ' (' + lowTotal() + ')' : '' }}</a
+            >
+          </div>
+          <app-data-table
+            [columns]="lowCols"
+            [rows]="lowRows()"
+            [clickable]="true"
+            [accent]="stockAccent"
+            emptyText="Inga artiklar med lågt lager."
+            (rowClick)="router.navigate(['/inventory', $event.id])"
+          >
+            <ng-template #cell let-a="row" let-c="col" let-text="text">
+              @if (c.key === 'size') {
+                <span class="inline-flex items-center gap-3">
+                  <app-item-icon [kind]="kind(a)" />{{ text }}
+                </span>
+              } @else {
+                {{ text }}
+              }
+            </ng-template>
+          </app-data-table>
+        </section>
+
+        <section class="min-w-0">
+          <div class="mb-3 flex items-center justify-between">
+            <h2 class="flex items-center gap-2 text-lg font-semibold">
+              <mat-icon class="text-gray-400">warehouse</mat-icon> Däckhotell
+            </h2>
+            <a mat-button routerLink="/storage">Visa alla</a>
+          </div>
+          <div class="flex flex-col rounded-xl bg-white p-2 shadow-sm">
+            @if (hotel(); as h) {
+              <a
+                routerLink="/storage"
+                class="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-gray-50"
+              >
+                <span class="grid h-9 w-9 place-items-center rounded-full bg-sky-50 text-sky-700"
+                  ><mat-icon>warehouse</mat-icon></span
+                >
+                <span class="flex-1 text-gray-600">Inlagrade set</span>
+                <b
+                  >{{ h.stored }}
+                  <span class="font-normal text-gray-500">({{ h.units }} st)</span></b
+                >
+              </a>
+              <a
+                routerLink="/storage"
+                [queryParams]="{ status: 'stored', paymentStatus: 'unpaid' }"
+                class="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-gray-50"
+              >
+                <span
+                  class="grid h-9 w-9 place-items-center rounded-full bg-amber-50 text-amber-700"
+                  ><mat-icon>payments</mat-icon></span
+                >
+                <span class="flex-1 text-gray-600">Obetalda</span>
+                <b
+                  >{{ h.unpaid }}
+                  <span class="font-normal text-gray-500">· {{ h.unpaidAmount | kr }}</span></b
+                >
+              </a>
+              <a
+                routerLink="/storage"
+                [queryParams]="{ status: 'stored', overdue: true }"
+                class="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-gray-50"
+              >
+                <span class="grid h-9 w-9 place-items-center rounded-full bg-red-50 text-red-700"
+                  ><mat-icon>event_busy</mat-icon></span
+                >
+                <span class="flex-1 text-gray-600">Passerat hämtdatum</span>
+                <b>{{ h.overdue }}</b>
+              </a>
+            } @else {
+              <span class="p-3 text-gray-500">Laddar…</span>
+            }
+          </div>
+        </section>
+      </div>
     </div>
   `,
 })
 export class Dashboard {
   private readonly api = inject(InventoryApi);
+  private readonly storage = inject(StorageApi);
   private readonly kr = new KrPipe();
   readonly router = inject(Router);
 
   readonly lowCols: DtCol<Article>[] = [
-    { key: 'size', label: 'Storlek', value: (a) => a.tyre.sizeLabel ?? '' },
+    {
+      key: 'size',
+      label: 'Mått',
+      value: (a) => a.sizeLabel ?? '',
+      fmt: (a) => a.sizeLabel || '–',
+    },
     { key: 'article', label: 'Artikel', value: (a) => `${a.brand} ${a.model}` },
     {
       key: 'location',
@@ -148,23 +222,19 @@ export class Dashboard {
       value: (a) => a.supplier ?? '',
       fmt: (a) => a.supplier || '–',
     },
-    { key: 'status', label: 'Status', value: (a) => a.quantity },
   ];
 
+  /** Perioden väljs under Inställningar. */
   readonly days = signal(inject(Settings).value().dashboardDays);
   readonly summary = toSignal(this.api.summary().pipe(catchError(() => of(null))));
   readonly low = toSignal(
     this.api.articles({ lowStock: true, limit: 50 }).pipe(catchError(() => of(null))),
   );
+  readonly hotel = toSignal(this.storage.summary().pipe(catchError(() => of(null))));
   readonly cur = signal<Report | null>(null);
   readonly prev = signal<Report | null>(null);
 
   constructor() {
-    this.load();
-  }
-
-  setDays(d: number) {
-    this.days.set(d);
     this.load();
   }
 
@@ -173,6 +243,15 @@ export class Dashboard {
     this.api.report(day(-(d - 1)), day(0)).subscribe((r) => this.cur.set(r));
     this.api.report(day(-(2 * d - 1)), day(-d)).subscribe((r) => this.prev.set(r));
   }
+
+  /** Röd = slut, gul = lågt lager (samma som i artikellistan). */
+  readonly stockAccent = (a: Article) =>
+    a.stockLevel === 'out' ? 'border-red-500' : a.stockLevel === 'low' ? 'border-amber-400' : null;
+  readonly kind = (a: Article) => itemKind(a.category);
+  readonly lowTotal = computed(() => this.low()?.pagination.total ?? 0);
+  readonly lowRows = computed(() => (this.low()?.items ?? []).slice(0, 8));
+  readonly stockCards = computed(() => this.cards().slice(0, 3));
+  readonly periodCards = computed(() => this.cards().slice(3));
 
   cards(): Card[] {
     const s = this.summary();
@@ -184,6 +263,7 @@ export class Dashboard {
       c && c.soldRevenue ? `${Math.round((c.grossProfit / c.soldRevenue) * 100)} % marginal` : '';
     const inv = '/inventory';
     const rep = '/reports';
+    // Ljusa toner: färgen antyder kategori utan att ta över sidan.
     return [
       {
         label: 'Artiklar',
@@ -192,25 +272,7 @@ export class Dashboard {
         sub: 'Aktiva artiklar',
         link: inv,
         params: {},
-        border: 'border-brand',
-      },
-      {
-        label: 'Däck i lager',
-        icon: 'layers',
-        value: s?.units ?? '–',
-        sub: 'Totalt antal däck',
-        link: inv,
-        params: { inStock: true },
-        border: 'border-green-500',
-      },
-      {
-        label: 'Lagervärde',
-        icon: 'payments',
-        value: s ? k(s.stockValue) : '–',
-        sub: s ? `Säljvärde ${k(s.retailValue)}` : '',
-        link: inv,
-        params: { inStock: true, sort: 'averageCost', order: 'desc' },
-        border: 'border-blue-500',
+        tone: 'bg-sky-50',
       },
       {
         label: 'Lågt lager',
@@ -219,7 +281,7 @@ export class Dashboard {
         sub: 'Behöver beställas',
         link: inv,
         params: { lowStock: true },
-        border: 'border-amber-400',
+        tone: 'bg-amber-50',
       },
       {
         label: 'Slut',
@@ -228,58 +290,47 @@ export class Dashboard {
         sub: 'Inget kvar i lager',
         link: inv,
         params: { inStock: false },
-        border: 'border-red-500',
+        tone: 'bg-red-50',
       },
-
       {
-        label: `Sålda däck · ${d} d`,
+        label: 'Sålda enheter',
         icon: 'shopping_cart',
         value: c ? `${c.soldUnits} st` : '–',
         sub: '',
         delta: this.delta(c?.soldUnits, p?.soldUnits, false),
         link: rep,
         params: {},
-        border: 'border-green-500',
+        tone: 'bg-green-50',
       },
       {
-        label: `Försäljning · ${d} d`,
+        label: 'Försäljning',
         icon: 'sell',
         value: c ? k(c.soldRevenue) : '–',
         sub: '',
         delta: this.delta(c?.soldRevenue, p?.soldRevenue, false),
         link: rep,
         params: {},
-        border: 'border-blue-500',
+        tone: 'bg-blue-50',
       },
       {
-        label: `Bruttovinst · ${d} d`,
+        label: 'Bruttovinst',
         icon: 'trending_up',
         value: c ? k(c.grossProfit) : '–',
         sub: margin,
         delta: this.delta(c?.grossProfit, p?.grossProfit, false),
         link: rep,
         params: {},
-        border: 'border-green-500',
+        tone: 'bg-emerald-50',
       },
       {
-        label: `Inköp · ${d} d`,
+        label: 'Inköp',
         icon: 'local_shipping',
         value: c ? k(c.purchasedCost) : '–',
         sub: c ? `${c.purchasedUnits} st` : '',
         delta: this.delta(c?.purchasedCost, p?.purchasedCost, false),
         link: rep,
         params: {},
-        border: 'border-brand',
-      },
-      {
-        label: `Kasserat · ${d} d`,
-        icon: 'delete_sweep',
-        value: c ? k(c.writtenOffCost) : '–',
-        sub: c ? `${c.writtenOffUnits} st` : '',
-        delta: this.delta(c?.writtenOffCost, p?.writtenOffCost, true),
-        link: rep,
-        params: {},
-        border: 'border-red-500',
+        tone: 'bg-violet-50',
       },
     ];
   }

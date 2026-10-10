@@ -12,9 +12,9 @@ import { StockActionDialog } from './stock-action-dialog/stock-action-dialog';
     SharedModule,
     RouterModule.forChild([
       { path: '', component: ArticleList },
-      { path: 'new', component: ArticleForm },
-      { path: ':id', component: ArticleDetail },
-      { path: ':id/edit', component: ArticleForm },
+      { path: 'new', title: 'Ny artikel', component: ArticleForm },
+      { path: ':id', title: 'Artikel', component: ArticleDetail },
+      { path: ':id/edit', title: 'Ändra artikel', component: ArticleForm },
     ]),
   ],
 })

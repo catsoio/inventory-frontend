@@ -13,7 +13,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
-import { Article } from '../../core/models';
+import { Article, itemKind } from '../../core/models';
 
 interface Line {
   a: Article;
@@ -47,14 +47,14 @@ const stamp = () => {
             (keydown.enter)="addFirst()"
             [placeholder]="
               sell
-                ? 'Sök däck att sälja: storlek, märke, artikelnummer…'
-                : 'Sök däck att köpa in: storlek, märke, artikelnummer…'
+                ? 'Sök artikel att sälja: storlek, märke, artikelnummer…'
+                : 'Sök artikel att köpa in: storlek, märke, artikelnummer…'
             "
-            class="focus:border-brand focus:ring-brand h-12 w-full rounded-lg border border-gray-300 bg-white pr-3 pl-11 outline-none focus:ring-1"
+            class="focus:ring-brand h-12 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-11 outline-none focus:ring-2"
           />
           @if (results().length) {
             <div
-              class="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-lg border bg-white shadow-lg"
+              class="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-xl bg-white shadow-sm shadow-lg"
             >
               @for (a of results(); track a.id) {
                 <button
@@ -62,8 +62,9 @@ const stamp = () => {
                   class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left last:border-b-0"
                   (click)="add(a)"
                 >
-                  <span>
-                    <span class="font-medium">{{ a.tyre.sizeLabel }}</span> · {{ a.brand }}
+                  <span class="flex items-center gap-3">
+                    <app-item-icon [kind]="kind(a)" />
+                    <span class="font-medium">{{ a.sizeLabel }}</span> · {{ a.brand }}
                     {{ a.model }}
                     <span class="text-sm text-gray-500">· {{ a.location || 'Ingen plats' }}</span>
                   </span>
@@ -77,9 +78,11 @@ const stamp = () => {
           }
         </div>
 
-        <div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-white">
+        <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white shadow-sm">
           <table class="w-full text-left text-sm">
-            <thead class="sticky top-0 z-10 bg-gray-100 text-gray-600">
+            <thead
+              class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
+            >
               <tr>
                 <th class="px-3 py-2">Artikel</th>
                 <th class="px-3 py-2 text-right">I lager</th>
@@ -91,12 +94,17 @@ const stamp = () => {
                 <th class="w-10 px-3 py-2"></th>
               </tr>
             </thead>
-            <tbody class="divide-y">
+            <tbody class="divide-y divide-gray-100">
               @for (l of lines(); track l.a.id; let i = $index) {
                 <tr class="h-14">
                   <td class="px-3">
-                    <div class="font-medium">{{ l.a.tyre.sizeLabel }}</div>
-                    <div class="text-gray-500">{{ l.a.brand }} {{ l.a.model }}</div>
+                    <div class="flex items-center gap-3">
+                      <app-item-icon [kind]="kind(l.a)" />
+                      <div>
+                        <div class="font-medium">{{ l.a.sizeLabel }}</div>
+                        <div class="text-gray-500">{{ l.a.brand }} {{ l.a.model }}</div>
+                      </div>
+                    </div>
                   </td>
                   <td class="px-3 text-right">{{ l.a.quantity }}</td>
                   <td class="px-3 text-right">
@@ -105,7 +113,7 @@ const stamp = () => {
                       min="1"
                       step="1"
                       inputmode="numeric"
-                      class="h-9 w-20 rounded border px-2 text-right"
+                      class="h-9 w-20 rounded-md border-0 bg-gray-50 px-2 text-right ring-1 ring-gray-200 focus:ring-2 focus:ring-brand outline-none"
                       [class.border-red-500]="!qtyOk(l)"
                       [value]="l.qty"
                       (focus)="$any($event.target).select()"
@@ -118,7 +126,7 @@ const stamp = () => {
                       min="0"
                       step="0.01"
                       inputmode="decimal"
-                      class="h-9 w-28 rounded border px-2 text-right"
+                      class="h-9 w-28 rounded-md border-0 bg-gray-50 px-2 text-right ring-1 ring-gray-200 focus:ring-2 focus:ring-brand outline-none"
                       [class.border-red-500]="!(l.price >= 0)"
                       [value]="l.price"
                       (focus)="$any($event.target).select()"
@@ -135,7 +143,7 @@ const stamp = () => {
               } @empty {
                 <tr>
                   <td colspan="6" class="px-3 py-10 text-center text-gray-500">
-                    Sök efter ett däck ovan och välj det för att lägga till en rad.
+                    Sök efter en artikel ovan och välj den för att lägga till en rad.
                   </td>
                 </tr>
               }
@@ -171,7 +179,7 @@ const stamp = () => {
           </mat-form-field>
 
           <div class="flex justify-between border-t pt-3 text-gray-600">
-            <span>Antal däck</span><b>{{ units() }} st</b>
+            <span>Antal</span><b>{{ units() }} st</b>
           </div>
           <div class="flex justify-between py-2 text-xl font-semibold">
             <span>Totalt</span><span>{{ totalOre() | kr }}</span>
@@ -210,6 +218,7 @@ export class Trade {
 
   readonly mode: 'sell' | 'receive' = inject(ActivatedRoute).snapshot.data['mode'];
   readonly sell = this.mode === 'sell';
+  readonly kind = (a: Article) => itemKind(a.category);
 
   readonly search = new FormControl('', { nonNullable: true });
   readonly results = signal<Article[]>([]);
