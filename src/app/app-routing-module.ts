@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { authGuard, garageGuard } from './core/auth/auth-guard';
+import { adminGuard, authGuard, garageGuard } from './core/auth/auth-guard';
 import { Shell } from './core/layout/shell/shell';
 
 const routes: Routes = [
@@ -45,6 +45,13 @@ const routes: Routes = [
         title: 'Logg och rapport',
         loadChildren: () =>
           import('./features/reports/reports-module').then((m) => m.ReportsModule),
+      },
+      {
+        path: 'bookkeeping',
+        title: 'Bokföring',
+        canActivate: [adminGuard],
+        loadChildren: () =>
+          import('./features/bookkeeping/bookkeeping-module').then((m) => m.BookkeepingModule),
       },
       {
         path: 'sales',

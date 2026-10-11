@@ -371,3 +371,159 @@ export interface StorageSummary {
   unpaidAmount: number;
   overdue: number;
 }
+
+// --- Bokföring (periodstängning) ---
+
+export type ClosingKind = 'period' | 'reset';
+export type ClosingStatus = 'closed' | 'voided';
+export type ClosingEntryKind = 'line' | 'movement' | 'deposit';
+
+export interface StockTotals {
+  articles: number;
+  units: number;
+  /** Öre, värderat till snittinköpspris. */
+  value: number;
+}
+
+export interface InventoryFigures {
+  purchasedUnits: number;
+  purchasedCost: number;
+  soldUnits: number;
+  soldRevenue: number;
+  soldCost: number;
+  grossProfit: number;
+  writtenOffUnits: number;
+  writtenOffCost: number;
+  adjustmentUnits: number;
+  adjustmentValue: number;
+}
+
+export interface HotelFigures {
+  received: number;
+  pickedUp: number;
+  feesPaid: number;
+  feesPaidCount: number;
+  feesByMethod: Record<PaymentMethod, number>;
+  storedAtEnd: number;
+  storedUnitsAtEnd: number;
+  unpaidAtEnd: number;
+  unpaidAmountAtEnd: number;
+}
+
+export interface ClosingSummary {
+  inventory: InventoryFigures;
+  stock: { opening: StockTotals; closing: StockTotals; revaluation: number };
+  hotel: HotelFigures;
+}
+
+export interface ClosingCounts {
+  lines: number;
+  movements: number;
+  deposits: number;
+}
+
+export interface Closing {
+  id: string;
+  number: number;
+  kind: ClosingKind;
+  status: ClosingStatus;
+  from: string;
+  /** Exklusiv slutpunkt. */
+  to: string;
+  closedAt: string;
+  closedBy: string;
+  closedByName: string | null;
+  closedBySuperAdmin: boolean;
+  note: string | null;
+  summary: ClosingSummary;
+  counts: ClosingCounts;
+  reset: {
+    articles: number;
+    movements: number;
+    deposits: number;
+    keptDeposits: number;
+    keepStoredDeposits: boolean;
+  } | null;
+  voided: { at: string; by: string; reason: string | null } | null;
+}
+
+export type ClosingWarningCode =
+  | 'LONG_PERIOD'
+  | 'PERIOD_ENDS_NOW'
+  | 'END_CAPPED_TO_NOW'
+  | 'STOCK_NOT_IN_LEDGER'
+  | 'NEGATIVE_STOCK'
+  | 'UNPAID_FEES'
+  | 'STORED_SETS'
+  | 'EMPTY_PERIOD';
+
+export interface ClosingWarning {
+  code: ClosingWarningCode;
+  severity: 'info' | 'warning';
+  params?: Record<string, number>;
+}
+
+export type ClosingBlocked = 'INVALID_PERIOD' | 'STARTS_AFTER_FIRST_EVENT' | 'NOTHING_TO_CLOSE';
+
+export interface ClosingPreview {
+  from: string;
+  to: string;
+  previous: { id: string; number: number; to: string } | null;
+  firstEventAt: string | null;
+  summary: ClosingSummary | null;
+  counts: ClosingCounts | null;
+  warnings: ClosingWarning[];
+  blocked: ClosingBlocked | null;
+}
+
+export interface ClosingStatusInfo {
+  lockedUntil: string | null;
+  latest: Closing | null;
+  suggestedFrom: string;
+  firstEventAt: string | null;
+  hasData: boolean;
+  fromIsFixed: boolean;
+}
+
+export interface ResetPreview {
+  garage: { id: string; name: string };
+  closing: ClosingPreview;
+  data: {
+    articles: number;
+    movements: number;
+    deposits: number;
+    storedDeposits: number;
+    storedUnits: number;
+    unpaidDeposits: number;
+    unpaidAmount: number;
+  };
+}
+
+export interface ClosingEntry<T = Record<string, any>> {
+  id: string;
+  kind: ClosingEntryKind;
+  seq: number;
+  sub: string | null;
+  data: T;
+}
+
+export interface ClosingLine {
+  articleId: string;
+  label: string;
+  sku: string | null;
+  category: Category | null;
+  location: string | null;
+  openingQty: number;
+  receivedQty: number;
+  returnedQty: number;
+  soldQty: number;
+  writtenOffQty: number;
+  adjustedQty: number;
+  unledgeredQty: number;
+  closingQty: number;
+  avgCost: number;
+  closingValue: number;
+  sellPrice: number | null;
+}
+
+export const closingCode = (n: number): string => `BS-${String(n).padStart(4, '0')}`;

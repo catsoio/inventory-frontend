@@ -1,0 +1,28 @@
+import { NgModule } from '@angular/core';
+import { RouterModule } from '@angular/router';
+import { SharedModule } from '../../shared/shared-module';
+import { BookDialog } from './book-dialog/book-dialog';
+import { Bookkeeping } from './bookkeeping';
+import { ClosingDetail } from './closing-detail/closing-detail';
+import { ClosingEntries } from './closing-entries/closing-entries';
+import { ClosingSummaryView } from './closing-summary/closing-summary';
+import { ResetDialog } from './reset-dialog/reset-dialog';
+
+@NgModule({
+  declarations: [
+    Bookkeeping,
+    ClosingDetail,
+    ClosingEntries,
+    ClosingSummaryView,
+    BookDialog,
+    ResetDialog,
+  ],
+  imports: [
+    SharedModule,
+    RouterModule.forChild([
+      { path: '', component: Bookkeeping },
+      { path: ':id', title: 'Bokföring', component: ClosingDetail },
+    ]),
+  ],
+})
+export class BookkeepingModule {}

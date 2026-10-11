@@ -20,6 +20,13 @@ const MESSAGES: Record<string, string> = {
   INVALID_MEMBER_ACTION: 'Det går inte att göra så med den användaren.',
   INVALID_DEPOSIT: 'Ogiltig inlämning. Kontrollera uppgifterna.',
   INVALID_DEPOSIT_STATE: 'Åtgärden passar inte inlämningens status.',
+  INVALID_PERIOD: 'Perioden är ogiltig. Slutdatum måste ligga efter startdatum.',
+  NOTHING_TO_CLOSE:
+    'Det finns inget att bokföra: inget lager, inga händelser och inga betalningar.',
+  PERIOD_ALREADY_CLOSED: 'Perioden bokfördes just av någon annan. Ladda om sidan.',
+  PERIOD_LOCKED: 'Betalningen tillhör en bokförd period och kan inte längre ändras.',
+  CLOSING_NOT_VOIDABLE: 'Bokföringen kan inte annulleras.',
+  RESET_NOT_CONFIRMED: 'Garagets namn stämmer inte. Skriv det exakt för att bekräfta.',
   ACCOUNT_NOT_ACTIVE: 'Kontot är inte aktiverat. Verifiera med engångskod först.',
 };
 

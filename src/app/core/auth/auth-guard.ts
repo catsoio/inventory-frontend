@@ -17,3 +17,9 @@ export const garageGuard: CanActivateFn = () => {
     catchError(() => of(router.createUrlTree(['/onboarding']))),
   );
 };
+
+/** Bokföring: garagets ägare och superadmin. */
+export const adminGuard: CanActivateFn = () => {
+  const auth = inject(Auth);
+  return auth.isAdmin() || auth.isSuperAdmin() || inject(Router).createUrlTree(['/dashboard']);
+};

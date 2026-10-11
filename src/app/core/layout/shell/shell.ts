@@ -125,7 +125,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
           </button>
         </div>
 
-        @for (g of groups; track g.title) {
+        @for (g of groups(); track g.title) {
           @if (collapsed()) {
             <div class="mx-3 my-2 h-px bg-gray-100 first:hidden"></div>
           } @else {
@@ -290,7 +290,7 @@ export class Shell {
     localStorage.setItem('garagestock.sidebar', this.collapsed() ? 'collapsed' : 'open');
   }
 
-  readonly groups = [
+  private readonly allGroups = [
     {
       title: 'Start',
       links: [{ path: '/dashboard', label: 'Översikt', icon: 'dashboard', exact: true }],
@@ -318,13 +318,30 @@ export class Shell {
     },
     {
       title: 'Uppföljning',
-      links: [{ path: '/reports', label: 'Logg och rapport', icon: 'bar_chart', exact: true }],
+      links: [
+        { path: '/reports', label: 'Logg och rapport', icon: 'bar_chart', exact: true },
+        {
+          path: '/bookkeeping',
+          label: 'Bokföring',
+          icon: 'menu_book',
+          exact: false,
+          adminOnly: true,
+        },
+      ],
     },
     {
       title: 'System',
       links: [{ path: '/settings', label: 'Inställningar', icon: 'settings', exact: true }],
     },
   ];
+  /** Bokföring syns bara för garagets ägare och superadmin. */
+  readonly groups = computed(() => {
+    const admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
+    return this.allGroups.map((g) => ({
+      ...g,
+      links: g.links.filter((l) => !('adminOnly' in l && l.adminOnly) || admin),
+    }));
+  });
   readonly mobileLinks = [
     { path: '/dashboard', label: 'Översikt', icon: 'dashboard' },
     { path: '/inventory', label: 'Lager', icon: 'inventory_2' },
