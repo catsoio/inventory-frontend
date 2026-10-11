@@ -18,8 +18,11 @@ import { Auth } from '../../../core/auth/auth';
 import {
   Article,
   ArticleQuery,
+  CATEGORY_LABELS,
+  Category,
   FacetItem,
   Facets,
+  itemKind,
   SEASON_LABELS,
   Season,
 } from '../../../core/models';
@@ -50,23 +53,36 @@ const SERVER_SORT = [
   'averageCost',
   'lastPurchasedAt',
 ];
-const DEFAULT_HIDDEN = ['reorderLevel', 'averageCost', 'stockValue', 'supplier', 'lastPurchasedAt'];
+const DEFAULT_HIDDEN = [
+  'category',
+  'reorderLevel',
+  'averageCost',
+  'stockValue',
+  'supplier',
+  'lastPurchasedAt',
+];
 
 const COLS: Col[] = [
   { key: 'sku', label: 'Nr', val: (a) => a.sku ?? '', fmt: (a) => a.sku ?? '–' },
   {
+    key: 'category',
+    label: 'Typ',
+    val: (a) => CATEGORY_LABELS[a.category],
+    fmt: (a) => CATEGORY_LABELS[a.category],
+  },
+  {
     key: 'size',
-    label: 'Storlek',
-    val: (a) => a.tyre.sizeLabel ?? '',
-    fmt: (a) => a.tyre.sizeLabel ?? '',
+    label: 'Mått',
+    val: (a) => a.sizeLabel ?? '',
+    fmt: (a) => a.sizeLabel ?? '–',
   },
   { key: 'brand', label: 'Märke', val: (a) => a.brand, fmt: (a) => a.brand },
   { key: 'model', label: 'Modell', val: (a) => a.model, fmt: (a) => a.model },
   {
     key: 'season',
     label: 'Säsong',
-    val: (a) => a.tyre.season,
-    fmt: (a) => SEASON_LABELS[a.tyre.season] + (a.tyre.studded ? ' (dubb)' : ''),
+    val: (a) => a.tyre?.season ?? '',
+    fmt: (a) => (a.tyre ? SEASON_LABELS[a.tyre.season] + (a.tyre.studded ? ' (dubb)' : '') : '–'),
   },
   {
     key: 'location',
@@ -106,8 +122,11 @@ const COLS: Col[] = [
     key: 'marginPercent',
     label: 'Marginal',
     right: true,
-    val: (a) => a.marginPercent,
-    fmt: (a) => `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
+    val: (a) => a.marginPercent ?? 0,
+    fmt: (a) =>
+      a.marginPercent == null
+        ? '–'
+        : `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
   },
   {
     key: 'stockValue',
@@ -144,8 +163,8 @@ const COLS: Col[] = [
           type="search"
           [formControl]="search"
           (keydown.enter)="openIfSingle()"
-          placeholder="Sök storlek, märke, säsong…"
-          class="focus:border-brand focus:ring-brand h-10 w-full rounded-lg border border-gray-300 bg-white pr-3 pl-10 outline-none focus:ring-1"
+          placeholder="Sök storlek, märke, säsong, 5x112…"
+          class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-10 outline-none focus:ring-2"
         />
       </div>
       <span class="flex-1"></span>
@@ -198,7 +217,7 @@ const COLS: Col[] = [
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
       <aside
-        class="max-h-[50vh] w-full shrink-0 overflow-y-auto rounded-lg border bg-white p-3 lg:max-h-none lg:w-60"
+        class="max-h-[50vh] w-full shrink-0 overflow-y-auto rounded-xl bg-white shadow-sm p-3 lg:max-h-none lg:w-60"
         [class]="showFilters() ? 'block' : 'hidden lg:block'"
       >
         <div class="mb-2 flex items-center justify-between">
@@ -219,32 +238,51 @@ const COLS: Col[] = [
           </button>
         }
 
-        <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Säsong</div>
-        @for (s of seasons; track s[0]) {
+        <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Typ</div>
+        @for (c of categories; track c[0]) {
           <button
             class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
-            [class]="sel()['season'] === s[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
-            (click)="toggle('season', s[0])"
+            [class]="sel()['category'] === c[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
+            (click)="toggle('category', c[0])"
           >
-            {{ s[1] }}
+            {{ c[1] }}
           </button>
+        }
+
+        @if (showTyreFilters()) {
+          <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Säsong</div>
+          @for (s of seasons; track s[0]) {
+            <button
+              class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
+              [class]="sel()['season'] === s[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
+              (click)="toggle('season', s[0])"
+            >
+              {{ s[1] }}
+            </button>
+          }
         }
 
         @if (facets(); as f) {
           @for (g of groups(f); track g.key) {
-            <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">{{ g.title }}</div>
-            <div class="max-h-44 overflow-y-auto">
-              @for (i of g.items; track i.value) {
-                <button
-                  class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
-                  [class]="sel()[g.key] === i.value ? 'bg-brand-soft font-semibold text-brand' : ''"
-                  (click)="toggle(g.key, i.value)"
-                >
-                  <span>{{ i.value }}</span
-                  ><span class="text-gray-500">{{ i.units }}</span>
-                </button>
-              }
-            </div>
+            @if (showTyreFilters() || g.key === 'rimDiameter' || g.key === 'brand') {
+              <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">
+                {{ g.title }}
+              </div>
+              <div class="max-h-44 overflow-y-auto">
+                @for (i of g.items; track i.value) {
+                  <button
+                    class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
+                    [class]="
+                      sel()[g.key] === i.value ? 'bg-brand-soft font-semibold text-brand' : ''
+                    "
+                    (click)="toggle(g.key, i.value)"
+                  >
+                    <span>{{ i.value }}</span
+                    ><span class="text-gray-500">{{ i.units }}</span>
+                  </button>
+                }
+              </div>
+            }
           }
         }
 
@@ -274,14 +312,16 @@ const COLS: Col[] = [
           }
         </div>
 
-        <div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-white">
+        <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white shadow-sm">
           @if (view() === 'table') {
             <table class="w-full border-collapse bg-white text-left text-sm">
-              <thead class="sticky top-0 z-10 bg-gray-100 text-gray-600">
+              <thead
+                class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
+              >
                 <tr>
                   @for (c of visibleCols(); track c.key) {
                     <th
-                      class="cursor-pointer px-3 py-2 whitespace-nowrap select-none hover:bg-gray-200"
+                      class="cursor-pointer px-3 py-2 whitespace-nowrap select-none hover:text-gray-900"
                       [class]="(c.right ? 'text-right ' : '') + (c.hide ?? '')"
                       (click)="sortBy(c.key)"
                     >
@@ -307,7 +347,7 @@ const COLS: Col[] = [
                   </tr>
                 }
               </thead>
-              <tbody class="divide-y">
+              <tbody class="divide-y divide-gray-100">
                 @for (a of rows(); track a.id) {
                   <tr
                     class="h-11 cursor-pointer hover:bg-brand-soft"
@@ -327,6 +367,9 @@ const COLS: Col[] = [
                         [class.border-amber-400]="first && a.stockLevel === 'low'"
                         [class.border-green-500]="first && a.stockLevel === 'in_stock'"
                       >
+                        @if (first) {
+                          <app-item-icon class="mr-3" [kind]="kind(a)" />
+                        }
                         {{ c.fmt(a) }}
                       </td>
                     }
@@ -351,7 +394,9 @@ const COLS: Col[] = [
                   [style.opacity]="a.active ? 1 : 0.6"
                 >
                   <div class="flex items-start justify-between gap-2">
-                    <div class="text-xl font-semibold">{{ a.tyre.sizeLabel }}</div>
+                    <div class="flex items-center gap-3 text-xl font-semibold">
+                      <app-item-icon [kind]="kind(a)" />{{ a.sizeLabel || a.brand }}
+                    </div>
                     <app-stock-badge [level]="a.stockLevel" />
                   </div>
                   <div class="text-gray-700">{{ a.brand }} {{ a.model }}</div>
@@ -390,6 +435,7 @@ export class ArticleList implements OnInit {
   private readonly router = inject(Router);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
   private readonly load$ = new Subject<number>();
+  private readonly facetLoad$ = new Subject<void>();
   private readonly settings = inject(Settings).value();
   private readonly PAGE = this.settings.pageSize;
 
@@ -397,6 +443,8 @@ export class ArticleList implements OnInit {
   readonly cols = COLS;
   readonly search = new FormControl('', { nonNullable: true });
   readonly seasons = Object.entries(SEASON_LABELS);
+  readonly kind = (a: Article) => itemKind(a.category);
+  readonly categories = Object.entries(CATEGORY_LABELS) as [Category, string][];
   readonly statuses: [Status, string][] = [
     ['', 'Alla'],
     ['in', 'I lager'],
@@ -430,6 +478,11 @@ export class ArticleList implements OnInit {
         : s['inStock'] === false
           ? 'out'
           : '';
+  });
+  /** Säsong, bredd och profil gäller bara däck. */
+  readonly showTyreFilters = computed(() => {
+    const c = this.sel()['category'];
+    return !c || c === 'tyre';
   });
   readonly activeFilters = computed(() => Object.values(this.sel()).some((v) => v !== undefined));
 
@@ -478,7 +531,17 @@ export class ArticleList implements OnInit {
   }
 
   ngOnInit() {
-    this.api.facets().subscribe((f) => this.facets.set(f));
+    // Chipsens antal följer aktuella filter, så de hämtas om vid varje filterändring.
+    this.facetLoad$
+      .pipe(
+        debounceTime(0),
+        switchMap(() => {
+          const { limit, offset, sort, order, ...filters } = this.query(0);
+          return this.api.facets(filters);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((f) => this.facets.set(f));
 
     this.search.valueChanges
       .pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
@@ -486,7 +549,10 @@ export class ArticleList implements OnInit {
 
     this.load$
       .pipe(
-        tap(() => this.loading.set(true)),
+        tap((offset) => {
+          this.loading.set(true);
+          if (offset === 0) this.facetLoad$.next();
+        }),
         switchMap((offset) => this.api.articles(this.query(offset))),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -513,26 +579,11 @@ export class ArticleList implements OnInit {
       }));
       this.load$.next(0);
     });
-
-    this.load$
-      .pipe(
-        tap(() => this.loading.set(true)),
-        switchMap((offset) => this.api.articles(this.query(offset))),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (p) => {
-          this.items.update((cur) => (p.pagination.offset === 0 ? p.items : [...cur, ...p.items]));
-          this.total.set(p.pagination.total);
-          this.loading.set(false);
-        },
-        error: () => this.loading.set(false),
-      });
   }
 
   groups(f: Facets): { key: string; title: string; items: FacetItem[] }[] {
     return [
-      { key: 'rimDiameter', title: 'Fälg', items: f.rimDiameters },
+      { key: 'rimDiameter', title: 'Tum', items: f.rimDiameters },
       { key: 'width', title: 'Bredd', items: f.widths },
       { key: 'profile', title: 'Profil', items: f.profiles },
       { key: 'brand', title: 'Märke', items: f.brands },
@@ -608,6 +659,7 @@ export class ArticleList implements OnInit {
     const s = this.sel();
     return {
       q: this.search.value.trim() || undefined,
+      category: s['category'] as Category | undefined,
       season: s['season'] as Season | undefined,
       brand: s['brand'] as string | undefined,
       rimDiameter: s['rimDiameter'] as number | undefined,

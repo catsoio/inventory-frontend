@@ -23,16 +23,25 @@ const when = (m: Movement) =>
   host: { class: 'flex min-h-0 flex-col' },
   template: `
     @if (compact) {
-      <div class="divide-y">
+      <div class="flex flex-col">
         @for (m of items(); track m.id) {
-          <div class="py-2 text-sm">
-            <div class="font-medium">{{ labels[m.type] }} · {{ m.quantity }} st</div>
-            <div class="truncate text-gray-500">
-              {{ m.createdAt | date: 'd MMM HH:mm' }}
-              @if (m.articleLabel ?? m.label) {
-                · {{ m.articleLabel ?? m.label }}
-              }
+          <div class="flex items-center gap-3 py-2.5 text-sm">
+            <span
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+              [class]="typeCls[m.type]"
+              ><mat-icon class="!h-5 !w-5 !text-xl">{{ icons[m.type] }}</mat-icon></span
+            >
+            <div class="min-w-0 flex-1">
+              <div class="font-medium">{{ labels[m.type] }} · {{ m.quantity }} st</div>
+              <div class="truncate text-gray-500">
+                @if (m.articleLabel ?? m.label) {
+                  {{ m.articleLabel ?? m.label }}
+                }
+              </div>
             </div>
+            <span class="shrink-0 text-xs text-gray-400">{{
+              m.createdAt | date: 'd MMM HH:mm'
+            }}</span>
           </div>
         } @empty {
           <div class="py-2 text-sm text-gray-500">
@@ -83,6 +92,13 @@ export class MovementList implements OnChanges {
 
   readonly labels = MOVEMENT_LABELS;
   readonly typeCls = TYPE_CLS;
+  readonly icons: Record<MovementType, string> = {
+    purchase: 'move_to_inbox',
+    sale: 'sell',
+    customer_return: 'undo',
+    write_off: 'delete_sweep',
+    adjustment: 'fact_check',
+  };
   readonly items = signal<Movement[]>([]);
   readonly hasNext = signal(false);
   readonly loading = signal(false);

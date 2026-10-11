@@ -10,6 +10,7 @@ import {
   Facets,
   Garage,
   GarageInvite,
+  GarageListItem,
   GarageMember,
   Movement,
   MovementQuery,
@@ -38,8 +39,9 @@ export class InventoryApi {
     return this.http.get<Summary>(`${this.base}/summary`);
   }
 
-  facets(): Observable<Facets> {
-    return this.http.get<Facets>(`${this.base}/facets`);
+  /** Filterchips med antal; ta med aktuella filter så att antalen stämmer med listan. */
+  facets(query: ArticleQuery = {}): Observable<Facets> {
+    return this.http.get<Facets>(`${this.base}/facets`, { params: toParams(query) });
   }
 
   articles(query: ArticleQuery = {}): Observable<Page<Article>> {
@@ -84,6 +86,11 @@ export class InventoryApi {
     return this.http.get<Garage>(`${this.base}/garage`);
   }
 
+  /** Alla garage (bara superadmin). */
+  allGarages(): Observable<GarageListItem[]> {
+    return this.http.get<GarageListItem[]>(`${this.base}/garage/all`);
+  }
+
   createGarage(name: string): Observable<Garage> {
     return this.http.post<Garage>(`${this.base}/garage`, { name });
   }
@@ -98,6 +105,19 @@ export class InventoryApi {
 
   members(): Observable<GarageMember[]> {
     return this.http.get<GarageMember[]>(`${this.base}/garage/members`);
+  }
+
+  /** Superadmin: nytt lösenord åt en användare (loggar ut den överallt). */
+  resetMemberPassword(userId: string, password: string): Observable<unknown> {
+    return this.http.post(`${this.base}/garage/members/${userId}/password`, { password });
+  }
+
+  /** Superadmin: spärra/aktivera en användare. Returnerar uppdaterad lista. */
+  setMemberBlocked(userId: string, blocked: boolean): Observable<GarageMember[]> {
+    return this.http.post<GarageMember[]>(
+      `${this.base}/garage/members/${userId}/${blocked ? 'block' : 'unblock'}`,
+      {},
+    );
   }
 
   removeMember(userId: string): Observable<unknown> {

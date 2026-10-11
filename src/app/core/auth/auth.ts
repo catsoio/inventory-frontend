@@ -1,11 +1,12 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
 import { API_URL, InventoryApi } from '../api/inventory-api';
-import { AuthTokens, AuthUser, Garage, Role } from '../models';
+import { AuthTokens, AuthUser, Garage, GarageListItem, Role } from '../models';
 
 const KEY = 'garagestock.auth';
+const ACTING_KEY = 'garagestock.actingGarage';
 
 // Backend svarar { tokens: { accessToken, refreshToken }, user }.
 type AuthResponse = Partial<AuthTokens> & { tokens?: AuthTokens; user?: AuthUser };
@@ -27,7 +28,11 @@ function jwtPayload(token: string): Record<string, any> {
 @Injectable({ providedIn: 'root' })
 export class Auth {
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+  // Hämtas först vid behov: Router -> TitleStrategy -> PageTitle -> Auth får inte bli en cirkel.
+  private readonly injector = inject(Injector);
+  private get router(): Router {
+    return this.injector.get(Router);
+  }
   private readonly api = inject(InventoryApi);
   private readonly url = `${API_URL}/auth`;
   private refreshing$?: Observable<AuthTokens>;
@@ -45,6 +50,16 @@ export class Auth {
   });
   /** The garage (tenant) the user works in; null until loaded or if none. */
   readonly garage = signal<Garage | null>(null);
+  /** Användarens eget garage (skiljer sig från `garage` när superadmin tittar i ett annat). */
+  readonly ownGarage = signal<Garage | null>(null);
+  /** Alla garage, för superadmin. */
+  readonly garages = signal<GarageListItem[]>([]);
+  readonly isSuperAdmin = computed(() => !!this.ownGarage()?.superAdmin);
+  /** Garage-id som skickas som X-Garage-Id; null när man jobbar i sitt eget. */
+  readonly actingGarageId = signal<string | null>(localStorage.getItem(ACTING_KEY));
+  readonly viewingOther = computed(
+    () => this.isSuperAdmin() && !!this.garage() && this.garage()!.id !== this.ownGarage()?.id,
+  );
   /** Garage owner: may archive articles and edit shared settings. */
   readonly isAdmin = computed(() => this.garage()?.role === 'owner');
 
@@ -68,11 +83,66 @@ export class Auth {
     return this.authenticate('email/otp/verify', { email, code });
   }
 
+  /** Byter eget lösenord. Övriga sessioner loggas ut; den här får nya tokens. */
+  changePassword(currentPassword: string, newPassword: string) {
+    // /auth/-anrop får ingen token automatiskt, så den skickas explicit.
+    return this.http
+      .post<{ tokens: AuthTokens }>(
+        `${this.url}/password/change`,
+        { currentPassword, newPassword },
+        { headers: { Authorization: `Bearer ${this.accessToken}` } },
+      )
+      .pipe(
+        tap((r) =>
+          this.store({
+            accessToken: r.tokens.accessToken,
+            refreshToken: r.tokens.refreshToken,
+            user: this.state()?.user,
+          }),
+        ),
+      );
+  }
+
   loadGarage(): Observable<Garage> {
-    return this.api.garage().pipe(tap((g) => this.garage.set(g)));
+    return this.api.garage().pipe(
+      tap((own) => {
+        this.ownGarage.set(own);
+        this.garage.set(own);
+        if (own.superAdmin) this.loadGarages();
+      }),
+    );
+  }
+
+  /** Hämtar alla garage och tillämpar ett sparat val; okänt val rensas. */
+  private loadGarages(): void {
+    this.api.allGarages().subscribe({
+      next: (list) => {
+        this.garages.set(list);
+        const id = this.actingGarageId();
+        const target = id ? list.find((g) => g.id === id) : undefined;
+        if (target && target.id !== this.ownGarage()?.id) {
+          this.garage.set({ id: target.id, name: target.name, role: 'owner', superAdmin: true });
+        } else if (id) {
+          this.setActing(null);
+        }
+      },
+    });
+  }
+
+  private setActing(id: string | null): void {
+    if (id) localStorage.setItem(ACTING_KEY, id);
+    else localStorage.removeItem(ACTING_KEY);
+    this.actingGarageId.set(id);
+  }
+
+  /** Byter garage (superadmin) och laddar om appen så att all data hämtas på nytt. */
+  switchGarage(id: string): void {
+    this.setActing(id === this.ownGarage()?.id ? null : id);
+    this.router.navigateByUrl('/dashboard').then(() => location.reload());
   }
 
   setGarage(g: Garage): void {
+    this.ownGarage.set(g);
     this.garage.set(g);
   }
 
@@ -97,8 +167,11 @@ export class Auth {
 
   clear(): void {
     localStorage.removeItem(KEY);
+    this.setActing(null);
     this.state.set(null);
     this.garage.set(null);
+    this.ownGarage.set(null);
+    this.garages.set([]);
     this.router.navigate(['/login']);
   }
 

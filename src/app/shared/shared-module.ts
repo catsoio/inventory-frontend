@@ -16,11 +16,15 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule } from '@angular/router';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
 import { DataTable } from './data-table/data-table';
+import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
 import { MovementList } from './movement-list/movement-list';
+import { Pill } from './pill/pill';
+import { RegPlate, SvFlag } from './reg-plate/reg-plate';
 import { StockBadge } from './stock-badge/stock-badge';
 
 const MATERIAL = [
@@ -39,10 +43,21 @@ const MATERIAL = [
   MatSnackBarModule,
   MatTabsModule,
   MatToolbarModule,
+  MatTooltipModule,
 ];
 
 @NgModule({
-  declarations: [ConfirmDialog, DataTable, KrPipe, StockBadge, MovementList],
+  declarations: [
+    ConfirmDialog,
+    DataTable,
+    KrPipe,
+    StockBadge,
+    MovementList,
+    Pill,
+    ItemIcon,
+    RegPlate,
+    SvFlag,
+  ],
   imports: [CommonModule, ...MATERIAL],
   exports: [
     CommonModule,
@@ -53,6 +68,10 @@ const MATERIAL = [
     KrPipe,
     StockBadge,
     MovementList,
+    Pill,
+    ItemIcon,
+    RegPlate,
+    SvFlag,
   ],
 })
 export class SharedModule {}

@@ -9,6 +9,8 @@ export interface AppSettings {
   defaultSupplier: string;
   defaultReorderLevel: number;
   markupPercent: number;
+  /** Standardavgift för däckhotell per inlämning, kr. */
+  defaultStorageFee: number;
 }
 
 export const SETTINGS_DEFAULTS: AppSettings = {
@@ -19,6 +21,7 @@ export const SETTINGS_DEFAULTS: AppSettings = {
   defaultSupplier: '',
   defaultReorderLevel: 4,
   markupPercent: 35,
+  defaultStorageFee: 0,
 };
 
 const KEY = 'garagestock.settings';

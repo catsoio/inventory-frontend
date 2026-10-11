@@ -33,13 +33,15 @@ export interface DtCol<T = any> {
         <mat-icon>filter_alt</mat-icon>
       </button>
     </div>
-    <div class="min-h-0 overflow-auto rounded-lg border bg-white" [class]="scrollClass">
+    <div class="min-h-0 overflow-auto rounded-xl bg-white shadow-sm" [class]="scrollClass">
       <table class="w-full border-collapse text-left text-sm">
-        <thead class="sticky top-0 z-10 bg-gray-100 text-gray-600">
+        <thead
+          class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
+        >
           <tr>
             @for (c of colsSig(); track c.key) {
               <th
-                class="cursor-pointer px-3 py-2 whitespace-nowrap select-none hover:bg-gray-200"
+                class="cursor-pointer px-3 py-2 whitespace-nowrap select-none hover:text-gray-900"
                 [class.text-right]="c.right"
                 (click)="sortBy(c.key)"
               >
@@ -63,15 +65,20 @@ export interface DtCol<T = any> {
             </tr>
           }
         </thead>
-        <tbody class="divide-y">
+        <tbody class="divide-y divide-gray-100">
           @for (r of view(); track $index) {
             <tr
               class="h-11"
               [class]="clickable ? 'cursor-pointer hover:bg-brand-soft' : 'hover:bg-gray-50'"
               (click)="clickable && rowClick.emit(r)"
             >
-              @for (c of colsSig(); track c.key) {
-                <td class="px-3 whitespace-nowrap" [class.text-right]="c.right">
+              @for (c of colsSig(); track c.key; let first = $first) {
+                <td
+                  class="px-3 whitespace-nowrap"
+                  [class.text-right]="c.right"
+                  [class.border-l-4]="first && !!accent"
+                  [class]="first && accent ? (accent(r) ?? '') : ''"
+                >
                   @if (cell) {
                     <ng-container
                       [ngTemplateOutlet]="cell"
@@ -106,6 +113,8 @@ export class DataTable {
     this.rowsSig.set(v ?? []);
   }
   @Input() emptyText = 'Inga rader.';
+  /** Färgad kant på radens första cell, t.ex. 'border-red-500' (som i artikellistan). */
+  @Input() accent?: (row: any) => string | null;
   @Input() clickable = false;
   // Standard: fyller tillgänglig höjd. Skicka t.ex. 'max-h-96' för en fast maxhöjd.
   @Input() scrollClass = 'flex-1';

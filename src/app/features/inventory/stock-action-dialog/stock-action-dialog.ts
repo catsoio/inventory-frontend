@@ -193,7 +193,7 @@ export class StockActionDialog {
     this.dialog
       .open(ConfirmDialog, {
         data: {
-          title: 'Kassera däck?',
+          title: 'Kassera artikel?',
           message: `${q} st ${this.data.article.label} tas bort ur lagret som kasserade. Detta går inte att ångra.`,
           confirmText: 'Kassera',
           danger: true,

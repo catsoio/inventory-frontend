@@ -4,7 +4,15 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryApi } from '../../../core/api/inventory-api';
 import { Auth } from '../../../core/auth/auth';
-import { Article, SEASON_LABELS, StockAction } from '../../../core/models';
+import { PageTitle } from '../../../core/page-title';
+import {
+  Article,
+  CATEGORY_LABELS,
+  RIM_MATERIAL_LABELS,
+  SEASON_LABELS,
+  StockAction,
+  itemKind,
+} from '../../../core/models';
 import { KrPipe } from '../../../shared/kr-pipe';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { StockActionDialog } from '../stock-action-dialog/stock-action-dialog';
@@ -18,10 +26,16 @@ type Field = [label: string, value: string | number];
     @if (a(); as a) {
       <div class="mb-1 text-sm text-gray-500">
         <a routerLink="/inventory" class="text-brand underline">Artiklar</a> /
-        {{ a.sku || a.tyre.sizeLabel }}
+        {{ a.sku || a.sizeLabel || a.label }}
       </div>
       <div class="mb-3 flex flex-wrap items-center gap-3">
-        <h1 class="text-2xl font-semibold">{{ a.tyre.sizeLabel }} · {{ a.brand }} {{ a.model }}</h1>
+        <app-item-icon [kind]="kind(a)" />
+        <h1 class="text-2xl font-semibold">
+          @if (a.sizeLabel) {
+            {{ a.sizeLabel }} ·
+          }
+          {{ a.brand }} {{ a.model }}
+        </h1>
         <app-stock-badge [level]="a.stockLevel" />
         @if (!a.active) {
           <span class="rounded-full bg-gray-200 px-3 py-1 text-sm">Arkiverad</span>
@@ -29,7 +43,7 @@ type Field = [label: string, value: string | number];
       </div>
 
       <div
-        class="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-white p-2"
+        class="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-white shadow-sm p-2"
       >
         @if (a.active) {
           <button mat-flat-button (click)="act('receive')">
@@ -61,15 +75,15 @@ type Field = [label: string, value: string | number];
       <div class="flex gap-6">
         <div class="flex min-w-0 flex-1 flex-col gap-4">
           @for (s of sections(a); track s.title) {
-            <details open class="rounded-lg border bg-white">
-              <summary class="cursor-pointer border-b px-4 py-3 font-semibold select-none">
+            <details open class="rounded-xl bg-white shadow-sm">
+              <summary class="cursor-pointer px-5 py-4 font-semibold select-none">
                 {{ s.title }}
               </summary>
-              <dl class="grid grid-cols-1 gap-x-8 gap-y-3 p-4 sm:grid-cols-2 2xl:grid-cols-3">
+              <dl
+                class="grid grid-cols-1 gap-x-10 gap-y-1 px-5 pb-5 sm:grid-cols-2 2xl:grid-cols-3"
+              >
                 @for (f of s.fields; track f[0]) {
-                  <div
-                    class="flex items-baseline justify-between gap-4 border-b border-dotted pb-1"
-                  >
+                  <div class="flex items-baseline justify-between gap-4 py-1.5">
                     <dt class="text-sm text-gray-500">{{ f[0] }}</dt>
                     <dd class="text-right font-medium">{{ f[1] }}</dd>
                   </div>
@@ -77,8 +91,8 @@ type Field = [label: string, value: string | number];
               </dl>
             </details>
           }
-          <details open class="rounded-lg border bg-white">
-            <summary class="cursor-pointer border-b px-4 py-3 font-semibold select-none">
+          <details open class="rounded-xl bg-white shadow-sm">
+            <summary class="cursor-pointer px-5 py-4 font-semibold select-none">
               Lagerhändelser
             </summary>
             <div class="p-4">
@@ -116,7 +130,9 @@ type Field = [label: string, value: string | number];
             </div>
             <div class="flex justify-between py-1">
               <span class="text-gray-500">Marginal</span
-              ><b>{{ a.marginPercent | number: '1.0-1' }} %</b>
+              ><b>{{
+                a.marginPercent == null ? '–' : (a.marginPercent | number: '1.0-1') + ' %'
+              }}</b>
             </div>
           </mat-card>
           <mat-card class="p-4">
@@ -142,12 +158,17 @@ export class ArticleDetail {
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
   private readonly kr = new KrPipe();
+  private readonly pageTitle = inject(PageTitle);
 
   readonly admin = inject(Auth).isAdmin();
   readonly a = signal<Article | null>(null);
+  readonly kind = (a: Article) => itemKind(a.category);
 
   constructor() {
-    this.api.article(this.id).subscribe((x) => this.a.set(x));
+    this.api.article(this.id).subscribe((x) => {
+      this.a.set(x);
+      this.pageTitle.page.set(x.label);
+    });
   }
 
   fill(a: Article) {
@@ -156,20 +177,40 @@ export class ArticleDetail {
   }
 
   sections(a: Article): { title: string; fields: Field[] }[] {
-    const t = a.tyre;
     const kr = (o: number) => this.kr.transform(o);
+    const spec: Field[] = [];
+    const t = a.tyre;
+    const r = a.rim;
+    if (t) {
+      spec.push(
+        ['Storlek', t.sizeLabel ?? ''],
+        ['Säsong', SEASON_LABELS[t.season] + (t.studded ? ' (dubb)' : '')],
+        ['Last/hastighet', `${t.loadIndex ?? '–'}${t.speedIndex ?? ''}`],
+        ['Runflat', t.runFlat ? 'Ja' : 'Nej'],
+        ['DOT', t.dot || '–'],
+      );
+    }
+    if (r) {
+      spec.push(
+        ['Mått', r.sizeLabel ?? ''],
+        ['Diameter', `${r.diameter}"`],
+        ['Bredd', `${r.width}J`],
+        ['Bultmönster', `${r.boltCount}x${r.boltCircle}`],
+        ['Offset', `ET${r.offset}`],
+        ['Centrumhål', r.centerBore != null ? `${r.centerBore} mm` : '–'],
+        ['Material', RIM_MATERIAL_LABELS[r.material]],
+        ['Färg', r.color || '–'],
+      );
+    }
     return [
       {
         title: 'Artikel',
         fields: [
+          ['Typ', CATEGORY_LABELS[a.category]],
           ['Artikelnummer', a.sku || '–'],
           ['Märke', a.brand],
           ['Modell', a.model],
-          ['Storlek', t.sizeLabel ?? ''],
-          ['Säsong', SEASON_LABELS[t.season] + (t.studded ? ' (dubb)' : '')],
-          ['Last/hastighet', `${t.loadIndex ?? '–'}${t.speedIndex ?? ''}`],
-          ['Runflat', t.runFlat ? 'Ja' : 'Nej'],
-          ['DOT', t.dot || '–'],
+          ...spec,
         ],
       },
       {
@@ -187,12 +228,14 @@ export class ArticleDetail {
       {
         title: 'Kostnader och prissättning',
         fields: [
-          ['Snittkostnad', kr(a.averageCost)],
+          ['Inköpspris (snitt)', kr(a.averageCost)],
           ['Försäljningspris', kr(a.sellPrice)],
           ['Marginal', kr(a.margin)],
           [
             'Marginal %',
-            `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
+            a.marginPercent == null
+              ? '–'
+              : `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
           ],
           ['Lagervärde', kr(a.stockValue)],
         ],
