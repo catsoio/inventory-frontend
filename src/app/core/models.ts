@@ -95,6 +95,10 @@ export interface RimSpec {
 
 export interface Article {
   id: string;
+  /** Löpnummer per verkstad; null tills befintliga artiklar numrerats. */
+  number: number | null;
+  /** Utskriftsform av numret, t.ex. "ART-00042". */
+  code: string | null;
   category: Category;
   label: string;
   brand: string;
@@ -510,6 +514,8 @@ export interface ClosingEntry<T = Record<string, any>> {
 export interface ClosingLine {
   articleId: string;
   label: string;
+  /** Saknas på rader från äldre bokföringar. */
+  code?: string | null;
   sku: string | null;
   category: Category | null;
   location: string | null;

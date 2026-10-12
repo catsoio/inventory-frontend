@@ -6,7 +6,7 @@ import { ApiError } from '../models';
 
 const MESSAGES: Record<string, string> = {
   INSUFFICIENT_STOCK: 'Det finns inte tillräckligt i lager.',
-  DUPLICATE_SKU: 'Artikelnumret finns redan.',
+  DUPLICATE_SKU: 'Koden finns redan på en annan artikel.',
   ARTICLE_HAS_STOCK: 'Artikeln kan inte arkiveras eftersom det finns lager kvar.',
   CONCURRENT_MODIFICATION: 'Någon annan har ändrat artikeln. Ladda om sidan och försök igen.',
   INVALID_QUANTITY: 'Ogiltigt antal. Ange ett heltal på minst 1.',

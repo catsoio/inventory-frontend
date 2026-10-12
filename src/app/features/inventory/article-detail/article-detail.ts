@@ -26,7 +26,7 @@ type Field = [label: string, value: string | number];
     @if (a(); as a) {
       <div class="mb-1 text-sm text-gray-500">
         <a routerLink="/inventory" class="text-brand underline">Artiklar</a> /
-        {{ a.sku || a.sizeLabel || a.label }}
+        {{ a.code || a.sku || a.sizeLabel || a.label }}
       </div>
       <div class="mb-3 flex flex-wrap items-center gap-3">
         <app-item-icon [kind]="kind(a)" />
@@ -207,7 +207,8 @@ export class ArticleDetail {
         title: 'Artikel',
         fields: [
           ['Typ', CATEGORY_LABELS[a.category]],
-          ['Artikelnummer', a.sku || '–'],
+          ['Artikelnummer', a.code || '–'],
+          ['Egen kod', a.sku || '–'],
           ['Märke', a.brand],
           ['Modell', a.model],
           ...spec,

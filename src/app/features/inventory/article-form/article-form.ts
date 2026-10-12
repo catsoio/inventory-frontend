@@ -54,7 +54,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         <mat-error>Obligatoriskt</mat-error></mat-form-field
       >
       <mat-form-field
-        ><mat-label>Artikelnummer</mat-label
+        ><mat-label>Egen kod (valfri)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">qr_code</mat-icon
         ><input matInput formControlName="sku"
       /></mat-form-field>
