@@ -5,6 +5,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -19,6 +21,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule } from '@angular/router';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
+import { DateField } from './date-field/date-field';
 import { DataTable } from './data-table/data-table';
 import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
@@ -32,7 +35,9 @@ const MATERIAL = [
   MatButtonToggleModule,
   MatCardModule,
   MatChipsModule,
+  MatDatepickerModule,
   MatDialogModule,
+  MatNativeDateModule,
   MatFormFieldModule,
   MatIconModule,
   MatInputModule,
@@ -50,6 +55,7 @@ const MATERIAL = [
   declarations: [
     ConfirmDialog,
     DataTable,
+    DateField,
     KrPipe,
     StockBadge,
     MovementList,
@@ -58,13 +64,14 @@ const MATERIAL = [
     RegPlate,
     SvFlag,
   ],
-  imports: [CommonModule, ...MATERIAL],
+  imports: [CommonModule, ReactiveFormsModule, ...MATERIAL],
   exports: [
     CommonModule,
     ReactiveFormsModule,
     RouterModule,
     ...MATERIAL,
     DataTable,
+    DateField,
     KrPipe,
     StockBadge,
     MovementList,

@@ -45,11 +45,11 @@ export interface StorageActionData {
             <mat-error>Välj betalsätt</mat-error>
           </mat-form-field>
         }
-        <mat-form-field>
-          <mat-label>{{ data.action === 'pay' ? 'Betaldatum' : 'Utlämningsdatum' }}</mat-label>
-          <input matInput type="date" formControlName="date" />
-          <mat-error>Ange datum</mat-error>
-        </mat-form-field>
+        <app-date-field
+          [label]="data.action === 'pay' ? 'Betaldatum' : 'Utlämningsdatum'"
+          error="Ange datum"
+          formControlName="date"
+        />
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Avbryt</button>

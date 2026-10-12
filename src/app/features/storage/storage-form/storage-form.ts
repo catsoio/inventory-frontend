@@ -188,20 +188,18 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
             ><input matInput formControlName="location" placeholder="t.ex. H-12-3"
           /></mat-form-field>
           <div class="hidden lg:block"></div>
-          <mat-form-field
-            ><mat-label>Inlämnad</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">event</mat-icon>
-            <input matInput type="date" formControlName="depositedAt" />
-            <mat-error>Ange datum</mat-error></mat-form-field
-          >
-          <mat-form-field
-            ><mat-label>Beräknad hämtning</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">event_available</mat-icon>
-            <input matInput type="date" formControlName="expectedPickupAt" />
-            @if (form.errors?.['pickup']) {
-              <mat-error>Före inlämningsdatumet</mat-error>
-            }
-          </mat-form-field>
+          <app-date-field
+            label="Inlämnad"
+            icon="event"
+            error="Ange datum"
+            formControlName="depositedAt"
+          />
+          <app-date-field
+            label="Beräknad hämtning"
+            icon="event_available"
+            [error]="form.errors?.['pickup'] ? 'Före inlämningsdatumet' : ''"
+            formControlName="expectedPickupAt"
+          />
           <div class="hidden lg:block"></div>
 
           <div class="sm:col-span-2 lg:col-span-3">
@@ -251,11 +249,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
             <mat-error>Välj betalsätt för betald avgift</mat-error></mat-form-field
           >
           @if (paid()) {
-            <mat-form-field
-              ><mat-label>Betaldatum</mat-label
-              ><mat-icon matPrefix class="mr-2 text-gray-400">event</mat-icon>
-              <input matInput type="date" formControlName="paidAt" />
-            </mat-form-field>
+            <app-date-field label="Betaldatum" icon="event" formControlName="paidAt" />
           }
           <mat-form-field class="sm:col-span-2 lg:col-span-3"
             ><mat-label>Anteckningar</mat-label
