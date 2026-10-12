@@ -53,7 +53,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
           <div class="grid gap-x-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
             <mat-form-field>
               <mat-label>Registreringsnummer</mat-label>
-              <input matInput formControlName="regNo" class="uppercase" autocomplete="off" />
+              <input matInput formControlName="regNo" appRegNo class="uppercase" />
               <mat-error>Obligatoriskt</mat-error>
             </mat-form-field>
             <mat-form-field

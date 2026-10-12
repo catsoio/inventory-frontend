@@ -2,17 +2,20 @@ import { Component, Inject, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { forkJoin } from 'rxjs';
-import { BookingApi } from '../../../core/api/booking-api';
-import { WorkshopApi } from '../../../core/api/workshop-api';
+import { Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
+import { BookingApi } from '../../core/api/booking-api';
+import { WorkOrderApi } from '../../core/api/work-order-api';
+import { WorkshopApi } from '../../core/api/workshop-api';
 import {
   BOOKING_STATUS_LABELS,
   Booking,
   BookingStatus,
   Resource,
   ServiceType,
-} from '../../../core/models';
-import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
-import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
+} from '../../core/models';
+import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
+import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-picker';
 
 export interface BookingDialogData {
   /** Befintlig bokning, eller null för en ny. */
@@ -34,7 +37,12 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
   selector: 'app-booking-dialog',
   standalone: false,
   template: `
-    <h2 mat-dialog-title>{{ data.booking ? 'Ändra bokning' : 'Ny bokning' }}</h2>
+    <h2 mat-dialog-title>
+      {{ data.booking ? 'Ändra bokning' : 'Ny bokning' }}
+      @if (data.booking) {
+        <span class="ml-2 text-sm font-normal text-gray-500">{{ data.booking.code }}</span>
+      }
+    </h2>
     <form [formGroup]="form" (ngSubmit)="save()">
       <mat-dialog-content class="grid gap-x-3 sm:grid-cols-6 !pt-2">
         <app-customer-vehicle-picker
@@ -119,6 +127,11 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
         @if (data.booking) {
           <button mat-button type="button" class="!text-red-700" (click)="remove()">Ta bort</button>
         }
+        @if (data.booking && workOrdersOn && !legacy) {
+          <button mat-button type="button" [disabled]="busy()" (click)="openWorkOrder()">
+            <mat-icon>assignment</mat-icon> Arbetsorder
+          </button>
+        }
         <span class="flex-1"></span>
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
         <button mat-flat-button color="primary" [disabled]="form.invalid || busy()">Spara</button>
@@ -130,6 +143,9 @@ export class BookingDialog {
   private readonly api = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
+  private readonly workOrders = inject(WorkOrderApi);
+  private readonly router = inject(Router);
+  readonly workOrdersOn = environment.workOrders;
   private readonly ref = inject<MatDialogRef<BookingDialog, BookingDialogResult>>(MatDialogRef);
 
   readonly busy = signal(false);
@@ -227,6 +243,18 @@ export class BookingDialog {
       : this.api.create(body);
     req.subscribe({
       next: (b) => this.ref.close(b),
+      error: () => this.busy.set(false),
+    });
+  }
+
+  /** Öppnar bokningens arbetsorder, och skapar den första gången. */
+  openWorkOrder() {
+    this.busy.set(true);
+    this.workOrders.fromBooking(this.data.booking!.id).subscribe({
+      next: (o) => {
+        this.ref.close();
+        this.router.navigate(['/workorders', o.id]);
+      },
       error: () => this.busy.set(false),
     });
   }

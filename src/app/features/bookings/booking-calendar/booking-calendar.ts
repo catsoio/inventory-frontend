@@ -15,7 +15,7 @@ import {
   BookingDialog,
   BookingDialogData,
   BookingDialogResult,
-} from '../booking-dialog/booking-dialog';
+} from '../../../shared/booking-dialog/booking-dialog';
 
 const COLORS: Record<BookingStatus, string> = {
   booked: '#1976d2',

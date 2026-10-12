@@ -81,7 +81,7 @@ const picked = (c: AbstractControl) =>
           matInput
           [formControl]="vehicle"
           [matAutocomplete]="vehicleAuto"
-          autocomplete="off"
+          appRegNo
           class="uppercase"
           [placeholder]="customerRef() ? 'Kundens bilar' : 'Sök regnr'"
         />

@@ -24,7 +24,7 @@ const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
         path: 'dashboard',
-        title: 'Översikt',
+        title: 'Hem',
         loadChildren: () =>
           import('./features/dashboard/dashboard-module').then((m) => m.DashboardModule),
       },
@@ -53,10 +53,28 @@ const routes: Routes = [
           import('./features/customers/customers-module').then((m) => m.CustomersModule),
       },
       {
-        path: 'workshop',
-        title: 'Mekaniker och åtgärder',
+        path: 'vehicles',
+        title: 'Bilar',
         loadChildren: () =>
-          import('./features/workshop/workshop-module').then((m) => m.WorkshopModule),
+          import('./features/vehicles/vehicles-module').then((m) => m.VehiclesModule),
+      },
+      {
+        path: 'resources',
+        title: 'Mekaniker och platser',
+        loadChildren: () =>
+          import('./features/resources/resources-module').then((m) => m.ResourcesModule),
+      },
+      {
+        path: 'service-types',
+        title: 'Åtgärder',
+        loadChildren: () =>
+          import('./features/service-types/service-types-module').then((m) => m.ServiceTypesModule),
+      },
+      {
+        path: 'workorders',
+        title: 'Arbetsorder',
+        loadChildren: () =>
+          import('./features/work-orders/work-orders-module').then((m) => m.WorkOrdersModule),
       },
       {
         path: 'reports',

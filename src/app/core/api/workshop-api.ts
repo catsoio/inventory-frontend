@@ -10,6 +10,7 @@ import {
   Resource,
   ServiceType,
   Vehicle,
+  VehicleDetail,
   VehicleInput,
 } from '../models';
 
@@ -70,8 +71,8 @@ export class WorkshopApi {
     return this.http.get<Page<Vehicle>>(`${this.base}/vehicles`, { params: toParams(query) });
   }
 
-  vehicle(id: string): Observable<Vehicle> {
-    return this.http.get<Vehicle>(`${this.base}/vehicles/${id}`);
+  vehicle(id: string): Observable<VehicleDetail> {
+    return this.http.get<VehicleDetail>(`${this.base}/vehicles/${id}`);
   }
 
   createVehicle(body: VehicleInput): Observable<Vehicle> {

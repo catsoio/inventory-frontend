@@ -23,6 +23,11 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule } from '@angular/router';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
 import { CustomerVehiclePicker } from './customer-vehicle-picker/customer-vehicle-picker';
+import { BookingDialog } from './booking-dialog/booking-dialog';
+import { CardPage } from './card-page/card-page';
+import { CustomerSelect } from './customer-select/customer-select';
+import { ListPage } from './list-page/list-page';
+import { RegNoInput } from './reg-no-input/reg-no-input';
 import { CustomerDialog } from './customer-dialog/customer-dialog';
 import { VehicleDialog } from './vehicle-dialog/vehicle-dialog';
 import { DateField } from './date-field/date-field';
@@ -63,6 +68,11 @@ const MATERIAL = [
     DateField,
     CustomerDialog,
     CustomerVehiclePicker,
+    RegNoInput,
+    ListPage,
+    CardPage,
+    BookingDialog,
+    CustomerSelect,
     VehicleDialog,
     KrPipe,
     StockBadge,
@@ -72,7 +82,7 @@ const MATERIAL = [
     RegPlate,
     SvFlag,
   ],
-  imports: [CommonModule, ReactiveFormsModule, ...MATERIAL],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, ...MATERIAL],
   exports: [
     CommonModule,
     ReactiveFormsModule,
@@ -82,6 +92,11 @@ const MATERIAL = [
     DateField,
     CustomerDialog,
     CustomerVehiclePicker,
+    RegNoInput,
+    ListPage,
+    CardPage,
+    BookingDialog,
+    CustomerSelect,
     VehicleDialog,
     KrPipe,
     StockBadge,

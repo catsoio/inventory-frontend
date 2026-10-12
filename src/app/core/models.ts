@@ -554,6 +554,9 @@ export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
 
 export interface Booking {
   id: string;
+  /** TID-00042 */
+  code: string;
+  number: number;
   /** Null på bokningar som gjordes innan kund- och bilregistret fanns. */
   customerId: string | null;
   vehicleId: string | null;
@@ -619,6 +622,9 @@ export type CustomerInput = Partial<
 
 export interface Vehicle {
   id: string;
+  /** BIL-0001 */
+  code: string;
+  number: number;
   customerId: string;
   regNo: string;
   make: string | null;
@@ -635,9 +641,16 @@ export type VehicleInput = Partial<
   Pick<Vehicle, 'customerId' | 'regNo' | 'make' | 'model' | 'year' | 'vin' | 'notes' | 'active'>
 >;
 
+/** Bilens kort: bilen med dess senaste bokningar. */
+export interface VehicleDetail extends Vehicle {
+  bookings: Booking[];
+  workOrders: WorkOrder[];
+}
+
 export interface CustomerDetail extends Customer {
   vehicles: Vehicle[];
   bookings: Booking[];
+  workOrders: WorkOrder[];
 }
 
 export type ResourceKind = 'mechanic' | 'lift' | 'bay';
@@ -650,6 +663,9 @@ export const RESOURCE_KIND_LABELS: Record<ResourceKind, string> = {
 
 export interface Resource {
   id: string;
+  /** RES-001 */
+  code: string;
+  number: number;
   name: string;
   kind: ResourceKind;
   color: string;
@@ -658,10 +674,106 @@ export interface Resource {
 
 export interface ServiceType {
   id: string;
+  /** ATG-001 */
+  code: string;
+  number: number;
   name: string;
   durationMinutes: number;
   /** Öre. */
   priceFrom: number | null;
   priceTo: number | null;
   active: boolean;
+}
+
+// --- Arbetsorder ---
+
+export type WorkOrderStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
+
+export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  open: 'Öppen',
+  in_progress: 'Pågår',
+  done: 'Klar',
+  cancelled: 'Avbruten',
+};
+
+export type WorkOrderLineType = 'labour' | 'part' | 'other';
+
+export const WORK_ORDER_LINE_LABELS: Record<WorkOrderLineType, string> = {
+  labour: 'Arbete',
+  part: 'Del',
+  other: 'Annat',
+};
+
+/** En rad på arbetsordern: ett jobb, en del eller något annat. */
+export interface WorkOrderLine {
+  id: string;
+  position: number;
+  type: WorkOrderLineType;
+  description: string;
+  articleId: string | null;
+  /** Timmar för arbete, antal för delar. */
+  quantity: number;
+  /** Öre per enhet. */
+  unitPrice: number;
+  /** Öre. */
+  total: number;
+  /** Avbockad av mekanikern. */
+  done: boolean;
+}
+
+export interface WorkOrder {
+  id: string;
+  /** AO-00042 */
+  code: string;
+  number: number;
+  customerId: string;
+  vehicleId: string;
+  bookingId: string | null;
+  resourceId: string | null;
+  customerName: string;
+  phone: string | null;
+  regNo: string;
+  vehicle: string | null;
+  resourceName: string | null;
+  status: WorkOrderStatus;
+  /** Inlämningsdatum, ISO-tid. */
+  receivedAt: string;
+  /** Hämtningsdatum, ISO-tid. */
+  pickupAt: string | null;
+  /** Överenskommet prisspann, öre. */
+  priceFrom: number | null;
+  priceTo: number | null;
+  /** Vårt prisförslag, öre. */
+  quote: number | null;
+  remarks: string | null;
+  notes: string | null;
+}
+
+export interface WorkOrderDetail extends WorkOrder {
+  lines: WorkOrderLine[];
+  /** Radernas summa, öre. */
+  total: number;
+}
+
+export interface WorkOrderLineInput {
+  type: WorkOrderLineType;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  done: boolean;
+}
+
+export interface WorkOrderInput {
+  customerId: string;
+  vehicleId: string;
+  resourceId: string | null;
+  status: WorkOrderStatus;
+  receivedAt: string;
+  pickupAt: string | null;
+  priceFrom: number | null;
+  priceTo: number | null;
+  quote: number | null;
+  remarks: string | null;
+  notes: string | null;
+  lines: WorkOrderLineInput[];
 }
