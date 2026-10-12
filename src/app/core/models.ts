@@ -316,6 +316,9 @@ export interface StorageDeposit {
   status: StorageStatus;
   contents: StorageContents;
   quantity: number;
+  /** Kundregistret; null på inlämningar från före registren. */
+  customerId: string | null;
+  vehicleId: string | null;
   customer: { name: string; phone: string | null; email: string | null };
   vehicle: { regNo: string; make: string | null; model: string | null };
   tyres: StoredTyres | null;
@@ -339,6 +342,9 @@ export interface StorageDeposit {
 export interface StorageDepositInput {
   contents: StorageContents;
   quantity?: number;
+  /** Anges båda hämtas kund och bil ur registret. */
+  customerId?: string;
+  vehicleId?: string;
   customer: { name: string; phone?: string; email?: string };
   vehicle: { regNo: string; make?: string; model?: string };
   tyres?: Omit<StoredTyres, 'sizeLabel'> | null;
@@ -533,3 +539,129 @@ export interface ClosingLine {
 }
 
 export const closingCode = (n: number): string => `BS-${String(n).padStart(4, '0')}`;
+
+// --- Tidsbokning ---
+
+export type BookingStatus = 'booked' | 'arrived' | 'done' | 'cancelled' | 'no_show';
+
+export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  booked: 'Bokad',
+  arrived: 'Anlänt',
+  done: 'Klar',
+  cancelled: 'Avbokad',
+  no_show: 'Uteblev',
+};
+
+export interface Booking {
+  id: string;
+  /** Null på bokningar som gjordes innan kund- och bilregistret fanns. */
+  customerId: string | null;
+  vehicleId: string | null;
+  resourceId: string | null;
+  serviceTypeId: string | null;
+  title: string;
+  /** Namn och regnr är kopior från när bokningen gjordes. */
+  customerName: string;
+  phone: string | null;
+  regNo: string | null;
+  vehicle: string | null;
+  resourceName: string | null;
+  /** ISO-tid. */
+  start: string;
+  end: string;
+  status: BookingStatus;
+  /** Öre. */
+  priceFrom: number | null;
+  priceTo: number | null;
+  notes: string | null;
+}
+
+export interface BookingInput {
+  customerId: string;
+  vehicleId: string;
+  resourceId: string | null;
+  serviceTypeId: string | null;
+  title: string;
+  start: string;
+  end: string;
+  status: BookingStatus;
+  priceFrom: number | null;
+  priceTo: number | null;
+  notes: string | null;
+}
+
+// --- Kunder, bilar och verkstadens resurser ---
+
+export type CustomerType = 'private' | 'company';
+
+export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
+  private: 'Privat',
+  company: 'Företag',
+};
+
+export interface Customer {
+  id: string;
+  /** KU-0001 */
+  code: string;
+  number: number;
+  type: CustomerType;
+  name: string;
+  orgNo: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
+export type CustomerInput = Partial<
+  Pick<Customer, 'type' | 'name' | 'orgNo' | 'phone' | 'email' | 'notes' | 'active'>
+>;
+
+export interface Vehicle {
+  id: string;
+  customerId: string;
+  regNo: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  vin: string | null;
+  /** Bestående anmärkningar som följer bilen. */
+  notes: string | null;
+  active: boolean;
+  customer: { id: string; code: string; name: string; phone: string | null } | null;
+}
+
+export type VehicleInput = Partial<
+  Pick<Vehicle, 'customerId' | 'regNo' | 'make' | 'model' | 'year' | 'vin' | 'notes' | 'active'>
+>;
+
+export interface CustomerDetail extends Customer {
+  vehicles: Vehicle[];
+  bookings: Booking[];
+}
+
+export type ResourceKind = 'mechanic' | 'lift' | 'bay';
+
+export const RESOURCE_KIND_LABELS: Record<ResourceKind, string> = {
+  mechanic: 'Mekaniker',
+  lift: 'Lyft',
+  bay: 'Plats',
+};
+
+export interface Resource {
+  id: string;
+  name: string;
+  kind: ResourceKind;
+  color: string;
+  active: boolean;
+}
+
+export interface ServiceType {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  /** Öre. */
+  priceFrom: number | null;
+  priceTo: number | null;
+  active: boolean;
+}

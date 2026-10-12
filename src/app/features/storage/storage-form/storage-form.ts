@@ -16,6 +16,7 @@ import {
   StorageDepositInput,
 } from '../../../core/models';
 import { Settings } from '../../../core/settings';
+import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../storage-format';
 
 const int = Validators.pattern(/^\d+$/);
@@ -36,51 +37,45 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
     <form [formGroup]="form" (ngSubmit)="save()" class="flex max-w-6xl flex-col gap-4">
       <section class="rounded-xl bg-white shadow-sm">
         <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Fordon och kund</h2>
-        <div class="grid gap-x-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <mat-form-field>
-            <mat-label>Registreringsnummer</mat-label><app-sv-flag matPrefix class="mr-2" />
-            <input
-              matInput
-              formControlName="regNo"
-              class="uppercase"
-              autocomplete="off"
-              (blur)="lookup()"
-            />
-            @if (sameCar() > 0) {
-              <mat-hint class="!text-amber-700"
-                >Bilen har redan {{ sameCar() }} inlagrat set</mat-hint
-              >
-            }
-            <mat-error>Obligatoriskt</mat-error>
-          </mat-form-field>
-          <mat-form-field
-            ><mat-label>Bilmärke</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">directions_car</mat-icon
-            ><input matInput formControlName="make"
-          /></mat-form-field>
-          <mat-form-field
-            ><mat-label>Bilmodell</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">commute</mat-icon
-            ><input matInput formControlName="vehicleModel"
-          /></mat-form-field>
-          <mat-form-field>
-            <mat-label>Kundens namn</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">person</mat-icon>
-            <input matInput formControlName="name" />
-            <mat-error>Obligatoriskt</mat-error>
-          </mat-form-field>
-          <mat-form-field
-            ><mat-label>Telefon</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">call</mat-icon
-            ><input matInput type="tel" formControlName="phone"
-          /></mat-form-field>
-          <mat-form-field
-            ><mat-label>E-post</mat-label
-            ><mat-icon matPrefix class="mr-2 text-gray-400">mail</mat-icon
-            ><input matInput type="email" formControlName="email" />
-            <mat-error>Ogiltig e-postadress</mat-error></mat-form-field
-          >
+        <div class="p-4 pb-0">
+          <app-customer-vehicle-picker formControlName="link" [legacy]="legacy()" />
+          @if (sameCar() > 0) {
+            <p class="-mt-2 mb-4 text-sm text-amber-700">
+              Bilen har redan {{ sameCar() }} inlagrat set
+            </p>
+          }
         </div>
+        @if (legacy() && !form.controls.link.value) {
+          <p class="px-5 text-sm text-gray-600">
+            Den här inlämningen gjordes innan kund- och bilregistret fanns. Välj kund och bil ovan
+            för att koppla den, eller ändra uppgifterna nedan som förut.
+          </p>
+          <div class="grid gap-x-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <mat-form-field>
+              <mat-label>Registreringsnummer</mat-label>
+              <input matInput formControlName="regNo" class="uppercase" autocomplete="off" />
+              <mat-error>Obligatoriskt</mat-error>
+            </mat-form-field>
+            <mat-form-field
+              ><mat-label>Bilmärke</mat-label><input matInput formControlName="make"
+            /></mat-form-field>
+            <mat-form-field
+              ><mat-label>Bilmodell</mat-label><input matInput formControlName="vehicleModel"
+            /></mat-form-field>
+            <mat-form-field>
+              <mat-label>Kundens namn</mat-label>
+              <input matInput formControlName="name" />
+              <mat-error>Obligatoriskt</mat-error>
+            </mat-form-field>
+            <mat-form-field
+              ><mat-label>Telefon</mat-label><input matInput type="tel" formControlName="phone"
+            /></mat-form-field>
+            <mat-form-field
+              ><mat-label>E-post</mat-label><input matInput type="email" formControlName="email" />
+              <mat-error>Ogiltig e-postadress</mat-error></mat-form-field
+            >
+          </div>
+        }
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
@@ -284,13 +279,16 @@ export class StorageForm {
   readonly contents = signal<StorageContents>('tyres');
   readonly paid = signal(false);
   readonly sameCar = signal(0);
+  /** Inlämning från före kundregistret: gamla fritextfält visas tills den kopplas. */
+  readonly legacy = signal<{ customer: string; regNo: string } | null>(null);
 
   readonly form = this.fb.group(
     {
-      regNo: ['', [Validators.required, Validators.minLength(2)]],
+      link: [null as PickerValue | null],
+      regNo: [''],
       make: [''],
       vehicleModel: [''],
-      name: ['', Validators.required],
+      name: [''],
       phone: [''],
       email: ['', Validators.email],
       contents: ['tyres' as StorageContents],
@@ -330,9 +328,17 @@ export class StorageForm {
     },
     {
       validators: (g) => {
+        const errors: ValidationErrors = {};
         const from = g.get('depositedAt')?.value;
         const to = g.get('expectedPickupAt')?.value;
-        return from && to && to < from ? { pickup: true } : null;
+        if (from && to && to < from) errors['pickup'] = true;
+        // Kund och bil ska vara valda ur registret; en gammal inlämning får behålla fritexten.
+        if (!g.get('link')?.value) {
+          const old = this.legacy();
+          const hasText = !!g.get('regNo')?.value?.trim() && !!g.get('name')?.value?.trim();
+          if (!old || !hasText) errors['link'] = true;
+        }
+        return Object.keys(errors).length ? errors : null;
       },
     },
   );
@@ -349,9 +355,30 @@ export class StorageForm {
     });
     this.applyContents('tyres');
 
+    // Valda kund och bil fyller i ögonblicksbilden som sparas på inlämningen.
+    c.link.valueChanges.pipe(takeUntilDestroyed()).subscribe((l) => {
+      if (!l?.vehicle || !l.customer) return;
+      this.form.patchValue({
+        regNo: l.vehicle.regNo,
+        make: l.vehicle.make ?? '',
+        vehicleModel: l.vehicle.model ?? '',
+        name: l.customer.name,
+        phone: l.customer.phone ?? '',
+        email: '',
+      });
+      this.countStored(l.vehicle.regNo);
+    });
+
     if (this.id) {
       this.api.deposit(this.id).subscribe((d) => {
+        if (!d.customerId || !d.vehicleId) {
+          this.legacy.set({ customer: d.customer.name, regNo: d.vehicle.regNo });
+        }
         this.form.patchValue({
+          link:
+            d.customerId && d.vehicleId
+              ? { customerId: d.customerId, vehicleId: d.vehicleId }
+              : null,
           regNo: d.vehicle.regNo,
           make: d.vehicle.make ?? '',
           vehicleModel: d.vehicle.model ?? '',
@@ -374,6 +401,7 @@ export class StorageForm {
           paidAt: dateInput(d.paidAt),
         } as never);
         this.applyContents(d.contents);
+        this.form.updateValueAndValidity();
       });
     } else {
       const fee = inject(Settings).value().defaultStorageFee;
@@ -390,29 +418,13 @@ export class StorageForm {
     else rims.enable();
   }
 
-  /** Förifyller kund och bil om registreringsnumret har lämnat in förut. */
-  lookup() {
-    if (this.id) return;
-    const reg = normalizeReg(this.form.controls.regNo.value ?? '');
-    if (reg.length < 3) return;
-    this.api
-      .deposits({ q: reg, limit: 20, sort: 'number', order: 'desc' })
-      .subscribe(({ items }) => {
-        const same = items.filter((d) => d.vehicle.regNo === reg);
-        this.sameCar.set(same.filter((d) => d.status === 'stored').length);
-        const last = same[0];
-        if (!last || this.form.controls.name.value) return;
-        this.form.patchValue({
-          name: last.customer.name,
-          phone: last.customer.phone ?? '',
-          email: last.customer.email ?? '',
-          make: last.vehicle.make ?? '',
-          vehicleModel: last.vehicle.model ?? '',
-        });
-        this.snack.open(`Hittade tidigare kund: ${last.customer.name}`, undefined, {
-          duration: 3000,
-        });
-      });
+  /** Varnar om bilen redan har inlagrade set. */
+  private countStored(regNo: string) {
+    const reg = normalizeReg(regNo);
+    this.api.deposits({ q: reg, limit: 20 }).subscribe(({ items }) => {
+      const same = items.filter((d) => d.vehicle.regNo === reg && d.id !== this.id);
+      this.sameCar.set(same.filter((d) => d.status === 'stored').length);
+    });
   }
 
   save() {
@@ -422,6 +434,8 @@ export class StorageForm {
     const t = v.tyres;
     const r = v.rims;
     const body: StorageDepositInput = {
+      customerId: v.link?.customerId,
+      vehicleId: v.link?.vehicleId,
       contents: v.contents!,
       quantity: v.quantity!,
       customer: { name: v.name!, phone: opt(v.phone), email: opt(v.email) },

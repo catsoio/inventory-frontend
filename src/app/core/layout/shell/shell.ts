@@ -310,6 +310,14 @@ export class Shell {
       ],
     },
     {
+      title: 'Verkstad',
+      links: [
+        { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month', exact: true },
+        { path: '/customers', label: 'Kunder och bilar', icon: 'groups', exact: false },
+        { path: '/workshop', label: 'Mekaniker och åtgärder', icon: 'engineering', exact: true },
+      ],
+    },
+    {
       title: 'Transaktioner',
       links: [
         { path: '/sales', label: 'Sälj', icon: 'point_of_sale', exact: true },
@@ -346,6 +354,7 @@ export class Shell {
     { path: '/dashboard', label: 'Översikt', icon: 'dashboard' },
     { path: '/inventory', label: 'Lager', icon: 'inventory_2' },
     { path: '/storage', label: 'Hotell', icon: 'warehouse' },
+    { path: '/bookings', label: 'Tider', icon: 'calendar_month' },
     { path: '/sales', label: 'Sälj', icon: 'point_of_sale' },
     { path: '/purchases', label: 'Inköp', icon: 'local_shipping' },
     { path: '/reports', label: 'Rapport', icon: 'bar_chart' },

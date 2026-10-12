@@ -41,6 +41,24 @@ const routes: Routes = [
           import('./features/storage/storage-module').then((m) => m.StorageModule),
       },
       {
+        path: 'bookings',
+        title: 'Tidsbokning',
+        loadChildren: () =>
+          import('./features/bookings/bookings-module').then((m) => m.BookingsModule),
+      },
+      {
+        path: 'customers',
+        title: 'Kunder',
+        loadChildren: () =>
+          import('./features/customers/customers-module').then((m) => m.CustomersModule),
+      },
+      {
+        path: 'workshop',
+        title: 'Mekaniker och åtgärder',
+        loadChildren: () =>
+          import('./features/workshop/workshop-module').then((m) => m.WorkshopModule),
+      },
+      {
         path: 'reports',
         title: 'Logg och rapport',
         loadChildren: () =>

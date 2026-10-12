@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { NgModule } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -21,6 +22,9 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterModule } from '@angular/router';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
+import { CustomerVehiclePicker } from './customer-vehicle-picker/customer-vehicle-picker';
+import { CustomerDialog } from './customer-dialog/customer-dialog';
+import { VehicleDialog } from './vehicle-dialog/vehicle-dialog';
 import { DateField } from './date-field/date-field';
 import { DataTable } from './data-table/data-table';
 import { ItemIcon } from './item-icon/item-icon';
@@ -31,6 +35,7 @@ import { RegPlate, SvFlag } from './reg-plate/reg-plate';
 import { StockBadge } from './stock-badge/stock-badge';
 
 const MATERIAL = [
+  MatAutocompleteModule,
   MatButtonModule,
   MatButtonToggleModule,
   MatCardModule,
@@ -56,6 +61,9 @@ const MATERIAL = [
     ConfirmDialog,
     DataTable,
     DateField,
+    CustomerDialog,
+    CustomerVehiclePicker,
+    VehicleDialog,
     KrPipe,
     StockBadge,
     MovementList,
@@ -72,6 +80,9 @@ const MATERIAL = [
     ...MATERIAL,
     DataTable,
     DateField,
+    CustomerDialog,
+    CustomerVehiclePicker,
+    VehicleDialog,
     KrPipe,
     StockBadge,
     MovementList,
