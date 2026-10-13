@@ -12,6 +12,7 @@ import {
   Vehicle,
   VehicleDetail,
   VehicleInput,
+  VehicleLookup,
 } from '../models';
 
 export interface Archived {
@@ -73,6 +74,13 @@ export class WorkshopApi {
 
   vehicle(id: string): Observable<VehicleDetail> {
     return this.http.get<VehicleDetail>(`${this.base}/vehicles/${id}`);
+  }
+
+  /** Märke, modell, år och chassinummer för ett regnr. Svarar alltid med en status, aldrig fel. */
+  lookupVehicle(regNo: string): Observable<VehicleLookup> {
+    return this.http.get<VehicleLookup>(
+      `${this.base}/vehicles/lookup/${encodeURIComponent(regNo)}`,
+    );
   }
 
   createVehicle(body: VehicleInput): Observable<Vehicle> {

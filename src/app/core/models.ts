@@ -641,6 +641,24 @@ export type VehicleInput = Partial<
   Pick<Vehicle, 'customerId' | 'regNo' | 'make' | 'model' | 'year' | 'vin' | 'notes' | 'active'>
 >;
 
+/** Vad fordonsregistret vet om ett regnr. Aldrig ägaruppgifter. */
+export interface VehicleInfo {
+  regNo: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  vin: string | null;
+  color: string | null;
+  tyreSize: string | null;
+  rimSize: string | null;
+}
+
+export interface VehicleLookup {
+  /** `unavailable`: källan gick inte att använda just nu, fyll i för hand. */
+  status: 'found' | 'not_found' | 'unavailable';
+  info: VehicleInfo | null;
+}
+
 /** Bilens kort: bilen med dess senaste bokningar. */
 export interface VehicleDetail extends Vehicle {
   bookings: Booking[];

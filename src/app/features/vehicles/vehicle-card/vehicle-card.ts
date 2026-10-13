@@ -11,7 +11,7 @@ import {
 } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
-import { RegLookup } from '../../../shared/reg-lookup';
+import { VehicleAutofill } from '../../../shared/vehicle-autofill';
 
 /** Bilens kort: ägare, uppgifter och bestående anmärkningar, med bilens bokningar under. */
 @Component({
@@ -55,6 +55,9 @@ import { RegLookup } from '../../../shared/reg-lookup';
           <input matInput formControlName="regNo" appRegNo class="uppercase" (blur)="lookup()" />
           <mat-error>Ange regnr</mat-error>
         </mat-form-field>
+        @if (looking()) {
+          <p class="mb-3 text-sm text-gray-500 sm:col-span-6">Hämtar bilinfo…</p>
+        }
         @if (note(); as n) {
           <p
             class="mb-3 rounded px-3 py-2 text-sm sm:col-span-6"
@@ -63,6 +66,11 @@ import { RegLookup } from '../../../shared/reg-lookup';
             {{ n.text }}
             @if (n.link) {
               <a class="font-medium underline" [routerLink]="n.link">Öppna bilen</a>
+            }
+            @if (locked()) {
+              <button type="button" class="ml-2 font-medium underline" (click)="unlock()">
+                Ändra manuellt
+              </button>
             }
           </p>
         }
@@ -144,7 +152,7 @@ import { RegLookup } from '../../../shared/reg-lookup';
 })
 export class VehicleCard implements OnInit {
   private readonly api = inject(WorkshopApi);
-  private readonly reg = inject(RegLookup);
+  private readonly autofill = inject(VehicleAutofill);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
   private readonly router = inject(Router);
@@ -159,6 +167,10 @@ export class VehicleCard implements OnInit {
   readonly note = signal<{ warn: boolean; text: string; link?: string[] } | null>(null);
   /** Regnumret finns redan på en annan bil. */
   readonly taken = signal(false);
+  /** Bilinfo hämtas just nu. */
+  readonly looking = signal(false);
+  /** Fälten är ifyllda från fordonsregistret och låsta. */
+  readonly locked = signal(false);
 
   readonly form = inject(FormBuilder).nonNullable.group({
     customerId: ['', Validators.required],
@@ -192,30 +204,31 @@ export class VehicleCard implements OnInit {
     });
   }
 
-  /** När man lämnat regnr-fältet: finns bilen redan, eller har den lämnats in förut? */
+  /** När man lämnat regnr-fältet: finns bilen redan, annars hämtas bilinfo och fälten låses. */
   lookup() {
     const regNo = this.form.controls.regNo.value;
     this.note.set(null);
     this.taken.set(false);
-    if (regNo.length < 2 || regNo === this.card()?.regNo) return;
-    this.reg.check(regNo).subscribe(({ taken, earlier }) => {
-      if (taken) {
-        this.taken.set(true);
-        this.note.set({
-          warn: true,
-          text: `${regNo} finns redan hos ${taken.customer?.name ?? 'en annan kund'}${taken.active ? '' : ' (arkiverad bil)'}. `,
-          link: ['/vehicles', taken.id],
-        });
-      } else if (earlier) {
-        const { make, model } = this.form.controls;
-        if (!make.value) make.setValue(earlier.make ?? '');
-        if (!model.value) model.setValue(earlier.model ?? '');
-        this.note.set({
-          warn: false,
-          text: 'Märke och modell hämtades från en tidigare inlämning av bilen.',
-        });
-      }
+    this.locked.set(false);
+    // Ändrar man inte regnumret på en sparad bil finns inget att hämta.
+    if (regNo === this.card()?.regNo) return;
+    this.looking.set(true);
+    this.autofill.run(this.form, regNo).subscribe({
+      next: (r) => {
+        this.looking.set(false);
+        this.taken.set(!!r.taken);
+        this.locked.set(r.locked);
+        this.note.set(r.note);
+      },
+      error: () => this.looking.set(false),
     });
+  }
+
+  /** Låser upp fälten om hämtningen blev fel eller bilen ska skrivas om. */
+  unlock() {
+    this.autofill.unlock(this.form);
+    this.locked.set(false);
+    this.note.set(null);
   }
 
   save() {
