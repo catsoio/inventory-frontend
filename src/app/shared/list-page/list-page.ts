@@ -1,0 +1,105 @@
+import {
+  Component,
+  ContentChild,
+  DestroyRef,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  TemplateRef,
+  inject,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl } from '@angular/forms';
+import { debounceTime } from 'rxjs';
+import type { DtCol } from '../data-table/data-table';
+
+/**
+ * Listsidan för en tabell (som en lista i Business Central): rubrik, sökruta, "Ny"-knapp mot
+ * tabellens kort och själva tabellen. Sidan som använder den hämtar data och lyssnar på `search`.
+ */
+@Component({
+  selector: 'app-list-page',
+  standalone: false,
+  host: { class: 'flex h-full flex-col' },
+  template: `
+    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+      <h1 class="mr-2 text-2xl font-semibold">{{ title }}</h1>
+      <div class="relative max-w-md min-w-56 flex-1">
+        <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
+        <input
+          type="search"
+          [formControl]="query"
+          [placeholder]="searchPlaceholder"
+          class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white pr-3 pl-10 shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
+        />
+      </div>
+      @if (archivable) {
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            [checked]="archived"
+            (change)="archived = !archived; archivedChange.emit(archived)"
+          />
+          Visa arkiverade
+        </label>
+      }
+      <span class="flex-1"></span>
+      @if (newLink) {
+        <a mat-flat-button color="primary" [routerLink]="newLink">
+          <mat-icon>add</mat-icon> {{ newLabel }}
+        </a>
+      }
+    </div>
+    <ng-content />
+    <app-data-table
+      class="min-h-0 flex-1"
+      [columns]="columns"
+      [rows]="rows"
+      [clickable]="true"
+      [emptyText]="loading ? 'Laddar…' : emptyText"
+      (rowClick)="rowClick.emit($event)"
+    >
+      <ng-template #cell let-row="row" let-col="col" let-text="text">
+        @if (cellTpl) {
+          <ng-container
+            [ngTemplateOutlet]="cellTpl"
+            [ngTemplateOutletContext]="{ row: row, col: col, text: text }"
+          />
+        } @else {
+          {{ text }}
+        }
+      </ng-template>
+    </app-data-table>
+  `,
+})
+export class ListPage implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
+  @Input({ required: true }) title = '';
+  @Input({ required: true }) columns: DtCol[] = [];
+  @Input() rows: unknown[] | null = [];
+  @Input() loading = false;
+  @Input() newLink: string | null = null;
+  @Input() newLabel = 'Ny';
+  @Input() emptyText = 'Inget hittades.';
+  @Input() searchPlaceholder = 'Sök…';
+  /** Visa kryssrutan "Visa arkiverade". */
+  @Input() archivable = false;
+  @Output() search = new EventEmitter<string>();
+  @Output() archivedChange = new EventEmitter<boolean>();
+  @Output() rowClick = new EventEmitter<any>();
+  /** Valfri mall för egna celler: `<ng-template #cell let-row="row" let-col="col" let-text="text">`. */
+  @ContentChild('cell') cellTpl?: TemplateRef<unknown>;
+
+  readonly query = new FormControl('', { nonNullable: true });
+  archived = false;
+
+  ngOnInit() {
+    // Första sökningen direkt, därefter när man slutat skriva en stund.
+    this.search.emit('');
+    this.query.valueChanges
+      .pipe(debounceTime(250), takeUntilDestroyed(this.destroyRef))
+      .subscribe((q) => this.search.emit(q.trim()));
+  }
+}

@@ -45,6 +45,7 @@ const VIEW_KEY = 'garagestock.view';
 const COLS_KEY = 'garagestock.cols';
 // Kolumner som backend kan sortera på (hela lagret); övriga sorteras bland inlästa rader.
 const SERVER_SORT = [
+  'number',
   'brand',
   'model',
   'location',
@@ -54,6 +55,7 @@ const SERVER_SORT = [
   'lastPurchasedAt',
 ];
 const DEFAULT_HIDDEN = [
+  'sku',
   'category',
   'reorderLevel',
   'averageCost',
@@ -63,7 +65,7 @@ const DEFAULT_HIDDEN = [
 ];
 
 const COLS: Col[] = [
-  { key: 'sku', label: 'Nr', val: (a) => a.sku ?? '', fmt: (a) => a.sku ?? '–' },
+  { key: 'number', label: 'Nr', val: (a) => a.code ?? '', fmt: (a) => a.code ?? '–' },
   {
     key: 'category',
     label: 'Typ',

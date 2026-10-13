@@ -28,7 +28,7 @@ const FILTERS: Record<ClosingEntryKind, [string, string][]> = {
 const COLUMNS: Record<ClosingEntryKind, DtCol<Row>[]> = {
   line: [
     { key: 'label', label: 'Artikel', value: (r) => r['label'] },
-    { key: 'sku', label: 'Art.nr', value: (r) => r['sku'] ?? '', fmt: (r) => r['sku'] || '–' },
+    { key: 'code', label: 'Art.nr', value: (r) => r['code'] ?? r['sku'] ?? '', fmt: (r) => r['code'] || r['sku'] || '–' },
     {
       key: 'category',
       label: 'Typ',

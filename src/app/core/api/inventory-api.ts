@@ -16,6 +16,9 @@ import {
   MovementQuery,
   Page,
   Report,
+  TradeDocument,
+  TradeKind,
+  TradeRow,
   StockAction,
   Summary,
 } from '../models';
@@ -70,6 +73,20 @@ export class InventoryApi {
 
   stockAction(id: string, action: StockAction, body: object): Observable<Article> {
     return this.http.post<Article>(`${this.base}/articles/${id}/${action}`, body);
+  }
+
+  /** Försäljnings- eller inköpsloggen, högsta nummer först. */
+  tradeRows(kind: TradeKind, query: { limit?: number; offset?: number } = {}) {
+    return this.http.get<Page<TradeRow>>(`${this.base}/${kind}`, { params: toParams(query) });
+  }
+
+  trade(kind: TradeKind, number: number): Observable<TradeDocument> {
+    return this.http.get<TradeDocument>(`${this.base}/${kind}/${number}`);
+  }
+
+  /** Bokför alla rader under ett löpnummer, allt eller inget. */
+  createTrade(kind: TradeKind, body: object): Observable<TradeDocument> {
+    return this.http.post<TradeDocument>(`${this.base}/${kind}`, body);
   }
 
   articleMovements(id: string, query: MovementQuery = {}): Observable<Page<Movement>> {

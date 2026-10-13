@@ -7,13 +7,23 @@
 
 html {
   height: 100%;
+  // Mjukare "bläck" i stället för nästan svart; behåller kontrast över WCAG AA mot vitt.
+  --mat-sys-on-surface: #1e293b;
+  --mat-sys-on-surface-variant: #52606d;
+
   @include mat.theme(
     (
       color: (
         primary: mat.$cyan-palette,
         tertiary: mat.$blue-palette,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: 'Inter',
+        brand-family: 'Inter',
+        bold-weight: 600,
+        medium-weight: 500,
+        regular-weight: 400,
+      ),
       density: 0,
     )
   );
@@ -30,6 +40,8 @@ body {
   // variables at https://material.angular.dev/guide/system-variables
   background-color: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font: var(--mat-sys-body-medium);
 
   // Reset the user agent margin.

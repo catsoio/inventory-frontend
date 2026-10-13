@@ -36,28 +36,26 @@ type Mode = 'now' | 'custom';
       @if (mode() === 'custom') {
         <form [formGroup]="form" class="flex flex-wrap items-start gap-3">
           @if (!status.fromIsFixed) {
-            <mat-form-field>
-              <mat-label>Från</mat-label>
-              <input
-                matInput
-                type="date"
-                formControlName="from"
-                [max]="firstDay"
-                (change)="refresh()"
-              />
-              <mat-hint>Senast {{ firstDay || 'första händelsen' }}</mat-hint>
-            </mat-form-field>
+            <app-date-field
+              label="Från"
+              formControlName="from"
+              [max]="firstDay"
+              [hint]="'Senast ' + (firstDay || 'första händelsen')"
+              (dateChange)="refresh()"
+            />
           } @else {
             <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
               Börjar där {{ code(status.latest!.number) }} slutade<br />
               <strong>{{ dateTime(status.latest!.to) }}</strong>
             </div>
           }
-          <mat-form-field>
-            <mat-label>Till och med</mat-label>
-            <input matInput type="date" formControlName="to" [max]="today" (change)="refresh()" />
-            <mat-hint>Hela dagen ingår</mat-hint>
-          </mat-form-field>
+          <app-date-field
+            label="Till och med"
+            formControlName="to"
+            [max]="today"
+            hint="Hela dagen ingår"
+            (dateChange)="refresh()"
+          />
         </form>
       }
 

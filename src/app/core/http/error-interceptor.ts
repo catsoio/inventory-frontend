@@ -1,12 +1,13 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { Injector, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, throwError } from 'rxjs';
+import { Billing } from '../billing/billing';
 import { ApiError } from '../models';
 
 const MESSAGES: Record<string, string> = {
   INSUFFICIENT_STOCK: 'Det finns inte tillräckligt i lager.',
-  DUPLICATE_SKU: 'Artikelnumret finns redan.',
+  DUPLICATE_SKU: 'Koden finns redan på en annan artikel.',
   ARTICLE_HAS_STOCK: 'Artikeln kan inte arkiveras eftersom det finns lager kvar.',
   CONCURRENT_MODIFICATION: 'Någon annan har ändrat artikeln. Ladda om sidan och försök igen.',
   INVALID_QUANTITY: 'Ogiltigt antal. Ange ett heltal på minst 1.',
@@ -27,11 +28,13 @@ const MESSAGES: Record<string, string> = {
   PERIOD_LOCKED: 'Betalningen tillhör en bokförd period och kan inte längre ändras.',
   CLOSING_NOT_VOIDABLE: 'Bokföringen kan inte annulleras.',
   RESET_NOT_CONFIRMED: 'Garagets namn stämmer inte. Skriv det exakt för att bekräfta.',
+  SUBSCRIPTION_REQUIRED: 'Din plan omfattar inte den här delen. Välj en plan för att fortsätta.',
   ACCOUNT_NOT_ACTIVE: 'Kontot är inte aktiverat. Verifiera med engångskod först.',
 };
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const snack = inject(MatSnackBar);
+  const injector = inject(Injector);
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
       const e = err.error?.error;
@@ -51,6 +54,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                   : 'Något gick fel. Försök igen.');
       if (err.status !== 401 && code !== 'NO_GARAGE')
         snack.open(message, 'Stäng', { duration: 6000 });
+      if (code === 'SUBSCRIPTION_REQUIRED') {
+        const billing = injector.get(Billing);
+        billing.refresh();
+        billing.openPlans();
+      }
       const apiError: ApiError = { code, message, status: err.status, details: e?.details };
       return throwError(() => apiError);
     }),

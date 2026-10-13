@@ -12,12 +12,8 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
   template: `
     <h1 class="mb-4 shrink-0 text-2xl font-semibold">Logg och rapport</h1>
     <form [formGroup]="form" class="mb-4 flex shrink-0 flex-wrap items-center gap-3">
-      <mat-form-field
-        ><mat-label>Från</mat-label><input matInput type="date" formControlName="from"
-      /></mat-form-field>
-      <mat-form-field
-        ><mat-label>Till</mat-label><input matInput type="date" formControlName="to"
-      /></mat-form-field>
+      <app-date-field label="Från" formControlName="from" />
+      <app-date-field label="Till" formControlName="to" />
       <mat-form-field
         ><mat-label>Typ</mat-label>
         <mat-select formControlName="type">

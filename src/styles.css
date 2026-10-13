@@ -1,11 +1,23 @@
 @import 'tailwindcss';
 
 @theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Mjukare grå text: mindre hård än nästan svart, men fortfarande tydlig mot vitt. */
+  --color-gray-900: #1e293b;
+  --color-gray-800: #2b3a4d;
+  --color-gray-700: #3e4c5e;
+  --color-gray-600: #52606d;
+  --color-gray-500: #697586;
   --color-brand: var(--mat-sys-primary);
   --color-brand-soft: color-mix(in srgb, var(--mat-sys-primary) 10%, white);
 }
 
 /* Utskrift (t.ex. en bokföring som PDF): bara innehållet, inga menyer. */
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  letter-spacing: -0.003em;
+}
+
 @media print {
   app-shell {
     display: block !important;

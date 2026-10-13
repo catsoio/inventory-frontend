@@ -95,6 +95,10 @@ export interface RimSpec {
 
 export interface Article {
   id: string;
+  /** Löpnummer per verkstad; null tills befintliga artiklar numrerats. */
+  number: number | null;
+  /** Utskriftsform av numret, t.ex. "ART-00042". */
+  code: string | null;
   category: Category;
   label: string;
   brand: string;
@@ -193,6 +197,65 @@ export interface Movement {
   createdAt: string;
   balanceAfter?: number;
 }
+
+export interface TradeParty {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string | null;
+}
+
+export interface TradeVehicle {
+  id: string;
+  code: string;
+  regNo: string;
+  make: string | null;
+  model: string | null;
+}
+
+/** En rad i försäljnings- eller inköpsloggen: ett dokument med löpnummer. */
+export interface TradeRow {
+  number: number;
+  code: string;
+  createdAt: string;
+  reference: string | null;
+  /** Fri text på inköp som gjordes innan leverantörsregistret fanns. */
+  supplierName: string | null;
+  note: string | null;
+  lines: number;
+  units: number;
+  /** Öre. */
+  total: number;
+  cost: number;
+  customer: TradeParty | null;
+  vehicle: TradeVehicle | null;
+  supplier: TradeParty | null;
+}
+
+export interface TradeLine {
+  articleId: string;
+  articleLabel: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface TradeDocument {
+  number: number;
+  code: string;
+  createdAt: string;
+  reference: string | null;
+  supplierName: string | null;
+  note: string | null;
+  units: number;
+  total: number;
+  customer: TradeParty | null;
+  vehicle: TradeVehicle | null;
+  supplier: TradeParty | null;
+  lines: TradeLine[];
+}
+
+export type TradeKind = 'sales' | 'purchases';
 
 export interface MovementQuery {
   type?: MovementType;
@@ -312,6 +375,9 @@ export interface StorageDeposit {
   status: StorageStatus;
   contents: StorageContents;
   quantity: number;
+  /** Kundregistret; null på inlämningar från före registren. */
+  customerId: string | null;
+  vehicleId: string | null;
   customer: { name: string; phone: string | null; email: string | null };
   vehicle: { regNo: string; make: string | null; model: string | null };
   tyres: StoredTyres | null;
@@ -335,6 +401,9 @@ export interface StorageDeposit {
 export interface StorageDepositInput {
   contents: StorageContents;
   quantity?: number;
+  /** Anges båda hämtas kund och bil ur registret. */
+  customerId?: string;
+  vehicleId?: string;
   customer: { name: string; phone?: string; email?: string };
   vehicle: { regNo: string; make?: string; model?: string };
   tyres?: Omit<StoredTyres, 'sizeLabel'> | null;
@@ -510,6 +579,8 @@ export interface ClosingEntry<T = Record<string, any>> {
 export interface ClosingLine {
   articleId: string;
   label: string;
+  /** Saknas på rader från äldre bokföringar. */
+  code?: string | null;
   sku: string | null;
   category: Category | null;
   location: string | null;
@@ -527,3 +598,284 @@ export interface ClosingLine {
 }
 
 export const closingCode = (n: number): string => `BS-${String(n).padStart(4, '0')}`;
+
+// --- Tidsbokning ---
+
+export type BookingStatus = 'booked' | 'arrived' | 'done' | 'cancelled' | 'no_show';
+
+export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  booked: 'Bokad',
+  arrived: 'Anlänt',
+  done: 'Klar',
+  cancelled: 'Avbokad',
+  no_show: 'Uteblev',
+};
+
+export interface Booking {
+  id: string;
+  /** TID-00042 */
+  code: string;
+  number: number;
+  /** Null på bokningar som gjordes innan kund- och bilregistret fanns. */
+  customerId: string | null;
+  vehicleId: string | null;
+  resourceId: string | null;
+  serviceTypeId: string | null;
+  title: string;
+  /** Namn och regnr är kopior från när bokningen gjordes. */
+  customerName: string;
+  phone: string | null;
+  regNo: string | null;
+  vehicle: string | null;
+  resourceName: string | null;
+  /** ISO-tid. */
+  start: string;
+  end: string;
+  status: BookingStatus;
+  /** Öre. */
+  priceFrom: number | null;
+  priceTo: number | null;
+  notes: string | null;
+}
+
+export interface BookingInput {
+  customerId: string;
+  vehicleId: string;
+  resourceId: string | null;
+  serviceTypeId: string | null;
+  title: string;
+  start: string;
+  end: string;
+  status: BookingStatus;
+  priceFrom: number | null;
+  priceTo: number | null;
+  notes: string | null;
+}
+
+// --- Kunder, bilar och verkstadens resurser ---
+
+export type CustomerType = 'private' | 'company';
+
+export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
+  private: 'Privat',
+  company: 'Företag',
+};
+
+export interface Customer {
+  id: string;
+  /** KU-0001 */
+  code: string;
+  number: number;
+  type: CustomerType;
+  name: string;
+  orgNo: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
+export type CustomerInput = Partial<
+  Pick<Customer, 'type' | 'name' | 'orgNo' | 'phone' | 'email' | 'notes' | 'active'>
+>;
+
+export interface Vehicle {
+  id: string;
+  /** BIL-0001 */
+  code: string;
+  number: number;
+  customerId: string;
+  regNo: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  vin: string | null;
+  /** Bestående anmärkningar som följer bilen. */
+  notes: string | null;
+  active: boolean;
+  customer: { id: string; code: string; name: string; phone: string | null } | null;
+}
+
+export type VehicleInput = Partial<
+  Pick<Vehicle, 'customerId' | 'regNo' | 'make' | 'model' | 'year' | 'vin' | 'notes' | 'active'>
+>;
+
+/** Vad fordonsregistret vet om ett regnr. Aldrig ägaruppgifter. */
+export interface VehicleInfo {
+  regNo: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  vin: string | null;
+  color: string | null;
+  tyreSize: string | null;
+  rimSize: string | null;
+}
+
+export interface VehicleLookup {
+  /** `unavailable`: källan gick inte att använda just nu, fyll i för hand. */
+  status: 'found' | 'not_found' | 'unavailable';
+  info: VehicleInfo | null;
+}
+
+/** Bilens kort: bilen med dess senaste bokningar. */
+export interface VehicleDetail extends Vehicle {
+  sales: TradeRow[];
+  bookings: Booking[];
+  workOrders: WorkOrder[];
+}
+
+export interface CustomerDetail extends Customer {
+  sales: TradeRow[];
+  saleCount: number;
+  vehicles: Vehicle[];
+  bookings: Booking[];
+  workOrders: WorkOrder[];
+}
+
+export type ResourceKind = 'mechanic' | 'lift' | 'bay';
+
+export const RESOURCE_KIND_LABELS: Record<ResourceKind, string> = {
+  mechanic: 'Mekaniker',
+  lift: 'Lyft',
+  bay: 'Plats',
+};
+
+export interface Resource {
+  id: string;
+  /** RES-001 */
+  code: string;
+  number: number;
+  name: string;
+  kind: ResourceKind;
+  color: string;
+  active: boolean;
+}
+
+export interface ServiceType {
+  id: string;
+  /** ATG-001 */
+  code: string;
+  number: number;
+  name: string;
+  durationMinutes: number;
+  /** Öre. */
+  priceFrom: number | null;
+  priceTo: number | null;
+  active: boolean;
+}
+
+// --- Arbetsorder ---
+
+export type WorkOrderStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
+
+export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  open: 'Öppen',
+  in_progress: 'Pågår',
+  done: 'Klar',
+  cancelled: 'Avbruten',
+};
+
+export type WorkOrderLineType = 'labour' | 'part' | 'other';
+
+export const WORK_ORDER_LINE_LABELS: Record<WorkOrderLineType, string> = {
+  labour: 'Arbete',
+  part: 'Del',
+  other: 'Annat',
+};
+
+/** En rad på arbetsordern: ett jobb, en del eller något annat. */
+export interface WorkOrderLine {
+  id: string;
+  position: number;
+  type: WorkOrderLineType;
+  description: string;
+  articleId: string | null;
+  /** Timmar för arbete, antal för delar. */
+  quantity: number;
+  /** Öre per enhet. */
+  unitPrice: number;
+  /** Öre. */
+  total: number;
+  /** Avbockad av mekanikern. */
+  done: boolean;
+}
+
+export interface WorkOrder {
+  id: string;
+  /** AO-00042 */
+  code: string;
+  number: number;
+  customerId: string;
+  vehicleId: string;
+  bookingId: string | null;
+  resourceId: string | null;
+  customerName: string;
+  phone: string | null;
+  regNo: string;
+  vehicle: string | null;
+  resourceName: string | null;
+  status: WorkOrderStatus;
+  /** Inlämningsdatum, ISO-tid. */
+  receivedAt: string;
+  /** Hämtningsdatum, ISO-tid. */
+  pickupAt: string | null;
+  /** Överenskommet prisspann, öre. */
+  priceFrom: number | null;
+  priceTo: number | null;
+  /** Vårt prisförslag, öre. */
+  quote: number | null;
+  remarks: string | null;
+  notes: string | null;
+}
+
+export interface WorkOrderDetail extends WorkOrder {
+  lines: WorkOrderLine[];
+  /** Radernas summa, öre. */
+  total: number;
+}
+
+export interface WorkOrderLineInput {
+  type: WorkOrderLineType;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  done: boolean;
+}
+
+export interface WorkOrderInput {
+  customerId: string;
+  vehicleId: string;
+  resourceId: string | null;
+  status: WorkOrderStatus;
+  receivedAt: string;
+  pickupAt: string | null;
+  priceFrom: number | null;
+  priceTo: number | null;
+  quote: number | null;
+  remarks: string | null;
+  notes: string | null;
+  lines: WorkOrderLineInput[];
+}
+
+export interface Supplier {
+  id: string;
+  /** LEV-0001 */
+  code: string;
+  number: number;
+  name: string;
+  orgNo: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
+export type SupplierInput = Partial<
+  Pick<Supplier, 'name' | 'orgNo' | 'phone' | 'email' | 'notes' | 'active'>
+>;
+
+export interface SupplierDetail extends Supplier {
+  purchases: TradeRow[];
+  purchaseCount: number;
+}

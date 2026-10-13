@@ -24,7 +24,7 @@ const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
         path: 'dashboard',
-        title: 'Översikt',
+        title: 'Hem',
         loadChildren: () =>
           import('./features/dashboard/dashboard-module').then((m) => m.DashboardModule),
       },
@@ -39,6 +39,48 @@ const routes: Routes = [
         title: 'Däckhotell',
         loadChildren: () =>
           import('./features/storage/storage-module').then((m) => m.StorageModule),
+      },
+      {
+        path: 'bookings',
+        title: 'Tidsbokning',
+        loadChildren: () =>
+          import('./features/bookings/bookings-module').then((m) => m.BookingsModule),
+      },
+      {
+        path: 'customers',
+        title: 'Kunder',
+        loadChildren: () =>
+          import('./features/customers/customers-module').then((m) => m.CustomersModule),
+      },
+      {
+        path: 'suppliers',
+        title: 'Leverantörer',
+        loadChildren: () =>
+          import('./features/suppliers/suppliers-module').then((m) => m.SuppliersModule),
+      },
+      {
+        path: 'vehicles',
+        title: 'Bilar',
+        loadChildren: () =>
+          import('./features/vehicles/vehicles-module').then((m) => m.VehiclesModule),
+      },
+      {
+        path: 'resources',
+        title: 'Mekaniker och platser',
+        loadChildren: () =>
+          import('./features/resources/resources-module').then((m) => m.ResourcesModule),
+      },
+      {
+        path: 'service-types',
+        title: 'Åtgärder',
+        loadChildren: () =>
+          import('./features/service-types/service-types-module').then((m) => m.ServiceTypesModule),
+      },
+      {
+        path: 'workorders',
+        title: 'Arbetsorder',
+        loadChildren: () =>
+          import('./features/work-orders/work-orders-module').then((m) => m.WorkOrdersModule),
       },
       {
         path: 'reports',
@@ -65,12 +107,7 @@ const routes: Routes = [
         data: { mode: 'receive' },
         loadChildren: () => import('./features/trade/trade-module').then((m) => m.TradeModule),
       },
-      {
-        path: 'settings',
-        title: 'Inställningar',
-        loadChildren: () =>
-          import('./features/settings/settings-module').then((m) => m.SettingsModule),
-      },
+      { path: 'settings', redirectTo: 'dashboard' },
     ],
   },
   { path: '**', redirectTo: '' },
