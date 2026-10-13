@@ -33,11 +33,11 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
   selector: 'app-storage-form',
   standalone: false,
   template: `
-    <h1 class="mb-4 text-2xl font-semibold">{{ id ? 'Ändra inlämning' : 'Ny inlämning' }}</h1>
-    <form [formGroup]="form" (ngSubmit)="save()" class="flex max-w-6xl flex-col gap-4">
+    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">{{ id ? 'Ändra inlämning' : 'Ny inlämning' }}</h1>
+    <form [formGroup]="form" (ngSubmit)="save()" class="flex max-w-6xl flex-col gap-3 pb-4 md:gap-4">
       <section class="rounded-xl bg-white shadow-sm">
-        <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Fordon och kund</h2>
-        <div class="p-4 pb-0">
+        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">Fordon och kund</h2>
+        <div class="p-3 pb-0 md:p-4 md:pb-0">
           <app-customer-vehicle-picker formControlName="link" [legacy]="legacy()" />
           @if (sameCar() > 0) {
             <p class="-mt-2 mb-4 text-sm text-amber-700">
@@ -50,7 +50,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
             Den här inlämningen gjordes innan kund- och bilregistret fanns. Välj kund och bil ovan
             för att koppla den, eller ändra uppgifterna nedan som förut.
           </p>
-          <div class="grid gap-x-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="grid grid-cols-6 gap-x-3 p-3 sm:grid-cols-2 sm:gap-x-4 md:p-4 lg:grid-cols-3">
             <mat-form-field>
               <mat-label>Registreringsnummer</mat-label>
               <input matInput formControlName="regNo" appRegNo class="uppercase" />
@@ -79,29 +79,29 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
-        <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Vad lämnas in?</h2>
-        <div class="grid gap-x-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div class="mb-4 sm:col-span-2 lg:col-span-3">
-            <mat-button-toggle-group formControlName="contents" hideSingleSelectionIndicator>
+        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">Vad lämnas in?</h2>
+        <div class="grid grid-cols-6 gap-x-3 p-3 sm:grid-cols-2 sm:gap-x-4 md:p-4 lg:grid-cols-3">
+          <div class="col-span-6 mb-3 sm:col-span-2 md:mb-4 lg:col-span-3">
+            <mat-button-toggle-group formControlName="contents" hideSingleSelectionIndicator class="w-full md:w-auto">
               @for (c of contentsOptions; track c[0]) {
-                <mat-button-toggle [value]="c[0]">{{ c[1] }}</mat-button-toggle>
+                <mat-button-toggle [value]="c[0]" class="flex-1">{{ c[1] }}</mat-button-toggle>
               }
             </mat-button-toggle-group>
           </div>
 
           @if (contents() !== 'rims') {
             <div formGroupName="tyres" class="contents">
-              <mat-form-field
+              <mat-form-field class="col-span-3 sm:col-span-1"
                 ><mat-label>Däckmärke</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">tire_repair</mat-icon
                 ><input matInput formControlName="brand"
               /></mat-form-field>
-              <mat-form-field
+              <mat-form-field class="col-span-3 sm:col-span-1"
                 ><mat-label>Däckmodell</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">tire_repair</mat-icon
                 ><input matInput formControlName="model"
               /></mat-form-field>
-              <mat-form-field
+              <mat-form-field class="col-span-6 sm:col-span-1"
                 ><mat-label>Säsong</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">thermostat</mat-icon>
                 <mat-select formControlName="season">
@@ -110,17 +110,17 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                   }
                 </mat-select></mat-form-field
               >
-              <mat-form-field
+              <mat-form-field class="col-span-2 sm:col-span-1"
                 ><mat-label>Bredd (mm)</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
                 <input matInput type="number" inputmode="numeric" formControlName="width" />
               </mat-form-field>
-              <mat-form-field
+              <mat-form-field class="col-span-2 sm:col-span-1"
                 ><mat-label>Profil</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
                 <input matInput type="number" inputmode="numeric" formControlName="profile" />
               </mat-form-field>
-              <mat-form-field
+              <mat-form-field class="col-span-2 sm:col-span-1"
                 ><mat-label>Fälg (tum)</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
                 <input matInput type="number" inputmode="numeric" formControlName="rimDiameter" />
@@ -128,7 +128,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                   <mat-error>Ange hela storleken eller ingenting</mat-error>
                 }
               </mat-form-field>
-              <mat-form-field
+              <mat-form-field class="col-span-3 sm:col-span-1"
                 ><mat-label>Mönsterdjup (mm)</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">height</mat-icon>
                 <input
@@ -140,16 +140,15 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                 />
                 <mat-hint>Grundaste mätpunkten</mat-hint>
               </mat-form-field>
-              <div class="flex items-center pb-4">
+              <div class="col-span-3 flex items-center pb-3 sm:col-span-1 md:pb-4">
                 <mat-slide-toggle formControlName="studded">Dubbade</mat-slide-toggle>
               </div>
-              <div class="hidden lg:block"></div>
-            </div>
+              </div>
           }
 
           @if (contents() !== 'tyres') {
             <div formGroupName="rims" class="contents">
-              <mat-form-field
+              <mat-form-field class="col-span-3 sm:col-span-1"
                 ><mat-label>Fälgtyp</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">album</mat-icon>
                 <mat-select formControlName="material">
@@ -158,12 +157,12 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                   }
                 </mat-select></mat-form-field
               >
-              <mat-form-field
+              <mat-form-field class="col-span-3 sm:col-span-1"
                 ><mat-label>Fälgmärke</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">sell</mat-icon
                 ><input matInput formControlName="brand"
               /></mat-form-field>
-              <mat-form-field
+              <mat-form-field class="col-span-6 sm:col-span-1"
                 ><mat-label>Fälgdiameter (tum)</mat-label
                 ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
                 <input matInput type="number" inputmode="numeric" formControlName="diameter" />
@@ -171,25 +170,27 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
             </div>
           }
 
-          <mat-form-field
+          <mat-form-field class="col-span-2 sm:col-span-1"
             ><mat-label>Antal (st)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">numbers</mat-icon>
             <input matInput type="number" inputmode="numeric" formControlName="quantity" />
             <mat-error>1–12</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-4 sm:col-span-1"
             ><mat-label>Plats i hotellet</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">location_on</mat-icon
             ><input matInput formControlName="location" placeholder="t.ex. H-12-3"
           /></mat-form-field>
           <div class="hidden lg:block"></div>
           <app-date-field
+            class="col-span-3 sm:col-span-1"
             label="Inlämnad"
             icon="event"
             error="Ange datum"
             formControlName="depositedAt"
           />
           <app-date-field
+            class="col-span-3 sm:col-span-1"
             label="Beräknad hämtning"
             icon="event_available"
             [error]="form.errors?.['pickup'] ? 'Före inlämningsdatumet' : ''"
@@ -197,15 +198,15 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
           />
           <div class="hidden lg:block"></div>
 
-          <div class="sm:col-span-2 lg:col-span-3">
-            <div class="mb-1 text-sm text-gray-600">Medföljande tillbehör</div>
-            <mat-chip-listbox formControlName="accessories" multiple aria-label="Tillbehör">
+          <mat-form-field class="col-span-6 sm:col-span-2 lg:col-span-3">
+            <mat-label>Medföljande tillbehör</mat-label>
+            <mat-select formControlName="accessories" multiple>
               @for (a of accessories; track a[0]) {
-                <mat-chip-option [value]="a[0]">{{ a[1] }}</mat-chip-option>
+                <mat-option [value]="a[0]">{{ a[1] }}</mat-option>
               }
-            </mat-chip-listbox>
-          </div>
-          <mat-form-field class="mt-4 sm:col-span-2 lg:col-span-3"
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field class="col-span-6 sm:col-span-2 lg:col-span-3"
             ><mat-label>Skick vid inlämning</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">report_problem</mat-icon
             ><input
@@ -217,22 +218,22 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
-        <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Avgift och betalning</h2>
-        <div class="grid gap-x-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <mat-form-field
+        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">Avgift och betalning</h2>
+        <div class="grid grid-cols-6 gap-x-3 p-3 sm:grid-cols-2 sm:gap-x-4 md:p-4 lg:grid-cols-3">
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Avgift (kr)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">payments</mat-icon>
             <input matInput type="number" inputmode="decimal" step="0.01" formControlName="fee" />
             <mat-error>0 eller mer</mat-error></mat-form-field
           >
-          <div class="mb-4 flex items-center">
+          <div class="col-span-3 mb-3 flex items-center sm:col-span-1 md:mb-4">
             <mat-button-toggle-group formControlName="paymentStatus" hideSingleSelectionIndicator>
               <mat-button-toggle value="unpaid">Obetald</mat-button-toggle>
               <mat-button-toggle value="paid">Betald</mat-button-toggle>
             </mat-button-toggle-group>
           </div>
           <div class="hidden lg:block"></div>
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Betalsätt</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">credit_card</mat-icon>
             <mat-select formControlName="paymentMethod">
@@ -244,9 +245,9 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
             <mat-error>Välj betalsätt för betald avgift</mat-error></mat-form-field
           >
           @if (paid()) {
-            <app-date-field label="Betaldatum" icon="event" formControlName="paidAt" />
+            <app-date-field class="col-span-3 sm:col-span-1" label="Betaldatum" icon="event" formControlName="paidAt" />
           }
-          <mat-form-field class="sm:col-span-2 lg:col-span-3"
+          <mat-form-field class="col-span-6 sm:col-span-2 lg:col-span-3"
             ><mat-label>Anteckningar</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">notes</mat-icon
             ><input matInput formControlName="notes"
@@ -255,7 +256,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <div class="flex gap-2">
-        <button mat-flat-button color="primary" class="!h-12" [disabled]="form.invalid || busy()">
+        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="form.invalid || busy()">
           Spara
         </button>
         <a mat-button class="!h-12" [routerLink]="id ? ['/storage', id] : '/storage'">Avbryt</a>

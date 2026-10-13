@@ -165,26 +165,13 @@ MENUS.overview = [
   ...(environment.workOrders ? MENUS.workorder : []),
 ];
 
-const MOBILE: Record<AppId, { path: string; label: string; icon: string }[]> = {
-  overview: [
-    { path: '/bookings', label: 'Kalender', icon: 'calendar_month' },
-    { path: '/customers', label: 'Kunder', icon: 'groups' },
-    { path: '/inventory', label: 'Lager', icon: 'inventory_2' },
-    { path: '/storage', label: 'Hotell', icon: 'warehouse' },
-  ],
-  stock: [
-    { path: '/inventory', label: 'Lager', icon: 'inventory_2' },
-    { path: '/storage', label: 'Hotell', icon: 'warehouse' },
-    { path: '/sales', label: 'Sälj', icon: 'point_of_sale' },
-    { path: '/purchases', label: 'Inköp', icon: 'local_shipping' },
-    { path: '/reports', label: 'Rapport', icon: 'bar_chart' },
-  ],
-  booking: [
-    { path: '/bookings', label: 'Kalender', icon: 'calendar_month' },
-    { path: '/bookings/list', label: 'Lista', icon: 'view_list' },
-  ],
-  workorder: [{ path: '/workorders', label: 'Arbetsorder', icon: 'assignment' }],
-};
+const MOBILE: { path: string; label: string; icon: string; exact: boolean }[] = [
+  { path: '/dashboard', label: 'Hem', icon: 'home', exact: true },
+  { path: '/inventory', label: 'Lager', icon: 'inventory_2', exact: false },
+  { path: '/storage', label: 'Hotell', icon: 'warehouse', exact: false },
+  { path: '/sales', label: 'Sälj', icon: 'point_of_sale', exact: false },
+  { path: '/bookings', label: 'Tider', icon: 'calendar_month', exact: false },
+];
 
 const today = () => new Date().toLocaleDateString('sv-SE');
 
@@ -274,7 +261,11 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 
       <span class="mx-1 h-6 w-px bg-white/25 max-md:hidden"></span>
 
-      <nav class="flex h-full items-stretch gap-1 self-stretch" aria-label="Avdelning">
+      <span class="min-w-0 flex-1 truncate text-base font-semibold md:hidden">{{
+        auth.garage()?.name ?? 'Däcklager'
+      }}</span>
+
+      <nav class="flex h-full items-stretch gap-1 self-stretch max-md:hidden" aria-label="Avdelning">
         @for (t of tabs; track t.id) {
           <a
             [routerLink]="t.home"
@@ -532,22 +523,22 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       </main>
     </div>
 
-    @if (mobileLinks().length) {
-      <nav
-        class="flex shrink-0 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_4px_rgba(0,0,0,0.06)] md:hidden"
-      >
-        @for (l of mobileLinks(); track l.path) {
-          <a
-            [routerLink]="l.path"
-            routerLinkActive="text-brand font-semibold"
-            class="flex flex-1 flex-col items-center py-2 text-xs"
-          >
-            <mat-icon>{{ l.icon }}</mat-icon
-            >{{ l.label }}
-          </a>
-        }
-      </nav>
-    }
+    <nav
+      class="flex shrink-0 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_4px_rgba(0,0,0,0.06)] md:hidden"
+      aria-label="Huvudmeny"
+    >
+      @for (l of mobileLinks; track l.path) {
+        <a
+          [routerLink]="l.path"
+          routerLinkActive="text-brand font-semibold"
+          [routerLinkActiveOptions]="{ exact: l.exact }"
+          class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-gray-600"
+        >
+          <mat-icon>{{ l.icon }}</mat-icon
+          >{{ l.label }}
+        </a>
+      }
+    </nav>
   `,
 })
 export class Shell {
@@ -655,7 +646,8 @@ export class Shell {
       links: g.links.filter((l) => !('adminOnly' in l && l.adminOnly) || admin),
     }));
   });
-  readonly mobileLinks = computed(() => MOBILE[this.app()]);
+  /** Mobilens bottenfält är alltid detsamma: det som används mest i verkstaden. */
+  readonly mobileLinks = MOBILE;
 
   readonly initial = computed(() => this.who()[0] ?? '?');
   readonly who = computed(() => {

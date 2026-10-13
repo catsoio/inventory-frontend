@@ -90,8 +90,8 @@ type PaymentFilter = PaymentStatus | '';
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <h1 class="mr-2 text-2xl font-semibold">Däckhotell</h1>
-      <div class="relative max-w-md min-w-56 flex-1">
+      <h1 class="mr-2 hidden text-2xl font-semibold md:block">Däckhotell</h1>
+      <div class="relative order-first w-full min-w-0 md:order-none md:max-w-md md:min-w-56 md:w-auto md:flex-1">
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
         <input
           type="search"
@@ -101,12 +101,44 @@ type PaymentFilter = PaymentStatus | '';
           class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-10 outline-none focus:ring-2"
         />
       </div>
-      <span class="flex-1"></span>
-      <a mat-flat-button color="primary" routerLink="new"><mat-icon>add</mat-icon> Ny inlämning</a>
+      <span class="hidden flex-1 md:block"></span>
+      <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
+        ><mat-icon>add</mat-icon> Ny inlämning</a
+      >
     </div>
 
-    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+    <div class="mb-2 flex shrink-0 items-center gap-2 md:hidden">
       <mat-button-toggle-group
+        hideSingleSelectionIndicator
+        class="compact-toggle min-w-0 flex-1"
+        [value]="status()"
+        (change)="setStatus($event.value)"
+        aria-label="Status"
+      >
+        <mat-button-toggle value="stored" class="flex-1">Inlagrade</mat-button-toggle>
+        <mat-button-toggle value="picked_up" class="flex-1">Utlämnade</mat-button-toggle>
+        <mat-button-toggle value="" class="flex-1">Alla</mat-button-toggle>
+      </mat-button-toggle-group>
+      <button
+        mat-stroked-button
+        type="button"
+        class="!min-w-0 !px-3"
+        (click)="showFilters.set(!showFilters())"
+        aria-label="Fler filter"
+      >
+        <mat-icon class="!m-0">tune</mat-icon>
+        @if (activeExtra()) {
+          <b class="ml-1">{{ activeExtra() }}</b>
+        }
+      </button>
+    </div>
+
+    <div
+      class="mb-2 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 md:mb-3 md:flex"
+      [class]="showFilters() ? 'flex' : 'hidden'"
+    >
+      <mat-button-toggle-group
+        class="max-md:!hidden"
         hideSingleSelectionIndicator
         [value]="status()"
         (change)="setStatus($event.value)"
@@ -144,7 +176,7 @@ type PaymentFilter = PaymentStatus | '';
     </div>
 
     @if (summary(); as s) {
-      <div class="mb-3 flex shrink-0 flex-wrap gap-2 text-sm">
+      <div class="mb-2 flex shrink-0 flex-wrap gap-1.5 text-xs md:mb-3 md:gap-2 md:text-sm">
         <span class="rounded-xl bg-white shadow-sm px-3 py-1"
           ><b>{{ s.stored }}</b> set inlagrade ({{ s.units }} st)</span
         >
@@ -155,7 +187,7 @@ type PaymentFilter = PaymentStatus | '';
         }
         @if (s.overdue) {
           <span class="rounded-lg border border-red-300 bg-red-50 px-3 py-1 text-red-900"
-            ><b>{{ s.overdue }}</b> har passerat hämtdatum</span
+            ><b>{{ s.overdue }}</b> försenade</span
           >
         }
       </div>
@@ -194,7 +226,7 @@ type PaymentFilter = PaymentStatus | '';
       @for (d of items(); track d.id) {
         <a
           [routerLink]="d.id"
-          class="rounded-lg border-l-8 bg-white p-3 shadow-sm"
+          class="rounded-lg border-l-8 bg-white p-2.5 shadow-sm"
           [class]="
             d.status === 'picked_up'
               ? 'border-gray-300'
@@ -224,6 +256,15 @@ type PaymentFilter = PaymentStatus | '';
         <p class="mt-6 text-center text-gray-500">Inga inlämningar hittades.</p>
       }
     </div>
+
+    <a
+      mat-fab
+      color="primary"
+      routerLink="new"
+      aria-label="Ny inlämning"
+      class="!fixed right-4 bottom-20 z-10 md:!hidden"
+      ><mat-icon>add</mat-icon></a
+    >
 
     @if (loading()) {
       <mat-progress-bar class="mt-2 shrink-0" mode="indeterminate" />
@@ -258,6 +299,9 @@ export class StorageList implements OnInit {
   readonly payment = signal<PaymentFilter>('');
   readonly contentsFilter = signal<StorageContents | ''>('');
   readonly overdue = signal(false);
+  readonly showFilters = signal(false);
+  readonly activeExtra = () =>
+    (this.payment() ? 1 : 0) + (this.contentsFilter() ? 1 : 0) + (this.overdue() ? 1 : 0);
   readonly items = signal<StorageDeposit[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);

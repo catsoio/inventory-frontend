@@ -157,8 +157,8 @@ const COLS: Col[] = [
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <h1 class="mr-2 text-2xl font-semibold">Artiklar</h1>
-      <div class="relative max-w-md min-w-56 flex-1">
+      <h1 class="mr-2 hidden text-2xl font-semibold md:block">Artiklar</h1>
+      <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
         <input
           #searchEl
@@ -169,20 +169,28 @@ const COLS: Col[] = [
           class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-10 outline-none focus:ring-2"
         />
       </div>
-      <span class="flex-1"></span>
+      <span class="flex-1 max-md:hidden"></span>
       <button
         mat-icon-button
-        class="lg:!hidden"
+        class="relative lg:!hidden"
         title="Filter"
+        [class.text-brand]="activeFilters()"
         (click)="showFilters.set(!showFilters())"
       >
         <mat-icon>filter_list</mat-icon>
+        @if (activeCount()) {
+          <span
+            class="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] leading-none font-semibold text-white"
+            >{{ activeCount() }}</span
+          >
+        }
       </button>
       @if (view() === 'table') {
-        <button mat-icon-button [matMenuTriggerFor]="colMenu" title="Välj kolumner">
+        <button class="max-md:!hidden" mat-icon-button [matMenuTriggerFor]="colMenu" title="Välj kolumner">
           <mat-icon>view_column</mat-icon>
         </button>
         <button
+          class="max-md:!hidden"
           mat-icon-button
           title="Filtrera per kolumn"
           [class.text-brand]="showColFilters()"
@@ -202,6 +210,7 @@ const COLS: Col[] = [
         }
       </mat-menu>
       <mat-button-toggle-group
+        class="max-md:!hidden"
         hideSingleSelectionIndicator
         [value]="view()"
         (change)="setView($event.value)"
@@ -214,16 +223,34 @@ const COLS: Col[] = [
           ><mat-icon>grid_view</mat-icon></mat-button-toggle
         >
       </mat-button-toggle-group>
-      <a mat-flat-button color="primary" routerLink="new"><mat-icon>add</mat-icon> Ny artikel</a>
+      <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
+        ><mat-icon>add</mat-icon> Ny artikel</a
+      >
     </div>
+
+    <a
+      mat-fab
+      color="primary"
+      routerLink="new"
+      aria-label="Ny artikel"
+      class="!fixed right-4 bottom-20 z-10 md:!hidden"
+      ><mat-icon>add</mat-icon></a
+    >
+
+    @if (showFilters()) {
+      <div class="fixed inset-0 z-30 bg-black/40 lg:hidden" (click)="showFilters.set(false)"></div>
+    }
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
       <aside
-        class="max-h-[50vh] w-full shrink-0 overflow-y-auto rounded-xl bg-white shadow-sm p-3 lg:max-h-none lg:w-60"
+        class="fixed inset-x-0 bottom-0 z-40 max-h-[75vh] overflow-y-auto rounded-t-2xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl lg:static lg:z-auto lg:max-h-none lg:w-60 lg:shrink-0 lg:rounded-xl lg:p-3 lg:shadow-sm"
         [class]="showFilters() ? 'block' : 'hidden lg:block'"
       >
         <div class="mb-2 flex items-center justify-between">
           <span class="font-semibold">Filter</span>
+          <button class="text-sm text-gray-500 lg:hidden" (click)="showFilters.set(false)">
+            Klar
+          </button>
           @if (activeFilters()) {
             <button class="text-sm text-brand underline" (click)="clearFilters()">Rensa</button>
           }
@@ -232,7 +259,7 @@ const COLS: Col[] = [
         <div class="mb-1 text-xs font-semibold text-gray-500 uppercase">Status</div>
         @for (s of statuses; track s[0]) {
           <button
-            class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
+            class="flex w-full justify-between rounded px-2 py-2 text-left text-sm hover:bg-gray-100 lg:py-1"
             [class]="status() === s[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
             (click)="setStatus(s[0])"
           >
@@ -314,9 +341,43 @@ const COLS: Col[] = [
           }
         </div>
 
-        <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white shadow-sm">
+        <div
+          class="min-h-0 flex-1 overflow-auto md:rounded-xl md:bg-white md:shadow-sm"
+        >
           @if (view() === 'table') {
-            <table class="w-full border-collapse bg-white text-left text-sm">
+            <div class="flex flex-col gap-2 md:hidden">
+              @for (a of rows(); track a.id) {
+                <a
+                  [routerLink]="a.id"
+                  class="flex items-center gap-3 rounded-lg border-l-8 bg-white p-2.5 shadow-sm"
+                  [class]="
+                    a.stockLevel === 'out'
+                      ? 'border-red-500'
+                      : a.stockLevel === 'low'
+                        ? 'border-amber-400'
+                        : 'border-green-500'
+                  "
+                  [style.opacity]="a.active ? 1 : 0.6"
+                >
+                  <app-item-icon [kind]="kind(a)" />
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate font-semibold">{{ a.sizeLabel || a.brand }}</span>
+                    <span class="block truncate text-sm text-gray-600"
+                      >{{ a.brand }} {{ a.model }}</span
+                    >
+                    <span class="block truncate text-xs text-gray-500">{{
+                      a.location || 'Ingen plats'
+                    }}</span>
+                  </span>
+                  <span class="text-right">
+                    <b class="text-lg">{{ a.quantity }}</b
+                    ><span class="text-xs text-gray-500"> st</span>
+                    <span class="block text-xs font-medium">{{ a.sellPrice | kr }}</span>
+                  </span>
+                </a>
+              }
+            </div>
+            <table class="hidden w-full border-collapse bg-white text-left text-sm md:table">
               <thead
                 class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
               >
@@ -486,6 +547,9 @@ export class ArticleList implements OnInit {
     const c = this.sel()['category'];
     return !c || c === 'tyre';
   });
+  readonly activeCount = computed(
+    () => Object.values(this.sel()).filter((v) => v !== undefined).length,
+  );
   readonly activeFilters = computed(() => Object.values(this.sel()).some((v) => v !== undefined));
 
   readonly visible = signal<Set<string>>(

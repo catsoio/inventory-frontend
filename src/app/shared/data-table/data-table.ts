@@ -22,7 +22,7 @@ export interface DtCol<T = any> {
   standalone: false,
   host: { class: 'flex min-h-0 flex-col' },
   template: `
-    <div class="mb-1 flex shrink-0 items-center justify-end gap-1 text-sm text-gray-500">
+    <div class="mb-1 flex shrink-0 items-center justify-end gap-1 text-sm text-gray-500 max-md:hidden">
       <span> {{ view().length }}{{ filtered() ? ' av ' + rowsSig().length : '' }} rader </span>
       <button
         mat-icon-button
@@ -33,7 +33,7 @@ export interface DtCol<T = any> {
         <mat-icon>filter_alt</mat-icon>
       </button>
     </div>
-    <div class="min-h-0 overflow-auto rounded-xl bg-white shadow-sm" [class]="scrollClass">
+    <div class="min-h-0 overflow-auto rounded-xl bg-white shadow-sm [-webkit-overflow-scrolling:touch]" [class]="scrollClass">
       <table class="w-full border-collapse text-left text-sm">
         <thead
           class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
@@ -68,7 +68,7 @@ export interface DtCol<T = any> {
         <tbody class="divide-y divide-gray-100">
           @for (r of view(); track $index) {
             <tr
-              class="h-11"
+              class="h-12 md:h-11"
               [class]="clickable ? 'cursor-pointer hover:bg-brand-soft' : 'hover:bg-gray-50'"
               (click)="clickable && rowClick.emit(r)"
             >

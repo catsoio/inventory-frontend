@@ -32,3 +32,55 @@ body {
     padding: 0 !important;
   }
 }
+
+/* Mobil: 16 px i fält hindrar iOS från att zooma in vid fokus; stabil rullning hindrar hopp. */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+main {
+  overscroll-behavior: contain;
+  overflow-x: hidden;
+}
+
+/* Mobil: kompakta fält. Felmeddelandet ligger över mellanrummet så att inget hoppar. */
+@media (max-width: 767px) {
+  .mat-mdc-form-field {
+    --mat-form-field-container-height: 48px;
+    --mat-form-field-filled-with-label-container-padding-top: 20px;
+    --mat-form-field-container-vertical-padding: 12px;
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .mat-mdc-form-field-bottom-align::before {
+    display: none;
+  }
+  .mat-mdc-form-field-subscript-wrapper {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 0;
+    overflow: visible;
+    margin-top: 1px;
+    line-height: 12px;
+    font-size: 11px;
+    pointer-events: none;
+  }
+  .mat-mdc-form-field-subscript-wrapper .mat-mdc-form-field-hint-wrapper,
+  .mat-mdc-form-field-subscript-wrapper .mat-mdc-form-field-error-wrapper {
+    padding: 0 4px;
+  }
+  .mat-mdc-form-field-hint-wrapper mat-hint {
+    display: none;
+  }
+  .mat-mdc-form-field-icon-prefix > .mat-icon {
+    display: none;
+  }
+}

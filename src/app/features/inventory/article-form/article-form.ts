@@ -22,12 +22,12 @@ const signedInt = Validators.pattern(/^-?\d+$/);
   selector: 'app-article-form',
   standalone: false,
   template: `
-    <h1 class="mb-4 text-2xl font-semibold">{{ id ? 'Ändra artikel' : 'Ny artikel' }}</h1>
-    <form [formGroup]="form" (ngSubmit)="save()" class="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="mb-4 sm:col-span-2 lg:col-span-3">
-        <mat-button-toggle-group formControlName="category" hideSingleSelectionIndicator>
+    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">{{ id ? 'Ändra artikel' : 'Ny artikel' }}</h1>
+    <form [formGroup]="form" (ngSubmit)="save()" class="grid grid-cols-6 gap-x-3 pb-4 sm:grid-cols-2 sm:gap-x-4 lg:grid-cols-3">
+      <div class="col-span-6 mb-3 sm:col-span-2 md:mb-4 lg:col-span-3">
+        <mat-button-toggle-group formControlName="category" hideSingleSelectionIndicator class="w-full md:w-auto">
           @for (c of categories; track c[0]) {
-            <mat-button-toggle [value]="c[0]">{{ c[1] }}</mat-button-toggle>
+            <mat-button-toggle [value]="c[0]" class="flex-1">{{ c[1] }}</mat-button-toggle>
           }
         </mat-button-toggle-group>
         @if (id) {
@@ -37,7 +37,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         }
       </div>
 
-      <mat-form-field
+      <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Märke</mat-label><mat-icon matPrefix class="mr-2 text-gray-400">label</mat-icon
         ><input matInput formControlName="brand" list="brands" />
         <datalist id="brands">
@@ -47,13 +47,13 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         </datalist>
         <mat-error>Obligatoriskt</mat-error></mat-form-field
       >
-      <mat-form-field
+      <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Modell</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">inventory_2</mat-icon
         ><input matInput formControlName="model" />
         <mat-error>Obligatoriskt</mat-error></mat-form-field
       >
-      <mat-form-field
+      <mat-form-field class="col-span-6 sm:col-span-1"
         ><mat-label>Egen kod (valfri)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">qr_code</mat-icon
         ><input matInput formControlName="sku"
@@ -61,21 +61,21 @@ const signedInt = Validators.pattern(/^-?\d+$/);
 
       @if (category() === 'tyre') {
         <div formGroupName="tyre" class="contents">
-          <mat-form-field
+          <mat-form-field class="col-span-2 sm:col-span-1"
             ><mat-label>Bredd (mm)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
             <input matInput type="number" inputmode="numeric" formControlName="width" /><mat-error
               >Heltal krävs</mat-error
             ></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-2 sm:col-span-1"
             ><mat-label>Profil</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
             <input matInput type="number" inputmode="numeric" formControlName="profile" /><mat-error
               >Heltal krävs</mat-error
             ></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-2 sm:col-span-1"
             ><mat-label>Fälg (tum)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
             <input
@@ -85,7 +85,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               formControlName="rimDiameter"
             /><mat-error>Heltal krävs</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Lastindex</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">weight</mat-icon>
             <input
@@ -95,12 +95,12 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               formControlName="loadIndex"
             /><mat-error>Heltal</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Hastighetsindex</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">speed</mat-icon
             ><input matInput formControlName="speedIndex"
           /></mat-form-field>
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Säsong</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">thermostat</mat-icon>
             <mat-select formControlName="season">
@@ -109,12 +109,12 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               }
             </mat-select></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>DOT</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">calendar_month</mat-icon
             ><input matInput formControlName="dot"
           /></mat-form-field>
-          <div class="flex items-center gap-6 pb-4">
+          <div class="col-span-6 flex items-center gap-6 pb-3 sm:col-span-1 md:pb-4">
             <mat-slide-toggle formControlName="studded">Dubb</mat-slide-toggle>
             <mat-slide-toggle formControlName="runFlat">Runflat</mat-slide-toggle>
           </div>
@@ -124,7 +124,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
 
       @if (category() === 'rim') {
         <div formGroupName="rim" class="contents">
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Diameter (tum)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
             <input
@@ -134,7 +134,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               formControlName="diameter"
             /><mat-error>Heltal krävs</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Bredd (J)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">straighten</mat-icon>
             <input
@@ -145,14 +145,14 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               formControlName="width"
             /><mat-error>Ange bredd, t.ex. 7 eller 7,5</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Offset ET (mm)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">swap_horiz</mat-icon>
             <input matInput type="number" inputmode="numeric" formControlName="offset" /><mat-error
               >Heltal krävs (kan vara negativt)</mat-error
             ></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Antal bultar</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">settings</mat-icon>
             <input
@@ -162,7 +162,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               formControlName="boltCount"
             /><mat-error>3–8</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Delningscirkel PCD (mm)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">radio_button_unchecked</mat-icon>
             <input
@@ -175,7 +175,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
             <mat-hint>T.ex. 112 för 5x112</mat-hint>
             <mat-error>Ange PCD</mat-error></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Centrumhål (mm)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">adjust</mat-icon>
             <input
@@ -186,7 +186,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               formControlName="centerBore"
             />
           </mat-form-field>
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Material</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">album</mat-icon>
             <mat-select formControlName="material">
@@ -195,7 +195,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
               }
             </mat-select></mat-form-field
           >
-          <mat-form-field
+          <mat-form-field class="col-span-3 sm:col-span-1"
             ><mat-label>Färg</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">palette</mat-icon
             ><input matInput formControlName="color"
@@ -204,12 +204,12 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         </div>
       }
 
-      <mat-form-field
+      <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Hyllplats</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">location_on</mat-icon
         ><input matInput formControlName="location"
       /></mat-form-field>
-      <mat-form-field
+      <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Beställningspunkt</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">notification_important</mat-icon>
         <input
@@ -219,13 +219,13 @@ const signedInt = Validators.pattern(/^-?\d+$/);
           formControlName="reorderLevel"
         /><mat-error>Heltal</mat-error></mat-form-field
       >
-      <mat-form-field
+      <mat-form-field class="col-span-6 sm:col-span-1"
         ><mat-label>Leverantör</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">local_shipping</mat-icon
         ><input matInput formControlName="supplier"
       /></mat-form-field>
 
-      <mat-form-field
+      <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Inköpspris per styck (kr)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">shopping_cart</mat-icon>
         <input
@@ -241,14 +241,14 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         }
         <mat-error>Krävs om ingångslager anges</mat-error></mat-form-field
       >
-      <mat-form-field
+      <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Försäljningspris (kr)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">sell</mat-icon>
         <input matInput type="number" inputmode="decimal" step="0.01" formControlName="sellPrice" />
         <mat-error>Ange pris (0 eller mer)</mat-error></mat-form-field
       >
       @if (id) {
-        <mat-form-field
+        <mat-form-field class="col-span-6 sm:col-span-1"
           ><mat-label>Lagersaldo (st)</mat-label
           ><mat-icon matPrefix class="mr-2 text-gray-400">inventory</mat-icon>
           <input matInput type="number" inputmode="numeric" formControlName="quantity" />
@@ -256,7 +256,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
           <mat-error>Heltal, 0 eller mer</mat-error></mat-form-field
         >
       } @else {
-        <mat-form-field
+        <mat-form-field class="col-span-6 sm:col-span-1"
           ><mat-label>Ingångslager (antal)</mat-label
           ><mat-icon matPrefix class="mr-2 text-gray-400">inventory</mat-icon>
           <input
@@ -267,14 +267,14 @@ const signedInt = Validators.pattern(/^-?\d+$/);
           /><mat-error>Heltal</mat-error></mat-form-field
         >
       }
-      <mat-form-field class="sm:col-span-2 lg:col-span-3"
+      <mat-form-field class="col-span-6 sm:col-span-2 lg:col-span-3"
         ><mat-label>Anteckningar</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">notes</mat-icon
         ><input matInput formControlName="notes"
       /></mat-form-field>
 
-      <div class="flex gap-2 sm:col-span-2 lg:col-span-3">
-        <button mat-flat-button color="primary" class="!h-12" [disabled]="form.invalid || busy()">
+      <div class="col-span-6 flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
+        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="form.invalid || busy()">
           Spara
         </button>
         @if (!id) {

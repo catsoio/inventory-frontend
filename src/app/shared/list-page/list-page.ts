@@ -24,8 +24,8 @@ import type { DtCol } from '../data-table/data-table';
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <h1 class="mr-2 text-2xl font-semibold">{{ title }}</h1>
-      <div class="relative max-w-md min-w-56 flex-1">
+      <h1 class="mr-2 hidden text-2xl font-semibold md:block">{{ title }}</h1>
+      <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
         <input
           type="search"
@@ -44,11 +44,19 @@ import type { DtCol } from '../data-table/data-table';
           Visa arkiverade
         </label>
       }
-      <span class="flex-1"></span>
+      <span class="flex-1 max-md:hidden"></span>
       @if (newLink) {
-        <a mat-flat-button color="primary" [routerLink]="newLink">
+        <a mat-flat-button color="primary" [routerLink]="newLink" class="max-md:!hidden">
           <mat-icon>add</mat-icon> {{ newLabel }}
         </a>
+        <a
+          mat-fab
+          color="primary"
+          [routerLink]="newLink"
+          [attr.aria-label]="newLabel"
+          class="!fixed right-4 bottom-20 z-10 md:!hidden"
+          ><mat-icon>add</mat-icon></a
+        >
       }
     </div>
     <ng-content />

@@ -24,12 +24,12 @@ const when = (m: Movement) =>
   template: `
     @if (compact) {
       <div class="flex flex-col">
-        @for (m of items(); track m.id) {
-          <div class="flex items-center gap-3 py-2.5 text-sm">
+        @for (m of items(); track m.id; let i = $index) {
+          <div class="flex items-center gap-3 py-2.5 text-sm" [class.max-md:hidden]="i >= 3">
             <span
-              class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+              class="grid h-7 w-7 shrink-0 place-items-center rounded-full md:h-9 md:w-9"
               [class]="typeCls[m.type]"
-              ><mat-icon class="!h-5 !w-5 !text-xl">{{ icons[m.type] }}</mat-icon></span
+              ><mat-icon class="!h-4 !w-4 !text-base md:!h-5 md:!w-5 md:!text-xl">{{ icons[m.type] }}</mat-icon></span
             >
             <div class="min-w-0 flex-1">
               <div class="font-medium">{{ labels[m.type] }} · {{ m.quantity }} st</div>

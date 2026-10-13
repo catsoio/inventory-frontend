@@ -74,12 +74,12 @@ const BOOKING_COLS: DtCol<Booking>[] = [
 
     <ng-template #kpi let-c>
       <a [routerLink]="c.link" [queryParams]="c.params" class="block">
-        <div class="h-full rounded-xl p-3 transition hover:brightness-[0.97]" [class]="c.tone">
-          <div class="flex items-center justify-between gap-2">
-            <span class="truncate text-xs text-gray-600">{{ c.label }}</span>
-            <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-500">{{ c.icon }}</mat-icon>
+        <div class="flex h-full min-h-[5.5rem] flex-col justify-between rounded-xl px-3 py-3 transition hover:brightness-[0.97] md:min-h-0 md:p-3" [class]="c.tone">
+          <div class="flex items-start justify-between gap-2">
+            <span class="text-xs leading-tight text-gray-600">{{ c.label }}</span>
+            <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-500 max-md:hidden">{{ c.icon }}</mat-icon>
           </div>
-          <div class="mt-0.5 truncate text-2xl font-semibold tracking-tight">{{ c.value }}</div>
+          <div class="truncate text-2xl leading-none font-semibold tracking-tight max-md:my-1.5 md:mt-0.5">{{ c.value }}</div>
           <div class="flex min-h-4 items-center gap-1 text-xs">
             @if (c.delta; as d) {
               <span class="flex items-center font-medium" [class]="d.cls">
@@ -87,35 +87,35 @@ const BOOKING_COLS: DtCol<Booking>[] = [
                 >{{ d.text }}
               </span>
             }
-            <span class="truncate text-gray-500">{{ c.sub }}</span>
+            <span class="truncate text-gray-500 max-md:text-xs">{{ c.sub }}</span>
           </div>
         </div>
       </a>
     </ng-template>
 
-    <div class="grid min-h-0 gap-x-4 gap-y-3 md:flex-1 xl:grid-cols-3">
-      <div class="flex min-h-0 min-w-0 flex-col gap-3 xl:col-span-2">
-        <section class="shrink-0">
+    <div class="grid shrink-0 gap-x-4 gap-y-3 md:min-h-0 md:flex-1 md:shrink xl:grid-cols-3">
+      <div class="min-w-0 flex-col gap-3 max-md:contents md:flex md:min-h-0 xl:col-span-2">
+        <section class="shrink-0 max-md:order-1">
           <h2 class="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">Lager</h2>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-3 gap-2.5 md:gap-3">
             @for (c of stockCards(); track c.label) {
               <ng-container [ngTemplateOutlet]="kpi" [ngTemplateOutletContext]="{ $implicit: c }" />
             }
           </div>
         </section>
 
-        <section class="shrink-0">
+        <section class="shrink-0 max-md:order-2">
           <h2 class="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
             Däckhotell
           </h2>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-3 gap-2.5 md:gap-3">
             @for (c of hotelCards(); track c.label) {
               <ng-container [ngTemplateOutlet]="kpi" [ngTemplateOutletContext]="{ $implicit: c }" />
             }
           </div>
         </section>
 
-        <section class="flex min-h-48 min-w-0 flex-1 flex-col xl:min-h-0">
+        <section class="flex min-w-0 shrink-0 flex-col max-md:order-5 md:min-h-48 md:flex-1 xl:min-h-0">
           <div class="mb-1 flex shrink-0 flex-wrap items-center gap-2">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
               <mat-icon class="!h-5 !w-5 !text-xl text-gray-400">calendar_month</mat-icon>
@@ -125,14 +125,33 @@ const BOOKING_COLS: DtCol<Booking>[] = [
               </span>
             </h2>
             <span class="flex-1"></span>
-        
-            <button mat-flat-button color="primary" (click)="open(null)">
+
+            <button mat-flat-button color="primary" class="max-md:!hidden" (click)="open(null)">
               <mat-icon>add</mat-icon> Ny bokning
             </button>
-            <a mat-button routerLink="/bookings">Kalender</a>
+            <a mat-button routerLink="/bookings" class="max-md:!hidden">Kalender</a>
+          </div>
+          <div class="flex flex-col gap-1.5 md:hidden">
+            @for (b of shown(); track b.id) {
+              <button
+                type="button"
+                (click)="open(b)"
+                class="flex items-center gap-3 rounded-xl bg-white p-2.5 text-left shadow-sm"
+              >
+                <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{ hhmm(b.start) }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm">{{ b.title }}</span>
+                  <span class="block truncate text-xs text-gray-500">
+                    {{ b.regNo || '–' }} · {{ b.customerName }}
+                  </span>
+                </span>
+              </button>
+            } @empty {
+              <p class="py-2 text-sm text-gray-500">Inga bokningar idag.</p>
+            }
           </div>
           <app-data-table
-            class="min-h-0 flex-1"
+            class="hidden min-h-0 flex-1 md:block"
             [columns]="bookingCols"
             [rows]="shown()"
             [clickable]="true"
@@ -163,8 +182,8 @@ const BOOKING_COLS: DtCol<Booking>[] = [
         </section>
       </div>
 
-      <div class="flex min-h-0 min-w-0 flex-col gap-3">
-        <section class="shrink-0 rounded-xl bg-white p-3 shadow-sm">
+      <div class="min-w-0 flex-col gap-3 max-md:contents md:flex md:min-h-0">
+        <section class="shrink-0 rounded-xl bg-white p-3 shadow-sm max-md:hidden">
           <div class="mb-1 flex items-center justify-between gap-2">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
               <mat-icon class="!h-5 !w-5 !text-xl text-gray-400">payments</mat-icon>
@@ -194,7 +213,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
           }
         </section>
 
-        <section class="flex min-h-40 min-w-0 flex-1 flex-col xl:min-h-0">
+        <section class="flex min-w-0 shrink-0 flex-col max-md:order-4 md:min-h-40 md:flex-1 xl:min-h-0">
           <div class="mb-1 flex shrink-0 items-center justify-between">
             <h2
               class="flex items-center gap-2 text-xs font-semibold tracking-wide text-gray-500 uppercase"
@@ -203,7 +222,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
             </h2>
             <a routerLink="/reports" class="text-xs text-gray-500 hover:underline">Visa logg</a>
           </div>
-          <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white px-4 py-1 shadow-sm">
+          <div class="rounded-xl bg-white px-4 py-1 shadow-sm md:min-h-0 md:flex-1 md:overflow-auto">
             <app-movement-list [compact]="true" [pageSize]="6" />
           </div>
         </section>
@@ -220,6 +239,7 @@ export class Dashboard {
   private readonly kr = new KrPipe();
   readonly router = inject(Router);
   readonly bookingCols = BOOKING_COLS;
+  readonly hhmm = time;
 
   /** Perioden för siffrorna under Pengar väljs under Inställningar. */
   readonly days = signal(inject(Settings).value().dashboardDays);
