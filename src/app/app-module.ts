@@ -8,6 +8,8 @@ import { MAT_DATE_LOCALE } from '@angular/material/core';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { App } from './app';
 import { AppRoutingModule } from './app-routing-module';
+import { BillingBanner } from './core/billing/billing-banner';
+import { PlansDialog } from './core/billing/plans-dialog';
 import { Shell } from './core/layout/shell/shell';
 import { AppTitleStrategy } from './core/page-title';
 import { appIdInterceptor } from './core/http/app-id-interceptor';
@@ -20,7 +22,7 @@ import { SharedModule } from './shared/shared-module';
 registerLocaleData(localeSv);
 
 @NgModule({
-  declarations: [App, Shell],
+  declarations: [App, Shell, BillingBanner, PlansDialog],
   imports: [BrowserModule, AppRoutingModule, SharedModule],
   providers: [
     provideBrowserGlobalErrorListeners(),
