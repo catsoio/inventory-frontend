@@ -143,6 +143,22 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
         }
 
         <section class="rounded-xl bg-white p-5 shadow-sm">
+          <div class="mb-2 flex items-center">
+            <h2 class="flex-1 text-lg font-semibold">Försäljningar ({{ c.saleCount }})</h2>
+            @if (c.active) {
+              <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ customerId: c.id }">
+                <mat-icon>add</mat-icon> Ny försäljning
+              </a>
+            }
+          </div>
+          <app-trade-history
+            [rows]="c.sales"
+            kind="sales"
+            empty="Inga försäljningar till den här kunden än."
+          />
+        </section>
+
+        <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-lg font-semibold">Senaste bokningar</h2>
           @for (b of c.bookings; track b.id) {
             <div class="flex flex-wrap items-center gap-x-4 border-t border-gray-100 py-2 text-sm">

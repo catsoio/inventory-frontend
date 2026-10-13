@@ -9,6 +9,9 @@ import {
   Page,
   Resource,
   ServiceType,
+  Supplier,
+  SupplierDetail,
+  SupplierInput,
   Vehicle,
   VehicleDetail,
   VehicleInput,
@@ -56,6 +59,30 @@ export class WorkshopApi {
 
   removeCustomer(id: string): Observable<Archived> {
     return this.http.delete<Archived>(`${this.base}/customers/${id}`);
+  }
+
+  // --- leverantörer ---
+
+  suppliers(
+    query: { q?: string; includeArchived?: boolean; limit?: number; offset?: number } = {},
+  ): Observable<Page<Supplier>> {
+    return this.http.get<Page<Supplier>>(`${this.base}/suppliers`, { params: toParams(query) });
+  }
+
+  supplier(id: string): Observable<SupplierDetail> {
+    return this.http.get<SupplierDetail>(`${this.base}/suppliers/${id}`);
+  }
+
+  createSupplier(body: SupplierInput): Observable<Supplier> {
+    return this.http.post<Supplier>(`${this.base}/suppliers`, body);
+  }
+
+  updateSupplier(id: string, body: SupplierInput): Observable<Supplier> {
+    return this.http.patch<Supplier>(`${this.base}/suppliers/${id}`, body);
+  }
+
+  removeSupplier(id: string): Observable<Archived> {
+    return this.http.delete<Archived>(`${this.base}/suppliers/${id}`);
   }
 
   // --- bilar ---

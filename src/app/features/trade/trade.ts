@@ -10,10 +10,11 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
-import { Article, itemKind } from '../../core/models';
+import { WorkshopApi } from '../../core/api/workshop-api';
+import { Article, Vehicle, itemKind } from '../../core/models';
 
 interface Line {
   a: Article;
@@ -21,18 +22,17 @@ interface Line {
   price: number; // kr
 }
 
-const stamp = () => {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
-};
-
 @Component({
   selector: 'app-trade',
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <h1 class="mb-4 shrink-0 text-2xl font-semibold">{{ sell ? 'Sälj' : 'Inköp' }}</h1>
+    <div class="mb-4 flex shrink-0 items-center gap-2">
+      <a mat-icon-button routerLink=".." aria-label="Till listan"
+        ><mat-icon>arrow_back</mat-icon></a
+      >
+      <h1 class="text-2xl font-semibold">{{ sell ? 'Ny försäljning' : 'Nytt inköp' }}</h1>
+    </div>
 
     <div class="grid min-h-0 flex-1 gap-6 xl:grid-cols-3">
       <section class="flex min-h-64 min-w-0 flex-col gap-4 xl:col-span-2">
@@ -163,15 +163,26 @@ const stamp = () => {
               (input)="reference.set($any($event.target).value)"
             />
           </mat-form-field>
-          @if (!sell) {
-            <mat-form-field>
-              <mat-label>Leverantör</mat-label>
-              <input
-                matInput
-                [value]="supplier()"
-                (input)="supplier.set($any($event.target).value)"
-              />
-            </mat-form-field>
+          @if (sell) {
+            <app-customer-select
+              label="Kund (tomt = kontantförsäljning)"
+              [formControl]="customerCtl"
+            />
+            @if (cars().length) {
+              <mat-form-field>
+                <mat-label>Bil</mat-label>
+                <mat-select [formControl]="vehicleCtl">
+                  <mat-option [value]="null">Ingen bil</mat-option>
+                  @for (v of cars(); track v.id) {
+                    <mat-option [value]="v.id">
+                      {{ v.regNo }} {{ v.make }} {{ v.model }}
+                    </mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+          } @else {
+            <app-supplier-select label="Leverantör" [formControl]="supplierCtl" />
           }
           <mat-form-field>
             <mat-label>Anteckning</mat-label>
@@ -199,16 +210,6 @@ const stamp = () => {
         </mat-card>
       </aside>
     </div>
-
-    <h2 class="mt-4 mb-1 shrink-0 text-xl font-semibold">
-      {{ sell ? 'Senaste försäljningar' : 'Senaste inköp' }}
-    </h2>
-    <app-movement-list
-      class="h-64 shrink-0"
-      [type]="sell ? 'sale' : 'purchase'"
-      [pageSize]="10"
-      [reloadKey]="done()"
-    />
   `,
 })
 export class Trade {
@@ -216,18 +217,24 @@ export class Trade {
   private readonly snack = inject(MatSnackBar);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
 
-  readonly mode: 'sell' | 'receive' = inject(ActivatedRoute).snapshot.data['mode'];
+  private readonly workshop = inject(WorkshopApi);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  readonly mode: 'sell' | 'receive' = this.route.snapshot.data['mode'];
   readonly sell = this.mode === 'sell';
   readonly kind = (a: Article) => itemKind(a.category);
 
   readonly search = new FormControl('', { nonNullable: true });
   readonly results = signal<Article[]>([]);
   readonly lines = signal<Line[]>([]);
-  readonly reference = signal(`${this.sell ? 'S' : 'I'}-${stamp()}`);
-  readonly supplier = signal('');
+  readonly reference = signal('');
+  readonly customerCtl = new FormControl<string | null>(null);
+  readonly vehicleCtl = new FormControl<string | null>(null);
+  readonly supplierCtl = new FormControl<string | null>(null);
+  /** Vald kunds bilar, att välja bland. */
+  readonly cars = signal<Vehicle[]>([]);
   readonly note = signal('');
   readonly busy = signal(false);
-  readonly done = signal(0);
 
   readonly units = computed(() => this.lines().reduce((n, l) => n + (l.qty || 0), 0));
   readonly totalOre = computed(() => this.lines().reduce((n, l) => n + this.lineOre(l), 0));
@@ -236,6 +243,30 @@ export class Trade {
   );
 
   constructor() {
+    // Kunden styr vilka bilar som kan väljas.
+    this.customerCtl.valueChanges
+      .pipe(
+        distinctUntilChanged(),
+        switchMap((id) => (id ? this.workshop.vehicles({ customerId: id, limit: 50 }) : of(null))),
+        takeUntilDestroyed(),
+      )
+      .subscribe((p) => {
+        this.cars.set(p?.items ?? []);
+        const v = this.vehicleCtl.value;
+        if (v && !this.cars().some((c) => c.id === v)) this.vehicleCtl.setValue(null);
+      });
+    // Länkar från kund-, bil- och leverantörskort fyller i vem det gäller.
+    const q = this.route.snapshot.queryParamMap;
+    if (this.sell) {
+      const customerId = q.get('customerId');
+      if (customerId) this.customerCtl.setValue(customerId);
+      const vehicleId = q.get('vehicleId');
+      if (vehicleId) this.vehicleCtl.setValue(vehicleId);
+    } else {
+      const supplierId = q.get('supplierId');
+      if (supplierId) this.supplierCtl.setValue(supplierId);
+    }
+
     this.search.valueChanges
       .pipe(
         debounceTime(250),
@@ -287,32 +318,37 @@ export class Trade {
     this.lines.update((ls) => ls.filter((_, j) => j !== i));
   }
 
-  // Backend har bara åtgärder per artikel, så raderna körs en i taget; lyckade rader tas bort.
+  /** Alla rader bokförs i ett svep under ett löpnummer; vid fel ändras ingenting. */
   async submit() {
     this.busy.set(true);
     const reference = this.reference().trim() || undefined;
     const note = this.note().trim() || undefined;
-    const supplier = this.supplier().trim() || undefined;
-    for (const l of [...this.lines()]) {
+    const lines = this.lines().map((l) => {
       const price = Math.round(l.price * 100);
-      const body = this.sell
-        ? { quantity: l.qty, unitPrice: price, reference, note }
-        : { quantity: l.qty, unitCost: price, supplier, reference, note };
-      try {
-        await firstValueFrom(this.api.stockAction(l.a.id, this.mode, body));
-        this.lines.update((ls) => ls.filter((x) => x !== l));
-      } catch {
-        this.busy.set(false);
-        this.done.update((n) => n + 1);
-        return;
-      }
-    }
-    this.busy.set(false);
-    this.done.update((n) => n + 1);
-    this.snack.open(this.sell ? 'Försäljningen är registrerad' : 'Inköpet är registrerat', 'OK', {
-      duration: 4000,
+      return this.sell
+        ? { articleId: l.a.id, quantity: l.qty, unitPrice: price }
+        : { articleId: l.a.id, quantity: l.qty, unitCost: price };
     });
-    this.reference.set(`${this.sell ? 'S' : 'I'}-${stamp()}`);
-    this.note.set('');
+    try {
+      const doc = await firstValueFrom(
+        this.api.createTrade(this.sell ? 'sales' : 'purchases', {
+          lines,
+          reference,
+          note,
+          ...(this.sell
+            ? {
+                customerId: this.customerCtl.value || undefined,
+                vehicleId: this.vehicleCtl.value || undefined,
+              }
+            : { supplierId: this.supplierCtl.value || undefined }),
+        }),
+      );
+      this.snack.open(`${this.sell ? 'Försäljning' : 'Inköp'} ${doc.code} är registrerad`, 'OK', {
+        duration: 4000,
+      });
+      await this.router.navigate(['..'], { relativeTo: this.route });
+    } catch {
+      this.busy.set(false);
+    }
   }
 }

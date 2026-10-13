@@ -37,6 +37,12 @@ import { KrPipe } from './kr-pipe';
 import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
 import { RegPlate, SvFlag } from './reg-plate/reg-plate';
+import { ResetPasswordDialog } from '../features/settings/reset-password-dialog/reset-password-dialog';
+import { SettingsPage } from '../features/settings/settings';
+import { SupplierDialog } from './supplier-dialog/supplier-dialog';
+import { SupplierSelect } from './supplier-select/supplier-select';
+import { TradeDocumentDialog } from './trade-document-dialog/trade-document-dialog';
+import { TradeHistory } from './trade-history/trade-history';
 import { StockBadge } from './stock-badge/stock-badge';
 
 const MATERIAL = [
@@ -81,6 +87,12 @@ const MATERIAL = [
     ItemIcon,
     RegPlate,
     SvFlag,
+    SettingsPage,
+    ResetPasswordDialog,
+    SupplierDialog,
+    SupplierSelect,
+    TradeDocumentDialog,
+    TradeHistory,
   ],
   imports: [CommonModule, ReactiveFormsModule, RouterModule, ...MATERIAL],
   exports: [
@@ -105,6 +117,10 @@ const MATERIAL = [
     ItemIcon,
     RegPlate,
     SvFlag,
+    SupplierDialog,
+    SupplierSelect,
+    TradeDocumentDialog,
+    TradeHistory,
   ],
 })
 export class SharedModule {}

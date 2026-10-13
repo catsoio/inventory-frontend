@@ -53,6 +53,12 @@ const routes: Routes = [
           import('./features/customers/customers-module').then((m) => m.CustomersModule),
       },
       {
+        path: 'suppliers',
+        title: 'Leverantörer',
+        loadChildren: () =>
+          import('./features/suppliers/suppliers-module').then((m) => m.SuppliersModule),
+      },
+      {
         path: 'vehicles',
         title: 'Bilar',
         loadChildren: () =>
@@ -101,12 +107,7 @@ const routes: Routes = [
         data: { mode: 'receive' },
         loadChildren: () => import('./features/trade/trade-module').then((m) => m.TradeModule),
       },
-      {
-        path: 'settings',
-        title: 'Inställningar',
-        loadChildren: () =>
-          import('./features/settings/settings-module').then((m) => m.SettingsModule),
-      },
+      { path: 'settings', redirectTo: 'dashboard' },
     ],
   },
   { path: '**', redirectTo: '' },

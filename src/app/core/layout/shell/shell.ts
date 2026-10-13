@@ -1,11 +1,13 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatDialog } from '@angular/material/dialog';
 import { NavigationEnd, Router } from '@angular/router';
 import { catchError, debounceTime, filter, merge, of } from 'rxjs';
 import { InventoryApi } from '../../api/inventory-api';
 import { StorageApi } from '../../api/storage-api';
 import { Report, StorageSummary, Summary } from '../../models';
 import { Auth } from '../../auth/auth';
+import { SettingsPage } from '../../../features/settings/settings';
 import { environment } from '../../../../environments/environment';
 import pkg from '../../../../../package.json';
 
@@ -42,7 +44,7 @@ const TABS: AppTab[] = [
     icon: 'home',
     home: '/dashboard',
     // Registren nås från Hem, så deras sidor hör hit.
-    pages: ['dashboard', 'customers', 'vehicles', 'resources', 'service-types'],
+    pages: ['dashboard', 'customers', 'vehicles', 'suppliers', 'resources', 'service-types'],
   },
   {
     id: 'stock',
@@ -95,6 +97,7 @@ const REGISTER_MENU: MenuGroup[] = [
     links: [
       { path: '/customers', label: 'Kunder', icon: 'groups', exact: false },
       { path: '/vehicles', label: 'Bilar', icon: 'directions_car', exact: false },
+      { path: '/suppliers', label: 'Leverantörer', icon: 'local_shipping', exact: false },
       { path: '/resources', label: 'Mekaniker och platser', icon: 'engineering', exact: false },
       { path: '/service-types', label: 'Åtgärder', icon: 'build', exact: false },
     ],
@@ -119,8 +122,8 @@ const MENUS: Record<AppId, MenuGroup[]> = {
     {
       title: 'Transaktioner',
       links: [
-        { path: '/sales', label: 'Sälj', icon: 'point_of_sale', exact: true },
-        { path: '/purchases', label: 'Inköp', icon: 'local_shipping', exact: true },
+        { path: '/sales', label: 'Försäljning', icon: 'point_of_sale', exact: false },
+        { path: '/purchases', label: 'Inköp', icon: 'shopping_cart_checkout', exact: false },
       ],
     },
     {
@@ -189,29 +192,64 @@ const today = () => new Date().toLocaleDateString('sv-SE');
   selector: 'app-shell',
   standalone: false,
   host: { class: 'flex h-dvh flex-col bg-gray-50' },
+  styles: `
+    .hdr-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 9999px;
+      color: #fff;
+      transition: background-color 0.15s;
+    }
+    .hdr-btn:hover {
+      background: rgb(255 255 255 / 0.15);
+    }
+    .hdr-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1;
+      color: rgb(255 255 255 / 0.92);
+      transition: background-color 0.15s;
+    }
+    .hdr-btn mat-icon,
+    .hdr-chip mat-icon {
+      flex: none;
+    }
+  `,
   template: `
     <header
-      class="flex h-14 shrink-0 items-center gap-1 px-2 text-white transition-colors md:gap-4 md:px-4"
+      class="flex h-14 shrink-0 items-center gap-2 px-2 text-white transition-colors md:gap-3 md:px-4"
       [class]="auth.viewingOther() ? 'bg-amber-700' : 'bg-brand'"
     >
       <button
-        mat-icon-button
-        class="md:!hidden !text-white"
+        type="button"
+        class="hdr-btn md:!hidden"
         (click)="drawer.set(true)"
         aria-label="Öppna menyn"
       >
         <mat-icon>menu</mat-icon>
       </button>
+
       @if (auth.isSuperAdmin()) {
         <button
-          mat-button
-          class="!text-lg !font-semibold !text-white"
+          type="button"
+          class="hdr-chip hover:bg-white/15"
           [matMenuTriggerFor]="garageMenu"
           aria-label="Byt garage"
         >
-          <mat-icon class="md:!hidden">business</mat-icon>
-          <span class="max-md:hidden">{{ auth.garage()?.name ?? 'Däcklager' }}</span>
-          <mat-icon iconPositionEnd class="max-md:!hidden">arrow_drop_down</mat-icon>
+          <mat-icon class="!h-5 !w-5 !text-[20px]">business</mat-icon>
+          <span class="max-w-[14rem] truncate max-md:hidden">{{
+            auth.garage()?.name ?? 'Däcklager'
+          }}</span>
+          <mat-icon class="!h-5 !w-5 !text-[20px] opacity-80">expand_more</mat-icon>
         </button>
         <mat-menu #garageMenu="matMenu">
           <div class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
@@ -228,43 +266,49 @@ const today = () => new Date().toLocaleDateString('sv-SE');
           }
         </mat-menu>
       } @else {
-        <span class="text-lg font-semibold max-md:hidden">{{
-          auth.garage()?.name ?? 'Däcklager'
-        }}</span>
+        <span class="hdr-chip max-md:hidden">
+          <mat-icon class="!h-5 !w-5 !text-[20px]">business</mat-icon>
+          <span class="max-w-[14rem] truncate">{{ auth.garage()?.name ?? 'Däcklager' }}</span>
+        </span>
       }
-      <nav
-        class="flex h-full items-stretch gap-0 self-stretch md:ml-4 md:gap-1"
-        aria-label="Avdelning"
-      >
+
+      <span class="mx-1 h-6 w-px bg-white/25 max-md:hidden"></span>
+
+      <nav class="flex h-full items-stretch gap-1 self-stretch" aria-label="Avdelning">
         @for (t of tabs; track t.id) {
           <a
             [routerLink]="t.home"
-            class="relative flex flex-col items-center justify-center gap-0.5 px-3 text-sm whitespace-nowrap transition-colors md:flex-row md:gap-2 md:px-4"
+            class="relative flex flex-col items-center justify-center gap-0.5 px-3 whitespace-nowrap transition-colors md:flex-row md:gap-2 md:px-4"
             [attr.aria-label]="t.label"
-            [class]="app() === t.id ? 'font-semibold text-white' : 'text-white/70 hover:text-white'"
+            [class]="
+              app() === t.id
+                ? 'font-semibold text-white'
+                : 'font-medium text-white/75 hover:bg-white/10 hover:text-white'
+            "
             [attr.aria-current]="app() === t.id ? 'page' : null"
           >
-            <mat-icon class="!h-5 !w-5 !text-xl">{{ t.icon }}</mat-icon>
-            <span class="text-[10px] leading-none md:hidden">{{ t.short }}</span>
-            <span class="hidden md:inline">{{ t.label }}</span>
+            <mat-icon class="!h-6 !w-6 !text-[24px]">{{ t.icon }}</mat-icon>
+            <span class="text-[11px] leading-none md:hidden">{{ t.short }}</span>
+            <span class="hidden text-base leading-none md:inline">{{ t.label }}</span>
             @if (app() === t.id) {
-              <span class="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-white"></span>
+              <span class="absolute inset-x-2 bottom-0 h-[3px] rounded-t bg-white"></span>
             }
           </a>
         }
       </nav>
+
       <span class="flex-1"></span>
-      <span class="text-xs text-white/60 tabular-nums max-lg:hidden" title="Version"
+      <span class="text-xs text-white/70 tabular-nums max-lg:hidden" title="Version"
         >v{{ version }}</span
       >
       <div class="hidden items-center gap-3 lg:flex">
         <span
-          class="grid h-9 w-9 place-items-center rounded-full bg-white/20 text-sm font-semibold uppercase"
+          class="grid h-9 w-9 place-items-center rounded-full bg-white/20 text-sm leading-none font-semibold uppercase"
           >{{ initial() }}</span
         >
         <div class="leading-tight">
           <div class="text-sm font-medium">{{ who() }}</div>
-          <div class="text-xs text-white/70">
+          <div class="text-xs text-white/80">
             {{
               auth.isSuperAdmin()
                 ? 'Superadmin'
@@ -275,18 +319,19 @@ const today = () => new Date().toLocaleDateString('sv-SE');
           </div>
         </div>
       </div>
-      <span class="mx-1 hidden h-6 w-px bg-white/25 lg:block"></span>
-      <a
-        mat-icon-button
-        routerLink="/settings"
-        class="!text-white hover:!bg-white/15 max-md:!hidden"
+      <span class="mx-1 h-6 w-px bg-white/25 max-lg:hidden"></span>
+      <button
+        type="button"
+        class="hdr-btn max-md:!hidden"
         matTooltip="Inställningar"
         aria-label="Inställningar"
-        ><mat-icon>settings</mat-icon></a
+        (click)="openSettings()"
       >
+        <mat-icon>settings</mat-icon>
+      </button>
       <button
-        mat-icon-button
-        class="!text-white hover:!bg-white/15 max-md:!hidden"
+        type="button"
+        class="hdr-btn max-md:!hidden"
         matTooltip="Logga ut"
         aria-label="Logga ut"
         (click)="auth.logout()"
@@ -366,11 +411,13 @@ const today = () => new Date().toLocaleDateString('sv-SE');
           <div
             class="flex flex-col gap-1 border-t border-gray-100 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
-            <a
-              routerLink="/settings"
-              class="flex items-center gap-3 rounded-lg px-3 py-3 text-gray-700"
-              ><mat-icon>settings</mat-icon> Inställningar</a
+            <button
+              type="button"
+              class="flex items-center gap-3 rounded-lg px-3 py-3 text-left text-gray-700"
+              (click)="drawer.set(false); openSettings()"
             >
+              <mat-icon>settings</mat-icon> Inställningar
+            </button>
             <button
               type="button"
               class="flex items-center gap-3 rounded-lg px-3 py-3 text-left text-gray-700"
@@ -510,6 +557,7 @@ export class Shell {
   private readonly api = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
   /** Flikarna i toppbalken. Arbetsorder tänds här när den är byggd. */
   readonly tabs = TABS.filter((t) => !t.hidden);
   /** Vilken flik sidan hör till, utifrån adressen. */
@@ -570,6 +618,10 @@ export class Shell {
     merge(of(null), this.router.events.pipe(filter((e) => e instanceof NavigationEnd)))
       .pipe(debounceTime(400), takeUntilDestroyed(inject(DestroyRef)))
       .subscribe(() => this.refresh());
+  }
+
+  openSettings() {
+    this.dialog.open(SettingsPage, { width: '960px', maxWidth: '95vw', maxHeight: '90vh' });
   }
 
   private refresh() {

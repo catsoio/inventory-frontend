@@ -198,6 +198,65 @@ export interface Movement {
   balanceAfter?: number;
 }
 
+export interface TradeParty {
+  id: string;
+  code: string;
+  name: string;
+  phone?: string | null;
+}
+
+export interface TradeVehicle {
+  id: string;
+  code: string;
+  regNo: string;
+  make: string | null;
+  model: string | null;
+}
+
+/** En rad i försäljnings- eller inköpsloggen: ett dokument med löpnummer. */
+export interface TradeRow {
+  number: number;
+  code: string;
+  createdAt: string;
+  reference: string | null;
+  /** Fri text på inköp som gjordes innan leverantörsregistret fanns. */
+  supplierName: string | null;
+  note: string | null;
+  lines: number;
+  units: number;
+  /** Öre. */
+  total: number;
+  cost: number;
+  customer: TradeParty | null;
+  vehicle: TradeVehicle | null;
+  supplier: TradeParty | null;
+}
+
+export interface TradeLine {
+  articleId: string;
+  articleLabel: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface TradeDocument {
+  number: number;
+  code: string;
+  createdAt: string;
+  reference: string | null;
+  supplierName: string | null;
+  note: string | null;
+  units: number;
+  total: number;
+  customer: TradeParty | null;
+  vehicle: TradeVehicle | null;
+  supplier: TradeParty | null;
+  lines: TradeLine[];
+}
+
+export type TradeKind = 'sales' | 'purchases';
+
 export interface MovementQuery {
   type?: MovementType;
   from?: string;
@@ -661,11 +720,14 @@ export interface VehicleLookup {
 
 /** Bilens kort: bilen med dess senaste bokningar. */
 export interface VehicleDetail extends Vehicle {
+  sales: TradeRow[];
   bookings: Booking[];
   workOrders: WorkOrder[];
 }
 
 export interface CustomerDetail extends Customer {
+  sales: TradeRow[];
+  saleCount: number;
   vehicles: Vehicle[];
   bookings: Booking[];
   workOrders: WorkOrder[];
@@ -794,4 +856,26 @@ export interface WorkOrderInput {
   remarks: string | null;
   notes: string | null;
   lines: WorkOrderLineInput[];
+}
+
+export interface Supplier {
+  id: string;
+  /** LEV-0001 */
+  code: string;
+  number: number;
+  name: string;
+  orgNo: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
+export type SupplierInput = Partial<
+  Pick<Supplier, 'name' | 'orgNo' | 'phone' | 'email' | 'notes' | 'active'>
+>;
+
+export interface SupplierDetail extends Supplier {
+  purchases: TradeRow[];
+  purchaseCount: number;
 }
