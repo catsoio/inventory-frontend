@@ -10,7 +10,6 @@ import { Auth } from '../../auth/auth';
 import { PageTitle } from '../../page-title';
 import { SettingsPage } from '../../../features/settings/settings';
 import { environment } from '../../../../environments/environment';
-import pkg from '../../../../../package.json';
 
 interface Badge {
   text: string;
@@ -261,7 +260,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
           }
         </mat-menu>
       } @else {
-        <span class="hdr-chip max-md:hidden">
+        <span class="hdr-chip max-md:!hidden">
           <mat-icon class="!h-5 !w-5 !text-[20px]">business</mat-icon>
           <span class="max-w-[14rem] truncate">{{ auth.garage()?.name ?? 'Däcklager' }}</span>
         </span>
@@ -270,7 +269,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       <span class="mx-1 h-6 w-px bg-white/25 max-md:hidden"></span>
 
       <span class="min-w-0 flex-1 truncate text-lg font-semibold md:hidden">{{
-        pageName() ?? auth.garage()?.name ?? 'Däcklager'
+        pageName() ?? ''
       }}</span>
       <a routerLink="/customers" class="hdr-btn md:!hidden" aria-label="Kunder">
         <mat-icon>groups</mat-icon>
@@ -309,9 +308,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       </nav>
 
       <span class="flex-1 max-md:hidden"></span>
-      <span class="text-xs text-white/70 tabular-nums max-lg:hidden" title="Version"
-        >v{{ version }}</span
-      >
+      <app-billing-banner />
       <div class="hidden items-center gap-3 lg:flex">
         <span
           class="grid h-9 w-9 place-items-center rounded-full bg-white/20 text-sm leading-none font-semibold uppercase"
@@ -371,7 +368,6 @@ const today = () => new Date().toLocaleDateString('sv-SE');
               >{{ initial() }}</span
             >
             <div class="min-w-0 flex-1 leading-tight">
-              <div class="truncate font-semibold">{{ auth.garage()?.name ?? 'Däcklager' }}</div>
               <div class="truncate text-xs text-white/80">
                 {{ who() }} ·
                 {{
@@ -436,7 +432,6 @@ const today = () => new Date().toLocaleDateString('sv-SE');
             >
               <mat-icon>logout</mat-icon> Logga ut
             </button>
-            <span class="px-3 pt-1 text-xs text-gray-400">v{{ version }}</span>
           </div>
         </aside>
       </div>
@@ -564,7 +559,6 @@ const today = () => new Date().toLocaleDateString('sv-SE');
   `,
 })
 export class Shell {
-  protected readonly version = pkg.version;
 
   readonly auth = inject(Auth);
   /** Sidans namn i mobilens topp (garaget syns i menyn). */
@@ -648,6 +642,8 @@ export class Shell {
       .summary()
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.hotel.set(x));
+    // Försäljningssiffror är bara för ägare; personal får annars 403 på varje sida.
+    if (!this.auth.isAdmin() && !this.auth.isSuperAdmin()) return;
     this.api
       .report(today(), today())
       .pipe(catchError(() => of(null)))

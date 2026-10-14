@@ -14,6 +14,7 @@ import {
   BookingDialogResult,
 } from '../../shared/booking-dialog/booking-dialog';
 import { DtCol } from '../../shared/data-table/data-table';
+import { Auth } from '../../core/auth/auth';
 import { Settings } from '../../core/settings';
 import { KrPipe } from '../../shared/kr-pipe';
 
@@ -204,6 +205,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
       </div>
 
       <div class="min-w-0 flex-col gap-3 max-md:contents md:flex md:min-h-0">
+        @if (admin) {
         <section class="shrink-0 rounded-xl bg-white p-3 shadow-sm max-md:hidden">
           <div class="mb-1 flex items-center justify-between gap-2">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
@@ -233,6 +235,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
             </a>
           }
         </section>
+        }
 
         <section
           class="flex min-w-0 shrink-0 flex-col max-md:order-4 md:min-h-40 md:flex-1 xl:min-h-0"
@@ -256,6 +259,9 @@ const BOOKING_COLS: DtCol<Booking>[] = [
   `,
 })
 export class Dashboard {
+  private readonly auth = inject(Auth);
+  /** Pengar och rapporter är bara för ägare. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
   private readonly bookings = inject(BookingApi);
@@ -337,6 +343,7 @@ export class Dashboard {
   }
 
   private load() {
+    if (!this.admin) return;
     const d = this.days();
     this.api.report(day(-(d - 1)), day(0)).subscribe((r) => this.cur.set(r));
     this.api.report(day(-(2 * d - 1)), day(-d)).subscribe((r) => this.prev.set(r));

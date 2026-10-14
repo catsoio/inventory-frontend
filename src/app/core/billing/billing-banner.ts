@@ -2,27 +2,34 @@ import { Component, computed, effect, inject } from '@angular/core';
 import { Auth } from '../auth/auth';
 import { Billing } from './billing';
 
-/** Smal rad längst ner som talar om hur länge provperioden räcker eller vad som saknas. */
+/** Liten pill i sidhuvudet som talar om hur länge provperioden räcker eller vad som saknas. */
 @Component({
   selector: 'app-billing-banner',
   standalone: false,
   styles: `
+    :host {
+      display: contents;
+    }
+    @media (max-width: 767px) {
+      :host {
+        display: none;
+      }
+    }
     .bar {
-      position: fixed;
-      left: 50%;
-      bottom: 16px;
-      transform: translateX(-50%);
-      z-index: 1000;
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 8px 8px 8px 20px;
-      border-radius: var(--radius-ui);
-      background: #1c1b1f;
+      gap: 8px;
+      min-width: 0;
+      padding: 2px 4px 2px 12px;
+      border-radius: 999px;
+      background: rgb(255 255 255 / 0.18);
       color: #fff;
-      box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
-      max-width: 95vw;
-      font-size: 14px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .bar span {
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .bar.warn {
       background: #b3261e;
@@ -32,7 +39,7 @@ import { Billing } from './billing';
     @if (message(); as m) {
       <div class="bar" [class.warn]="warn()" role="status">
         <span>{{ m }}</span>
-        <button mat-flat-button (click)="billing.openPlans()">
+        <button mat-flat-button class="!h-7" (click)="billing.openPlans()">
           {{ warn() ? 'Välj plan' : 'Se planer' }}
         </button>
       </div>

@@ -3,9 +3,11 @@ import { FormBuilder, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
+import { InventoryApi } from '../../../core/api/inventory-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
-import { RESOURCE_KIND_LABELS, Resource, ResourceKind } from '../../../core/models';
+import { GarageMember, RESOURCE_KIND_LABELS, Resource, ResourceKind } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { Auth } from '../../../core/auth/auth';
 
 /** Kortet för en mekaniker eller plats som kan bokas. */
 @Component({
@@ -23,12 +25,17 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
           @if (c.active) {
-            <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            @if (admin) {
+<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+}
           } @else {
-            <button mat-stroked-button (click)="restore()">Återställ</button>
+            @if (admin) {
+<button mat-stroked-button (click)="restore()">Återställ</button>
+}
           }
         }
-        <button
+        @if (admin) {
+<button
           mat-flat-button
           color="primary"
           (click)="save()"
@@ -36,6 +43,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
         >
           Spara
         </button>
+}
       </div>
 
       <form
@@ -55,6 +63,18 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
             }
           </mat-select>
         </mat-form-field>
+        @if (admin) {
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Inloggning (valfritt)</mat-label>
+            <mat-select formControlName="userId">
+              <mat-option [value]="null">Ingen</mat-option>
+              @for (m of members(); track m.userId) {
+                <mat-option [value]="m.userId">{{ m.name || m.email || m.phone }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Kopplar mekanikern till ett konto så att "Mina" i kalendern fungerar.</mat-hint>
+          </mat-form-field>
+        }
         <label class="flex items-center gap-3 text-sm sm:col-span-2">
           Färg i kalendern
           <input type="color" formControlName="color" class="h-9 w-14 cursor-pointer rounded-lg" />
@@ -64,6 +84,9 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
   `,
 })
 export class ResourceCard implements OnInit {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
@@ -78,9 +101,14 @@ export class ResourceCard implements OnInit {
     name: ['', Validators.required],
     kind: ['mechanic' as ResourceKind],
     color: ['#1976d2'],
+    userId: [null as string | null],
   });
+  readonly members = signal<GarageMember[]>([]);
+  private readonly inventory = inject(InventoryApi);
 
   ngOnInit() {
+    if (!this.admin) this.form.disable();
+    else this.inventory.members().subscribe((m) => this.members.set(m));
     if (this.id) this.load();
   }
 
@@ -89,7 +117,7 @@ export class ResourceCard implements OnInit {
       const r = all.find((x) => x.id === this.id);
       if (!r) return void this.router.navigate(['/resources']);
       this.card.set(r);
-      this.form.reset({ name: r.name, kind: r.kind, color: r.color });
+      this.form.reset({ name: r.name, kind: r.kind, color: r.color, userId: r.userId ?? null });
     });
   }
 

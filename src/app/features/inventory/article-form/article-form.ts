@@ -13,6 +13,7 @@ import {
   RIM_MATERIAL_LABELS,
   SEASON_LABELS,
 } from '../../../core/models';
+import { Auth } from '../../../core/auth/auth';
 import { Settings } from '../../../core/settings';
 
 const int = Validators.pattern(/^\d+$/);
@@ -225,6 +226,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         ><input matInput formControlName="supplier"
       /></mat-form-field>
 
+      @if (admin || !id) {
       <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">shopping_cart</mat-icon>
@@ -241,6 +243,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         }
         <mat-error>Krävs om ingångslager anges</mat-error></mat-form-field
       >
+      }
       <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Försäljningspris (kr, exkl. moms)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">sell</mat-icon>
@@ -298,6 +301,7 @@ export class ArticleForm {
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
   private readonly settings = inject(Settings);
+  readonly admin = inject(Auth).isAdmin();
   private readonly fb = inject(FormBuilder);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
   readonly seasons = Object.entries(SEASON_LABELS);
@@ -363,7 +367,7 @@ export class ArticleForm {
           tyre: a.tyre ?? undefined,
           rim: a.rim ?? undefined,
           sellPrice: a.sellPrice / 100,
-          averageCost: a.averageCost / 100,
+          averageCost: a.averageCost == null ? null : a.averageCost / 100,
         } as never);
         this.applyCategory(a.category);
       });
@@ -415,7 +419,10 @@ export class ArticleForm {
       location: text(v.location),
       reorderLevel: editing ? (v.reorderLevel ?? 0) : opt(v.reorderLevel),
       sellPrice: Math.round(v.sellPrice! * 100),
-      averageCost: v.averageCost == null ? undefined : Math.round(v.averageCost * 100),
+      averageCost:
+        v.averageCost == null || (editing && !this.admin)
+          ? undefined
+          : Math.round(v.averageCost * 100),
       supplier: text(v.supplier),
       notes: text(v.notes),
     };

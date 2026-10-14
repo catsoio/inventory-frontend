@@ -17,6 +17,7 @@ import {
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-picker';
 import { LinkResolver, type ResolvedLink } from '../customer-vehicle-picker/link-resolver';
+import { Auth } from '../../core/auth/auth';
 
 export interface BookingDialogData {
   /** Befintlig bokning, eller null för en ny. */
@@ -128,7 +129,9 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
       </mat-dialog-content>
       <mat-dialog-actions>
         @if (data.booking) {
-          <button mat-button type="button" class="!text-red-700" (click)="remove()">Ta bort</button>
+          @if (admin) {
+<button mat-button type="button" class="!text-red-700" (click)="remove()">Ta bort</button>
+}
         }
         @if (data.booking && workOrdersOn && !legacy) {
           <button mat-button type="button" [disabled]="busy()" (click)="openWorkOrder()">
@@ -143,6 +146,9 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
   `,
 })
 export class BookingDialog {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);

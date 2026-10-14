@@ -8,6 +8,7 @@ import listPlugin from '@fullcalendar/angular/list';
 import svLocale from 'fullcalendar/locales/sv';
 import timeGridPlugin from '@fullcalendar/angular/timegrid';
 import themePlugin from '@fullcalendar/angular/themes/classic';
+import { Auth } from '../../../core/auth/auth';
 import { BookingApi } from '../../../core/api/booking-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { Booking, BookingStatus, Resource } from '../../../core/models';
@@ -37,7 +38,7 @@ const COLORS: Record<BookingStatus, string> = {
         <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
           <mat-option value="">Alla</mat-option>
           @for (r of resources(); track r.id) {
-            <mat-option [value]="r.id">{{ r.name }}</mat-option>
+            <mat-option [value]="r.id">{{ r.name }}{{ mine(r) ? " (jag)" : "" }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
@@ -59,6 +60,12 @@ const COLORS: Record<BookingStatus, string> = {
 export class BookingCalendar implements OnInit {
   private readonly api = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
+  private readonly auth = inject(Auth);
+  private readonly myId = this.auth.user()?.id;
+  /** Mekaniker som är kopplad till den inloggade, om någon. */
+  mine(r: Resource) {
+    return !!this.myId && r.userId === this.myId;
+  }
 
   readonly resources = signal<Resource[]>([]);
   /** Resurs-id som kalendern är filtrerad på, tomt = alla. */
@@ -109,7 +116,12 @@ export class BookingCalendar implements OnInit {
   };
 
   ngOnInit() {
-    this.workshop.resources(true).subscribe((r) => this.resources.set(r));
+    this.workshop.resources(true).subscribe((r) => {
+      this.resources.set(r);
+      // En mekaniker med eget konto ser sina egna bokningar först; "Alla" finns kvar.
+      const mine = r.find((x) => this.mine(x) && x.active);
+      if (mine && !this.auth.isAdmin()) this.filter.set(mine.id);
+    });
   }
 
   setFilter(id: string) {

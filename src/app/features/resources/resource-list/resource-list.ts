@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { Auth } from '../../../core/auth/auth';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { RESOURCE_KIND_LABELS, Resource } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
@@ -22,7 +23,7 @@ const COLS: DtCol<Resource>[] = [
       [columns]="cols"
       [rows]="shown()"
       [loading]="loading()"
-      newLink="/resources/new"
+      [newLink]="admin ? '/resources/new' : null"
       newLabel="Ny"
       emptyText="Inga än. Lägg till de som jobbar hos er."
       searchPlaceholder="Sök namn eller nummer…"
@@ -47,6 +48,9 @@ const COLS: DtCol<Resource>[] = [
   `,
 })
 export class ResourceList {
+  private readonly auth = inject(Auth);
+  /** Bara ägare lägger till och ändrar. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
   private readonly router = inject(Router);
 

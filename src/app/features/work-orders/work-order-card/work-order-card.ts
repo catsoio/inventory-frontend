@@ -19,6 +19,7 @@ import { LinkResolver } from '../../../shared/customer-vehicle-picker/link-resol
 import { switchMap } from 'rxjs';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../../storage/storage-format';
+import { Auth } from '../../../core/auth/auth';
 
 const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
 const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
@@ -37,7 +38,9 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
     >
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
-          <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+          @if (admin) {
+<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+}
           <a
             mat-stroked-button
             [routerLink]="['/workorders', c.id, 'print']"
@@ -192,6 +195,9 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
   `,
 })
 export class WorkOrderCard implements OnInit {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkOrderApi);
   private readonly links = inject(LinkResolver);
   private readonly workshop = inject(WorkshopApi);

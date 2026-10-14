@@ -64,6 +64,9 @@ const DEFAULT_HIDDEN = [
   'lastPurchasedAt',
 ];
 
+/** Kolumner med inköpspris och marginal; döljs för personal. */
+const COST_COLS = ['averageCost', 'marginPercent', 'stockValue'];
+
 const COLS: Col[] = [
   { key: 'number', label: 'Nr', val: (a) => a.code ?? '', fmt: (a) => a.code ?? '–' },
   {
@@ -110,8 +113,8 @@ const COLS: Col[] = [
     key: 'averageCost',
     label: 'Snittkostnad exkl. moms',
     right: true,
-    val: (a) => a.averageCost,
-    fmt: (a) => kr.transform(a.averageCost),
+    val: (a) => a.averageCost ?? 0,
+    fmt: (a) => kr.transform(a.averageCost ?? 0),
   },
   {
     key: 'sellPrice',
@@ -134,8 +137,8 @@ const COLS: Col[] = [
     key: 'stockValue',
     label: 'Lagervärde (inköp, exkl. moms)',
     right: true,
-    val: (a) => a.stockValue,
-    fmt: (a) => kr.transform(a.stockValue),
+    val: (a) => a.stockValue ?? 0,
+    fmt: (a) => kr.transform(a.stockValue ?? 0),
   },
   {
     key: 'supplier',
@@ -503,7 +506,7 @@ export class ArticleList implements OnInit {
   private readonly PAGE = this.settings.pageSize;
 
   readonly admin = inject(Auth).isAdmin();
-  readonly cols = COLS;
+  readonly cols = COLS.filter((c) => this.admin || !COST_COLS.includes(c.key));
   readonly search = new FormControl('', { nonNullable: true });
   readonly seasons = Object.entries(SEASON_LABELS);
   readonly kind = (a: Article) => itemKind(a.category);
@@ -560,7 +563,7 @@ export class ArticleList implements OnInit {
         ),
     ),
   );
-  readonly visibleCols = computed(() => COLS.filter((c) => this.visible().has(c.key)));
+  readonly visibleCols = computed(() => this.cols.filter((c) => this.visible().has(c.key)));
   readonly colFilters = signal<Record<string, string>>({});
   readonly hasColFilters = computed(() => Object.values(this.colFilters()).some((v) => v.trim()));
 

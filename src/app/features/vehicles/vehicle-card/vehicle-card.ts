@@ -12,6 +12,7 @@ import {
 import { environment } from '../../../../environments/environment';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { VehicleAutofill } from '../../../shared/vehicle-autofill';
+import { Auth } from '../../../core/auth/auth';
 
 /** Bilens kort: ägare, uppgifter och bestående anmärkningar, med bilens bokningar under. */
 @Component({
@@ -29,7 +30,9 @@ import { VehicleAutofill } from '../../../shared/vehicle-autofill';
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
           @if (c.active) {
-            <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            @if (admin) {
+<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+}
           } @else {
             <button mat-stroked-button (click)="restore()">Återställ</button>
           }
@@ -171,6 +174,9 @@ import { VehicleAutofill } from '../../../shared/vehicle-autofill';
   `,
 })
 export class VehicleCard implements OnInit {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
   private readonly autofill = inject(VehicleAutofill);
   private readonly dialog = inject(MatDialog);

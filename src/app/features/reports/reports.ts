@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
+import { Auth } from '../../core/auth/auth';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { MOVEMENT_LABELS, MovementType, Report } from '../../core/models';
 
@@ -55,6 +56,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 })
 export class Reports {
   private readonly api = inject(InventoryApi);
+  private readonly auth = inject(Auth);
   readonly types = Object.entries(MOVEMENT_LABELS);
   readonly form = inject(FormBuilder).group({
     from: [iso(new Date(Date.now() - 30 * 864e5))],
@@ -71,6 +73,8 @@ export class Reports {
   apply() {
     const { from, to, type } = this.form.getRawValue();
     this.applied.set({ type: type ?? undefined, from: from || undefined, to: to || undefined });
-    this.api.report(from || undefined, to || undefined).subscribe((r) => this.report.set(r));
+    if (this.auth.isAdmin() || this.auth.isSuperAdmin()) {
+      this.api.report(from || undefined, to || undefined).subscribe((r) => this.report.set(r));
+    }
   }
 }

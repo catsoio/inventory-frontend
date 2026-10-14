@@ -144,7 +144,7 @@ export class StockActionDialog {
         [...int, Validators.min(1), ...(outgoing ? [Validators.max(art.quantity)] : [])],
       ],
       countedQuantity: [String(art.quantity), int],
-      unitCost: [kr(art.averageCost), [Validators.required, Validators.min(0)]],
+      unitCost: [kr(art.averageCost ?? 0), [Validators.required, Validators.min(0)]],
       unitPrice: [kr(art.sellPrice), [Validators.min(0)]],
       supplier: [art.supplier ?? ''],
       reference: [''],

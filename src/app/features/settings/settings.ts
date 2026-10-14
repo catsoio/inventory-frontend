@@ -8,6 +8,7 @@ import { Auth } from '../../core/auth/auth';
 import { Billing } from '../../core/billing/billing';
 import { GarageMember, SEASON_LABELS } from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
+import pkg from '../../../../package.json';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
 
 @Component({
@@ -204,10 +205,12 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
           </div>
         </section>
       }
+      <div class="px-5 py-4 text-xs text-gray-400 tabular-nums">Version {{ version }}</div>
     </mat-dialog-content>
   `,
 })
 export class SettingsPage {
+  protected readonly version = pkg.version;
   private readonly settings = inject(Settings);
   private readonly snack = inject(MatSnackBar);
   private readonly api = inject(InventoryApi);
@@ -271,7 +274,9 @@ export class SettingsPage {
     const seen = m.lastSeenAt
       ? `senast inloggad ${new Date(m.lastSeenAt).toLocaleDateString('sv-SE')}`
       : 'har aldrig loggat in';
-    return [m.name ? m.email : null, m.phone, seen].filter(Boolean).join(' · ');
+    const n = m.activeSessions ?? 0;
+    const devices = n > 0 ? `${n} ${n === 1 ? 'enhet' : 'enheter'} inloggade` : null;
+    return [m.name ? m.email : null, m.phone, seen, devices].filter(Boolean).join(' · ');
   }
 
   resetPassword(m: GarageMember) {

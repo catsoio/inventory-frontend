@@ -342,7 +342,7 @@ export class Trade {
     this.lines.update((ls) => {
       const i = ls.findIndex((l) => l.a.id === a.id);
       if (i >= 0) return ls.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
-      const price = this.sell ? a.sellPrice / 100 : a.averageCost / 100;
+      const price = this.sell ? a.sellPrice / 100 : (a.averageCost ?? 0) / 100;
       return [...ls, { a, qty: 1, price }];
     });
     this.search.setValue('', { emitEvent: false });
