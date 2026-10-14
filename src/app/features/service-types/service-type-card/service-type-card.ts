@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { ServiceType } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { Auth } from '../../../core/auth/auth';
 
 /** Kortet för en åtgärd: namn, standardtid och prisspann som bokningen fylls i med. */
 @Component({
@@ -23,19 +24,25 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
           @if (c.active) {
-            <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            @if (admin) {
+<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+}
           } @else {
-            <button mat-stroked-button (click)="restore()">Återställ</button>
+            @if (admin) {
+<button mat-stroked-button (click)="restore()">Återställ</button>
+}
           }
         }
-        <button
+        @if (admin) {
+<button
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || (!!card() && form.pristine)"
+          [disabled]="form.invalid || busy()"
         >
           Spara
         </button>
+}
       </div>
 
       <form
@@ -53,11 +60,11 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
           <mat-error>Minst 5 minuter</mat-error>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris från (kr)</mat-label>
+          <mat-label>Pris från (kr, exkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceFrom" />
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris till (kr)</mat-label>
+          <mat-label>Pris till (kr, exkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceTo" />
           @if (form.errors?.['price']) {
             <mat-error>Lägre än "från"</mat-error>
@@ -68,6 +75,9 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
   `,
 })
 export class ServiceTypeCard implements OnInit {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
@@ -93,6 +103,7 @@ export class ServiceTypeCard implements OnInit {
   );
 
   ngOnInit() {
+    if (!this.admin) this.form.disable();
     if (this.id) this.load();
   }
 

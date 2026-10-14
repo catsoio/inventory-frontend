@@ -8,6 +8,7 @@ import listPlugin from '@fullcalendar/angular/list';
 import svLocale from 'fullcalendar/locales/sv';
 import timeGridPlugin from '@fullcalendar/angular/timegrid';
 import themePlugin from '@fullcalendar/angular/themes/classic';
+import { Auth } from '../../../core/auth/auth';
 import { BookingApi } from '../../../core/api/booking-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { Booking, BookingStatus, Resource } from '../../../core/models';
@@ -31,19 +32,24 @@ const COLORS: Record<BookingStatus, string> = {
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 items-center gap-3">
-      <h1 class="text-2xl font-semibold">Tidsbokning</h1>
-      <mat-form-field class="w-52" subscriptSizing="dynamic">
+      <h1 class="text-2xl font-semibold max-md:hidden">Tidsbokning</h1>
+      <mat-form-field class="w-52 max-md:min-w-0 max-md:flex-1" subscriptSizing="dynamic">
         <mat-label>Visa</mat-label>
         <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
           <mat-option value="">Alla</mat-option>
           @for (r of resources(); track r.id) {
-            <mat-option [value]="r.id">{{ r.name }}</mat-option>
+            <mat-option [value]="r.id">{{ r.name }}{{ mine(r) ? " (jag)" : "" }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
-      <span class="flex-1"></span>
-      <button mat-flat-button color="primary" (click)="create(newStart(), newEnd())">
-        <mat-icon>add</mat-icon> Ny bokning
+      <span class="flex-1 max-md:hidden"></span>
+      <button
+        mat-flat-button
+        color="primary"
+        class="whitespace-nowrap"
+        (click)="create(newStart(), newEnd())"
+      >
+        <mat-icon>add</mat-icon> Ny<span class="max-md:hidden">&nbsp;bokning</span>
       </button>
     </div>
     <div class="min-h-0 flex-1 rounded-xl bg-white p-3 shadow-sm">
@@ -54,6 +60,12 @@ const COLORS: Record<BookingStatus, string> = {
 export class BookingCalendar implements OnInit {
   private readonly api = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
+  private readonly auth = inject(Auth);
+  private readonly myId = this.auth.user()?.id;
+  /** Mekaniker som är kopplad till den inloggade, om någon. */
+  mine(r: Resource) {
+    return !!this.myId && r.userId === this.myId;
+  }
 
   readonly resources = signal<Resource[]>([]);
   /** Resurs-id som kalendern är filtrerad på, tomt = alla. */
@@ -62,15 +74,18 @@ export class BookingCalendar implements OnInit {
 
   @ViewChild(FullCalendarComponent) calendar!: FullCalendarComponent;
 
+  /** Mobil: bara dagvyn, med pilar och Idag. */
+  private readonly mobile = window.innerWidth < 768;
+
   readonly options: CalendarOptions = {
     plugins: [themePlugin, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin],
     locale: svLocale,
-    initialView: window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek',
+    initialView: this.mobile ? 'timeGridDay' : 'timeGridWeek',
     height: '100%',
     headerToolbar: {
       left: 'prev,next today',
       center: 'title',
-      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
+      right: this.mobile ? '' : 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
     },
     weekNumbers: true,
     nowIndicator: true,
@@ -101,7 +116,12 @@ export class BookingCalendar implements OnInit {
   };
 
   ngOnInit() {
-    this.workshop.resources(true).subscribe((r) => this.resources.set(r));
+    this.workshop.resources(true).subscribe((r) => {
+      this.resources.set(r);
+      // En mekaniker med eget konto ser sina egna bokningar först; "Alla" finns kvar.
+      const mine = r.find((x) => this.mine(x) && x.active);
+      if (mine && !this.auth.isAdmin()) this.filter.set(mine.id);
+    });
   }
 
   setFilter(id: string) {
@@ -151,6 +171,7 @@ export class BookingCalendar implements OnInit {
         data,
         width: '720px',
         maxWidth: '96vw',
+        panelClass: 'dialog-sheet',
       })
       .afterClosed()
       .subscribe((r) => r && this.calendar.getApi().refetchEvents());

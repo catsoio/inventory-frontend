@@ -18,7 +18,7 @@ interface Row {
     @if (summary; as s) {
       <section>
         <h3 class="mb-2 text-sm font-semibold tracking-wide text-gray-500 uppercase">
-          Försäljning och resultat
+          Försäljning och resultat (alla belopp exkl. moms)
         </h3>
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
           @for (t of tiles(); track t[0]) {
@@ -33,7 +33,7 @@ interface Row {
 
       <section class="rounded-xl bg-white p-4 shadow-sm">
         <h3 class="mb-2 text-sm font-semibold tracking-wide text-gray-500 uppercase">
-          Lagervärde (till inköpspris)
+          Lagervärde (till inköpspris, exkl. moms)
         </h3>
         <table class="w-full text-sm">
           <tbody>
@@ -54,7 +54,7 @@ interface Row {
       </section>
 
       <section>
-        <h3 class="mb-2 text-sm font-semibold tracking-wide text-gray-500 uppercase">Däckhotell</h3>
+        <h3 class="mb-2 text-sm font-semibold tracking-wide text-gray-500 uppercase">Däckhotell (belopp exkl. moms)</h3>
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
           @for (t of hotel(); track t[0]) {
             <div class="rounded-xl bg-white p-4 shadow-sm">

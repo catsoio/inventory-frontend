@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { Auth } from '../../../core/auth/auth';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { ServiceType } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
@@ -19,7 +20,7 @@ const COLS: DtCol<ServiceType>[] = [
   },
   {
     key: 'price',
-    label: 'Pris',
+    label: 'Pris exkl. moms',
     right: true,
     value: (t) => t.priceFrom ?? 0,
     fmt: (t) =>
@@ -41,7 +42,7 @@ const COLS: DtCol<ServiceType>[] = [
       [columns]="cols"
       [rows]="shown()"
       [loading]="loading()"
-      newLink="/service-types/new"
+      [newLink]="admin ? '/service-types/new' : null"
       newLabel="Ny åtgärd"
       emptyText="Inga än, t.ex. Däckbyte, Service, Hjulinställning."
       searchPlaceholder="Sök åtgärd eller nummer…"
@@ -61,6 +62,9 @@ const COLS: DtCol<ServiceType>[] = [
   `,
 })
 export class ServiceTypeList {
+  private readonly auth = inject(Auth);
+  /** Bara ägare lägger till och ändrar. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
   private readonly router = inject(Router);
 

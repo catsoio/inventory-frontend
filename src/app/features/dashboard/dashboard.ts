@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
@@ -14,6 +14,7 @@ import {
   BookingDialogResult,
 } from '../../shared/booking-dialog/booking-dialog';
 import { DtCol } from '../../shared/data-table/data-table';
+import { Auth } from '../../core/auth/auth';
 import { Settings } from '../../core/settings';
 import { KrPipe } from '../../shared/kr-pipe';
 
@@ -70,16 +71,25 @@ const BOOKING_COLS: DtCol<Booking>[] = [
   standalone: false,
   host: { class: 'flex h-full flex-col gap-3 overflow-auto md:overflow-hidden' },
   template: `
-    <h1 class="shrink-0 text-2xl font-semibold">Hem</h1>
+    <h1 class="shrink-0 text-2xl font-semibold max-md:hidden">Hem</h1>
 
     <ng-template #kpi let-c>
       <a [routerLink]="c.link" [queryParams]="c.params" class="block">
-        <div class="flex h-full min-h-[5.5rem] flex-col justify-between rounded-xl px-3 py-3 transition hover:brightness-[0.97] md:min-h-0 md:p-3" [class]="c.tone">
+        <div
+          class="flex h-full min-h-[5.5rem] flex-col justify-between rounded-xl px-3 py-3 transition hover:brightness-[0.97] md:min-h-0 md:p-3"
+          [class]="c.tone"
+        >
           <div class="flex items-start justify-between gap-2">
             <span class="text-xs leading-tight text-gray-600">{{ c.label }}</span>
-            <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-500 max-md:hidden">{{ c.icon }}</mat-icon>
+            <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-500 max-md:hidden">{{
+              c.icon
+            }}</mat-icon>
           </div>
-          <div class="truncate text-2xl leading-none font-semibold tracking-tight max-md:my-1.5 md:mt-0.5">{{ c.value }}</div>
+          <div
+            class="truncate text-2xl leading-none font-semibold tracking-tight max-md:my-1.5 md:mt-0.5"
+          >
+            {{ c.value }}
+          </div>
           <div class="flex min-h-4 items-center gap-1 text-xs">
             @if (c.delta; as d) {
               <span class="flex items-center font-medium" [class]="d.cls">
@@ -115,7 +125,9 @@ const BOOKING_COLS: DtCol<Booking>[] = [
           </div>
         </section>
 
-        <section class="flex min-w-0 shrink-0 flex-col max-md:order-5 md:min-h-48 md:flex-1 xl:min-h-0">
+        <section
+          class="flex min-w-0 shrink-0 flex-col max-md:order-5 md:min-h-48 md:flex-1 xl:min-h-0"
+        >
           <div class="mb-1 flex shrink-0 flex-wrap items-center gap-2">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
               <mat-icon class="!h-5 !w-5 !text-xl text-gray-400">calendar_month</mat-icon>
@@ -137,14 +149,24 @@ const BOOKING_COLS: DtCol<Booking>[] = [
                 type="button"
                 (click)="open(b)"
                 class="flex items-center gap-3 rounded-xl bg-white p-2.5 text-left shadow-sm"
+                [class.opacity-55]="past(b) || b.status === 'done'"
               >
-                <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{ hhmm(b.start) }}</span>
+                <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{
+                  hhmm(b.start)
+                }}</span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-sm">{{ b.title }}</span>
                   <span class="block truncate text-xs text-gray-500">
                     {{ b.regNo || '–' }} · {{ b.customerName }}
                   </span>
                 </span>
+                @if (b.status === 'done') {
+                  <app-pill tone="green">Klar</app-pill>
+                } @else if (past(b)) {
+                  <app-pill tone="gray">Passerad</app-pill>
+                } @else if (b.status === 'arrived') {
+                  <app-pill tone="amber">Här</app-pill>
+                }
               </button>
             } @empty {
               <p class="py-2 text-sm text-gray-500">Inga bokningar idag.</p>
@@ -183,6 +205,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
       </div>
 
       <div class="min-w-0 flex-col gap-3 max-md:contents md:flex md:min-h-0">
+        @if (admin) {
         <section class="shrink-0 rounded-xl bg-white p-3 shadow-sm max-md:hidden">
           <div class="mb-1 flex items-center justify-between gap-2">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
@@ -212,8 +235,11 @@ const BOOKING_COLS: DtCol<Booking>[] = [
             </a>
           }
         </section>
+        }
 
-        <section class="flex min-w-0 shrink-0 flex-col max-md:order-4 md:min-h-40 md:flex-1 xl:min-h-0">
+        <section
+          class="flex min-w-0 shrink-0 flex-col max-md:order-4 md:min-h-40 md:flex-1 xl:min-h-0"
+        >
           <div class="mb-1 flex shrink-0 items-center justify-between">
             <h2
               class="flex items-center gap-2 text-xs font-semibold tracking-wide text-gray-500 uppercase"
@@ -222,7 +248,9 @@ const BOOKING_COLS: DtCol<Booking>[] = [
             </h2>
             <a routerLink="/reports" class="text-xs text-gray-500 hover:underline">Visa logg</a>
           </div>
-          <div class="rounded-xl bg-white px-4 py-1 shadow-sm md:min-h-0 md:flex-1 md:overflow-auto">
+          <div
+            class="rounded-xl bg-white px-4 py-1 shadow-sm md:min-h-0 md:flex-1 md:overflow-auto"
+          >
             <app-movement-list [compact]="true" [pageSize]="6" />
           </div>
         </section>
@@ -231,6 +259,9 @@ const BOOKING_COLS: DtCol<Booking>[] = [
   `,
 })
 export class Dashboard {
+  private readonly auth = inject(Auth);
+  /** Pengar och rapporter är bara för ägare. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
   private readonly bookings = inject(BookingApi);
@@ -256,11 +287,21 @@ export class Dashboard {
   readonly shown = computed(() =>
     this.today().filter((b) => !this.filter() || b.resourceId === this.filter()),
   );
+  /** Klockan, uppdaterad varje minut, så att "kvar" följer tiden på dagen. */
+  readonly now = signal(Date.now());
+  /** Passerad: sluttiden har gått, oavsett status. */
+  readonly past = (b: Booking) => new Date(b.end).getTime() <= this.now();
+  /** Kvar: inte avslutad och inte passerad. */
   readonly left = computed(
-    () => this.shown().filter((b) => b.status === 'booked' || b.status === 'arrived').length,
+    () =>
+      this.shown().filter(
+        (b) => (b.status === 'booked' || b.status === 'arrived') && !this.past(b),
+      ).length,
   );
 
   constructor() {
+    const tick = setInterval(() => this.now.set(Date.now()), 60_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(tick));
     this.load();
     this.loadBookings();
     this.workshop
@@ -283,6 +324,7 @@ export class Dashboard {
         data,
         width: '720px',
         maxWidth: '96vw',
+        panelClass: 'dialog-sheet',
       })
       .afterClosed()
       .subscribe((r) => r && this.loadBookings());
@@ -301,6 +343,7 @@ export class Dashboard {
   }
 
   private load() {
+    if (!this.admin) return;
     const d = this.days();
     this.api.report(day(-(d - 1)), day(0)).subscribe((r) => this.cur.set(r));
     this.api.report(day(-(2 * d - 1)), day(-d)).subscribe((r) => this.prev.set(r));
@@ -357,7 +400,7 @@ export class Dashboard {
         label: 'Obetalda',
         icon: 'payments',
         value: h?.unpaid ?? '–',
-        sub: h ? this.kr.transform(h.unpaidAmount) : '',
+        sub: h ? this.kr.transform(h.unpaidAmount) + ' exkl. moms' : '',
         link: '/storage',
         params: { status: 'stored', paymentStatus: 'unpaid' },
         tone: 'bg-amber-50',
@@ -384,7 +427,7 @@ export class Dashboard {
     const rep = '/reports';
     const cards: Card[] = [
       {
-        label: 'Försäljning',
+        label: 'Försäljning exkl. moms',
         icon: 'sell',
         value: c ? k(c.soldRevenue) : '–',
         sub: '',
@@ -394,7 +437,7 @@ export class Dashboard {
         tone: 'bg-blue-50',
       },
       {
-        label: 'Bruttovinst',
+        label: 'Bruttovinst exkl. moms',
         icon: 'trending_up',
         value: c ? k(c.grossProfit) : '–',
         sub: margin,
@@ -414,7 +457,7 @@ export class Dashboard {
         tone: 'bg-green-50',
       },
       {
-        label: 'Inköp',
+        label: 'Inköp exkl. moms',
         icon: 'local_shipping',
         value: c ? k(c.purchasedCost) : '–',
         sub: c ? `${c.purchasedUnits} st` : '',

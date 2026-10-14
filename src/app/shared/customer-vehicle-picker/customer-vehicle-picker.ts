@@ -10,12 +10,9 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, ControlValueAccessor, FormControl, NgControl } from '@angular/forms';
-import { MatDialog } from '@angular/material/dialog';
 import { debounceTime, of, startWith, switchMap } from 'rxjs';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { Customer, Vehicle } from '../../core/models';
-import { CustomerDialog } from '../customer-dialog/customer-dialog';
-import { VehicleDialog } from '../vehicle-dialog/vehicle-dialog';
 
 /** Det en vald kund består av här. */
 export type CustomerRef = Pick<Customer, 'id' | 'name' | 'code' | 'phone'>;
@@ -29,17 +26,24 @@ export interface PickerValue {
   vehicleId: string;
   customer?: CustomerRef;
   vehicle?: Vehicle;
+  /**
+   * Något är skrivet men inte valt ur listan: kunden och/eller bilen skapas när formuläret sparas
+   * (se `LinkResolver`). `customerId`/`vehicleId` är då tomma.
+   */
+  pending?: { customerId?: string; customerName?: string; regNo?: string };
 }
 
-const NEW = '__new__';
-
-/** Giltigt först när något valts ur listan (ett objekt), inte bara skrivits. */
-const picked = (c: AbstractControl) =>
-  c.value && typeof c.value === 'object' ? null : { pick: true };
+/** Giltigt när något valts ur listan (ett objekt) eller skrivits (då skapas det vid spar). */
+const filled = (min: number) => (c: AbstractControl) => {
+  const v = c.value;
+  if (v && typeof v === 'object') return null;
+  return typeof v === 'string' && v.trim().length >= min ? null : { required: true };
+};
 
 /**
  * Kund och bil som hänger ihop: välj kund så visas bara hennes bilar, välj bil först så
- * fylls kunden i. "+ Ny kund" och "+ Ny bil" öppnar en dialog utan att man lämnar formuläret.
+ * fylls kunden i. Skriver man något som inte finns skapas kunden och/eller bilen när formuläret
+ * sparas (`LinkResolver`), så det blir ingen dialog i dialogen.
  */
 @Component({
   selector: 'app-customer-vehicle-picker',
@@ -47,14 +51,15 @@ const picked = (c: AbstractControl) =>
   template: `
     <div class="grid gap-x-3 sm:grid-cols-2">
       <mat-form-field>
-        <mat-label>Kund</mat-label>
+        <mat-label>{{ customerLabel }}</mat-label>
         <mat-icon matPrefix class="mr-2 text-gray-400">person</mat-icon>
         <input
           matInput
           [formControl]="customer"
           [matAutocomplete]="customerAuto"
+          (input)="edited.set(true)"
           autocomplete="off"
-          placeholder="Sök namn, telefon eller KU-nummer"
+          placeholder="Sök eller skriv ny kund"
         />
         <mat-autocomplete
           #customerAuto="matAutocomplete"
@@ -67,11 +72,8 @@ const picked = (c: AbstractControl) =>
               <span class="ml-2 text-xs text-gray-500">{{ c.code }} {{ c.phone }}</span>
             </mat-option>
           }
-          <mat-option [value]="NEW" class="!font-medium !text-brand">
-            + Ny kund{{ customerText() ? ' "' + customerText() + '"' : '' }}
-          </mat-option>
         </mat-autocomplete>
-        <mat-error>Välj en kund ur listan, eller skapa en ny</mat-error>
+        <mat-error>Ange kund</mat-error>
       </mat-form-field>
 
       <mat-form-field>
@@ -81,9 +83,10 @@ const picked = (c: AbstractControl) =>
           matInput
           [formControl]="vehicle"
           [matAutocomplete]="vehicleAuto"
+          (input)="edited.set(true)"
           appRegNo
           class="uppercase"
-          [placeholder]="customerRef() ? 'Kundens bilar' : 'Sök regnr'"
+          [placeholder]="customerRef() ? 'Kundens bilar eller nytt regnr' : 'Sök eller skriv regnr'"
         />
         <mat-autocomplete
           #vehicleAuto="matAutocomplete"
@@ -101,21 +104,32 @@ const picked = (c: AbstractControl) =>
               </span>
             </mat-option>
           }
-          @if (customerRef()) {
-            <mat-option [value]="NEW" class="!font-medium !text-brand">
-              + Ny bil åt {{ customerRef()!.name }}
-            </mat-option>
-          }
         </mat-autocomplete>
-        <mat-error>Välj en bil ur listan</mat-error>
+        <mat-error>Ange registreringsnummer</mat-error>
       </mat-form-field>
     </div>
+
+    @if (newCustomer() || newVehicle()) {
+      <div class="mb-3 -mt-1 flex items-start gap-1 text-xs text-gray-600">
+        <mat-icon class="!h-4 !w-4 shrink-0 !text-base text-brand">add_circle</mat-icon>
+        <span>
+          @if (newCustomer() && newVehicle()) {
+            Ny kund och ny bil skapas när du sparar.
+          } @else if (newCustomer()) {
+            Ny kund skapas när du sparar.
+          } @else {
+            Ny bil skapas åt {{ customerRef()?.name }} när du sparar.
+          }
+          Resten fyller du i senare på kortet.
+        </span>
+      </div>
+    }
 
     @if (selectedVehicle(); as v) {
       <div class="mb-4 text-sm">
         <span class="font-medium">{{ carLabel(v) || v.regNo }}</span>
         @if (v.notes) {
-          <div class="mt-1 rounded bg-amber-50 px-2 py-1 text-amber-900">
+          <div class="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-amber-900">
             <mat-icon class="!h-4 !w-4 align-middle !text-base">warning</mat-icon>
             {{ v.notes }}
           </div>
@@ -126,7 +140,6 @@ const picked = (c: AbstractControl) =>
 })
 export class CustomerVehiclePicker implements ControlValueAccessor {
   private readonly api = inject(WorkshopApi);
-  private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Gammal post utan register: visa den gamla texten tills man väljer ur listan. */
@@ -137,8 +150,20 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     this.vehicle.setValue(v.regNo ?? '', { emitEvent: false });
   }
 
+  /** Rubrik på kundfältet. */
+  @Input() customerLabel = 'Kund';
+  /** Valfritt: bilen får saknas, och hela väljaren får vara tom (t.ex. kontantförsäljning). */
+  @Input() set optional(v: boolean) {
+    const [c, r] = v ? [[], []] : [filled(1), filled(2)];
+    this.customer.setValidators(c);
+    this.vehicle.setValidators(r);
+    this.customer.updateValueAndValidity({ emitEvent: false });
+    this.vehicle.updateValueAndValidity({ emitEvent: false });
+    this.isOptional = v;
+  }
+
+  private isOptional = false;
   private hasLegacy = false;
-  readonly NEW = NEW;
   readonly customerOptions = signal<Customer[]>([]);
   private readonly ownCars = signal<Vehicle[]>([]);
   private readonly foundCars = signal<Vehicle[]>([]);
@@ -147,13 +172,26 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
   readonly customerRef = signal<CustomerRef | null>(null);
   readonly selectedVehicle = signal<Vehicle | null>(null);
 
+  /** Skrivet men inte valt: skapas vid spar. */
+  readonly newCustomer = computed(
+    () => !this.customerRef() && this.customerText().trim().length > 0 && !this.isLegacyText(),
+  );
+  readonly newVehicle = computed(
+    () => !this.selectedVehicle() && this.carQuery().trim().length >= 2 && !this.isLegacyText(),
+  );
+  /** Sant när man själv skrivit i något av fälten. */
+  readonly edited = signal(false);
+  private isLegacyText() {
+    return this.hasLegacy && !this.edited();
+  }
+
   readonly customer = new FormControl<string | CustomerRef>('', {
     nonNullable: true,
-    validators: picked,
+    validators: filled(1),
   });
   readonly vehicle = new FormControl<string | Vehicle>('', {
     nonNullable: true,
-    validators: picked,
+    validators: filled(2),
   });
 
   /** Kundens bilar filtrerade på det som skrivits; utan kund söks alla bilar. */
@@ -174,10 +212,8 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
   }
 
   carLabel = (v: Vehicle) => [v.make, v.model, v.year].filter(Boolean).join(' ');
-  showCustomer = (c: string | CustomerRef | null) =>
-    !c || c === NEW ? '' : typeof c === 'string' ? c : c.name;
-  showVehicle = (v: string | Vehicle | null) =>
-    !v || v === NEW ? '' : typeof v === 'string' ? v : v.regNo;
+  showCustomer = (c: string | CustomerRef | null) => (!c ? '' : typeof c === 'string' ? c : c.name);
+  showVehicle = (v: string | Vehicle | null) => (!v ? '' : typeof v === 'string' ? v : v.regNo);
 
   /** Sök i registren medan man skriver. */
   private watchTyping() {
@@ -196,6 +232,7 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     // Skriver man om kundfältet efter ett val är valet borta, och bilen med det.
     this.customer.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((v) => {
       if (typeof v !== 'string') return;
+      this.edited.set(true);
       this.customerRef.set(null);
       this.ownCars.set([]);
       if (this.vehicle.value && typeof this.vehicle.value === 'object') this.setVehicle('');
@@ -218,38 +255,12 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
       .subscribe((p) => p && this.foundCars.set(p.items));
   }
 
-  pickCustomer(value: Customer | string) {
-    if (value !== NEW) return this.setCustomer(value as Customer);
-    const name = this.customerText();
-    this.customer.setValue(name);
-    this.dialog
-      .open<CustomerDialog, unknown, Customer>(CustomerDialog, {
-        data: { name },
-        width: '560px',
-        maxWidth: '96vw',
-      })
-      .afterClosed()
-      .subscribe((c) => c && this.setCustomer(c));
+  pickCustomer(value: Customer) {
+    this.setCustomer(value);
   }
 
-  pickVehicle(value: Vehicle | string) {
-    const c = this.customerRef();
-    if (value !== NEW) return this.setVehicle(value as Vehicle);
-    const regNo = this.carQuery().toUpperCase();
-    this.vehicle.setValue(regNo);
-    if (!c) return;
-    this.dialog
-      .open<VehicleDialog, unknown, Vehicle>(VehicleDialog, {
-        data: { customerId: c.id, customerName: c.name, regNo },
-        width: '640px',
-        maxWidth: '96vw',
-      })
-      .afterClosed()
-      .subscribe((v) => {
-        if (!v) return;
-        this.ownCars.update((l) => [...l, v]);
-        this.setVehicle(v);
-      });
+  pickVehicle(value: Vehicle) {
+    this.setVehicle(value);
   }
 
   private setCustomer(c: CustomerRef) {
@@ -280,11 +291,34 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
   private emit() {
     const customer = this.customerRef();
     const vehicle = this.selectedVehicle();
-    this.onChange(
-      customer && vehicle
-        ? { customerId: customer.id, vehicleId: vehicle.id, customer, vehicle }
-        : null,
-    );
+    if (customer && vehicle) {
+      return this.onChange({ customerId: customer.id, vehicleId: vehicle.id, customer, vehicle });
+    }
+    // Gammal text från före registren är ingen ny kund förrän man ändrat den.
+    if (this.isLegacyText()) return this.onChange(null);
+    const c = this.customer.value;
+    const v = this.vehicle.value;
+    const customerName = typeof c === 'string' ? c.trim() : '';
+    const regNo = typeof v === 'string' ? v.trim().toUpperCase() : '';
+    if (regNo.length >= 2 && (customer || customerName)) {
+      return this.onChange({
+        customerId: '',
+        vehicleId: '',
+        pending: {
+          customerId: customer?.id,
+          customerName: customer ? customer.name : customerName,
+          regNo,
+        },
+      });
+    }
+    // Valfri bil: bara en kund räcker.
+    if (this.isOptional && customer) {
+      return this.onChange({ customerId: customer.id, vehicleId: '', customer });
+    }
+    if (this.isOptional && customerName) {
+      return this.onChange({ customerId: '', vehicleId: '', pending: { customerName } });
+    }
+    this.onChange(null);
   }
 
   // --- ControlValueAccessor ---
@@ -297,6 +331,17 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
       this.selectedVehicle.set(null);
       this.customer.setValue('', { emitEvent: false });
       this.vehicle.setValue('', { emitEvent: false });
+      return;
+    }
+    // Bara en kund (ingen bil): hämta kunden och hennes bilar.
+    if (!v.vehicleId && v.customerId) {
+      this.api.customer(v.customerId).subscribe((c) => {
+        this.customerRef.set(c);
+        this.customer.setValue(c, { emitEvent: false });
+        this.api
+          .vehicles({ customerId: c.id, limit: 100 })
+          .subscribe((p) => this.ownCars.set(p.items));
+      });
       return;
     }
     // Bilen bär sin ägare, så en hämtning räcker för att fylla i båda fälten.

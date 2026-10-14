@@ -47,7 +47,7 @@ type Mode = 'login' | 'register' | 'verify';
                 Logga in för att hantera ert lager.
               }
               @case ('register') {
-                Skapa ett konto med din e-post.
+                Kontot kräver en inbjudningskod. Be ägaren i ert garage, eller oss på Catso, om en.
               }
               @case ('verify') {
                 Vi har skickat en kod till {{ form.controls.email.value }}. Skriv in den för att
@@ -61,6 +61,13 @@ type Mode = 'login' | 'register' | 'verify';
               <mat-label>E-post</mat-label>
               <input matInput type="email" formControlName="email" autocomplete="email" />
             </mat-form-field>
+
+            @if (mode() === 'register') {
+              <mat-form-field>
+                <mat-label>Inbjudningskod</mat-label>
+                <input matInput formControlName="inviteCode" autocomplete="off" />
+              </mat-form-field>
+            }
 
             @if (mode() === 'verify') {
               <mat-form-field>
@@ -148,6 +155,7 @@ export class Login {
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
     code: [''],
+    inviteCode: [''],
   });
 
   setMode(m: Mode) {
@@ -161,6 +169,7 @@ export class Login {
           : [],
     );
     c.code.setValidators(m === 'verify' ? [Validators.required] : []);
+    c.inviteCode.setValidators(m === 'register' ? [Validators.required] : []);
     c.code.reset();
     Object.values(c).forEach((x) => x.updateValueAndValidity());
   }
@@ -182,7 +191,7 @@ export class Login {
   submit() {
     this.form.markAllAsTouched();
     if (this.form.invalid) return;
-    const { email, password, code } = this.form.getRawValue();
+    const { email, password, code, inviteCode } = this.form.getRawValue();
     this.busy.set(true);
     const done = () => this.busy.set(false);
 
@@ -199,8 +208,9 @@ export class Login {
           },
         });
       case 'register':
-        return void this.auth.registerEmail(email, password).subscribe({
+        return void this.auth.registerEmail(email, password, inviteCode.trim()).subscribe({
           next: () => {
+            this.auth.pendingInviteCode = inviteCode.trim();
             done();
             this.setMode('verify');
           },

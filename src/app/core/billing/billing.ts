@@ -13,6 +13,8 @@ export interface BillingPlan {
   name: string;
   /** Öre per månad, exkl. moms. */
   priceMinor: number;
+  /** Öre per månad, inkl. moms. */
+  priceInclVatMinor: number;
   includedUsers: number;
   modules: string[];
 }
@@ -29,7 +31,17 @@ export interface BillingStatus {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   hasPaymentMethod: boolean;
-  users: { current: number; included: number; extra: number; extraUserPriceMinor: number };
+  /** Momssats som decimal, t.ex. 0.25. Alla belopp är exkl. moms om inget annat anges. */
+  vatRate: number;
+  users: {
+    current: number;
+    /** Tak: ingående användare plus köpta platser. */
+    limit: number;
+    included: number;
+    extraSeats: number;
+    extraUserPriceMinor: number;
+    extraUserPriceInclVatMinor: number;
+  };
   plans: BillingPlan[];
 }
 

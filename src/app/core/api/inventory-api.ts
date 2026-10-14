@@ -108,8 +108,8 @@ export class InventoryApi {
     return this.http.get<GarageListItem[]>(`${this.base}/garage/all`);
   }
 
-  createGarage(name: string): Observable<Garage> {
-    return this.http.post<Garage>(`${this.base}/garage`, { name });
+  createGarage(name: string, signupCode?: string): Observable<Garage> {
+    return this.http.post<Garage>(`${this.base}/garage`, { name, signupCode });
   }
 
   joinGarage(code: string): Observable<Garage> {

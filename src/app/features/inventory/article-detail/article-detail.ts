@@ -120,8 +120,9 @@ type Field = [label: string, value: string | number];
             />
             <div class="mt-1 text-xs text-gray-500">Beställningspunkt: {{ a.reorderLevel }} st</div>
           </mat-card>
+          @if (admin) {
           <mat-card class="p-4">
-            <div class="mb-2 font-semibold">Nyckeltal</div>
+            <div class="mb-2 font-semibold">Nyckeltal (belopp exkl. moms)</div>
             <div class="flex justify-between py-1">
               <span class="text-gray-500">Lagervärde</span><b>{{ a.stockValue | kr }}</b>
             </div>
@@ -135,6 +136,7 @@ type Field = [label: string, value: string | number];
               }}</b>
             </div>
           </mat-card>
+          }
           <mat-card class="p-4">
             <div class="mb-1 font-semibold">Senaste händelser</div>
             <app-movement-list
@@ -177,7 +179,7 @@ export class ArticleDetail {
   }
 
   sections(a: Article): { title: string; fields: Field[] }[] {
-    const kr = (o: number) => this.kr.transform(o);
+    const kr = (o: number | null) => this.kr.transform(o ?? 0);
     const spec: Field[] = [];
     const t = a.tyre;
     const r = a.rim;
@@ -227,18 +229,22 @@ export class ArticleDetail {
         ],
       },
       {
-        title: 'Kostnader och prissättning',
+        title: 'Kostnader och prissättning (alla belopp exkl. moms)',
         fields: [
-          ['Inköpspris (snitt)', kr(a.averageCost)],
-          ['Försäljningspris', kr(a.sellPrice)],
-          ['Marginal', kr(a.margin)],
-          [
-            'Marginal %',
-            a.marginPercent == null
-              ? '–'
-              : `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
-          ],
-          ['Lagervärde', kr(a.stockValue)],
+          ...((this.admin
+            ? [
+                ['Inköpspris (snitt, exkl. moms)', kr(a.averageCost)],
+                ['Försäljningspris (exkl. moms)', kr(a.sellPrice)],
+                ['Marginal', kr(a.margin)],
+                [
+                  'Marginal %',
+                  a.marginPercent == null
+                    ? '–'
+                    : `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
+                ],
+                ['Lagervärde', kr(a.stockValue)],
+              ]
+            : [['Försäljningspris (exkl. moms)', kr(a.sellPrice)]]) as Field[]),
         ],
       },
       {

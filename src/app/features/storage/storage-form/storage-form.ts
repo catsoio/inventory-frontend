@@ -1,5 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Observable, of, switchMap } from 'rxjs';
+import {
+  LinkResolver,
+  type ResolvedLink,
+} from '../../../shared/customer-vehicle-picker/link-resolver';
 import { AbstractControl, FormBuilder, ValidationErrors, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -33,10 +38,18 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
   selector: 'app-storage-form',
   standalone: false,
   template: `
-    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">{{ id ? 'Ändra inlämning' : 'Ny inlämning' }}</h1>
-    <form [formGroup]="form" (ngSubmit)="save()" class="flex max-w-6xl flex-col gap-3 pb-4 md:gap-4">
+    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">
+      {{ id ? 'Ändra inlämning' : 'Ny inlämning' }}
+    </h1>
+    <form
+      [formGroup]="form"
+      (ngSubmit)="save()"
+      class="flex max-w-6xl flex-col gap-3 pb-4 md:gap-4"
+    >
       <section class="rounded-xl bg-white shadow-sm">
-        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">Fordon och kund</h2>
+        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">
+          Fordon och kund
+        </h2>
         <div class="p-3 pb-0 md:p-4 md:pb-0">
           <app-customer-vehicle-picker formControlName="link" [legacy]="legacy()" />
           @if (sameCar() > 0) {
@@ -79,10 +92,16 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
-        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">Vad lämnas in?</h2>
+        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">
+          Vad lämnas in?
+        </h2>
         <div class="grid grid-cols-6 gap-x-3 p-3 sm:grid-cols-2 sm:gap-x-4 md:p-4 lg:grid-cols-3">
           <div class="col-span-6 mb-3 sm:col-span-2 md:mb-4 lg:col-span-3">
-            <mat-button-toggle-group formControlName="contents" hideSingleSelectionIndicator class="w-full md:w-auto">
+            <mat-button-toggle-group
+              formControlName="contents"
+              hideSingleSelectionIndicator
+              class="w-full md:w-auto"
+            >
               @for (c of contentsOptions; track c[0]) {
                 <mat-button-toggle [value]="c[0]" class="flex-1">{{ c[1] }}</mat-button-toggle>
               }
@@ -143,7 +162,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
               <div class="col-span-3 flex items-center pb-3 sm:col-span-1 md:pb-4">
                 <mat-slide-toggle formControlName="studded">Dubbade</mat-slide-toggle>
               </div>
-              </div>
+            </div>
           }
 
           @if (contents() !== 'tyres') {
@@ -218,10 +237,12 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <section class="rounded-xl bg-white shadow-sm">
-        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">Avgift och betalning</h2>
+        <h2 class="px-4 pt-4 pb-0 text-base font-semibold md:px-5 md:pt-5 md:pb-1">
+          Avgift och betalning (exkl. moms)
+        </h2>
         <div class="grid grid-cols-6 gap-x-3 p-3 sm:grid-cols-2 sm:gap-x-4 md:p-4 lg:grid-cols-3">
           <mat-form-field class="col-span-3 sm:col-span-1"
-            ><mat-label>Avgift (kr)</mat-label
+            ><mat-label>Avgift (kr, exkl. moms)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">payments</mat-icon>
             <input matInput type="number" inputmode="decimal" step="0.01" formControlName="fee" />
             <mat-error>0 eller mer</mat-error></mat-form-field
@@ -245,7 +266,12 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
             <mat-error>Välj betalsätt för betald avgift</mat-error></mat-form-field
           >
           @if (paid()) {
-            <app-date-field class="col-span-3 sm:col-span-1" label="Betaldatum" icon="event" formControlName="paidAt" />
+            <app-date-field
+              class="col-span-3 sm:col-span-1"
+              label="Betaldatum"
+              icon="event"
+              formControlName="paidAt"
+            />
           }
           <mat-form-field class="col-span-6 sm:col-span-2 lg:col-span-3"
             ><mat-label>Anteckningar</mat-label
@@ -256,7 +282,12 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <div class="flex gap-2">
-        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="form.invalid || busy()">
+        <button
+          mat-flat-button
+          color="primary"
+          class="!h-12 max-md:flex-1"
+          [disabled]="form.invalid || busy()"
+        >
           Spara
         </button>
         <a mat-button class="!h-12" [routerLink]="id ? ['/storage', id] : '/storage'">Avbryt</a>
@@ -266,6 +297,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
 })
 export class StorageForm {
   private readonly api = inject(StorageApi);
+  private readonly links = inject(LinkResolver);
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
@@ -358,6 +390,11 @@ export class StorageForm {
 
     // Valda kund och bil fyller i ögonblicksbilden som sparas på inlämningen.
     c.link.valueChanges.pipe(takeUntilDestroyed()).subscribe((l) => {
+      if (l?.pending) {
+        // Nyskriven kund/bil: ögonblicksbilden fylls i nu, själva posterna skapas vid spar.
+        this.form.patchValue({ regNo: l.pending.regNo ?? '', name: l.pending.customerName ?? '' });
+        return;
+      }
       if (!l?.vehicle || !l.customer) return;
       this.form.patchValue({
         regNo: l.vehicle.regNo,
@@ -435,8 +472,6 @@ export class StorageForm {
     const t = v.tyres;
     const r = v.rims;
     const body: StorageDepositInput = {
-      customerId: v.link?.customerId,
-      vehicleId: v.link?.vehicleId,
       contents: v.contents!,
       quantity: v.quantity!,
       customer: { name: v.name!, phone: opt(v.phone), email: opt(v.email) },
@@ -470,10 +505,18 @@ export class StorageForm {
       paidAt: v.paymentStatus === 'paid' && v.paidAt ? dateIso(v.paidAt) : null,
     };
     this.busy.set(true);
-    const req = this.id ? this.api.update(this.id, body) : this.api.create(body);
-    req.subscribe({
-      next: (d) => this.router.navigate(['/storage', d.id]),
-      error: () => this.busy.set(false),
-    });
+    // Nyskriven kund och bil skapas först; gammal fritext utan länk sparas som den är.
+    const link$: Observable<ResolvedLink | null> = v.link ? this.links.resolve(v.link) : of(null);
+    link$
+      .pipe(
+        switchMap((link) => {
+          const full = { ...body, ...(link ?? {}) };
+          return this.id ? this.api.update(this.id, full) : this.api.create(full);
+        }),
+      )
+      .subscribe({
+        next: (d) => this.router.navigate(['/storage', d.id]),
+        error: () => this.busy.set(false),
+      });
   }
 }

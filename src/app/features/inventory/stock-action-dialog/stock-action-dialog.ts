@@ -62,7 +62,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         }
         @if (data.action === 'receive') {
           <mat-form-field
-            ><mat-label>Inköpspris per styck (kr)</mat-label>
+            ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label>
             <input
               matInput
               type="number"
@@ -80,7 +80,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         }
         @if (data.action === 'sell') {
           <mat-form-field
-            ><mat-label>Pris per styck (kr)</mat-label>
+            ><mat-label>Pris per styck (kr, exkl. moms)</mat-label>
             <input
               matInput
               type="number"
@@ -144,7 +144,7 @@ export class StockActionDialog {
         [...int, Validators.min(1), ...(outgoing ? [Validators.max(art.quantity)] : [])],
       ],
       countedQuantity: [String(art.quantity), int],
-      unitCost: [kr(art.averageCost), [Validators.required, Validators.min(0)]],
+      unitCost: [kr(art.averageCost ?? 0), [Validators.required, Validators.min(0)]],
       unitPrice: [kr(art.sellPrice), [Validators.min(0)]],
       supplier: [art.supplier ?? ''],
       reference: [''],

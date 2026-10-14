@@ -73,8 +73,25 @@ export class Auth {
   loginPhone(phone: string, password: string) {
     return this.authenticate('login', { phone, password });
   }
-  registerEmail(email: string, password: string) {
-    return this.http.post(`${this.url}/email/register`, { email, password });
+  registerEmail(email: string, password: string, inviteCode: string) {
+    return this.http.post(`${this.url}/email/register`, { email, password, inviteCode });
+  }
+
+  /** Koden man registrerade sig med; används vid nästa steg (gå med / skapa garage). */
+  get pendingInviteCode(): string {
+    try {
+      return sessionStorage.getItem('catso.inviteCode') ?? '';
+    } catch {
+      return '';
+    }
+  }
+  set pendingInviteCode(code: string) {
+    try {
+      if (code) sessionStorage.setItem('catso.inviteCode', code);
+      else sessionStorage.removeItem('catso.inviteCode');
+    } catch {
+      // Utan sessionStorage skriver man bara in koden igen.
+    }
   }
   requestEmailOtp(email: string) {
     return this.http.post(`${this.url}/email/otp/request`, { email });

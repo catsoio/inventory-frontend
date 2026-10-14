@@ -112,11 +112,12 @@ export interface Article {
   quantity: number;
   stockLevel: StockLevel;
   reorderLevel: number;
-  averageCost: number;
+  /** null för personal: inköpspris visas bara för ägare. */
+  averageCost: number | null;
   sellPrice: number;
-  margin: number;
+  margin: number | null;
   marginPercent: number | null;
-  stockValue: number;
+  stockValue: number | null;
   supplier: string | null;
   notes: string | null;
   active: boolean;
@@ -305,6 +306,8 @@ export interface GarageMember {
   phone?: string | null;
   status?: 'active' | 'blocked' | 'pending_verification' | 'deactivated' | 'deleted' | null;
   lastSeenAt?: string | null;
+  /** Enheter som är inloggade just nu. */
+  activeSessions?: number;
 }
 
 export interface GarageInvite {
@@ -749,6 +752,8 @@ export interface Resource {
   name: string;
   kind: ResourceKind;
   color: string;
+  /** Inloggning som mekanikern använder, om någon. */
+  userId?: string | null;
   active: boolean;
 }
 

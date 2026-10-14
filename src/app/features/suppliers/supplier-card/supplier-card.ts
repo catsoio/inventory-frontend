@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { SupplierDetail } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { Auth } from '../../../core/auth/auth';
 
 /** Leverantörens kort: fälten överst och senaste inköp under. */
 @Component({
@@ -23,7 +24,9 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
           @if (c.active) {
-            <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            @if (admin) {
+<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+}
           } @else {
             <button mat-stroked-button (click)="restore()">Återställ</button>
           }
@@ -32,7 +35,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || (!!card() && form.pristine)"
+          [disabled]="form.invalid || busy()"
         >
           Spara
         </button>
@@ -91,6 +94,9 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
   `,
 })
 export class SupplierCard implements OnInit {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);

@@ -32,7 +32,7 @@ export interface VehicleDialogData {
         }
         @if (note(); as n) {
           <p
-            class="mb-3 rounded px-3 py-2 text-sm sm:col-span-4"
+            class="mb-3 rounded-lg px-3 py-2 text-sm sm:col-span-4"
             [class]="n.warn ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'"
           >
             {{ n.text }}

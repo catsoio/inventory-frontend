@@ -31,6 +31,7 @@ import { RegNoInput } from './reg-no-input/reg-no-input';
 import { CustomerDialog } from './customer-dialog/customer-dialog';
 import { VehicleDialog } from './vehicle-dialog/vehicle-dialog';
 import { DateField } from './date-field/date-field';
+import { TimeField } from './time-field/time-field';
 import { DataTable } from './data-table/data-table';
 import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
@@ -72,6 +73,7 @@ const MATERIAL = [
     ConfirmDialog,
     DataTable,
     DateField,
+    TimeField,
     CustomerDialog,
     CustomerVehiclePicker,
     RegNoInput,
@@ -102,6 +104,7 @@ const MATERIAL = [
     ...MATERIAL,
     DataTable,
     DateField,
+    TimeField,
     CustomerDialog,
     CustomerVehiclePicker,
     RegNoInput,

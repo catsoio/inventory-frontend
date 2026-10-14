@@ -15,8 +15,11 @@ import {
   WorkOrderStatus,
 } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { LinkResolver } from '../../../shared/customer-vehicle-picker/link-resolver';
+import { switchMap } from 'rxjs';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../../storage/storage-format';
+import { Auth } from '../../../core/auth/auth';
 
 const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
 const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
@@ -35,7 +38,9 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
     >
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
-          <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+          @if (admin) {
+<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+}
           <a
             mat-stroked-button
             [routerLink]="['/workorders', c.id, 'print']"
@@ -49,7 +54,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || (!!card() && form.pristine)"
+          [disabled]="form.invalid || busy()"
         >
           Spara
         </button>
@@ -88,18 +93,18 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
           </mat-form-field>
 
           <mat-form-field class="sm:col-span-2">
-            <mat-label>Pris överenskommet från (kr)</mat-label>
+            <mat-label>Pris överenskommet från (kr, exkl. moms)</mat-label>
             <input matInput type="number" inputmode="decimal" min="0" formControlName="priceFrom" />
           </mat-form-field>
           <mat-form-field class="sm:col-span-2">
-            <mat-label>Pris överenskommet till (kr)</mat-label>
+            <mat-label>Pris överenskommet till (kr, exkl. moms)</mat-label>
             <input matInput type="number" inputmode="decimal" min="0" formControlName="priceTo" />
             @if (form.errors?.['price']) {
               <mat-error>Lägre än "från"</mat-error>
             }
           </mat-form-field>
           <mat-form-field class="sm:col-span-2">
-            <mat-label>Prisförslag (kr)</mat-label>
+            <mat-label>Prisförslag (kr, exkl. moms)</mat-label>
             <input matInput type="number" inputmode="decimal" min="0" formControlName="quote" />
           </mat-form-field>
 
@@ -159,7 +164,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                   <input matInput type="number" min="0" step="0.25" formControlName="quantity" />
                 </mat-form-field>
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>À-pris (kr)</mat-label>
+                  <mat-label>À-pris (kr, exkl. moms)</mat-label>
                   <input matInput type="number" min="0" formControlName="unitPrice" />
                 </mat-form-field>
                 <div class="self-center text-right tabular-nums">{{ rowTotal(row) | kr }}</div>
@@ -181,7 +186,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
           </div>
 
           <div class="mt-3 flex justify-end gap-6 border-t border-gray-200 pt-3 text-lg">
-            <span class="text-gray-600">Summa</span>
+            <span class="text-gray-600">Summa exkl. moms</span>
             <b class="tabular-nums">{{ total() | kr }}</b>
           </div>
         </section>
@@ -190,7 +195,11 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
   `,
 })
 export class WorkOrderCard implements OnInit {
+  private readonly auth = inject(Auth);
+  /** Bara ägare får ta bort. */
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkOrderApi);
+  private readonly links = inject(LinkResolver);
   private readonly workshop = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
@@ -322,8 +331,8 @@ export class WorkOrderCard implements OnInit {
   save() {
     const v = this.form.getRawValue();
     const body: WorkOrderInput = {
-      customerId: v.link!.customerId,
-      vehicleId: v.link!.vehicleId,
+      customerId: '',
+      vehicleId: '',
       resourceId: v.resourceId || null,
       status: v.status,
       receivedAt: dateIso(v.receivedAt),
@@ -351,16 +360,23 @@ export class WorkOrderCard implements OnInit {
       }),
     };
     this.busy.set(true);
-    const req = this.id ? this.api.update(this.id, body) : this.api.create(body);
-    req.subscribe({
-      next: (o) => {
-        this.busy.set(false);
-        this.snack.open('Sparat', undefined, { duration: 2000 });
-        if (this.id) this.load();
-        else this.router.navigate(['/workorders', o.id]);
-      },
-      error: () => this.busy.set(false),
-    });
+    this.links
+      .resolve(v.link!)
+      .pipe(
+        switchMap((link) => {
+          const full = { ...body, ...link };
+          return this.id ? this.api.update(this.id, full) : this.api.create(full);
+        }),
+      )
+      .subscribe({
+        next: (o) => {
+          this.busy.set(false);
+          this.snack.open('Sparat', undefined, { duration: 2000 });
+          if (this.id) this.load();
+          else this.router.navigate(['/workorders', o.id]);
+        },
+        error: () => this.busy.set(false),
+      });
   }
 
   remove() {

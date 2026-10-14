@@ -29,6 +29,7 @@ const MESSAGES: Record<string, string> = {
   CLOSING_NOT_VOIDABLE: 'Bokföringen kan inte annulleras.',
   RESET_NOT_CONFIRMED: 'Garagets namn stämmer inte. Skriv det exakt för att bekräfta.',
   SUBSCRIPTION_REQUIRED: 'Din plan omfattar inte den här delen. Välj en plan för att fortsätta.',
+  SIGNUP_CODE_REQUIRED: 'Registreringskoden saknas eller stämmer inte.',
   ACCOUNT_NOT_ACTIVE: 'Kontot är inte aktiverat. Verifiera med engångskod först.',
 };
 
