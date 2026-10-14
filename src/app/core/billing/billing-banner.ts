@@ -17,7 +17,7 @@ import { Billing } from './billing';
       align-items: center;
       gap: 12px;
       padding: 8px 8px 8px 20px;
-      border-radius: 999px;
+      border-radius: var(--radius-ui);
       background: #1c1b1f;
       color: #fff;
       box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);

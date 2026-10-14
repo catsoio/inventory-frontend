@@ -1,10 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { AbstractControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { Auth } from '../../core/auth/auth';
+import { Billing } from '../../core/billing/billing';
 import { GarageMember, SEASON_LABELS } from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
@@ -88,7 +89,7 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
           <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Däckhotell</h2>
           <div class="grid gap-x-6 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <mat-form-field>
-              <mat-label>Standardavgift per inlämning (kr)</mat-label>
+              <mat-label>Standardavgift per inlämning (kr, exkl. moms)</mat-label>
               <input matInput type="number" min="0" step="1" formControlName="defaultStorageFee" />
               <mat-hint>Förifylls vid ny inlämning</mat-hint>
               <mat-error>0 eller mer</mat-error>
@@ -180,12 +181,23 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 }
               </div>
             }
+            @if (billing.status(); as b) {
+              <p class="text-sm text-gray-600">
+                {{ b.users.current }} av {{ b.users.limit }} användare används.
+                @if (b.users.current >= b.users.limit) {
+                  Ni har nått taket för er plan. Kontakta oss om ni behöver fler användare ({{
+                    b.users.extraUserPriceMinor | kr
+                  }}
+                  per användare och månad exkl. moms).
+                }
+              </p>
+            }
             <div class="flex items-center gap-3">
-              <button mat-stroked-button type="button" (click)="invite()">
+              <button mat-stroked-button type="button" [disabled]="seatsFull()" (click)="invite()">
                 Skapa inbjudningskod
               </button>
               @if (inviteCode()) {
-                <code class="rounded bg-gray-100 px-2 py-1 select-all">{{ inviteCode() }}</code>
+                <code class="rounded-lg bg-gray-100 px-2 py-1 select-all">{{ inviteCode() }}</code>
                 <span class="text-xs text-gray-500">Gäller 7 dagar, kan användas en gång</span>
               }
             </div>
@@ -214,6 +226,11 @@ export class SettingsPage {
         g.get('next')?.value !== g.get('repeat')?.value ? { mismatch: true } : null,
     },
   );
+  protected readonly billing = inject(Billing);
+  readonly seatsFull = computed(() => {
+    const u = this.billing.status()?.users;
+    return !!u && u.current >= u.limit;
+  });
   readonly inviteCode = signal<string | null>(null);
   readonly seasons = Object.entries(SEASON_LABELS);
 

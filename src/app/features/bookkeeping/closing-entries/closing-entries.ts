@@ -44,14 +44,14 @@ const COLUMNS: Record<ClosingEntryKind, DtCol<Row>[]> = {
     { key: 'close', label: 'Utgående', right: true, value: (r) => r['closingQty'] },
     {
       key: 'avg',
-      label: 'Snittpris',
+      label: 'Snittpris exkl. moms',
       right: true,
       value: (r) => r['avgCost'],
       fmt: (r) => kr.transform(r['avgCost']),
     },
     {
       key: 'value',
-      label: 'Värde',
+      label: 'Värde exkl. moms',
       right: true,
       value: (r) => r['closingValue'],
       fmt: (r) => kr.transform(r['closingValue']),
@@ -76,14 +76,14 @@ const COLUMNS: Record<ClosingEntryKind, DtCol<Row>[]> = {
     { key: 'qty', label: 'Antal', right: true, value: (r) => r['quantity'] },
     {
       key: 'unit',
-      label: 'Pris/st',
+      label: 'Pris/st exkl. moms',
       right: true,
       value: (r) => r['unitPrice'] ?? r['unitCost'] ?? 0,
       fmt: (r) => kr.transform(r['unitPrice'] ?? r['unitCost']),
     },
     {
       key: 'sum',
-      label: 'Summa',
+      label: 'Summa exkl. moms',
       right: true,
       value: (r) => (r['unitPrice'] ?? r['unitCost'] ?? 0) * r['quantity'],
       fmt: (r) => kr.transform((r['unitPrice'] ?? r['unitCost'] ?? 0) * r['quantity']),

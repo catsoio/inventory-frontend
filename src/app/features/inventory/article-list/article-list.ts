@@ -108,21 +108,21 @@ const COLS: Col[] = [
   },
   {
     key: 'averageCost',
-    label: 'Snittkostnad',
+    label: 'Snittkostnad exkl. moms',
     right: true,
     val: (a) => a.averageCost,
     fmt: (a) => kr.transform(a.averageCost),
   },
   {
     key: 'sellPrice',
-    label: 'Pris',
+    label: 'Pris exkl. moms',
     right: true,
     val: (a) => a.sellPrice,
     fmt: (a) => kr.transform(a.sellPrice),
   },
   {
     key: 'marginPercent',
-    label: 'Marginal',
+    label: 'Marginal exkl. moms',
     right: true,
     val: (a) => a.marginPercent ?? 0,
     fmt: (a) =>
@@ -132,7 +132,7 @@ const COLS: Col[] = [
   },
   {
     key: 'stockValue',
-    label: 'Lagervärde',
+    label: 'Lagervärde (inköp, exkl. moms)',
     right: true,
     val: (a) => a.stockValue,
     fmt: (a) => kr.transform(a.stockValue),
@@ -259,7 +259,7 @@ const COLS: Col[] = [
         <div class="mb-1 text-xs font-semibold text-gray-500 uppercase">Status</div>
         @for (s of statuses; track s[0]) {
           <button
-            class="flex w-full justify-between rounded px-2 py-2 text-left text-sm hover:bg-gray-100 lg:py-1"
+            class="flex w-full justify-between rounded-lg px-2 py-2 text-left text-sm hover:bg-gray-100 lg:py-1"
             [class]="status() === s[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
             (click)="setStatus(s[0])"
           >
@@ -270,7 +270,7 @@ const COLS: Col[] = [
         <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Typ</div>
         @for (c of categories; track c[0]) {
           <button
-            class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
+            class="flex w-full justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-gray-100"
             [class]="sel()['category'] === c[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
             (click)="toggle('category', c[0])"
           >
@@ -282,7 +282,7 @@ const COLS: Col[] = [
           <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Säsong</div>
           @for (s of seasons; track s[0]) {
             <button
-              class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
+              class="flex w-full justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-gray-100"
               [class]="sel()['season'] === s[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
               (click)="toggle('season', s[0])"
             >
@@ -300,7 +300,7 @@ const COLS: Col[] = [
               <div class="max-h-44 overflow-y-auto">
                 @for (i of g.items; track i.value) {
                   <button
-                    class="flex w-full justify-between rounded px-2 py-1 text-left text-sm hover:bg-gray-100"
+                    class="flex w-full justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-gray-100"
                     [class]="
                       sel()[g.key] === i.value ? 'bg-brand-soft font-semibold text-brand' : ''
                     "
@@ -398,7 +398,7 @@ const COLS: Col[] = [
                     @for (c of visibleCols(); track c.key) {
                       <th class="px-2 pb-2 font-normal">
                         <input
-                          class="w-full min-w-16 rounded border bg-white px-2 py-1 text-sm text-gray-900"
+                          class="w-full min-w-16 rounded-lg border bg-white px-2 py-1 text-sm text-gray-900"
                           [class.text-right]="c.right"
                           placeholder="Filter"
                           [value]="colFilters()[c.key] ?? ''"

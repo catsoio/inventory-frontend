@@ -22,7 +22,7 @@ const MODULE_LABELS: Record<string, string> = {
     }
     .plan {
       border: 1px solid var(--mat-sys-outline-variant, #ccc);
-      border-radius: 16px;
+      border-radius: var(--radius-ui);
       padding: 20px;
       display: flex;
       flex-direction: column;
@@ -55,14 +55,17 @@ const MODULE_LABELS: Record<string, string> = {
     <mat-dialog-content>
       @if (billing.status(); as s) {
         <p class="note">
-          Priserna är per månad och exkl. moms. {{ s.users.current }} användare i garaget; extra
-          användare kostar {{ s.users.extraUserPriceMinor | kr }} per månad.
+          Priserna är per månad och exkl. moms ({{ s.vatRate * 100 }} % moms tillkommer).
+          {{ s.users.current }} av {{ s.users.limit }} användare används. Fler användare läggs till
+          av oss på begäran och kostar {{ s.users.extraUserPriceMinor | kr }} per användare och
+          månad exkl. moms. Antalet ändras aldrig av sig självt.
         </p>
         <div class="plans">
           @for (p of s.plans; track p.id) {
             <div class="plan" [class.current]="s.state === 'subscribed' && s.plan === p.id">
               <strong>{{ p.name }}</strong>
-              <div class="price">{{ p.priceMinor | kr }} <small>/ mån</small></div>
+              <div class="price">{{ p.priceMinor | kr }} <small>/ mån exkl. moms</small></div>
+              <div class="note">{{ p.priceInclVatMinor | kr }} inkl. moms</div>
               <ul>
                 <li>{{ p.includedUsers }} användare ingår</li>
                 @for (m of p.modules; track m) {

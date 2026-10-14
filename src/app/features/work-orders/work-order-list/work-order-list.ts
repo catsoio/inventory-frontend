@@ -28,7 +28,7 @@ const COLS: DtCol<WorkOrder>[] = [
   },
   {
     key: 'price',
-    label: 'Pris',
+    label: 'Pris exkl. moms',
     right: true,
     value: (o) => o.quote ?? o.priceFrom ?? 0,
     fmt: (o) =>

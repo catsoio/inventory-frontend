@@ -32,7 +32,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || (!!card() && form.pristine)"
+          [disabled]="form.invalid || busy()"
         >
           Spara
         </button>
@@ -57,7 +57,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
         </mat-form-field>
         <label class="flex items-center gap-3 text-sm sm:col-span-2">
           Färg i kalendern
-          <input type="color" formControlName="color" class="h-9 w-14 cursor-pointer rounded" />
+          <input type="color" formControlName="color" class="h-9 w-14 cursor-pointer rounded-lg" />
         </label>
       </form>
     </app-card-page>

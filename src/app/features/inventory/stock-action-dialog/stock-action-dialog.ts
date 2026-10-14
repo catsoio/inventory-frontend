@@ -62,7 +62,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         }
         @if (data.action === 'receive') {
           <mat-form-field
-            ><mat-label>Inköpspris per styck (kr)</mat-label>
+            ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label>
             <input
               matInput
               type="number"
@@ -80,7 +80,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         }
         @if (data.action === 'sell') {
           <mat-form-field
-            ><mat-label>Pris per styck (kr)</mat-label>
+            ><mat-label>Pris per styck (kr, exkl. moms)</mat-label>
             <input
               matInput
               type="number"

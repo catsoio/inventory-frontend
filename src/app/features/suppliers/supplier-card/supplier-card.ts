@@ -32,7 +32,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || (!!card() && form.pristine)"
+          [disabled]="form.invalid || busy()"
         >
           Spara
         </button>

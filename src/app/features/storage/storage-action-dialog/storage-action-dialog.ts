@@ -25,7 +25,7 @@ export interface StorageActionData {
           <b>{{ data.deposit.fee | kr }}</b>
         </p>
         @if (data.action === 'pickup' && unpaid) {
-          <p class="rounded bg-amber-50 p-2 text-sm text-amber-800">
+          <p class="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">
             Avgiften är inte betald. Ta betalt nu eller lämna ut och betala senare.
           </p>
         }

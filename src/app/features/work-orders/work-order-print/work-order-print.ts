@@ -56,7 +56,7 @@ import { Auth } from '../../../core/auth/auth';
           <div><span class="text-gray-600">Inlämnad:</span> {{ day(o.receivedAt) }}</div>
           <div><span class="text-gray-600">Hämtas:</span> {{ day(o.pickupAt) }}</div>
           <div class="col-span-2">
-            <span class="text-gray-600">Pris:</span>
+            <span class="text-gray-600">Pris (exkl. moms):</span>
             @if (o.priceFrom !== null) {
               överenskommet
               <b
@@ -96,8 +96,8 @@ import { Auth } from '../../../core/auth/auth';
               <th class="w-8 py-1">Klar</th>
               <th class="py-1">Vad ska göras</th>
               <th class="w-20 py-1 text-right">Antal</th>
-              <th class="w-24 py-1 text-right">À-pris</th>
-              <th class="w-24 py-1 text-right">Summa</th>
+              <th class="w-24 py-1 text-right">À-pris exkl. moms</th>
+              <th class="w-24 py-1 text-right">Summa exkl. moms</th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +124,7 @@ import { Auth } from '../../../core/auth/auth';
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="4" class="pt-2 text-right font-bold">Summa</td>
+              <td colspan="4" class="pt-2 text-right font-bold">Summa exkl. moms</td>
               <td class="pt-2 text-right font-bold tabular-nums">{{ o.total | kr }}</td>
             </tr>
           </tfoot>

@@ -121,7 +121,7 @@ type Field = [label: string, value: string | number];
             <div class="mt-1 text-xs text-gray-500">Beställningspunkt: {{ a.reorderLevel }} st</div>
           </mat-card>
           <mat-card class="p-4">
-            <div class="mb-2 font-semibold">Nyckeltal</div>
+            <div class="mb-2 font-semibold">Nyckeltal (belopp exkl. moms)</div>
             <div class="flex justify-between py-1">
               <span class="text-gray-500">Lagervärde</span><b>{{ a.stockValue | kr }}</b>
             </div>
@@ -227,10 +227,10 @@ export class ArticleDetail {
         ],
       },
       {
-        title: 'Kostnader och prissättning',
+        title: 'Kostnader och prissättning (alla belopp exkl. moms)',
         fields: [
-          ['Inköpspris (snitt)', kr(a.averageCost)],
-          ['Försäljningspris', kr(a.sellPrice)],
+          ['Inköpspris (snitt, exkl. moms)', kr(a.averageCost)],
+          ['Försäljningspris (exkl. moms)', kr(a.sellPrice)],
           ['Marginal', kr(a.margin)],
           [
             'Marginal %',

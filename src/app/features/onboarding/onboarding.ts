@@ -54,6 +54,13 @@ import { Auth } from '../../core/auth/auth';
                 <input matInput formControlName="name" placeholder="t.ex. Däckhotellet AB" />
                 <mat-error>Minst 2 tecken</mat-error>
               </mat-form-field>
+              @if (!auth.isSuperAdmin()) {
+                <mat-form-field>
+                  <mat-label>Startkod från Catso</mat-label>
+                  <input matInput formControlName="signupCode" autocomplete="off" />
+                  <mat-error>Skriv in koden du fick av oss</mat-error>
+                </mat-form-field>
+              }
             } @else {
               <h2 class="text-xl font-semibold">Gå med i ett garage</h2>
               <p class="mb-3 text-sm text-gray-600">
@@ -102,7 +109,7 @@ import { Auth } from '../../core/auth/auth';
       text-align: left;
       background: white;
       border: 1px solid #e5e7eb;
-      border-radius: 0.75rem;
+      border-radius: var(--radius-ui);
       cursor: pointer;
       transition:
         box-shadow 0.15s,
@@ -124,26 +131,34 @@ export class Onboarding {
 
   readonly form = inject(FormBuilder).nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
-    code: ['', [Validators.required, Validators.minLength(8)]],
+    code: [this.auth.pendingInviteCode, [Validators.required, Validators.minLength(8)]],
+    signupCode: [this.auth.pendingInviteCode, [Validators.required, Validators.minLength(8)]],
   });
 
   back() {
     this.mode.set(null);
-    this.form.reset();
+    const code = this.auth.pendingInviteCode;
+    this.form.reset({ name: '', code, signupCode: code });
   }
 
   invalid() {
     const c = this.form.controls;
-    return (this.mode() === 'create' ? c.name : c.code).invalid;
+    if (this.mode() === 'create') {
+      return c.name.invalid || (!this.auth.isSuperAdmin() && c.signupCode.invalid);
+    }
+    return c.code.invalid;
   }
 
   submit() {
-    const { name, code } = this.form.getRawValue();
+    const { name, code, signupCode } = this.form.getRawValue();
     this.busy.set(true);
     const request =
-      this.mode() === 'create' ? this.api.createGarage(name) : this.api.joinGarage(code);
+      this.mode() === 'create'
+        ? this.api.createGarage(name, signupCode.trim() || undefined)
+        : this.api.joinGarage(code.trim());
     request.subscribe({
       next: (garage) => {
+        this.auth.pendingInviteCode = '';
         this.auth.setGarage(garage);
         this.router.navigateByUrl('/');
       },

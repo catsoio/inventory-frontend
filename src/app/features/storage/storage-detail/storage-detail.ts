@@ -82,7 +82,7 @@ type Field = [label: string, value: string | number];
             <dl class="grid grid-cols-1 gap-x-10 gap-y-1 px-5 pb-5 sm:grid-cols-2 2xl:grid-cols-3">
               @for (f of s.fields; track f[0]) {
                 <div
-                  class="flex items-baseline justify-between gap-4 rounded px-2 py-1.5 hover:bg-gray-50"
+                  class="flex items-baseline justify-between gap-4 rounded-lg px-2 py-1.5 hover:bg-gray-50"
                 >
                   <dt class="text-sm text-gray-500">{{ f[0] }}</dt>
                   <dd class="text-right font-medium">{{ f[1] }}</dd>
@@ -174,9 +174,9 @@ export class StorageDetail {
     }
     sections.push(
       {
-        title: 'Avgift och betalning',
+        title: 'Avgift och betalning (exkl. moms)',
         fields: [
-          ['Avgift', this.kr.transform(d.fee)],
+          ['Avgift (exkl. moms)', this.kr.transform(d.fee)],
           ['Status', PAYMENT_STATUS_LABELS[d.paymentStatus]],
           ['Betalsätt', d.paymentMethod ? PAYMENT_METHOD_LABELS[d.paymentMethod] : '–'],
           ['Betaldatum', dateText(d.paidAt)],

@@ -61,7 +61,7 @@ const COLS: DtCol<StorageDeposit>[] = [
   { key: 'days', label: 'Dagar', right: true, value: (d) => d.daysStored },
   {
     key: 'fee',
-    label: 'Avgift',
+    label: 'Avgift exkl. moms',
     right: true,
     value: (d) => d.fee,
     fmt: (d) => kr.transform(d.fee),

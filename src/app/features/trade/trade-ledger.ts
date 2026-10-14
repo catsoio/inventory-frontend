@@ -85,7 +85,7 @@ export class TradeLedger {
     { key: 'units', label: 'Antal', right: true, value: (r) => r.units },
     {
       key: 'total',
-      label: 'Summa',
+      label: 'Summa exkl. moms',
       right: true,
       value: (r) => r.total,
       fmt: (r) => kr.transform(r.total),

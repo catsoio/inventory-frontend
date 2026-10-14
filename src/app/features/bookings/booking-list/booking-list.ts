@@ -28,7 +28,7 @@ const COLS: DtCol<Booking>[] = [
   },
   {
     key: 'price',
-    label: 'Pris',
+    label: 'Pris exkl. moms',
     right: true,
     value: (b) => b.priceFrom ?? 0,
     fmt: (b) =>
@@ -160,6 +160,7 @@ export class BookingList {
         data,
         width: '720px',
         maxWidth: '96vw',
+        panelClass: 'dialog-sheet',
       })
       .afterClosed()
       .subscribe((r) => r && this.load());

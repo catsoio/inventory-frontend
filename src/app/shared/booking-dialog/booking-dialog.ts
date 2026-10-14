@@ -1,7 +1,7 @@
 import { Component, Inject, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { forkJoin } from 'rxjs';
+import { Observable, forkJoin, of, switchMap } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { BookingApi } from '../../core/api/booking-api';
@@ -16,6 +16,7 @@ import {
 } from '../../core/models';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-picker';
+import { LinkResolver, type ResolvedLink } from '../customer-vehicle-picker/link-resolver';
 
 export interface BookingDialogData {
   /** Befintlig bokning, eller null för en ny. */
@@ -44,14 +45,14 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
       }
     </h2>
     <form [formGroup]="form" (ngSubmit)="save()">
-      <mat-dialog-content class="grid gap-x-3 sm:grid-cols-6 !pt-2">
+      <mat-dialog-content class="!grid grid-cols-2 gap-x-3 sm:grid-cols-6 !pt-2">
         <app-customer-vehicle-picker
-          class="sm:col-span-6"
+          class="col-span-2 sm:col-span-6"
           formControlName="link"
           [legacy]="legacy"
         />
 
-        <mat-form-field class="sm:col-span-3">
+        <mat-form-field class="col-span-2 sm:col-span-6">
           <mat-label>Åtgärd</mat-label>
           <mat-select formControlName="serviceTypeId" (selectionChange)="pickService($event.value)">
             <mat-option value="">Annat</mat-option>
@@ -60,32 +61,34 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             }
           </mat-select>
         </mat-form-field>
-        <mat-form-field class="sm:col-span-3">
+        <mat-form-field class="col-span-2 sm:col-span-6">
           <mat-label>Vad ska göras</mat-label>
-          <input matInput formControlName="title" />
+          <textarea
+            matInput
+            rows="6"
+            maxlength="2000"
+            formControlName="title"
+            placeholder="Beskriv jobbet, t.ex. däckbyte, felsökning, besiktningsanmärkningar"
+          ></textarea>
           <mat-error>Ange vad som ska göras</mat-error>
         </mat-form-field>
 
         <app-date-field
-          class="sm:col-span-2"
+          class="col-span-2 sm:col-span-2"
           label="Datum"
           icon="event"
           error="Ange datum"
           formControlName="day"
         />
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>Från</mat-label>
-          <input matInput type="time" step="900" formControlName="startTime" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>Till</mat-label>
-          <input matInput type="time" step="900" formControlName="endTime" />
-          @if (form.errors?.['order']) {
-            <mat-error>Måste vara efter starttiden</mat-error>
-          }
-        </mat-form-field>
+        <app-time-field class="col-span-1 sm:col-span-2" label="Från" formControlName="startTime" />
+        <app-time-field
+          class="col-span-1 sm:col-span-2"
+          label="Till"
+          formControlName="endTime"
+          [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
+        />
 
-        <mat-form-field class="sm:col-span-3">
+        <mat-form-field class="col-span-1 sm:col-span-3">
           <mat-label>Mekaniker / plats</mat-label>
           <mat-select formControlName="resourceId">
             <mat-option value="">Ingen vald</mat-option>
@@ -97,7 +100,7 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             <mat-hint>Lägg till mekaniker under Verkstad › Mekaniker och åtgärder</mat-hint>
           }
         </mat-form-field>
-        <mat-form-field class="sm:col-span-3">
+        <mat-form-field class="col-span-1 sm:col-span-3">
           <mat-label>Status</mat-label>
           <mat-select formControlName="status">
             @for (s of statuses; track s[0]) {
@@ -106,21 +109,21 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field class="sm:col-span-3">
-          <mat-label>Pris från (kr)</mat-label>
+        <mat-form-field class="col-span-2 sm:col-span-3">
+          <mat-label>Pris från (kr, exkl. moms)</mat-label>
           <input matInput type="number" inputmode="decimal" min="0" formControlName="priceFrom" />
         </mat-form-field>
-        <mat-form-field class="sm:col-span-3">
-          <mat-label>Pris till (kr)</mat-label>
+        <mat-form-field class="col-span-2 sm:col-span-3">
+          <mat-label>Pris till (kr, exkl. moms)</mat-label>
           <input matInput type="number" inputmode="decimal" min="0" formControlName="priceTo" />
           @if (form.errors?.['price']) {
             <mat-error>Lägre än "från"</mat-error>
           }
         </mat-form-field>
 
-        <mat-form-field class="sm:col-span-6">
-          <mat-label>Anmärkning för det här besöket</mat-label>
-          <textarea matInput rows="2" formControlName="notes"></textarea>
+        <mat-form-field class="col-span-2 sm:col-span-6">
+          <mat-label>Anmärkning</mat-label>
+          <textarea matInput rows="3" formControlName="notes"></textarea>
         </mat-form-field>
       </mat-dialog-content>
       <mat-dialog-actions>
@@ -143,6 +146,7 @@ export class BookingDialog {
   private readonly api = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
+  private readonly links = inject(LinkResolver);
   private readonly workOrders = inject(WorkOrderApi);
   private readonly router = inject(Router);
   readonly workOrdersOn = environment.workOrders;
@@ -172,7 +176,8 @@ export class BookingDialog {
           (b?.customerId && b.vehicleId
             ? { customerId: b.customerId, vehicleId: b.vehicleId }
             : null) as PickerValue | null,
-          Validators.required,
+          // Gamla bokningar utan kund/bil i registren går att ändra utan att välja om dem.
+          this.legacy ? [] : Validators.required,
         ],
         serviceTypeId: [b?.serviceTypeId ?? ''],
         title: [b?.title ?? '', Validators.required],
@@ -197,6 +202,19 @@ export class BookingDialog {
         },
       },
     );
+    // Ändrar man dag eller starttid följer sluttiden med, så att tiden inte blir ogiltig.
+    let duration = end.getTime() - start.getTime();
+    const f = this.form.controls;
+    f.endTime.valueChanges.subscribe(() => {
+      const ms =
+        at(f.day.value, f.endTime.value).getTime() - at(f.day.value, f.startTime.value).getTime();
+      if (ms > 0) duration = ms;
+    });
+    const followStart = () => {
+      const next = new Date(at(f.day.value, f.startTime.value).getTime() + duration);
+      if (ymd(next) === f.day.value) f.endTime.setValue(hm(next), { emitEvent: false });
+    };
+    f.startTime.valueChanges.subscribe(followStart);
     forkJoin([this.workshop.resources(true), this.workshop.serviceTypes(true)]).subscribe(
       ([r, s]) => {
         // Arkiverade val syns bara om just den här bokningen använder dem.
@@ -222,11 +240,8 @@ export class BookingDialog {
 
   save() {
     const v = this.form.getRawValue();
-    const link = v.link!;
     const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
     const body = {
-      customerId: link.customerId,
-      vehicleId: link.vehicleId,
       resourceId: v.resourceId || null,
       serviceTypeId: v.serviceTypeId || null,
       title: v.title,
@@ -238,13 +253,24 @@ export class BookingDialog {
       notes: v.notes || null,
     };
     this.busy.set(true);
-    const req = this.data.booking
-      ? this.api.update(this.data.booking.id, body)
-      : this.api.create(body);
-    req.subscribe({
-      next: (b) => this.ref.close(b),
-      error: () => this.busy.set(false),
-    });
+    // Nyskriven kund och bil skapas först. Gamla bokningar utan länk skickas utan kund/bil.
+    const link$: Observable<ResolvedLink | null> = v.link ? this.links.resolve(v.link) : of(null);
+    link$
+      .pipe(
+        switchMap((link) => {
+          if (this.data.booking)
+            return this.api.update(this.data.booking.id, { ...body, ...(link ?? {}) });
+          return this.api.create({
+            ...body,
+            customerId: link!.customerId,
+            vehicleId: link!.vehicleId,
+          });
+        }),
+      )
+      .subscribe({
+        next: (b) => this.ref.close(b),
+        error: () => this.busy.set(false),
+      });
   }
 
   /** Öppnar bokningens arbetsorder, och skapar den första gången. */

@@ -19,7 +19,7 @@ const COLS: DtCol<ServiceType>[] = [
   },
   {
     key: 'price',
-    label: 'Pris',
+    label: 'Pris exkl. moms',
     right: true,
     value: (t) => t.priceFrom ?? 0,
     fmt: (t) =>

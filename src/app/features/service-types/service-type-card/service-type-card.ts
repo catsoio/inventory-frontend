@@ -32,7 +32,7 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || (!!card() && form.pristine)"
+          [disabled]="form.invalid || busy()"
         >
           Spara
         </button>
@@ -53,11 +53,11 @@ import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
           <mat-error>Minst 5 minuter</mat-error>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris från (kr)</mat-label>
+          <mat-label>Pris från (kr, exkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceFrom" />
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris till (kr)</mat-label>
+          <mat-label>Pris till (kr, exkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceTo" />
           @if (form.errors?.['price']) {
             <mat-error>Lägre än "från"</mat-error>

@@ -226,7 +226,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
       /></mat-form-field>
 
       <mat-form-field class="col-span-3 sm:col-span-1"
-        ><mat-label>Inköpspris per styck (kr)</mat-label
+        ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">shopping_cart</mat-icon>
         <input
           matInput
@@ -242,7 +242,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         <mat-error>Krävs om ingångslager anges</mat-error></mat-form-field
       >
       <mat-form-field class="col-span-3 sm:col-span-1"
-        ><mat-label>Försäljningspris (kr)</mat-label
+        ><mat-label>Försäljningspris (kr, exkl. moms)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">sell</mat-icon>
         <input matInput type="number" inputmode="decimal" step="0.01" formControlName="sellPrice" />
         <mat-error>Ange pris (0 eller mer)</mat-error></mat-form-field

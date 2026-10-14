@@ -7,6 +7,7 @@ import { InventoryApi } from '../../api/inventory-api';
 import { StorageApi } from '../../api/storage-api';
 import { Report, StorageSummary, Summary } from '../../models';
 import { Auth } from '../../auth/auth';
+import { PageTitle } from '../../page-title';
 import { SettingsPage } from '../../../features/settings/settings';
 import { environment } from '../../../../environments/environment';
 import pkg from '../../../../../package.json';
@@ -186,7 +187,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       justify-content: center;
       width: 40px;
       height: 40px;
-      border-radius: 9999px;
+      border-radius: var(--radius-ui);
       color: #fff;
       transition: background-color 0.15s;
     }
@@ -199,12 +200,19 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       gap: 6px;
       height: 36px;
       padding: 0 10px;
-      border-radius: 8px;
+      border-radius: var(--radius-ui);
       font-size: 14px;
       font-weight: 500;
       line-height: 1;
       color: rgb(255 255 255 / 0.92);
       transition: background-color 0.15s;
+    }
+    .mtab.is-active {
+      color: var(--mat-sys-primary);
+      font-weight: 700;
+    }
+    .mtab.is-active .mpill {
+      background: color-mix(in srgb, var(--mat-sys-primary) 16%, white);
     }
     .hdr-btn mat-icon,
     .hdr-chip mat-icon {
@@ -261,11 +269,23 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 
       <span class="mx-1 h-6 w-px bg-white/25 max-md:hidden"></span>
 
-      <span class="min-w-0 flex-1 truncate text-base font-semibold md:hidden">{{
-        auth.garage()?.name ?? 'Däcklager'
+      <span class="min-w-0 flex-1 truncate text-lg font-semibold md:hidden">{{
+        pageName() ?? auth.garage()?.name ?? 'Däcklager'
       }}</span>
+      <a routerLink="/customers" class="hdr-btn md:!hidden" aria-label="Kunder">
+        <mat-icon>groups</mat-icon>
+      </a>
+      <a routerLink="/vehicles" class="hdr-btn md:!hidden" aria-label="Bilar">
+        <mat-icon>directions_car</mat-icon>
+      </a>
+      <a routerLink="/service-types" class="hdr-btn md:!hidden" aria-label="Åtgärder">
+        <mat-icon>build</mat-icon>
+      </a>
 
-      <nav class="flex h-full items-stretch gap-1 self-stretch max-md:hidden" aria-label="Avdelning">
+      <nav
+        class="flex h-full items-stretch gap-1 self-stretch max-md:hidden"
+        aria-label="Avdelning"
+      >
         @for (t of tabs; track t.id) {
           <a
             [routerLink]="t.home"
@@ -288,7 +308,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
         }
       </nav>
 
-      <span class="flex-1"></span>
+      <span class="flex-1 max-md:hidden"></span>
       <span class="text-xs text-white/70 tabular-nums max-lg:hidden" title="Version"
         >v{{ version }}</span
       >
@@ -530,12 +550,14 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       @for (l of mobileLinks; track l.path) {
         <a
           [routerLink]="l.path"
-          routerLinkActive="text-brand font-semibold"
+          routerLinkActive="is-active"
           [routerLinkActiveOptions]="{ exact: l.exact }"
-          class="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] text-gray-600"
+          class="mtab flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] font-medium text-gray-600"
         >
-          <mat-icon>{{ l.icon }}</mat-icon
-          >{{ l.label }}
+          <span class="mpill grid h-8 w-16 place-items-center rounded-lg transition-colors">
+            <mat-icon>{{ l.icon }}</mat-icon>
+          </span>
+          {{ l.label }}
         </a>
       }
     </nav>
@@ -545,6 +567,8 @@ export class Shell {
   protected readonly version = pkg.version;
 
   readonly auth = inject(Auth);
+  /** Sidans namn i mobilens topp (garaget syns i menyn). */
+  readonly pageName = inject(PageTitle).page;
   private readonly api = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
   private readonly router = inject(Router);

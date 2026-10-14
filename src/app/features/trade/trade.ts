@@ -13,8 +13,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
-import { WorkshopApi } from '../../core/api/workshop-api';
-import { Article, Vehicle, itemKind } from '../../core/models';
+import { Article, itemKind } from '../../core/models';
+import { type PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
+import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
 
 interface Line {
   a: Article;
@@ -78,7 +79,43 @@ interface Line {
           }
         </div>
 
-        <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white shadow-sm">
+        <ng-template #qtyField let-l="l" let-i="i">
+          <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <mat-label>Antal</mat-label>
+            <input
+              matInput
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              class="text-right"
+              [value]="l.qty"
+              (focus)="$any($event.target).select()"
+              (input)="setQty(i, $any($event.target).valueAsNumber)"
+            />
+          </mat-form-field>
+        </ng-template>
+        <ng-template #priceField let-l="l" let-i="i">
+          <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <mat-label>{{
+              sell ? 'Pris/st (kr, exkl. moms)' : 'Inköpspris/st (kr, exkl. moms)'
+            }}</mat-label>
+            <input
+              matInput
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              class="text-right"
+              [value]="l.price"
+              (focus)="$any($event.target).select()"
+              (input)="setPrice(i, $any($event.target).valueAsNumber)"
+            />
+          </mat-form-field>
+        </ng-template>
+
+        <!-- Dator: tabell -->
+        <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white shadow-sm max-md:hidden">
           <table class="w-full text-left text-sm">
             <thead
               class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
@@ -86,17 +123,15 @@ interface Line {
               <tr>
                 <th class="px-3 py-2">Artikel</th>
                 <th class="px-3 py-2 text-right">I lager</th>
-                <th class="px-3 py-2 text-right">Antal</th>
-                <th class="px-3 py-2 text-right">
-                  {{ sell ? 'Pris/st (kr)' : 'Inköpspris/st (kr)' }}
-                </th>
-                <th class="px-3 py-2 text-right">Summa</th>
+                <th class="w-28 px-3 py-2 text-right">Antal</th>
+                <th class="w-44 px-3 py-2 text-right">Pris/st (kr)</th>
+                <th class="px-3 py-2 text-right">Summa exkl. moms</th>
                 <th class="w-10 px-3 py-2"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
               @for (l of lines(); track l.a.id; let i = $index) {
-                <tr class="h-14">
+                <tr class="h-20 align-middle">
                   <td class="px-3">
                     <div class="flex items-center gap-3">
                       <app-item-icon [kind]="kind(l.a)" />
@@ -107,30 +142,16 @@ interface Line {
                     </div>
                   </td>
                   <td class="px-3 text-right">{{ l.a.quantity }}</td>
-                  <td class="px-3 text-right">
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      inputmode="numeric"
-                      class="h-9 w-20 rounded-md border-0 bg-gray-50 px-2 text-right ring-1 ring-gray-200 focus:ring-2 focus:ring-brand outline-none"
-                      [class.border-red-500]="!qtyOk(l)"
-                      [value]="l.qty"
-                      (focus)="$any($event.target).select()"
-                      (input)="setQty(i, $any($event.target).valueAsNumber)"
+                  <td class="px-3">
+                    <ng-container
+                      [ngTemplateOutlet]="qtyField"
+                      [ngTemplateOutletContext]="{ l: l, i: i }"
                     />
                   </td>
-                  <td class="px-3 text-right">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputmode="decimal"
-                      class="h-9 w-28 rounded-md border-0 bg-gray-50 px-2 text-right ring-1 ring-gray-200 focus:ring-2 focus:ring-brand outline-none"
-                      [class.border-red-500]="!(l.price >= 0)"
-                      [value]="l.price"
-                      (focus)="$any($event.target).select()"
-                      (input)="setPrice(i, $any($event.target).valueAsNumber)"
+                  <td class="px-3">
+                    <ng-container
+                      [ngTemplateOutlet]="priceField"
+                      [ngTemplateOutletContext]="{ l: l, i: i }"
                     />
                   </td>
                   <td class="px-3 text-right font-medium">{{ lineOre(l) | kr }}</td>
@@ -140,6 +161,13 @@ interface Line {
                     </button>
                   </td>
                 </tr>
+                @if (!qtyOk(l)) {
+                  <tr>
+                    <td colspan="6" class="px-3 pb-2 text-xs text-red-600">
+                      {{ qtyHint(l) }}
+                    </td>
+                  </tr>
+                }
               } @empty {
                 <tr>
                   <td colspan="6" class="px-3 py-10 text-center text-gray-500">
@@ -150,9 +178,49 @@ interface Line {
             </tbody>
           </table>
         </div>
+
+        <!-- Mobil: ett kort per rad -->
+        <div class="flex flex-col gap-2 md:hidden">
+          @for (l of lines(); track l.a.id; let i = $index) {
+            <div class="rounded-xl bg-white p-3 shadow-sm">
+              <div class="flex items-start gap-3">
+                <app-item-icon [kind]="kind(l.a)" />
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold">{{ l.a.sizeLabel }}</div>
+                  <div class="truncate text-sm text-gray-500">{{ l.a.brand }} {{ l.a.model }}</div>
+                  <div class="text-xs text-gray-500">{{ l.a.quantity }} st i lager</div>
+                </div>
+                <button mat-icon-button (click)="remove(i)" aria-label="Ta bort rad">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-x-3">
+                <ng-container
+                  [ngTemplateOutlet]="qtyField"
+                  [ngTemplateOutletContext]="{ l: l, i: i }"
+                />
+                <ng-container
+                  [ngTemplateOutlet]="priceField"
+                  [ngTemplateOutletContext]="{ l: l, i: i }"
+                />
+              </div>
+              @if (!qtyOk(l)) {
+                <div class="mt-3 text-xs text-red-600">{{ qtyHint(l) }}</div>
+              }
+              <div class="mt-2 flex justify-between border-t pt-2 text-sm">
+                <span class="text-gray-600">Summa exkl. moms</span>
+                <b>{{ lineOre(l) | kr }}</b>
+              </div>
+            </div>
+          } @empty {
+            <p class="rounded-xl bg-white px-3 py-8 text-center text-gray-500 shadow-sm">
+              Sök efter en artikel ovan och välj den för att lägga till en rad.
+            </p>
+          }
+        </div>
       </section>
 
-      <aside class="overflow-y-auto">
+      <aside class="xl:overflow-y-auto">
         <mat-card class="flex flex-col gap-1 p-4">
           <div class="mb-2 text-lg font-semibold">{{ sell ? 'Försäljning' : 'Inköp' }}</div>
           <mat-form-field>
@@ -164,23 +232,11 @@ interface Line {
             />
           </mat-form-field>
           @if (sell) {
-            <app-customer-select
-              label="Kund (tomt = kontantförsäljning)"
-              [formControl]="customerCtl"
+            <app-customer-vehicle-picker
+              [formControl]="linkCtl"
+              [optional]="true"
+              customerLabel="Kund (tomt = kontantförsäljning)"
             />
-            @if (cars().length) {
-              <mat-form-field>
-                <mat-label>Bil</mat-label>
-                <mat-select [formControl]="vehicleCtl">
-                  <mat-option [value]="null">Ingen bil</mat-option>
-                  @for (v of cars(); track v.id) {
-                    <mat-option [value]="v.id">
-                      {{ v.regNo }} {{ v.make }} {{ v.model }}
-                    </mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            }
           } @else {
             <app-supplier-select label="Leverantör" [formControl]="supplierCtl" />
           }
@@ -193,7 +249,7 @@ interface Line {
             <span>Antal</span><b>{{ units() }} st</b>
           </div>
           <div class="flex justify-between py-2 text-xl font-semibold">
-            <span>Totalt</span><span>{{ totalOre() | kr }}</span>
+            <span>Totalt exkl. moms</span><span>{{ totalOre() | kr }}</span>
           </div>
           <button
             mat-flat-button
@@ -217,7 +273,7 @@ export class Trade {
   private readonly snack = inject(MatSnackBar);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
 
-  private readonly workshop = inject(WorkshopApi);
+  private readonly links = inject(LinkResolver);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly mode: 'sell' | 'receive' = this.route.snapshot.data['mode'];
@@ -228,11 +284,9 @@ export class Trade {
   readonly results = signal<Article[]>([]);
   readonly lines = signal<Line[]>([]);
   readonly reference = signal('');
-  readonly customerCtl = new FormControl<string | null>(null);
-  readonly vehicleCtl = new FormControl<string | null>(null);
+  /** Kund och bil (båda valfria); nyskrivna skapas när försäljningen sparas. */
+  readonly linkCtl = new FormControl<PickerValue | null>(null);
   readonly supplierCtl = new FormControl<string | null>(null);
-  /** Vald kunds bilar, att välja bland. */
-  readonly cars = signal<Vehicle[]>([]);
   readonly note = signal('');
   readonly busy = signal(false);
 
@@ -243,25 +297,14 @@ export class Trade {
   );
 
   constructor() {
-    // Kunden styr vilka bilar som kan väljas.
-    this.customerCtl.valueChanges
-      .pipe(
-        distinctUntilChanged(),
-        switchMap((id) => (id ? this.workshop.vehicles({ customerId: id, limit: 50 }) : of(null))),
-        takeUntilDestroyed(),
-      )
-      .subscribe((p) => {
-        this.cars.set(p?.items ?? []);
-        const v = this.vehicleCtl.value;
-        if (v && !this.cars().some((c) => c.id === v)) this.vehicleCtl.setValue(null);
-      });
     // Länkar från kund-, bil- och leverantörskort fyller i vem det gäller.
     const q = this.route.snapshot.queryParamMap;
     if (this.sell) {
       const customerId = q.get('customerId');
-      if (customerId) this.customerCtl.setValue(customerId);
       const vehicleId = q.get('vehicleId');
-      if (vehicleId) this.vehicleCtl.setValue(vehicleId);
+      if (customerId || vehicleId) {
+        this.linkCtl.setValue({ customerId: customerId ?? '', vehicleId: vehicleId ?? '' });
+      }
     } else {
       const supplierId = q.get('supplierId');
       if (supplierId) this.supplierCtl.setValue(supplierId);
@@ -283,6 +326,12 @@ export class Trade {
 
   qtyOk(l: Line) {
     return Number.isInteger(l.qty) && l.qty >= 1 && (!this.sell || l.qty <= l.a.quantity);
+  }
+
+  qtyHint(l: Line) {
+    return this.sell && l.qty > l.a.quantity
+      ? `Bara ${l.a.quantity} st i lager.`
+      : 'Ange ett helt antal, minst 1.';
   }
 
   lineOre(l: Line) {
@@ -330,6 +379,10 @@ export class Trade {
         : { articleId: l.a.id, quantity: l.qty, unitCost: price };
     });
     try {
+      const link =
+        this.sell && this.linkCtl.value
+          ? await firstValueFrom(this.links.resolve(this.linkCtl.value))
+          : null;
       const doc = await firstValueFrom(
         this.api.createTrade(this.sell ? 'sales' : 'purchases', {
           lines,
@@ -337,8 +390,8 @@ export class Trade {
           note,
           ...(this.sell
             ? {
-                customerId: this.customerCtl.value || undefined,
-                vehicleId: this.vehicleCtl.value || undefined,
+                customerId: link?.customerId || undefined,
+                vehicleId: link?.vehicleId || undefined,
               }
             : { supplierId: this.supplierCtl.value || undefined }),
         }),
