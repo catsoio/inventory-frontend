@@ -62,6 +62,8 @@ export class Auth {
   );
   /** Garage owner: may archive articles and edit shared settings. */
   readonly isAdmin = computed(() => this.garage()?.role === 'owner');
+  /** Mekaniker: ser bara arbetsorder, utan priser och kunduppgifter. */
+  readonly isMechanic = computed(() => this.garage()?.role === 'mechanic' && !this.isSuperAdmin());
 
   get accessToken(): string | null {
     return this.state()?.accessToken ?? null;

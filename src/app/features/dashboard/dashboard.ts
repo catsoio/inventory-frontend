@@ -7,7 +7,16 @@ import { BookingApi } from '../../core/api/booking-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { StorageApi } from '../../core/api/storage-api';
-import { BOOKING_STATUS_LABELS, Booking, Report, Resource } from '../../core/models';
+import { WorkOrderApi } from '../../core/api/work-order-api';
+import { environment } from '../../../environments/environment';
+import {
+  BOOKING_STATUS_LABELS,
+  Booking,
+  Report,
+  Resource,
+  WorkOrder,
+  WorkOrderStatus,
+} from '../../core/models';
 import {
   BookingDialog,
   BookingDialogData,
@@ -88,7 +97,9 @@ const BOOKING_COLS: DtCol<Booking>[] = [
         <div
           class="flex h-full min-h-[6.5rem] flex-col justify-between gap-1 md:min-h-[7rem] rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-black/5 transition hover:shadow-md md:p-3.5"
         >
-          <div class="flex flex-col-reverse items-start gap-1.5 md:flex-row md:items-center md:justify-between md:gap-2">
+          <div
+            class="flex flex-col-reverse items-start gap-1.5 md:flex-row md:items-center md:justify-between md:gap-2"
+          >
             <span class="text-xs leading-tight font-medium text-gray-600">{{ c.label }}</span>
             <span
               class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg md:h-8 md:w-8"
@@ -115,7 +126,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
       </a>
     </ng-template>
 
-    <div class="grid gap-x-6 gap-y-4 lg:grid-cols-2">
+    <div class="grid gap-x-5 gap-y-4 lg:grid-cols-[1fr_auto_1fr]">
       <section>
         <h2 class="mb-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase">Lager</h2>
         <div class="grid grid-cols-3 gap-2.5 md:gap-3">
@@ -124,6 +135,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
           }
         </div>
       </section>
+      <div class="hidden w-px self-stretch bg-gray-200 lg:block" role="separator"></div>
       <section>
         <h2 class="mb-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase">
           Däckhotell
@@ -135,6 +147,49 @@ const BOOKING_COLS: DtCol<Booking>[] = [
         </div>
       </section>
     </div>
+
+    @if (workOrdersOn) {
+      <section class="mb-4 min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <h2 class="flex items-center gap-2 text-sm font-semibold">
+            <mat-icon class="kpi-icon text-gray-400">assignment</mat-icon>
+            Arbetsorder idag
+            <span class="font-normal text-gray-500">· {{ activeOrders() }} pågående</span>
+          </h2>
+          <span class="flex-1"></span>
+          <a mat-button routerLink="/workorders">Alla arbetsorder</a>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          @for (col of orderColumns(); track col.status) {
+            <div class="min-w-0 rounded-xl bg-gray-50 p-2.5">
+              <div class="mb-2 flex items-center justify-between px-1 text-xs font-semibold">
+                <span class="text-gray-600 uppercase">{{ col.label }}</span>
+                <app-pill [tone]="col.tone">{{ col.items.length }}</app-pill>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                @for (o of col.items; track o.id) {
+                  <a
+                    [routerLink]="['/workorders', o.id]"
+                    class="block rounded-lg bg-white p-2 text-sm shadow-sm ring-1 ring-black/5"
+                  >
+                    <span class="flex items-center justify-between gap-2">
+                      <app-reg-plate [value]="o.regNo" size="sm" />
+                      <span class="text-xs text-gray-500">{{ o.code }}</span>
+                    </span>
+                    <span class="mt-1 block truncate">{{ o.vehicle || '–' }}</span>
+                    <span class="block truncate text-xs text-gray-500">
+                      {{ o.customerName }} · {{ o.resourceName || 'Ej tilldelad' }}
+                    </span>
+                  </a>
+                } @empty {
+                  <p class="px-1 py-2 text-xs text-gray-400">Inga.</p>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
 
     <div class="grid gap-4 lg:grid-cols-3">
       <section class="min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 lg:col-span-2">
@@ -292,14 +347,44 @@ export class Dashboard {
   );
   /** Klockan, uppdaterad varje minut, så att "kvar" följer tiden på dagen. */
   readonly now = signal(Date.now());
+
+  /** Arbetsorder visas bara när funktionen är påslagen. */
+  readonly workOrdersOn = environment.workOrders;
+  private readonly workOrderApi = inject(WorkOrderApi);
+  readonly orders = signal<WorkOrder[]>([]);
+  private readonly isToday = (iso: string | null) =>
+    !!iso && new Date(iso).toLocaleDateString('sv-SE') === day(0);
+  /** Öppna, pågående och väntande order, samt de som blev klara idag eller hämtas idag. */
+  readonly orderColumns = computed(() => {
+    const list = this.orders().filter((o) => o.status !== 'cancelled');
+    const col = (
+      status: WorkOrderStatus,
+      label: string,
+      tone: 'blue' | 'amber' | 'green' | 'gray',
+      keep: (o: WorkOrder) => boolean = () => true,
+    ) => ({ status, label, tone, items: list.filter((o) => o.status === status && keep(o)) });
+    return [
+      col('open', 'Öppna', 'blue'),
+      col('in_progress', 'Pågår', 'amber'),
+      col('waiting_parts', 'Väntar på del', 'gray'),
+      col(
+        'done',
+        'Klara idag',
+        'green',
+        (o) => this.isToday(o.pickupAt) || this.isToday(o.receivedAt),
+      ),
+    ];
+  });
+  readonly activeOrders = computed(
+    () => this.orders().filter((o) => o.status === 'open' || o.status === 'in_progress').length,
+  );
   /** Passerad: sluttiden har gått, oavsett status. */
   readonly past = (b: Booking) => new Date(b.end).getTime() <= this.now();
   /** Kvar: inte avslutad och inte passerad. */
   readonly left = computed(
     () =>
-      this.shown().filter(
-        (b) => (b.status === 'booked' || b.status === 'arrived') && !this.past(b),
-      ).length,
+      this.shown().filter((b) => (b.status === 'booked' || b.status === 'arrived') && !this.past(b))
+        .length,
   );
 
   constructor() {
@@ -307,6 +392,12 @@ export class Dashboard {
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
     this.load();
     this.loadBookings();
+    if (this.workOrdersOn) {
+      this.workOrderApi
+        .list({ limit: 100 })
+        .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
+        .subscribe((p) => this.orders.set(p.items));
+    }
     this.workshop
       .resources()
       .pipe(catchError(() => of([] as Resource[])))

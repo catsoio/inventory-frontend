@@ -18,6 +18,15 @@ export interface DtCol<T = any> {
 }
 
 @Component({
+  styles: `
+    /* Den valda raden markeras över hela bredden, i alla celler. */
+    tr.selected-row > td {
+      background-color: var(--color-brand-soft, #e3f0ee);
+    }
+    tr.selected-row > td:first-child {
+      box-shadow: inset 4px 0 0 var(--mat-sys-primary, #1f6f6b);
+    }
+  `,
   selector: 'app-data-table',
   standalone: false,
   host: { class: 'flex min-h-0 flex-col' },
@@ -75,6 +84,7 @@ export interface DtCol<T = any> {
             <tr
               class="h-12 md:h-11"
               [class]="clickable ? 'cursor-pointer hover:bg-brand-soft' : 'hover:bg-gray-50'"
+              [class.selected-row]="!!highlight && highlight(r)"
               (click)="clickable && rowClick.emit(r)"
             >
               @for (c of colsSig(); track c.key; let first = $first) {
@@ -176,6 +186,8 @@ export class DataTable {
   @Input() emptyText = 'Inga rader.';
   /** Färgad kant på radens första cell, t.ex. 'border-red-500' (som i artikellistan). */
   @Input() accent?: (row: any) => string | null;
+  /** Markerar hela raden (t.ex. den som visas i en panel bredvid). */
+  @Input() highlight?: (row: any) => boolean;
   @Input() clickable = false;
   // Standard: fyller tillgänglig höjd. Skicka t.ex. 'max-h-96' för en fast maxhöjd.
   @Input() scrollClass = 'flex-1';

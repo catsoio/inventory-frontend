@@ -19,7 +19,9 @@ import { Auth } from '../../../core/auth/auth';
   standalone: false,
   template: `
     <div class="mb-4 flex items-center gap-2 print:hidden">
-      <a mat-button [routerLink]="['/workorders', id]"><mat-icon>arrow_back</mat-icon> Tillbaka</a>
+      <a mat-button [routerLink]="auth.isMechanic() ? ['/workorders/mine'] : ['/workorders', id]"
+        ><mat-icon>arrow_back</mat-icon> Tillbaka</a
+      >
       <span class="flex-1"></span>
       <button mat-flat-button color="primary" (click)="print()">
         <mat-icon>print</mat-icon> Skriv ut
@@ -45,9 +47,13 @@ import { Auth } from '../../../core/auth/auth';
 
         <section class="mt-4 grid grid-cols-2 gap-x-8 gap-y-1">
           <div>
-            <span class="text-gray-600">Kund:</span> <b>{{ o.customerName }}</b>
+            @if (!auth.isMechanic()) {
+              <span class="text-gray-600">Kund:</span> <b>{{ o.customerName }}</b>
+            }
           </div>
-          <div><span class="text-gray-600">Telefon:</span> {{ o.phone || '–' }}</div>
+          @if (!auth.isMechanic()) {
+            <div><span class="text-gray-600">Telefon:</span> {{ o.phone || '–' }}</div>
+          }
           <div>
             <span class="text-gray-600">Bil:</span> <b>{{ o.regNo }}</b>
             {{ o.vehicle ? '· ' + o.vehicle : '' }}
@@ -55,24 +61,26 @@ import { Auth } from '../../../core/auth/auth';
           <div><span class="text-gray-600">Mekaniker:</span> {{ o.resourceName || '–' }}</div>
           <div><span class="text-gray-600">Inlämnad:</span> {{ day(o.receivedAt) }}</div>
           <div><span class="text-gray-600">Hämtas:</span> {{ day(o.pickupAt) }}</div>
-          <div class="col-span-2">
-            <span class="text-gray-600">Pris (exkl. moms):</span>
-            @if (o.priceFrom !== null) {
-              överenskommet
-              <b
-                >{{ o.priceFrom | kr
-                }}{{
-                  o.priceTo !== null && o.priceTo !== o.priceFrom ? ' – ' + (o.priceTo | kr) : ''
-                }}</b
-              >
-            }
-            @if (o.quote !== null) {
-              · prisförslag <b>{{ o.quote | kr }}</b>
-            }
-            @if (o.priceFrom === null && o.quote === null) {
-              –
-            }
-          </div>
+          @if (!auth.isMechanic()) {
+            <div class="col-span-2">
+              <span class="text-gray-600">Pris (exkl. moms):</span>
+              @if (o.priceFrom !== null) {
+                överenskommet
+                <b
+                  >{{ o.priceFrom | kr
+                  }}{{
+                    o.priceTo !== null && o.priceTo !== o.priceFrom ? ' – ' + (o.priceTo | kr) : ''
+                  }}</b
+                >
+              }
+              @if (o.quote !== null) {
+                · prisförslag <b>{{ o.quote | kr }}</b>
+              }
+              @if (o.priceFrom === null && o.quote === null) {
+                –
+              }
+            </div>
+          }
         </section>
 
         @if (vehicle()?.notes; as note) {
@@ -96,8 +104,10 @@ import { Auth } from '../../../core/auth/auth';
               <th class="w-8 py-1">Klar</th>
               <th class="py-1">Vad ska göras</th>
               <th class="w-20 py-1 text-right">Antal</th>
-              <th class="w-24 py-1 text-right">À-pris exkl. moms</th>
-              <th class="w-24 py-1 text-right">Summa exkl. moms</th>
+              @if (!auth.isMechanic()) {
+                <th class="w-24 py-1 text-right">À-pris exkl. moms</th>
+                <th class="w-24 py-1 text-right">Summa exkl. moms</th>
+              }
             </tr>
           </thead>
           <tbody>
@@ -113,8 +123,10 @@ import { Auth } from '../../../core/auth/auth';
                   <span class="text-xs text-gray-500">({{ lineLabels[l.type] }})</span>
                 </td>
                 <td class="py-2 text-right tabular-nums">{{ l.quantity }}</td>
-                <td class="py-2 text-right tabular-nums">{{ l.unitPrice | kr }}</td>
-                <td class="py-2 text-right tabular-nums">{{ l.total | kr }}</td>
+                @if (!auth.isMechanic()) {
+                  <td class="py-2 text-right tabular-nums">{{ l.unitPrice | kr }}</td>
+                  <td class="py-2 text-right tabular-nums">{{ l.total | kr }}</td>
+                }
               </tr>
             } @empty {
               <tr>
@@ -122,12 +134,14 @@ import { Auth } from '../../../core/auth/auth';
               </tr>
             }
           </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="4" class="pt-2 text-right font-bold">Summa exkl. moms</td>
-              <td class="pt-2 text-right font-bold tabular-nums">{{ o.total | kr }}</td>
-            </tr>
-          </tfoot>
+          @if (!auth.isMechanic()) {
+            <tfoot>
+              <tr>
+                <td colspan="4" class="pt-2 text-right font-bold">Summa exkl. moms</td>
+                <td class="pt-2 text-right font-bold tabular-nums">{{ o.total | kr }}</td>
+              </tr>
+            </tfoot>
+          }
         </table>
 
         <section class="mt-6">

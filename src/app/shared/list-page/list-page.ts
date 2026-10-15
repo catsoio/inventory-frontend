@@ -60,25 +60,30 @@ import type { DtCol } from '../data-table/data-table';
       }
     </div>
     <ng-content />
-    <app-data-table
-      class="min-h-0 flex-1"
-      [columns]="columns"
-      [rows]="rows"
-      [clickable]="true"
-      [emptyText]="loading ? 'Laddar…' : emptyText"
-      (rowClick)="rowClick.emit($event)"
-    >
-      <ng-template #cell let-row="row" let-col="col" let-text="text">
-        @if (cellTpl) {
-          <ng-container
-            [ngTemplateOutlet]="cellTpl"
-            [ngTemplateOutletContext]="{ row: row, col: col, text: text }"
-          />
-        } @else {
-          {{ text }}
-        }
-      </ng-template>
-    </app-data-table>
+    <div class="flex min-h-0 flex-1 gap-4">
+      <app-data-table
+        class="min-h-0 min-w-0 flex-1"
+        [columns]="columns"
+        [rows]="rows"
+        [clickable]="true"
+        [accent]="accent"
+        [highlight]="highlight"
+        [emptyText]="loading ? 'Laddar…' : emptyText"
+        (rowClick)="rowClick.emit($event)"
+      >
+        <ng-template #cell let-row="row" let-col="col" let-text="text">
+          @if (cellTpl) {
+            <ng-container
+              [ngTemplateOutlet]="cellTpl"
+              [ngTemplateOutletContext]="{ row: row, col: col, text: text }"
+            />
+          } @else {
+            {{ text }}
+          }
+        </ng-template>
+      </app-data-table>
+      <ng-content select="[detail]" />
+    </div>
   `,
 })
 export class ListPage implements OnInit {
@@ -91,6 +96,10 @@ export class ListPage implements OnInit {
   @Input() newLink: string | null = null;
   @Input() newLabel = 'Ny';
   @Input() emptyText = 'Inget hittades.';
+  /** Klasser per rad, t.ex. för att markera den valda raden. */
+  @Input() accent?: (row: any) => string | null;
+  /** Markerar hela raden, t.ex. den som visas i panelen bredvid. */
+  @Input() highlight?: (row: any) => boolean;
   @Input() searchPlaceholder = 'Sök…';
   /** Visa kryssrutan "Visa arkiverade". */
   @Input() archivable = false;

@@ -246,8 +246,11 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
         switchMap((v) => {
           this.carQuery.set(typeof v === 'string' ? v.trim() : '');
           if (typeof v !== 'string') return of(null);
-          this.selectedVehicle.set(null);
-          this.emit();
+          // Startvärdet (tomt) får inte skriva över en kund och bil som formuläret just fyllt i.
+          if (this.selectedVehicle() || this.edited()) {
+            this.selectedVehicle.set(null);
+            this.emit();
+          }
           return this.customerRef() ? of(null) : this.api.vehicles({ q: v.trim(), limit: 15 });
         }),
         takeUntilDestroyed(this.destroyRef),

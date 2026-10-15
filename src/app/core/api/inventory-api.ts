@@ -137,6 +137,11 @@ export class InventoryApi {
     );
   }
 
+  /** Ägare: gör en medlem till personal eller mekaniker. Returnerar uppdaterad lista. */
+  setMemberRole(userId: string, role: 'staff' | 'mechanic'): Observable<GarageMember[]> {
+    return this.http.patch<GarageMember[]>(`${this.base}/garage/members/${userId}/role`, { role });
+  }
+
   removeMember(userId: string): Observable<unknown> {
     return this.http.delete(`${this.base}/garage/members/${userId}`);
   }

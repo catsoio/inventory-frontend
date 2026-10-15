@@ -2,7 +2,14 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Page, WorkOrder, WorkOrderDetail, WorkOrderInput, WorkOrderStatus } from '../models';
+import {
+  Page,
+  WorkOrder,
+  WorkOrderDetail,
+  WorkOrderInput,
+  WorkOrderLineType,
+  WorkOrderStatus,
+} from '../models';
 
 function toParams(obj: object): HttpParams {
   let p = new HttpParams();
@@ -24,6 +31,12 @@ export class WorkOrderApi {
       status?: WorkOrderStatus | '';
       customerId?: string;
       vehicleId?: string;
+      resourceId?: string;
+      /** Order som ingen fått än. För mekaniker: dessa i stället för sina egna. */
+      unassigned?: boolean;
+      /** Inlämnad eller hämtas från (inkl.) / till (exkl.), ISO-tid. */
+      from?: string;
+      to?: string;
       limit?: number;
       offset?: number;
     } = {},
@@ -41,6 +54,23 @@ export class WorkOrderApi {
 
   update(id: string, body: Partial<WorkOrderInput>): Observable<WorkOrderDetail> {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}`, body);
+  }
+
+  /** Mekanikerns arbete: status, bocka av rader och lägga till rader utan pris. */
+  progress(
+    id: string,
+    body: {
+      status?: WorkOrderStatus;
+      lines?: { id: string; done: boolean }[];
+      add?: {
+        description: string;
+        type?: WorkOrderLineType;
+        quantity?: number;
+        toOrder?: boolean;
+      }[];
+    },
+  ): Observable<WorkOrderDetail> {
+    return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/progress`, body);
   }
 
   remove(id: string): Observable<unknown> {
