@@ -21,7 +21,7 @@ type Mode = 'now' | 'custom';
   standalone: false,
   template: `
     <h2 mat-dialog-title>Bokför period</h2>
-    <mat-dialog-content class="flex flex-col gap-3 !pt-2">
+    <mat-dialog-content class="!flex flex-col gap-3 !pt-2">
       <p class="text-sm text-gray-600">
         Bokföringen arkiverar periodens siffror, lagersaldon och händelser så att de går att granska
         i efterhand. Lagret ligger kvar och saldona förs vidare till nästa period. Perioden låses:

@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, of, switchMap } from 'rxjs';
 import {
@@ -286,7 +287,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
           mat-flat-button
           color="primary"
           class="!h-12 max-md:flex-1"
-          [disabled]="form.invalid || busy()"
+          [disabled]="busy()"
         >
           Spara
         </button>
@@ -466,6 +467,8 @@ export class StorageForm {
   }
 
   save() {
+    if (!ensureValid(this.form, this.snack, this.form.errors?.['link'] ? 'Välj kund och bil' : this.form.errors?.['pickup'] ? 'Hämtdatum ligger före inlämningsdatum' : undefined)) return;
+
     const v = this.form.getRawValue();
     const opt = <T>(x: T | null | '') => (x === null || x === '' ? undefined : x);
     const orNull = (x: string | null) => x || null;

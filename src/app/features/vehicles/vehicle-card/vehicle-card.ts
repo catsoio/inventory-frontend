@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { map, of, switchMap, tap } from 'rxjs';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -13,6 +14,8 @@ import { environment } from '../../../../environments/environment';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { VehicleAutofill } from '../../../shared/vehicle-autofill';
 import { Auth } from '../../../core/auth/auth';
+import { ensureValid } from '../../../shared/form-guard';
+import { PENDING_CUSTOMER } from '../../../shared/customer-select/customer-select';
 
 /** Bilens kort: ägare, uppgifter och bestående anmärkningar, med bilens bokningar under. */
 @Component({
@@ -41,7 +44,7 @@ import { Auth } from '../../../core/auth/auth';
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy() || taken()"
+          [disabled]="busy()"
         >
           Spara
         </button>
@@ -51,7 +54,7 @@ import { Auth } from '../../../core/auth/auth';
         [formGroup]="form"
         class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6"
       >
-        <app-customer-select class="sm:col-span-4" label="Ägare" formControlName="customerId" />
+        <app-customer-select class="sm:col-span-4" [allowNew]="true" label="Ägare" formControlName="customerId" />
         <mat-form-field class="sm:col-span-2">
           <mat-label>Registreringsnummer</mat-label>
           <app-sv-flag matPrefix class="mr-2" />
@@ -227,6 +230,8 @@ export class VehicleCard implements OnInit {
         vin: v.vin ?? '',
         notes: v.notes ?? '',
       });
+      // En bil som lagts upp med bara regnr: försök hämta bilinfon igen.
+      if (this.autofill.missingInfo(this.form)) this.lookup();
     });
   }
 
@@ -236,10 +241,10 @@ export class VehicleCard implements OnInit {
     this.note.set(null);
     this.taken.set(false);
     this.locked.set(false);
-    // Ändrar man inte regnumret på en sparad bil finns inget att hämta.
-    if (regNo === this.card()?.regNo) return;
+    // Ändrar man inte regnumret på en sparad bil finns inget att hämta, om den inte saknar bilinfo.
+    if (regNo === this.card()?.regNo && !this.autofill.missingInfo(this.form)) return;
     this.looking.set(true);
-    this.autofill.run(this.form, regNo).subscribe({
+    this.autofill.run(this.form, regNo, this.id ?? undefined).subscribe({
       next: (r) => {
         this.looking.set(false);
         this.taken.set(!!r.taken);
@@ -258,6 +263,12 @@ export class VehicleCard implements OnInit {
   }
 
   save() {
+    if (this.taken()) {
+      this.snack.open('Regnumret finns redan på en annan bil', undefined, { duration: 4000 });
+      return;
+    }
+    const owner = this.form.controls.customerId.invalid ? 'Välj en ägare' : undefined;
+    if (!ensureValid(this.form, this.snack, owner)) return;
     const v = this.form.getRawValue();
     const body = {
       customerId: v.customerId,
@@ -269,8 +280,24 @@ export class VehicleCard implements OnInit {
       notes: v.notes || null,
     };
     this.busy.set(true);
-    const req = this.id ? this.api.updateVehicle(this.id, body) : this.api.createVehicle(body);
-    req.subscribe({
+    // Ett skrivet namn som inte fanns i registret blir en ny kund först.
+    const customerId$ = body.customerId.startsWith(PENDING_CUSTOMER)
+      ? this.api
+          .createCustomer({ type: 'private', name: body.customerId.slice(PENDING_CUSTOMER.length) })
+          .pipe(
+            // Blir bilen fel ska ett nytt försök inte skapa kunden en gång till.
+            tap((c) => this.form.controls.customerId.setValue(c.id)),
+            map((c) => c.id),
+          )
+      : of(body.customerId);
+    customerId$
+      .pipe(
+        switchMap((customerId) => {
+          const full = { ...body, customerId };
+          return this.id ? this.api.updateVehicle(this.id, full) : this.api.createVehicle(full);
+        }),
+      )
+      .subscribe({
       next: (c) => {
         this.busy.set(false);
         this.snack.open('Sparat', undefined, { duration: 2000 });

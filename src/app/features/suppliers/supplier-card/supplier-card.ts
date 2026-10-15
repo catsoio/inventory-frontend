@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -35,7 +36,7 @@ import { Auth } from '../../../core/auth/auth';
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy()"
+          [disabled]="busy()"
         >
           Spara
         </button>
@@ -132,6 +133,8 @@ export class SupplierCard implements OnInit {
   }
 
   save() {
+    if (!ensureValid(this.form, this.snack)) return;
+
     const v = this.form.getRawValue();
     const body = {
       name: v.name,

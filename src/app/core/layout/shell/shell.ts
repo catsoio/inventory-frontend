@@ -52,7 +52,7 @@ const TABS: AppTab[] = [
     short: 'Lager',
     icon: 'inventory_2',
     home: '/inventory',
-    pages: ['inventory', 'storage', 'sales', 'purchases', 'reports', 'bookkeeping', 'settings'],
+    pages: ['inventory', 'storage', 'sales', 'purchases', 'reports', 'bookkeeping', 'activity', 'settings'],
   },
   {
     id: 'booking',
@@ -134,6 +134,13 @@ const MENUS: Record<AppId, MenuGroup[]> = {
           path: '/bookkeeping',
           label: 'Bokföring',
           icon: 'menu_book',
+          exact: false,
+          adminOnly: true,
+        },
+        {
+          path: '/activity',
+          label: 'Aktivitetslogg',
+          icon: 'history',
           exact: false,
           adminOnly: true,
         },

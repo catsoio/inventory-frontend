@@ -1,4 +1,6 @@
 import { Component, Inject, inject, signal } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { StorageApi } from '../../../core/api/storage-api';
@@ -19,7 +21,7 @@ export interface StorageActionData {
       {{ data.deposit.vehicle.regNo }}
     </h2>
     <form [formGroup]="form" (ngSubmit)="submit()">
-      <mat-dialog-content class="flex flex-col gap-1 !pt-2">
+      <mat-dialog-content class="!flex flex-col gap-1 !pt-2">
         <p class="text-sm text-gray-600">
           {{ data.deposit.customer.name }} · {{ data.deposit.code }} · avgift
           <b>{{ data.deposit.fee | kr }}</b>
@@ -53,7 +55,7 @@ export interface StorageActionData {
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
-        <button mat-flat-button color="primary" [disabled]="form.invalid || busy()">
+        <button mat-flat-button color="primary" [disabled]="busy()">
           {{ data.action === 'pay' ? 'Markera betald' : 'Lämna ut' }}
         </button>
       </mat-dialog-actions>
@@ -61,6 +63,7 @@ export interface StorageActionData {
   `,
 })
 export class StorageActionDialog {
+  private readonly snack = inject(MatSnackBar);
   private readonly api = inject(StorageApi);
   private readonly ref = inject<MatDialogRef<StorageActionDialog, StorageDeposit>>(MatDialogRef);
 
@@ -81,6 +84,8 @@ export class StorageActionDialog {
   }
 
   submit() {
+    if (!ensureValid(this.form, this.snack)) return;
+
     const { method, date } = this.form.getRawValue();
     this.busy.set(true);
     const id = this.data.deposit.id;

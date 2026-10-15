@@ -1,4 +1,5 @@
 import { Component, Inject, inject, signal } from '@angular/core';
+import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -19,7 +20,7 @@ function generate(length = 12): string {
   template: `
     <h2 mat-dialog-title>Nytt lösenord – {{ name }}</h2>
     <form [formGroup]="form" (ngSubmit)="submit()">
-      <mat-dialog-content class="flex flex-col gap-1 !pt-2">
+      <mat-dialog-content class="!flex flex-col gap-1 !pt-2">
         <p class="text-sm text-gray-600">
           Användaren loggas ut överallt och måste logga in med det nya lösenordet. Skicka det till
           personen på ett säkert sätt.
@@ -45,7 +46,7 @@ function generate(length = 12): string {
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
-        <button mat-flat-button color="primary" [disabled]="form.invalid || busy()">
+        <button mat-flat-button color="primary" [disabled]="busy()">
           Byt lösenord
         </button>
       </mat-dialog-actions>
@@ -75,6 +76,8 @@ export class ResetPasswordDialog {
   }
 
   submit() {
+    if (!ensureValid(this.form, this.snack)) return;
+
     this.busy.set(true);
     this.api.resetMemberPassword(this.member.userId, this.form.controls.password.value).subscribe({
       next: () => this.ref.close(true),

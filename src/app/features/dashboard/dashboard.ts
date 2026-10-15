@@ -33,8 +33,8 @@ interface Card {
   delta?: Delta;
   link: string;
   params: Record<string, string | number | boolean>;
-  /** Ljus bakgrund: färgen antyder ämnet utan att ta över sidan. */
-  tone: string;
+  /** Ikonens färg, samma ton som bakgrunden fast mörkare. */
+  ico: string;
 }
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toLocaleDateString('sv-SE');
@@ -69,21 +69,33 @@ const BOOKING_COLS: DtCol<Booking>[] = [
 @Component({
   selector: 'app-dashboard',
   standalone: false,
-  host: { class: 'flex h-full flex-col gap-3 overflow-auto md:overflow-hidden' },
+  host: { class: 'flex h-full flex-col gap-4 overflow-auto' },
+  styles: `
+    /* Ikonen i en fast ruta: Material-ikoner klipps annars av radhöjden. */
+    .kpi-icon {
+      width: 20px;
+      height: 20px;
+      font-size: 20px;
+      line-height: 20px;
+      overflow: visible;
+    }
+  `,
   template: `
     <h1 class="shrink-0 text-2xl font-semibold max-md:hidden">Hem</h1>
 
     <ng-template #kpi let-c>
-      <a [routerLink]="c.link" [queryParams]="c.params" class="block">
+      <a [routerLink]="c.link" [queryParams]="c.params" class="block min-w-0">
         <div
-          class="flex h-full min-h-[5.5rem] flex-col justify-between rounded-xl px-3 py-3 transition hover:brightness-[0.97] md:min-h-0 md:p-3"
-          [class]="c.tone"
+          class="flex h-full min-h-[6.5rem] flex-col justify-between gap-1 md:min-h-[7rem] rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-black/5 transition hover:shadow-md md:p-3.5"
         >
-          <div class="flex items-start justify-between gap-2">
-            <span class="text-xs leading-tight text-gray-600">{{ c.label }}</span>
-            <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-500 max-md:hidden">{{
-              c.icon
-            }}</mat-icon>
+          <div class="flex flex-col-reverse items-start gap-1.5 md:flex-row md:items-center md:justify-between md:gap-2">
+            <span class="text-xs leading-tight font-medium text-gray-600">{{ c.label }}</span>
+            <span
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg md:h-8 md:w-8"
+              [class]="c.ico"
+            >
+              <mat-icon class="kpi-icon">{{ c.icon }}</mat-icon>
+            </span>
           </div>
           <div
             class="truncate text-2xl leading-none font-semibold tracking-tight max-md:my-1.5 md:mt-0.5"
@@ -93,7 +105,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
           <div class="flex min-h-4 items-center gap-1 text-xs">
             @if (c.delta; as d) {
               <span class="flex items-center font-medium" [class]="d.cls">
-                <mat-icon class="!h-4 !w-4 !text-sm">{{ d.icon }}</mat-icon
+                <mat-icon class="!h-4 !w-4 !text-sm !leading-4">{{ d.icon }}</mat-icon
                 >{{ d.text }}
               </span>
             }
@@ -103,156 +115,147 @@ const BOOKING_COLS: DtCol<Booking>[] = [
       </a>
     </ng-template>
 
-    <div class="grid shrink-0 gap-x-4 gap-y-3 md:min-h-0 md:flex-1 md:shrink xl:grid-cols-3">
-      <div class="min-w-0 flex-col gap-3 max-md:contents md:flex md:min-h-0 xl:col-span-2">
-        <section class="shrink-0 max-md:order-1">
-          <h2 class="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">Lager</h2>
-          <div class="grid grid-cols-3 gap-2.5 md:gap-3">
-            @for (c of stockCards(); track c.label) {
-              <ng-container [ngTemplateOutlet]="kpi" [ngTemplateOutletContext]="{ $implicit: c }" />
-            }
-          </div>
-        </section>
-
-        <section class="shrink-0 max-md:order-2">
-          <h2 class="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
-            Däckhotell
-          </h2>
-          <div class="grid grid-cols-3 gap-2.5 md:gap-3">
-            @for (c of hotelCards(); track c.label) {
-              <ng-container [ngTemplateOutlet]="kpi" [ngTemplateOutletContext]="{ $implicit: c }" />
-            }
-          </div>
-        </section>
-
-        <section
-          class="flex min-w-0 shrink-0 flex-col max-md:order-5 md:min-h-48 md:flex-1 xl:min-h-0"
-        >
-          <div class="mb-1 flex shrink-0 flex-wrap items-center gap-2">
-            <h2 class="flex items-center gap-2 text-sm font-semibold">
-              <mat-icon class="!h-5 !w-5 !text-xl text-gray-400">calendar_month</mat-icon>
-              Verkstaden idag
-              <span class="font-normal text-gray-500">
-                · {{ shown().length }} bokningar, {{ left() }} kvar
-              </span>
-            </h2>
-            <span class="flex-1"></span>
-
-            <button mat-flat-button color="primary" class="max-md:!hidden" (click)="open(null)">
-              <mat-icon>add</mat-icon> Ny bokning
-            </button>
-            <a mat-button routerLink="/bookings" class="max-md:!hidden">Kalender</a>
-          </div>
-          <div class="flex flex-col gap-1.5 md:hidden">
-            @for (b of shown(); track b.id) {
-              <button
-                type="button"
-                (click)="open(b)"
-                class="flex items-center gap-3 rounded-xl bg-white p-2.5 text-left shadow-sm"
-                [class.opacity-55]="past(b) || b.status === 'done'"
-              >
-                <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{
-                  hhmm(b.start)
-                }}</span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm">{{ b.title }}</span>
-                  <span class="block truncate text-xs text-gray-500">
-                    {{ b.regNo || '–' }} · {{ b.customerName }}
-                  </span>
-                </span>
-                @if (b.status === 'done') {
-                  <app-pill tone="green">Klar</app-pill>
-                } @else if (past(b)) {
-                  <app-pill tone="gray">Passerad</app-pill>
-                } @else if (b.status === 'arrived') {
-                  <app-pill tone="amber">Här</app-pill>
-                }
-              </button>
-            } @empty {
-              <p class="py-2 text-sm text-gray-500">Inga bokningar idag.</p>
-            }
-          </div>
-          <app-data-table
-            class="hidden min-h-0 flex-1 md:block"
-            [columns]="bookingCols"
-            [rows]="shown()"
-            [clickable]="true"
-            emptyText="Inga bokningar idag."
-            (rowClick)="open($event)"
-          >
-            <ng-template #cell let-b="row" let-c="col" let-text="text">
-              @if (c.key === 'status') {
-                <app-pill
-                  [tone]="
-                    b.status === 'done'
-                      ? 'green'
-                      : b.status === 'arrived'
-                        ? 'amber'
-                        : b.status === 'booked'
-                          ? 'blue'
-                          : 'gray'
-                  "
-                  >{{ text }}</app-pill
-                >
-              } @else if (c.key === 'regNo' && b.regNo) {
-                <app-reg-plate [value]="text" size="sm" />
-              } @else {
-                {{ text }}
-              }
-            </ng-template>
-          </app-data-table>
-        </section>
-      </div>
-
-      <div class="min-w-0 flex-col gap-3 max-md:contents md:flex md:min-h-0">
-        @if (admin) {
-        <section class="shrink-0 rounded-xl bg-white p-3 shadow-sm max-md:hidden">
-          <div class="mb-1 flex items-center justify-between gap-2">
-            <h2 class="flex items-center gap-2 text-sm font-semibold">
-              <mat-icon class="!h-5 !w-5 !text-xl text-gray-400">payments</mat-icon>
-              Pengar
-              <span class="font-normal text-gray-500">· senaste {{ days() }} dagarna</span>
-            </h2>
-            <a routerLink="/reports" class="text-xs text-gray-500 hover:underline">Öppna</a>
-          </div>
-          @for (c of moneyCards(); track c.label) {
-            <a
-              [routerLink]="c.link"
-              [queryParams]="c.params"
-              class="flex items-baseline gap-2 rounded-md px-1 py-1.5 text-sm hover:bg-gray-50"
-            >
-              <span class="flex-1 text-gray-600">{{ c.label }}</span>
-              @if (c.delta; as d) {
-                <span class="flex items-center text-xs font-medium" [class]="d.cls">
-                  <mat-icon class="!h-4 !w-4 !text-sm">{{ d.icon }}</mat-icon
-                  >{{ d.text }}
-                </span>
-              }
-              @if (c.sub) {
-                <span class="text-xs text-gray-500">{{ c.sub }}</span>
-              }
-              <b class="tabular-nums">{{ c.value }}</b>
-            </a>
+    <div class="grid gap-x-6 gap-y-4 lg:grid-cols-2">
+      <section>
+        <h2 class="mb-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase">Lager</h2>
+        <div class="grid grid-cols-3 gap-2.5 md:gap-3">
+          @for (c of stockCards(); track c.label) {
+            <ng-container [ngTemplateOutlet]="kpi" [ngTemplateOutletContext]="{ $implicit: c }" />
           }
-        </section>
+        </div>
+      </section>
+      <section>
+        <h2 class="mb-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+          Däckhotell
+        </h2>
+        <div class="grid grid-cols-3 gap-2.5 md:gap-3">
+          @for (c of hotelCards(); track c.label) {
+            <ng-container [ngTemplateOutlet]="kpi" [ngTemplateOutletContext]="{ $implicit: c }" />
+          }
+        </div>
+      </section>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-3">
+      <section class="min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 lg:col-span-2">
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <h2 class="flex items-center gap-2 text-sm font-semibold">
+            <mat-icon class="kpi-icon text-gray-400">calendar_month</mat-icon>
+            Verkstaden idag
+            <span class="font-normal text-gray-500">
+              · {{ shown().length }} bokningar, {{ left() }} kvar
+            </span>
+          </h2>
+          <span class="flex-1"></span>
+          <button mat-flat-button color="primary" class="max-md:!hidden" (click)="open(null)">
+            <mat-icon>add</mat-icon> Ny bokning
+          </button>
+          <a mat-button routerLink="/bookings" class="max-md:!hidden">Kalender</a>
+        </div>
+        <div class="flex flex-col gap-1.5 md:hidden">
+          @for (b of shown(); track b.id) {
+            <button
+              type="button"
+              (click)="open(b)"
+              class="flex items-center gap-3 rounded-xl bg-gray-50 p-2.5 text-left"
+              [class.opacity-55]="past(b) || b.status === 'done'"
+            >
+              <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{
+                hhmm(b.start)
+              }}</span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm">{{ b.title }}</span>
+                <span class="block truncate text-xs text-gray-500">
+                  {{ b.regNo || '–' }} · {{ b.customerName }}
+                </span>
+              </span>
+              @if (b.status === 'done') {
+                <app-pill tone="green">Klar</app-pill>
+              } @else if (past(b)) {
+                <app-pill tone="gray">Passerad</app-pill>
+              } @else if (b.status === 'arrived') {
+                <app-pill tone="amber">Här</app-pill>
+              }
+            </button>
+          } @empty {
+            <p class="py-2 text-sm text-gray-500">Inga bokningar idag.</p>
+          }
+          <button mat-stroked-button class="mt-1" (click)="open(null)">
+            <mat-icon>add</mat-icon> Ny bokning
+          </button>
+        </div>
+        <app-data-table
+          class="hidden md:block"
+          [columns]="bookingCols"
+          [rows]="shown()"
+          [clickable]="true"
+          emptyText="Inga bokningar idag."
+          (rowClick)="open($event)"
+        >
+          <ng-template #cell let-b="row" let-c="col" let-text="text">
+            @if (c.key === 'status') {
+              <app-pill
+                [tone]="
+                  b.status === 'done'
+                    ? 'green'
+                    : b.status === 'arrived'
+                      ? 'amber'
+                      : b.status === 'booked'
+                        ? 'blue'
+                        : 'gray'
+                "
+                >{{ text }}</app-pill
+              >
+            } @else if (c.key === 'regNo' && b.regNo) {
+              <app-reg-plate [value]="text" size="sm" />
+            } @else {
+              {{ text }}
+            }
+          </ng-template>
+        </app-data-table>
+      </section>
+
+      <div class="flex min-w-0 flex-col gap-4">
+        @if (admin) {
+          <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <h2 class="flex items-center gap-2 text-sm font-semibold">
+                <mat-icon class="kpi-icon text-gray-400">insights</mat-icon>
+                Försäljning och inköp
+                <span class="font-normal text-gray-500">· {{ days() }} dagar</span>
+              </h2>
+              <a routerLink="/reports" class="text-xs text-gray-500 hover:underline">Öppna</a>
+            </div>
+            @for (c of moneyCards(); track c.label) {
+              <a
+                [routerLink]="c.link"
+                [queryParams]="c.params"
+                class="flex flex-wrap items-baseline gap-x-2 rounded-md px-1 py-1.5 text-sm hover:bg-gray-50"
+              >
+                <span class="min-w-0 flex-1 text-gray-600">{{ c.label }}</span>
+                @if (c.delta; as d) {
+                  <span class="flex items-center text-xs font-medium" [class]="d.cls">
+                    <mat-icon class="!h-4 !w-4 !text-sm !leading-4">{{ d.icon }}</mat-icon
+                    >{{ d.text }}
+                  </span>
+                }
+                @if (c.sub) {
+                  <span class="text-xs text-gray-500">{{ c.sub }}</span>
+                }
+                <b class="tabular-nums">{{ c.value }}</b>
+              </a>
+            }
+          </section>
         }
 
-        <section
-          class="flex min-w-0 shrink-0 flex-col max-md:order-4 md:min-h-40 md:flex-1 xl:min-h-0"
-        >
-          <div class="mb-1 flex shrink-0 items-center justify-between">
-            <h2
-              class="flex items-center gap-2 text-xs font-semibold tracking-wide text-gray-500 uppercase"
-            >
-              <mat-icon class="!h-4 !w-4 !text-base">history</mat-icon> Senaste händelser
+        <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+          <div class="mb-1 flex items-center justify-between">
+            <h2 class="flex items-center gap-2 text-sm font-semibold">
+              <mat-icon class="kpi-icon text-gray-400">history</mat-icon> Senaste händelser
             </h2>
             <a routerLink="/reports" class="text-xs text-gray-500 hover:underline">Visa logg</a>
           </div>
-          <div
-            class="rounded-xl bg-white px-4 py-1 shadow-sm md:min-h-0 md:flex-1 md:overflow-auto"
-          >
-            <app-movement-list [compact]="true" [pageSize]="6" />
-          </div>
+          <app-movement-list [compact]="true" [pageSize]="5" />
         </section>
       </div>
     </div>
@@ -260,7 +263,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
 })
 export class Dashboard {
   private readonly auth = inject(Auth);
-  /** Pengar och rapporter är bara för ägare. */
+  /** Försäljning och rapporter är bara för ägare. */
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
@@ -360,7 +363,7 @@ export class Dashboard {
         sub: 'Aktiva artiklar',
         link: inv,
         params: {},
-        tone: 'bg-sky-50',
+        ico: 'bg-sky-100 text-sky-700',
       },
       {
         label: 'Lågt lager',
@@ -369,7 +372,7 @@ export class Dashboard {
         sub: 'Behöver beställas',
         link: inv,
         params: { lowStock: true },
-        tone: 'bg-amber-50',
+        ico: 'bg-amber-100 text-amber-700',
       },
       {
         label: 'Slut',
@@ -378,7 +381,7 @@ export class Dashboard {
         sub: 'Inget kvar i lager',
         link: inv,
         params: { inStock: false },
-        tone: 'bg-red-50',
+        ico: 'bg-rose-100 text-rose-700',
       },
     ];
     return cards;
@@ -394,7 +397,7 @@ export class Dashboard {
         sub: h ? `${h.units} st` : '',
         link: '/storage',
         params: { status: 'stored' },
-        tone: 'bg-sky-50',
+        ico: 'bg-indigo-100 text-indigo-700',
       },
       {
         label: 'Obetalda',
@@ -403,7 +406,7 @@ export class Dashboard {
         sub: h ? this.kr.transform(h.unpaidAmount) + ' exkl. moms' : '',
         link: '/storage',
         params: { status: 'stored', paymentStatus: 'unpaid' },
-        tone: 'bg-amber-50',
+        ico: 'bg-violet-100 text-violet-700',
       },
       {
         label: 'Passerat hämtdatum',
@@ -412,7 +415,7 @@ export class Dashboard {
         sub: 'Skulle ha hämtats',
         link: '/storage',
         params: { status: 'stored', overdue: true },
-        tone: 'bg-red-50',
+        ico: 'bg-orange-100 text-orange-700',
       },
     ];
     return cards;
@@ -434,7 +437,7 @@ export class Dashboard {
         delta: this.delta(c?.soldRevenue, p?.soldRevenue),
         link: rep,
         params: {},
-        tone: 'bg-blue-50',
+        ico: 'bg-blue-100 text-blue-700',
       },
       {
         label: 'Bruttovinst exkl. moms',
@@ -444,7 +447,7 @@ export class Dashboard {
         delta: this.delta(c?.grossProfit, p?.grossProfit),
         link: rep,
         params: {},
-        tone: 'bg-emerald-50',
+        ico: 'bg-emerald-100 text-emerald-700',
       },
       {
         label: 'Sålda enheter',
@@ -454,7 +457,7 @@ export class Dashboard {
         delta: this.delta(c?.soldUnits, p?.soldUnits),
         link: rep,
         params: {},
-        tone: 'bg-green-50',
+        ico: 'bg-teal-100 text-teal-700',
       },
       {
         label: 'Inköp exkl. moms',
@@ -464,7 +467,7 @@ export class Dashboard {
         delta: this.delta(c?.purchasedCost, p?.purchasedCost),
         link: rep,
         params: {},
-        tone: 'bg-violet-50',
+        ico: 'bg-fuchsia-100 text-fuchsia-700',
       },
     ];
     return cards;
