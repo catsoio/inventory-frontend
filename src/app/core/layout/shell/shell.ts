@@ -5,7 +5,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { catchError, debounceTime, filter, merge, of } from 'rxjs';
 import { InventoryApi } from '../../api/inventory-api';
 import { StorageApi } from '../../api/storage-api';
-import { Report, StorageSummary, Summary } from '../../models';
+import { GARAGE_ROLE_LABELS, Report, StorageSummary, Summary } from '../../models';
 import { Auth } from '../../auth/auth';
 import { PageTitle } from '../../page-title';
 import { SettingsPage } from '../../../features/settings/settings';
@@ -52,7 +52,16 @@ const TABS: AppTab[] = [
     short: 'Lager',
     icon: 'inventory_2',
     home: '/inventory',
-    pages: ['inventory', 'storage', 'sales', 'purchases', 'reports', 'bookkeeping', 'activity', 'settings'],
+    pages: [
+      'inventory',
+      'storage',
+      'sales',
+      'purchases',
+      'reports',
+      'bookkeeping',
+      'activity',
+      'settings',
+    ],
   },
   {
     id: 'booking',
@@ -324,13 +333,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
         <div class="leading-tight">
           <div class="text-sm font-medium">{{ who() }}</div>
           <div class="text-xs text-white/80">
-            {{
-              auth.isSuperAdmin()
-                ? 'Superadmin'
-                : auth.garage()?.role === 'owner'
-                  ? 'Ägare'
-                  : 'Personal'
-            }}
+            {{ auth.isSuperAdmin() ? 'Superadmin' : roleLabels[auth.garage()?.role ?? 'staff'] }}
           </div>
         </div>
       </div>
@@ -378,11 +381,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
               <div class="truncate text-xs text-white/80">
                 {{ who() }} ·
                 {{
-                  auth.isSuperAdmin()
-                    ? 'Superadmin'
-                    : auth.garage()?.role === 'owner'
-                      ? 'Ägare'
-                      : 'Personal'
+                  auth.isSuperAdmin() ? 'Superadmin' : roleLabels[auth.garage()?.role ?? 'staff']
                 }}
               </div>
             </div>
@@ -549,7 +548,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       class="flex shrink-0 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_4px_rgba(0,0,0,0.06)] md:hidden"
       aria-label="Huvudmeny"
     >
-      @for (l of mobileLinks; track l.path) {
+      @for (l of mobileLinks(); track l.path) {
         <a
           [routerLink]="l.path"
           routerLinkActive="is-active"
@@ -566,8 +565,8 @@ const today = () => new Date().toLocaleDateString('sv-SE');
   `,
 })
 export class Shell {
-
   readonly auth = inject(Auth);
+  readonly roleLabels = GARAGE_ROLE_LABELS;
   /** Sidans namn i mobilens topp (garaget syns i menyn). */
   readonly pageName = inject(PageTitle).page;
   private readonly api = inject(InventoryApi);
@@ -575,9 +574,11 @@ export class Shell {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   /** Flikarna i toppbalken. Arbetsorder tänds här när den är byggd. */
-  readonly tabs = TABS.filter((t) => !t.hidden);
+  readonly tabs = TABS.filter(
+    (t) => !t.hidden && (!this.auth.isMechanic() || t.id === 'workorder'),
+  );
   /** Vilken flik sidan hör till, utifrån adressen. */
-  readonly app = signal<AppId>(appOf(this.router.url));
+  readonly app = signal<AppId>(this.auth.isMechanic() ? 'workorder' : appOf(this.router.url));
   /** Menyn som glider in på mobilen. */
   readonly drawer = signal(false);
   private readonly stock = signal<Summary | null>(null);
@@ -641,6 +642,8 @@ export class Shell {
   }
 
   private refresh() {
+    // Mekanikern har inga lager- eller hotellsiffror att visa (och skulle få 403).
+    if (this.auth.isMechanic()) return;
     this.api
       .summary()
       .pipe(catchError(() => of(null)))
@@ -674,7 +677,12 @@ export class Shell {
     }));
   });
   /** Mobilens bottenfält är alltid detsamma: det som används mest i verkstaden. */
-  readonly mobileLinks = MOBILE;
+  /** Mekanikern har bara sina arbetsorder i bottenmenyn. */
+  readonly mobileLinks = computed(() =>
+    this.auth.isMechanic()
+      ? [{ path: '/workorders/mine', label: 'Order', icon: 'assignment', exact: false }]
+      : MOBILE,
+  );
 
   readonly initial = computed(() => this.who()[0] ?? '?');
   readonly who = computed(() => {

@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { adminGuard, authGuard, garageGuard } from './core/auth/auth-guard';
+import { adminGuard, authGuard, garageGuard, mechanicGuard } from './core/auth/auth-guard';
 import { Shell } from './core/layout/shell/shell';
 
 const routes: Routes = [
@@ -20,6 +20,7 @@ const routes: Routes = [
     path: '',
     component: Shell,
     canActivate: [authGuard, garageGuard],
+    canActivateChild: [mechanicGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {

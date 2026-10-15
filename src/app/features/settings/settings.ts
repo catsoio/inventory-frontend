@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { Auth } from '../../core/auth/auth';
 import { Billing } from '../../core/billing/billing';
-import { GarageMember, SEASON_LABELS } from '../../core/models';
+import { GARAGE_ROLE_LABELS, GarageMember, SEASON_LABELS } from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
 import pkg from '../../../../package.json';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
@@ -150,9 +150,12 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
                     <span class="truncate font-medium">{{ label(m) }}</span>
-                    <app-pill [tone]="m.role === 'owner' ? 'blue' : 'gray'">{{
-                      m.role === 'owner' ? 'Ägare' : 'Personal'
-                    }}</app-pill>
+                    <app-pill
+                      [tone]="
+                        m.role === 'owner' ? 'blue' : m.role === 'mechanic' ? 'amber' : 'gray'
+                      "
+                      >{{ roleLabels[m.role] }}</app-pill
+                    >
                     @if (m.status === 'blocked') {
                       <app-pill tone="red">Spärrad</app-pill>
                     }
@@ -178,6 +181,15 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                   }
                 }
                 @if (m.role !== 'owner') {
+                  <mat-button-toggle-group
+                    hideSingleSelectionIndicator
+                    [value]="m.role"
+                    (change)="setRole(m, $event.value)"
+                    aria-label="Roll"
+                  >
+                    <mat-button-toggle value="staff">Personal</mat-button-toggle>
+                    <mat-button-toggle value="mechanic">Mekaniker</mat-button-toggle>
+                  </mat-button-toggle-group>
                   <button mat-button type="button" (click)="remove(m)">Ta bort</button>
                 }
               </div>
@@ -264,6 +276,25 @@ export class SettingsPage {
 
   invite() {
     this.api.createInvite().subscribe((i) => this.inviteCode.set(i.code));
+  }
+
+  readonly roleLabels = GARAGE_ROLE_LABELS;
+
+  setRole(m: GarageMember, role: 'staff' | 'mechanic') {
+    if (m.role === role) return;
+    this.api.setMemberRole(m.userId, role).subscribe({
+      next: (list) => {
+        this.members.set(list);
+        this.snack.open(
+          `${this.label(m)} är nu ${GARAGE_ROLE_LABELS[role].toLowerCase()}`,
+          undefined,
+          {
+            duration: 3000,
+          },
+        );
+      },
+      error: () => this.loadMembers(),
+    });
   }
 
   label(m: GarageMember) {

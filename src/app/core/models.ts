@@ -279,7 +279,13 @@ export interface Report {
 
 export type StockAction = 'receive' | 'sell' | 'return' | 'write-off' | 'adjust';
 
-export type GarageRole = 'owner' | 'staff';
+export type GarageRole = 'owner' | 'staff' | 'mechanic';
+
+export const GARAGE_ROLE_LABELS: Record<GarageRole, string> = {
+  owner: 'Ägare',
+  staff: 'Personal',
+  mechanic: 'Mekaniker',
+};
 
 export interface Garage {
   id: string;
@@ -772,11 +778,12 @@ export interface ServiceType {
 
 // --- Arbetsorder ---
 
-export type WorkOrderStatus = 'open' | 'in_progress' | 'done' | 'cancelled';
+export type WorkOrderStatus = 'open' | 'in_progress' | 'waiting_parts' | 'done' | 'cancelled';
 
 export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   open: 'Öppen',
   in_progress: 'Pågår',
+  waiting_parts: 'Väntar på del',
   done: 'Klar',
   cancelled: 'Avbruten',
 };
@@ -804,6 +811,12 @@ export interface WorkOrderLine {
   total: number;
   /** Avbockad av mekanikern. */
   done: boolean;
+  /** Tillagd av mekanikern under jobbet, utan pris tills admin prissätter. */
+  addedByStaff?: boolean;
+  /** Delen måste beställas hem. */
+  toOrder?: boolean;
+  /** Delen är uttagen ur lagret (bokförd som försäljning när ordern blev klar). */
+  stockBooked?: boolean;
 }
 
 export interface WorkOrder {
@@ -838,9 +851,15 @@ export interface WorkOrderDetail extends WorkOrder {
   lines: WorkOrderLine[];
   /** Radernas summa, öre. */
   total: number;
+  /** Lagerdelar på en klar order som inte kunde tas ur lagret (saknas eller arkiverad). */
+  stockMissing?: number;
 }
 
 export interface WorkOrderLineInput {
+  /** Befintlig rad, så att dess lageruttag behålls när raderna ersätts. */
+  id?: string;
+  articleId?: string | null;
+  toOrder?: boolean;
   type: WorkOrderLineType;
   description: string;
   quantity: number;
