@@ -21,22 +21,28 @@ const when = (m: Movement) =>
   selector: 'app-movement-list',
   standalone: false,
   host: { class: 'flex min-h-0 flex-col' },
+  styles: `
+    .mv-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+      line-height: 18px;
+    }
+  `,
   template: `
     @if (compact) {
-      <div class="flex flex-col">
+      <div class="flex flex-col divide-y divide-gray-100">
         @for (m of items(); track m.id; let i = $index) {
-          <div class="flex items-center gap-3 py-2.5 text-sm" [class.max-md:hidden]="i >= 3">
+          <div class="flex items-center gap-3 py-2.5 text-sm" [class.max-md:hidden]="i >= 4">
             <span
-              class="grid h-7 w-7 shrink-0 place-items-center rounded-full md:h-9 md:w-9"
+              class="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
               [class]="typeCls[m.type]"
-              ><mat-icon class="!h-4 !w-4 !text-base md:!h-5 md:!w-5 md:!text-xl">{{ icons[m.type] }}</mat-icon></span
+              ><mat-icon class="mv-icon">{{ icons[m.type] }}</mat-icon></span
             >
             <div class="min-w-0 flex-1">
-              <div class="font-medium">{{ labels[m.type] }} · {{ m.quantity }} st</div>
-              <div class="truncate text-gray-500">
-                @if (m.articleLabel ?? m.label) {
-                  {{ m.articleLabel ?? m.label }}
-                }
+              <div class="truncate font-medium">{{ m.articleLabel ?? m.label ?? '–' }}</div>
+              <div class="text-xs text-gray-500">
+                {{ labels[m.type] }} · {{ m.quantity }} st
               </div>
             </div>
             <span class="shrink-0 text-xs text-gray-400">{{

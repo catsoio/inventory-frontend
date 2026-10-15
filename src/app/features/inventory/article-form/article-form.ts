@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -277,7 +278,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
       /></mat-form-field>
 
       <div class="col-span-6 flex flex-wrap gap-2 sm:col-span-2 lg:col-span-3">
-        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="form.invalid || busy()">
+        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="busy()">
           Spara
         </button>
         @if (!id) {
@@ -285,7 +286,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
             mat-stroked-button
             type="button"
             class="!h-12"
-            [disabled]="form.invalid || busy()"
+            [disabled]="busy()"
             (click)="save(true)"
           >
             Spara och lägg till nästa
@@ -405,6 +406,8 @@ export class ArticleForm {
   }
 
   save(addNext = false) {
+    if (!ensureValid(this.form, this.snack)) return;
+
     const v = this.form.getRawValue();
     const editing = !!this.id;
     const opt = <T>(x: T | null | '') => (x === null || x === '' ? undefined : x);

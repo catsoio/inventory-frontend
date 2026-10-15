@@ -1,4 +1,6 @@
 import { Component, Inject, inject, signal } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ensureValid } from '../form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { Observable, forkJoin, of, switchMap } from 'rxjs';
@@ -140,12 +142,13 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
         }
         <span class="flex-1"></span>
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
-        <button mat-flat-button color="primary" [disabled]="form.invalid || busy()">Spara</button>
+        <button mat-flat-button color="primary" [disabled]="busy()">Spara</button>
       </mat-dialog-actions>
     </form>
   `,
 })
 export class BookingDialog {
+  private readonly snack = inject(MatSnackBar);
   private readonly auth = inject(Auth);
   /** Bara ägare får ta bort. */
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
@@ -245,6 +248,8 @@ export class BookingDialog {
   }
 
   save() {
+    if (!ensureValid(this.form, this.snack)) return;
+
     const v = this.form.getRawValue();
     const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
     const body = {

@@ -87,6 +87,7 @@ export class SupplierSelect implements ControlValueAccessor {
         data: {},
         width: '560px',
         maxWidth: '96vw',
+        panelClass: 'dialog-sheet',
       })
       .afterClosed()
       .subscribe((c) => {

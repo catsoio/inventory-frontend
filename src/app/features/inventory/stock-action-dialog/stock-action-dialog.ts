@@ -1,4 +1,6 @@
 import { Component, Inject, inject, signal } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { InventoryApi } from '../../../core/api/inventory-api';
@@ -26,7 +28,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
   template: `
     <h2 mat-dialog-title>{{ title }} – {{ data.article.label }}</h2>
     <form [formGroup]="form" (ngSubmit)="submit()">
-      <mat-dialog-content class="flex flex-col gap-1 !pt-2">
+      <mat-dialog-content class="!flex flex-col gap-1 !pt-2">
         @if (data.action === 'adjust') {
           <p class="text-sm text-gray-600">Nuvarande saldo: {{ data.article.quantity }} st</p>
           <mat-form-field
@@ -107,7 +109,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         <button
           mat-flat-button
           [color]="data.action === 'write-off' ? 'warn' : 'primary'"
-          [disabled]="form.invalid || busy()"
+          [disabled]="busy()"
         >
           {{ title }}
         </button>
@@ -116,6 +118,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
   `,
 })
 export class StockActionDialog {
+  private readonly snack = inject(MatSnackBar);
   private readonly api = inject(InventoryApi);
   private readonly dialog = inject(MatDialog);
   private readonly ref = inject<MatDialogRef<StockActionDialog, Article>>(MatDialogRef);
@@ -160,6 +163,8 @@ export class StockActionDialog {
   }
 
   submit() {
+    if (!ensureValid(this.form, this.snack)) return;
+
     const v = this.form.getRawValue();
     const ore = (kr: string) => Math.round(Number(kr) * 100);
     const common = { reference: v.reference || undefined, note: v.note || undefined };

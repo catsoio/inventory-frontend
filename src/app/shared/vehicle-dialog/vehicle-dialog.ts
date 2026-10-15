@@ -1,4 +1,6 @@
 import { Component, Inject, inject, signal } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ensureValid } from '../form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { WorkshopApi } from '../../core/api/workshop-api';
@@ -21,7 +23,7 @@ export interface VehicleDialogData {
   template: `
     <h2 mat-dialog-title>{{ data.vehicle ? 'Ändra bil' : 'Ny bil' }} – {{ data.customerName }}</h2>
     <form [formGroup]="form" (ngSubmit)="save()">
-      <mat-dialog-content class="grid gap-x-3 sm:grid-cols-6 !pt-2">
+      <mat-dialog-content class="!grid gap-x-3 sm:grid-cols-6 !pt-2">
         <mat-form-field class="sm:col-span-2">
           <mat-label>Regnr</mat-label>
           <input matInput formControlName="regNo" appRegNo class="uppercase" (blur)="lookup()" />
@@ -72,7 +74,7 @@ export interface VehicleDialogData {
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
-        <button mat-flat-button color="primary" [disabled]="form.invalid || busy() || taken()">
+        <button mat-flat-button color="primary" [disabled]="busy()">
           Spara
         </button>
       </mat-dialog-actions>
@@ -80,6 +82,7 @@ export interface VehicleDialogData {
   `,
 })
 export class VehicleDialog {
+  private readonly snack = inject(MatSnackBar);
   private readonly api = inject(WorkshopApi);
   private readonly autofill = inject(VehicleAutofill);
   private readonly ref = inject<MatDialogRef<VehicleDialog, Vehicle>>(MatDialogRef);
@@ -103,7 +106,8 @@ export class VehicleDialog {
       vin: [v?.vin ?? ''],
       notes: [v?.notes ?? ''],
     });
-    if (!v && this.form.controls.regNo.value) this.lookup();
+    // Ny bil med regnr, eller en sparad bil som bara har regnr: hämta bilinfon.
+    if (this.form.controls.regNo.value && (!v || this.autofill.missingInfo(this.form))) this.lookup();
   }
 
   /** När man lämnat regnr-fältet: finns bilen redan, annars hämtas bilinfo och fälten låses. */
@@ -112,9 +116,9 @@ export class VehicleDialog {
     this.note.set(null);
     this.taken.set(false);
     this.locked.set(false);
-    if (reg === this.data.vehicle?.regNo) return;
+    if (reg === this.data.vehicle?.regNo && !this.autofill.missingInfo(this.form)) return;
     this.looking.set(true);
-    this.autofill.run(this.form, reg).subscribe({
+    this.autofill.run(this.form, reg, this.data.vehicle?.id).subscribe({
       next: (r) => {
         this.looking.set(false);
         this.taken.set(!!r.taken);
@@ -140,6 +144,12 @@ export class VehicleDialog {
   }
 
   save() {
+    if (this.taken()) {
+      this.snack.open('Regnumret finns redan på en annan bil', undefined, { duration: 4000 });
+      return;
+    }
+    if (!ensureValid(this.form, this.snack)) return;
+
     const v = this.form.getRawValue();
     const body = {
       regNo: v.regNo,

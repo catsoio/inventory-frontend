@@ -38,12 +38,19 @@ export class VehicleAutofill {
   private readonly workshop = inject(WorkshopApi);
   private readonly storage = inject(StorageApi);
 
-  run(form: VehicleForm, regNo: string): Observable<AutofillResult> {
+  /** Bilen har ett regnr men ingen bilinfo alls: då är det värt att försöka hämta den igen. */
+  missingInfo(form: VehicleForm): boolean {
+    const c = form.controls;
+    return !c.make.value && !c.model.value && c.year.value == null && !c.vin.value;
+  }
+
+  /** `selfId` är bilen som redigeras, så att den inte räknas som "finns redan". */
+  run(form: VehicleForm, regNo: string, selfId?: string): Observable<AutofillResult> {
     this.unlock(form, true);
     if (regNo.length < 2) return of(NONE);
     return this.workshop.vehicles({ q: regNo, includeArchived: true, limit: 5 }).pipe(
       switchMap((p) => {
-        const taken = p.items.find((v) => v.regNo === regNo) ?? null;
+        const taken = p.items.find((v) => v.regNo === regNo && v.id !== selfId) ?? null;
         if (taken) {
           return of<AutofillResult>({
             taken,

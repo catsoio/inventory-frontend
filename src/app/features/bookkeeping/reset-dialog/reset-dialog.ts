@@ -10,7 +10,7 @@ import { BLOCKED_TEXT, periodLabel, warningText } from '../bookkeeping-format';
   standalone: false,
   template: `
     <h2 mat-dialog-title class="!text-red-700">Nollställ garagets data</h2>
-    <mat-dialog-content class="flex flex-col gap-3 !pt-2">
+    <mat-dialog-content class="!flex flex-col gap-3 !pt-2">
       @if (!preview()) {
         <mat-progress-bar mode="indeterminate" />
       } @else {

@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -54,7 +55,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="form.invalid || busy()"
+          [disabled]="busy()"
         >
           Spara
         </button>
@@ -329,6 +330,8 @@ export class WorkOrderCard implements OnInit {
   }
 
   save() {
+    if (!ensureValid(this.form, this.snack)) return;
+
     const v = this.form.getRawValue();
     const body: WorkOrderInput = {
       customerId: '',

@@ -96,6 +96,13 @@ const routes: Routes = [
           import('./features/bookkeeping/bookkeeping-module').then((m) => m.BookkeepingModule),
       },
       {
+        path: 'activity',
+        title: 'Aktivitetslogg',
+        canActivate: [adminGuard],
+        loadChildren: () =>
+          import('./features/activity/activity-module').then((m) => m.ActivityModule),
+      },
+      {
         path: 'sales',
         title: 'Sälj',
         data: { mode: 'sell' },
