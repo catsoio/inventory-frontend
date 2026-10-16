@@ -63,10 +63,12 @@ import { Auth } from '../../../core/auth/auth';
         <mat-form-field>
           <mat-label>Pris från (kr, exkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceFrom" />
+          <mat-hint>{{ form.controls.priceFrom.value | inclVat }}</mat-hint>
         </mat-form-field>
         <mat-form-field>
           <mat-label>Pris till (kr, exkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceTo" />
+          <mat-hint>{{ form.controls.priceTo.value | inclVat }}</mat-hint>
           @if (form.errors?.['price']) {
             <mat-error>Lägre än "från"</mat-error>
           }

@@ -106,6 +106,7 @@ import { Auth } from '../../../core/auth/auth';
               <th class="w-20 py-1 text-right">Antal</th>
               @if (!auth.isMechanic()) {
                 <th class="w-24 py-1 text-right">À-pris exkl. moms</th>
+                <th class="w-16 py-1 text-right">Rabatt</th>
                 <th class="w-24 py-1 text-right">Summa exkl. moms</th>
               }
             </tr>
@@ -125,20 +126,37 @@ import { Auth } from '../../../core/auth/auth';
                 <td class="py-2 text-right tabular-nums">{{ l.quantity }}</td>
                 @if (!auth.isMechanic()) {
                   <td class="py-2 text-right tabular-nums">{{ l.unitPrice | kr }}</td>
+                  <td class="py-2 text-right tabular-nums">
+                    {{ l.discountPercent ? l.discountPercent + ' %' : '' }}
+                  </td>
                   <td class="py-2 text-right tabular-nums">{{ l.total | kr }}</td>
                 }
               </tr>
             } @empty {
               <tr>
-                <td colspan="5" class="py-4 text-gray-500">Inga rader.</td>
+                <td colspan="6" class="py-4 text-gray-500">Inga rader.</td>
               </tr>
             }
           </tbody>
           @if (!auth.isMechanic()) {
             <tfoot>
               <tr>
-                <td colspan="4" class="pt-2 text-right font-bold">Summa exkl. moms</td>
-                <td class="pt-2 text-right font-bold tabular-nums">{{ o.total | kr }}</td>
+                <td colspan="5" class="pt-2 text-right font-bold">Summa exkl. moms</td>
+                <td class="pt-2 text-right font-bold tabular-nums">{{ o.totals.net | kr }}</td>
+              </tr>
+              @for (b of o.totals.byRate; track b.rate) {
+                <tr class="text-gray-700">
+                  <td colspan="5" class="text-right">Moms {{ b.rate }} %</td>
+                  <td class="text-right tabular-nums">{{ b.vat | kr }}</td>
+                </tr>
+              }
+              <tr>
+                <td colspan="5" class="border-t border-black pt-1 text-right font-bold">
+                  Att betala inkl. moms
+                </td>
+                <td class="border-t border-black pt-1 text-right font-bold tabular-nums">
+                  {{ o.totals.total | kr }}
+                </td>
               </tr>
             </tfoot>
           }

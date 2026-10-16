@@ -91,7 +91,9 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
               min="0"
               formControlName="unitPrice"
               (focus)="$any($event.target).select()"
-          /></mat-form-field>
+            />
+            <mat-hint>{{ form.controls.unitPrice.value | inclVat }}</mat-hint></mat-form-field
+          >
         }
         <mat-form-field
           ><mat-label>Referens (t.ex. ordernr)</mat-label

@@ -16,6 +16,7 @@ import {
   MovementQuery,
   Page,
   Report,
+  SellerDetails,
   TradeDocument,
   TradeKind,
   TradeRow,
@@ -37,6 +38,15 @@ function toParams(obj: object): HttpParams {
 export class InventoryApi {
   private readonly http = inject(HttpClient);
   private readonly base = `${API_URL}/inventory`;
+
+  /** Verkstadens uppgifter på faktura och kvitto. */
+  seller(): Observable<SellerDetails> {
+    return this.http.get<SellerDetails>(`${this.base}/seller`);
+  }
+
+  saveSeller(body: Partial<SellerDetails>): Observable<SellerDetails> {
+    return this.http.put<SellerDetails>(`${this.base}/seller`, body);
+  }
 
   summary(): Observable<Summary> {
     return this.http.get<Summary>(`${this.base}/summary`);

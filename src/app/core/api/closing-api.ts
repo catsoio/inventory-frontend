@@ -10,6 +10,7 @@ import {
   ClosingStatusInfo,
   Page,
   ResetPreview,
+  VatReport,
 } from '../models';
 
 function toParams(obj: object): HttpParams {
@@ -33,6 +34,11 @@ export class ClosingApi {
   /** `from`/`to`: YYYY-MM-DD (hela dagar, `to` inklusive) eller ISO-tidpunkt. Tomt `to` = nu. */
   preview(period: { from?: string; to?: string }): Observable<ClosingPreview> {
     return this.http.get<ClosingPreview>(`${this.base}/preview`, { params: toParams(period) });
+  }
+
+  /** Utgående moms för en period (fakturor, lagerförsäljning utanför order, däckhotell). */
+  vatReport(period: { from?: string; to?: string }): Observable<VatReport> {
+    return this.http.get<VatReport>(`${this.base}/vat-report`, { params: toParams(period) });
   }
 
   close(body: { from?: string; to?: string; note?: string }): Observable<Closing> {

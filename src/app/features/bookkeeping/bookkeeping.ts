@@ -65,6 +65,8 @@ const statusText = (c: Closing) =>
         </section>
       }
 
+      <app-vat-report />
+
       <h2 class="mb-2 text-base font-semibold">Bokförda perioder</h2>
       <app-data-table
         [columns]="columns"

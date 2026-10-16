@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   Page,
+  PaymentMethod,
   WorkOrder,
   WorkOrderDetail,
   WorkOrderInput,
@@ -71,6 +72,16 @@ export class WorkOrderApi {
     },
   ): Observable<WorkOrderDetail> {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/progress`, body);
+  }
+
+  /** Fakturerar (företag) eller kvitterar (privat) en klar order. Därefter är ordern låst. */
+  issueInvoice(id: string, supplyDate?: string): Observable<WorkOrderDetail> {
+    return this.http.post<WorkOrderDetail>(`${this.base}/${id}/invoice`, { supplyDate });
+  }
+
+  /** Markera fakturan betald (och hur) eller ångra. */
+  setPaid(id: string, paid: boolean, method?: PaymentMethod): Observable<WorkOrderDetail> {
+    return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/payment`, { paid, method });
   }
 
   remove(id: string): Observable<unknown> {

@@ -7,6 +7,7 @@ import { ClosingDetail } from './closing-detail/closing-detail';
 import { ClosingEntries } from './closing-entries/closing-entries';
 import { ClosingSummaryView } from './closing-summary/closing-summary';
 import { ResetDialog } from './reset-dialog/reset-dialog';
+import { VatReportPanel } from './vat-report/vat-report';
 
 @NgModule({
   declarations: [
@@ -16,6 +17,7 @@ import { ResetDialog } from './reset-dialog/reset-dialog';
     ClosingSummaryView,
     BookDialog,
     ResetDialog,
+    VatReportPanel,
   ],
   imports: [
     SharedModule,

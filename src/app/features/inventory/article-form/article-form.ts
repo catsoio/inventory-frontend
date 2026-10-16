@@ -249,6 +249,7 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         ><mat-label>Försäljningspris (kr, exkl. moms)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">sell</mat-icon>
         <input matInput type="number" inputmode="decimal" step="0.01" formControlName="sellPrice" />
+        <mat-hint>{{ form.controls.sellPrice.value | inclVat }}</mat-hint>
         <mat-error>Ange pris (0 eller mer)</mat-error></mat-form-field
       >
       @if (id) {

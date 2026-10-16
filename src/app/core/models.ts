@@ -678,6 +678,12 @@ export interface Customer {
   type: CustomerType;
   name: string;
   orgNo: string | null;
+  /** Momsregistreringsnummer (företag), t.ex. SE556123456701. */
+  vatNumber: string | null;
+  /** Faktureringsadress – krävs på en företagsfaktura. */
+  address: string | null;
+  postalCode: string | null;
+  city: string | null;
   phone: string | null;
   email: string | null;
   notes: string | null;
@@ -685,7 +691,20 @@ export interface Customer {
 }
 
 export type CustomerInput = Partial<
-  Pick<Customer, 'type' | 'name' | 'orgNo' | 'phone' | 'email' | 'notes' | 'active'>
+  Pick<
+    Customer,
+    | 'type'
+    | 'name'
+    | 'orgNo'
+    | 'vatNumber'
+    | 'address'
+    | 'postalCode'
+    | 'city'
+    | 'phone'
+    | 'email'
+    | 'notes'
+    | 'active'
+  >
 >;
 
 export interface Vehicle {
@@ -788,13 +807,100 @@ export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   cancelled: 'Avbruten',
 };
 
-export type WorkOrderLineType = 'labour' | 'part' | 'other';
+export type WorkOrderLineType = 'labour' | 'part' | 'environment_fee' | 'other';
 
 export const WORK_ORDER_LINE_LABELS: Record<WorkOrderLineType, string> = {
   labour: 'Arbete',
   part: 'Del',
+  environment_fee: 'Miljöavgift',
   other: 'Annat',
 };
+
+/** Moms per momssats: underlag (netto) och momsbelopp, öre. */
+export interface VatBucket {
+  rate: number;
+  base: number;
+  vat: number;
+}
+
+/** Summor för en order eller faktura. Alla belopp i öre. */
+export interface OrderTotals {
+  /** Före rabatt, exkl. moms. */
+  gross: number;
+  discount: number;
+  /** Momspliktigt belopp efter rabatt, exkl. moms. */
+  net: number;
+  vat: number;
+  /** Att betala, inkl. moms. */
+  total: number;
+  byRate: VatBucket[];
+}
+
+export interface InvoiceSeller {
+  name: string;
+  orgNo: string;
+  vatNumber: string | null;
+  address: string;
+  postalCode: string;
+  city: string;
+  phone: string | null;
+  email: string | null;
+  fTax: boolean;
+  paymentDetails: string | null;
+  footer: string | null;
+}
+
+export interface InvoiceBuyer {
+  type: CustomerType;
+  name: string;
+  orgNo: string | null;
+  vatNumber: string | null;
+  address: string | null;
+  postalCode: string | null;
+  city: string | null;
+}
+
+/** Fakturan (företag) eller kvittot (privat) som låser ordern. */
+export interface WorkOrderInvoice {
+  /** FAK-00042 */
+  code: string;
+  number: number;
+  kind: 'invoice' | 'receipt';
+  issuedAt: string;
+  supplyDate: string;
+  dueAt: string | null;
+  seller: InvoiceSeller;
+  buyer: InvoiceBuyer;
+  totals: OrderTotals;
+  paidAt: string | null;
+  paymentMethod: PaymentMethod | null;
+}
+
+/** Verkstadens uppgifter på fakturan. */
+export interface SellerDetails extends Omit<InvoiceSeller, 'footer' | 'paymentDetails'> {
+  paymentDetails: string | null;
+  footer: string | null;
+  /** Dagar till förfallodatum på företagsfaktura. */
+  paymentTermsDays: number;
+}
+
+export interface VatSource {
+  count: number;
+  net: number;
+  vat: number;
+  byRate: VatBucket[];
+}
+
+/** Utgående moms för en period. */
+export interface VatReport {
+  from: string;
+  to: string;
+  invoices: VatSource;
+  stockSales: VatSource;
+  hotel: VatSource;
+  total: { net: number; vat: number; gross: number; byRate: VatBucket[] };
+  doneNotInvoiced: number;
+}
 
 /** En rad på arbetsordern: ett jobb, en del eller något annat. */
 export interface WorkOrderLine {
@@ -805,9 +911,13 @@ export interface WorkOrderLine {
   articleId: string | null;
   /** Timmar för arbete, antal för delar. */
   quantity: number;
-  /** Öre per enhet. */
+  /** Öre per enhet, exkl. moms. */
   unitPrice: number;
-  /** Öre. */
+  /** Rabatt på raden, 0–100 %. */
+  discountPercent: number;
+  /** Momssats i procent: 25, 12, 6 eller 0. */
+  vatRate: number;
+  /** Öre, exkl. moms, efter rabatt. */
   total: number;
   /** Avbockad av mekanikern. */
   done: boolean;
@@ -845,12 +955,19 @@ export interface WorkOrder {
   quote: number | null;
   remarks: string | null;
   notes: string | null;
+  /** FAK-00042 när ordern är fakturerad (då är den låst). */
+  invoiceCode?: string | null;
+  invoicedAt?: string | null;
+  paidAt?: string | null;
 }
 
 export interface WorkOrderDetail extends WorkOrder {
   lines: WorkOrderLine[];
-  /** Radernas summa, öre. */
+  /** Radernas summa exkl. moms, öre. */
   total: number;
+  /** Netto, moms per sats och belopp att betala. */
+  totals: OrderTotals;
+  invoice: WorkOrderInvoice | null;
   /** Lagerdelar på en klar order som inte kunde tas ur lagret (saknas eller arkiverad). */
   stockMissing?: number;
 }
@@ -864,6 +981,8 @@ export interface WorkOrderLineInput {
   description: string;
   quantity: number;
   unitPrice: number;
+  discountPercent?: number;
+  vatRate?: number;
   done: boolean;
 }
 
