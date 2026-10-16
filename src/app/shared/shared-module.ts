@@ -35,6 +35,7 @@ import { TimeField } from './time-field/time-field';
 import { DataTable } from './data-table/data-table';
 import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
+import { InclVatPipe } from './incl-vat-pipe';
 import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
 import { RegPlate, SvFlag } from './reg-plate/reg-plate';
@@ -83,6 +84,7 @@ const MATERIAL = [
     CustomerSelect,
     VehicleDialog,
     KrPipe,
+    InclVatPipe,
     StockBadge,
     MovementList,
     Pill,
@@ -114,6 +116,7 @@ const MATERIAL = [
     CustomerSelect,
     VehicleDialog,
     KrPipe,
+    InclVatPipe,
     StockBadge,
     MovementList,
     Pill,

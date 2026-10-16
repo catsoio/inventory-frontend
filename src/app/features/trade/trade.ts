@@ -1,3 +1,4 @@
+import { vatOf } from '../../shared/vat';
 import {
   Component,
   DestroyRef,
@@ -251,6 +252,14 @@ interface Line {
           <div class="flex justify-between py-2 text-xl font-semibold">
             <span>Totalt exkl. moms</span><span>{{ totalOre() | kr }}</span>
           </div>
+          @if (sell) {
+            <div class="flex justify-between text-sm text-gray-600">
+              <span>Moms 25 %</span><span>{{ vatOre() | kr }}</span>
+            </div>
+            <div class="flex justify-between pb-2 font-semibold">
+              <span>Att betala inkl. moms</span><span>{{ totalOre() + vatOre() | kr }}</span>
+            </div>
+          }
           <button
             mat-flat-button
             color="primary"
@@ -292,6 +301,8 @@ export class Trade {
 
   readonly units = computed(() => this.lines().reduce((n, l) => n + (l.qty || 0), 0));
   readonly totalOre = computed(() => this.lines().reduce((n, l) => n + this.lineOre(l), 0));
+  /** Moms på försäljningen (25 %), avrundad en gång på summan. */
+  readonly vatOre = computed(() => vatOf(this.totalOre()));
   readonly valid = computed(
     () => this.lines().length > 0 && this.lines().every((l) => this.qtyOk(l) && l.price >= 0),
   );

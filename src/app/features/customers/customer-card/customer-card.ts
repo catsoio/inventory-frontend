@@ -70,11 +70,40 @@ import { Auth } from '../../../core/auth/auth';
           <mat-error>Ange namn</mat-error>
         </mat-form-field>
         @if (form.controls.type.value === 'company') {
-          <mat-form-field class="sm:col-span-2">
+          <mat-form-field>
             <mat-label>Organisationsnummer</mat-label>
-            <input matInput formControlName="orgNo" />
+            <input matInput formControlName="orgNo" placeholder="556123-4567" />
+            <mat-hint>Krävs på företagsfaktura</mat-hint>
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Momsregistreringsnummer</mat-label>
+            <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
+            <mat-hint>Valfritt för svenska företag</mat-hint>
           </mat-form-field>
         }
+        <mat-form-field class="sm:col-span-2">
+          <mat-label>Adress{{ form.controls.type.value === 'company' ? ' (krävs på faktura)' : '' }}</mat-label>
+          <input matInput formControlName="address" autocomplete="off" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Postnummer</mat-label>
+          <input matInput formControlName="postalCode" autocomplete="off" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Ort</mat-label>
+          <input matInput formControlName="city" autocomplete="off" />
+        </mat-form-field>
+        <p class="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2">
+          @if (form.controls.type.value === 'company') {
+            <b>Företag:</b> får faktura med organisationsnummer och förfallodatum. Svenska företag
+            betalar 25 % moms precis som privatpersoner, men kan normalt dra av den i sin egen
+            moms. Företaget ser därför priser exkl. moms först. Utländska (EU-)företag hanteras inte automatiskt –
+            fakturera dem utanför systemet.
+          } @else {
+            <b>Privatperson:</b> får kvitto. Priser till privatpersoner anges inklusive moms (25 %)
+            – det är den summan som ska stå först.
+          }
+        </p>
         <mat-form-field>
           <mat-label>Telefon</mat-label>
           <input matInput type="tel" formControlName="phone" />
@@ -207,6 +236,10 @@ export class CustomerCard implements OnInit {
     type: ['private' as CustomerType],
     name: ['', Validators.required],
     orgNo: [''],
+    vatNumber: [''],
+    address: [''],
+    postalCode: [''],
+    city: [''],
     phone: [''],
     email: ['', Validators.email],
     notes: [''],
@@ -231,6 +264,10 @@ export class CustomerCard implements OnInit {
         type: c.type,
         name: c.name,
         orgNo: c.orgNo ?? '',
+        vatNumber: c.vatNumber ?? '',
+        address: c.address ?? '',
+        postalCode: c.postalCode ?? '',
+        city: c.city ?? '',
         phone: c.phone ?? '',
         email: c.email ?? '',
         notes: c.notes ?? '',
@@ -246,6 +283,10 @@ export class CustomerCard implements OnInit {
       type: v.type,
       name: v.name,
       orgNo: v.type === 'company' ? v.orgNo || null : null,
+      vatNumber: v.type === 'company' ? v.vatNumber || null : null,
+      address: v.address || null,
+      postalCode: v.postalCode || null,
+      city: v.city || null,
       phone: v.phone || null,
       email: v.email || null,
       notes: v.notes || null,

@@ -1,3 +1,4 @@
+import { vatOf, withVat } from '../../../shared/vat';
 import { Component, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -177,6 +178,8 @@ export class StorageDetail {
         title: 'Avgift och betalning (exkl. moms)',
         fields: [
           ['Avgift (exkl. moms)', this.kr.transform(d.fee)],
+          ['Moms 25 %', this.kr.transform(vatOf(d.fee))],
+          ['Att betala (inkl. moms)', this.kr.transform(withVat(d.fee))],
           ['Status', PAYMENT_STATUS_LABELS[d.paymentStatus]],
           ['Betalsätt', d.paymentMethod ? PAYMENT_METHOD_LABELS[d.paymentMethod] : '–'],
           ['Betaldatum', dateText(d.paidAt)],

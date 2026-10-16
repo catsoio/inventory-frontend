@@ -115,10 +115,12 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
         <mat-form-field class="col-span-2 sm:col-span-3">
           <mat-label>Pris från (kr, exkl. moms)</mat-label>
           <input matInput type="number" inputmode="decimal" min="0" formControlName="priceFrom" />
+          <mat-hint>{{ form.controls.priceFrom.value | inclVat }}</mat-hint>
         </mat-form-field>
         <mat-form-field class="col-span-2 sm:col-span-3">
           <mat-label>Pris till (kr, exkl. moms)</mat-label>
           <input matInput type="number" inputmode="decimal" min="0" formControlName="priceTo" />
+          <mat-hint>{{ form.controls.priceTo.value | inclVat }}</mat-hint>
           @if (form.errors?.['price']) {
             <mat-error>Lägre än "från"</mat-error>
           }

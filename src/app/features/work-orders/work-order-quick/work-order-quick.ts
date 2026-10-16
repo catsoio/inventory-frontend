@@ -23,6 +23,9 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
   description: l.description,
   quantity: l.quantity,
   unitPrice: l.unitPrice,
+  // Utan dessa skulle en sparning nollställa rabatt och momssats.
+  discountPercent: l.discountPercent,
+  vatRate: l.vatRate,
   done,
 });
 
@@ -116,7 +119,7 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
                 type="checkbox"
                 class="h-5 w-5 shrink-0 accent-teal-700"
                 [checked]="l.done"
-                [disabled]="busy()"
+                [disabled]="busy() || !!o.invoice"
                 (change)="toggle(o, l, $any($event.target).checked)"
                 [attr.aria-label]="'Klar: ' + l.description"
               />
@@ -167,7 +170,10 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
         <footer class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
           <div class="mr-auto text-sm">
             <span class="text-gray-500">Summa exkl. moms</span>
-            <b class="ml-2 text-base tabular-nums">{{ o.total | kr }}</b>
+            <b class="ml-2 text-base tabular-nums">{{ o.totals.net | kr }}</b>
+            <div class="text-xs text-gray-500">
+              + moms {{ o.totals.vat | kr }} = <b>{{ o.totals.total | kr }}</b> inkl. moms
+            </div>
             @if (o.priceFrom !== null) {
               <div class="text-xs text-gray-500">
                 Överenskommet {{ o.priceFrom | kr
@@ -220,6 +226,10 @@ export class WorkOrderQuick implements OnInit {
   patch(body: Partial<WorkOrderInput>) {
     const o = this.order();
     if (!o || this.busy()) return;
+    if (o.invoice && (body.lines || body.status)) {
+      this.snack.open('Ordern är fakturerad och låst.', undefined, { duration: 2500 });
+      return;
+    }
     this.busy.set(true);
     this.api.update(o.id, body).subscribe({
       next: (r) => {

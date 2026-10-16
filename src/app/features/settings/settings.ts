@@ -141,6 +141,76 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
 
       @if (auth.isAdmin()) {
         <section class="mt-4 rounded-xl bg-white shadow-sm">
+          <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Fakturauppgifter</h2>
+          <p class="px-5 text-sm text-gray-600">
+            Skrivs ut på faktura (företagskunder) och kvitto (privatkunder). En faktura måste enligt
+            mervärdesskattelagen ha säljarens momsregistreringsnummer, namn och adress, så de här
+            uppgifterna krävs innan du kan fakturera. De kopieras in på varje faktura när den
+            utfärdas och ändras inte i efterhand.
+          </p>
+          <form
+            [formGroup]="sellerForm"
+            (ngSubmit)="saveSeller()"
+            class="grid gap-x-4 p-4 sm:grid-cols-6"
+          >
+            <mat-form-field class="sm:col-span-3">
+              <mat-label>Företagsnamn</mat-label>
+              <input matInput formControlName="name" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3">
+              <mat-label>Organisationsnummer</mat-label>
+              <input matInput formControlName="orgNo" placeholder="556123-4567" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3">
+              <mat-label>Momsregistreringsnummer</mat-label>
+              <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
+              <mat-hint>SE + organisationsnumret utan bindestreck + 01</mat-hint>
+            </mat-form-field>
+            <div class="flex items-center sm:col-span-3">
+              <mat-checkbox formControlName="fTax">Godkänd för F-skatt</mat-checkbox>
+            </div>
+            <mat-form-field class="sm:col-span-3">
+              <mat-label>Adress</mat-label>
+              <input matInput formControlName="address" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-1">
+              <mat-label>Postnr</mat-label>
+              <input matInput formControlName="postalCode" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-2">
+              <mat-label>Ort</mat-label>
+              <input matInput formControlName="city" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3">
+              <mat-label>Telefon</mat-label>
+              <input matInput formControlName="phone" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3">
+              <mat-label>E-post</mat-label>
+              <input matInput formControlName="email" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-4">
+              <mat-label>Betalningsuppgifter</mat-label>
+              <input matInput formControlName="paymentDetails" placeholder="Bankgiro 123-4567" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-2">
+              <mat-label>Betalningsvillkor (dagar)</mat-label>
+              <input matInput type="number" min="0" max="365" formControlName="paymentTermsDays" />
+              <mat-hint>Gäller företagsfaktura</mat-hint>
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-6">
+              <mat-label>Text längst ned (valfritt)</mat-label>
+              <input matInput formControlName="footer" />
+            </mat-form-field>
+            <div class="sm:col-span-6">
+              <button mat-flat-button color="primary" [disabled]="sellerForm.invalid || sellerBusy()">
+                Spara fakturauppgifter
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="mt-4 rounded-xl bg-white shadow-sm">
           <h2 class="px-5 pt-5 pb-1 text-base font-semibold">
             Personal i {{ auth.garage()?.name }}
           </h2>
@@ -248,6 +318,21 @@ export class SettingsPage {
   });
   readonly inviteCode = signal<string | null>(null);
   readonly seasons = Object.entries(SEASON_LABELS);
+  readonly sellerBusy = signal(false);
+  readonly sellerForm = inject(FormBuilder).nonNullable.group({
+    name: ['', Validators.required],
+    orgNo: ['', Validators.required],
+    vatNumber: ['', Validators.pattern(/^(SE\s?\d{12})?$/i)],
+    fTax: [true],
+    address: ['', Validators.required],
+    postalCode: ['', Validators.required],
+    city: ['', Validators.required],
+    phone: [''],
+    email: [''],
+    paymentDetails: [''],
+    paymentTermsDays: [30, [Validators.min(0), Validators.max(365)]],
+    footer: [''],
+  });
 
   readonly form = inject(FormBuilder).nonNullable.group({
     defaultView: this.settings.value().defaultView,
@@ -267,7 +352,31 @@ export class SettingsPage {
   });
 
   constructor() {
-    if (this.auth.isAdmin()) this.loadMembers();
+    if (this.auth.isAdmin()) {
+      this.loadMembers();
+      this.api.seller().subscribe((s) =>
+        this.sellerForm.patchValue({
+          ...s,
+          vatNumber: s.vatNumber ?? '',
+          phone: s.phone ?? '',
+          email: s.email ?? '',
+          paymentDetails: s.paymentDetails ?? '',
+          footer: s.footer ?? '',
+        }),
+      );
+    }
+  }
+
+  saveSeller() {
+    this.sellerBusy.set(true);
+    const v = this.sellerForm.getRawValue();
+    this.api.saveSeller(v).subscribe({
+      next: () => {
+        this.sellerBusy.set(false);
+        this.snack.open('Fakturauppgifterna sparades', undefined, { duration: 2500 });
+      },
+      error: () => this.sellerBusy.set(false),
+    });
   }
 
   private loadMembers() {
