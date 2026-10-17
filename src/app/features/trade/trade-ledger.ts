@@ -5,6 +5,7 @@ import { InventoryApi } from '../../core/api/inventory-api';
 import { TradeKind, TradeRow } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
+import { vatOf, withVat } from '../../shared/vat';
 import { TradeDocumentDialog } from '../../shared/trade-document-dialog/trade-document-dialog';
 
 const kr = new KrPipe();
@@ -90,6 +91,24 @@ export class TradeLedger {
       value: (r) => r.total,
       fmt: (r) => kr.transform(r.total),
     },
+    ...(this.sell
+      ? [
+          {
+            key: 'vat',
+            label: 'Moms 25 %',
+            right: true,
+            value: (r: TradeRow) => vatOf(r.total),
+            fmt: (r: TradeRow) => kr.transform(vatOf(r.total)),
+          },
+          {
+            key: 'gross',
+            label: 'Inkl. moms',
+            right: true,
+            value: (r: TradeRow) => withVat(r.total),
+            fmt: (r: TradeRow) => kr.transform(withVat(r.total)),
+          },
+        ]
+      : []),
     { key: 'note', label: 'Anteckning', value: (r) => r.note ?? '', fmt: (r) => r.note || '–' },
   ]);
 
