@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { Auth } from '../../core/auth/auth';
+import { I18n } from '../../core/i18n/i18n';
 import { Billing } from '../../core/billing/billing';
 import { GARAGE_ROLE_LABELS, GarageMember, SEASON_LABELS } from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
@@ -25,6 +26,18 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
       <form [formGroup]="form" (ngSubmit)="save()" class="flex flex-col gap-4">
         <section class="rounded-xl bg-white shadow-sm">
           <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Visning</h2>
+          <div class="flex flex-wrap items-center gap-3 px-5 pt-3">
+            <span class="text-sm">Språk</span>
+            <mat-button-toggle-group
+              [value]="i18n.lang()"
+              (change)="i18n.set($event.value)"
+              aria-label="Språk"
+              hideSingleSelectionIndicator
+            >
+              <mat-button-toggle value="sv">Svenska</mat-button-toggle>
+              <mat-button-toggle value="en">English</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
           <div class="grid gap-x-6 p-4 sm:grid-cols-3">
             <mat-form-field>
               <mat-label>Standardvy för artiklar</mat-label>
@@ -293,6 +306,7 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
 })
 export class SettingsPage {
   protected readonly version = pkg.version;
+  protected readonly i18n = inject(I18n);
   private readonly settings = inject(Settings);
   private readonly snack = inject(MatSnackBar);
   private readonly api = inject(InventoryApi);

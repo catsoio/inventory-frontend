@@ -22,17 +22,15 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
   type: l.type,
   description: l.description,
   quantity: l.quantity,
-  unitPrice: l.unitPrice,
-  // Utan dessa skulle en sparning nollställa rabatt och momssats.
-  discountPercent: l.discountPercent,
-  vatRate: l.vatRate,
+  // Utan instruktionen skulle en sparning tömma den.
+  instruction: l.instruction,
   done,
 });
 
 /**
- * Snabbpanelen bredvid listan: byt status, mekaniker och hämtdatum, bocka av rader, lägg till en
+ * Snabbpanelen bredvid listan: byt status, mekaniker och datum, bocka av rader, lägg till en
  * rad och skriv en intern anteckning utan att lämna listan. Varje ändring sparas direkt.
- * Priser och kund ändras på hela ordern.
+ * Pris och kund ändras på hela ordern.
  */
 @Component({
   selector: 'app-work-order-quick',
@@ -74,7 +72,7 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
 
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
           <label class="block text-xs text-gray-500">
-            Mekaniker / plats
+            Mekaniker
             <select
               class="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900"
               [value]="o.resourceId ?? ''"
@@ -83,7 +81,25 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
             >
               <option value="">Ingen vald</option>
               @for (r of resources(); track r.id) {
-                <option [value]="r.id" [selected]="r.id === o.resourceId">{{ r.name }}</option>
+                @if (r.kind === 'mechanic') {
+                  <option [value]="r.id" [selected]="r.id === o.resourceId">{{ r.name }}</option>
+                }
+              }
+            </select>
+          </label>
+          <label class="block text-xs text-gray-500">
+            Lyft / plats
+            <select
+              class="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900"
+              [value]="o.placeId ?? ''"
+              [disabled]="busy()"
+              (change)="patch({ placeId: $any($event.target).value || null })"
+            >
+              <option value="">Ingen vald</option>
+              @for (r of resources(); track r.id) {
+                @if (r.kind !== 'mechanic') {
+                  <option [value]="r.id" [selected]="r.id === o.placeId">{{ r.name }}</option>
+                }
               }
             </select>
           </label>
@@ -129,12 +145,14 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
                   ({{ lineLabels[l.type] }}{{ l.toOrder ? ', beställs' : ''
                   }}{{ l.stockBooked ? ', uttagen' : '' }})
                 </span>
-                @if (l.addedByStaff) {
-                  <app-pill tone="amber">Tillagd av mekaniker – prissätt</app-pill>
+                @if (l.toOrder) {
+                  <app-pill tone="amber">Del saknas</app-pill>
+                }
+                @if (l.instruction) {
+                  <span class="block text-xs text-gray-500">{{ l.instruction }}</span>
                 }
               </span>
               <span class="text-sm text-gray-600 tabular-nums">{{ l.quantity }}</span>
-              <span class="w-24 text-right text-sm tabular-nums">{{ l.total | kr }}</span>
             </li>
           } @empty {
             <li class="py-2 text-sm text-gray-500">Inga rader än.</li>
@@ -169,22 +187,18 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
 
         <footer class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
           <div class="mr-auto text-sm">
-            <span class="text-gray-500">Summa exkl. moms</span>
-            <b class="ml-2 text-base tabular-nums">{{ o.totals.net | kr }}</b>
-            <div class="text-xs text-gray-500">
-              + moms {{ o.totals.vat | kr }} = <b>{{ o.totals.total | kr }}</b> inkl. moms
-            </div>
-            @if (o.priceFrom !== null) {
-              <div class="text-xs text-gray-500">
-                Överenskommet {{ o.priceFrom | kr
-                }}{{
-                  o.priceTo !== null && o.priceTo !== o.priceFrom ? ' – ' + (o.priceTo | kr) : ''
-                }}
-              </div>
+            @if (o.price !== null) {
+              <span class="text-gray-500">Pris exkl. moms</span>
+              <b class="ml-2 text-base tabular-nums">{{ o.price | kr }}</b>
+              @if (o.priceNote) {
+                <div class="text-xs text-gray-500">{{ o.priceNote }}</div>
+              }
+            } @else {
+              <span class="text-gray-500">Inget pris satt</span>
             }
           </div>
           <a mat-stroked-button [routerLink]="['/workorders', o.id, 'print']">
-            <mat-icon>print</mat-icon> Skriv ut
+            <mat-icon>print</mat-icon> Arbetsblad
           </a>
           <a mat-flat-button color="primary" [routerLink]="['/workorders', o.id]">
             Öppna hela ordern
@@ -261,7 +275,6 @@ export class WorkOrderQuick implements OnInit {
           type: type as WorkOrderLineType,
           description,
           quantity: 1,
-          unitPrice: 0,
           done: false,
         },
       ],

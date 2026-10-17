@@ -160,7 +160,10 @@ const MENUS: Record<AppId, MenuGroup[]> = {
     {
       title: 'Tidsbokning',
       links: [
-        { path: '/bookings', label: 'Kalender', icon: 'calendar_month', exact: true },
+        { path: '/bookings', label: 'Resurser', icon: 'view_column', exact: true },
+        { path: '/bookings/day', label: 'Dag', icon: 'today', exact: true },
+        { path: '/bookings/week', label: 'Vecka', icon: 'view_week', exact: true },
+        { path: '/bookings/month', label: 'Månad', icon: 'calendar_month', exact: true },
         { path: '/bookings/list', label: 'Bokningslista', icon: 'view_list', exact: true },
       ],
     },

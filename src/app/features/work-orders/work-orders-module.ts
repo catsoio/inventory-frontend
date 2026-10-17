@@ -6,10 +6,19 @@ import { WorkOrderQuick } from './work-order-quick/work-order-quick';
 import { WorkOrderMine } from './work-order-mine/work-order-mine';
 import { WorkOrderList } from './work-order-list/work-order-list';
 import { WorkOrderPrint } from './work-order-print/work-order-print';
+import { QuickArticleDialog } from './quick-article-dialog/quick-article-dialog';
 import { WorkOrderInvoicePage } from './work-order-invoice/work-order-invoice';
 
 @NgModule({
-  declarations: [WorkOrderList, WorkOrderCard, WorkOrderPrint, WorkOrderMine, WorkOrderQuick, WorkOrderInvoicePage],
+  declarations: [
+    WorkOrderList,
+    WorkOrderCard,
+    WorkOrderPrint,
+    WorkOrderMine,
+    WorkOrderQuick,
+    WorkOrderInvoicePage,
+    QuickArticleDialog,
+  ],
   imports: [
     SharedModule,
     RouterModule.forChild([

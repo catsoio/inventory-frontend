@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
@@ -13,8 +13,6 @@ import {
   PAYMENT_METHOD_LABELS,
   PaymentMethod,
   Resource,
-  ServiceType,
-  WORK_ORDER_LINE_LABELS,
   WORK_ORDER_STATUS_LABELS,
   WorkOrderDetail,
   WorkOrderInput,
@@ -27,12 +25,13 @@ import { Subject, debounceTime, switchMap } from 'rxjs';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../../storage/storage-format';
 import { Auth } from '../../../core/auth/auth';
-import { STANDARD_VAT, VAT_OPTIONS, rowNet, totalsOf, withVat } from '../../../shared/vat';
+import { totalsOf, withVat } from '../../../shared/vat';
+import { QuickArticleDialog } from '../quick-article-dialog/quick-article-dialog';
 
 const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
 const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
 
-/** Arbetsordern: huvudet med kund, bil, datum och pris, och raderna som mekanikern arbetar igenom. */
+/** Arbetsordern: arbetsbladet till mekanikern (utan pris) och, separat, priset och kvittot mellan admin och kund. */
 @Component({
   selector: 'app-work-order-card',
   standalone: false,
@@ -55,7 +54,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
             [disabled]="form.dirty"
             [matTooltip]="form.dirty ? 'Spara först' : ''"
           >
-            <mat-icon>print</mat-icon> Skriv ut
+            <mat-icon>print</mat-icon> Skriv ut arbetsblad
           </a>
         }
         @if (!card()?.invoice) {
@@ -68,8 +67,21 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
       @if (card()?.invoice; as inv) {
         <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
           <b>{{ inv.kind === 'invoice' ? 'Fakturerad' : 'Kvitterad' }} som {{ inv.code }}.</b>
-          Ordern är låst: rader, priser och kund kan inte ändras (en utfärdad faktura får inte
-          ändras i efterhand).
+          Ordern är låst: rader, pris och kund kan inte ändras (en utfärdad faktura får inte ändras
+          i efterhand).
+        </p>
+      }
+
+      @if (card()?.hasMissing && card()!.status !== 'done') {
+        <p
+          class="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900"
+        >
+          <span><b>Del saknas.</b> Någon rad måste beställas innan jobbet kan bli klart.</span>
+          @if (card()!.status !== 'waiting_parts' && !card()!.invoice) {
+            <button mat-stroked-button type="button" (click)="waitForParts()">
+              Sätt Väntar på del
+            </button>
+          }
         </p>
       }
 
@@ -80,48 +92,38 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
         </section>
 
         <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
-          <h2 class="mb-2 text-base font-semibold sm:col-span-6">Inlämning</h2>
+          <h2 class="mb-2 text-base font-semibold sm:col-span-6">Arbetsblad</h2>
           <app-date-field
-            class="sm:col-span-2"
-            label="Inlämningsdatum"
+            class="sm:col-span-3"
+            label="Start"
             icon="event"
             error="Ange datum"
             formControlName="receivedAt"
           />
           <app-date-field
-            class="sm:col-span-2"
-            label="Hämtningsdatum"
+            class="sm:col-span-3"
+            label="Klar senast"
             icon="event_available"
-            [error]="form.errors?.['pickup'] ? 'Före inlämningsdatumet' : ''"
+            [error]="form.errors?.['pickup'] ? 'Före startdatumet' : ''"
             formControlName="pickupAt"
           />
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Mekaniker / plats</mat-label>
+          <mat-form-field class="sm:col-span-3">
+            <mat-label>Mekaniker</mat-label>
             <mat-select formControlName="resourceId">
               <mat-option value="">Ingen vald</mat-option>
-              @for (r of resources(); track r.id) {
+              @for (r of mechanics(); track r.id) {
                 <mat-option [value]="r.id">{{ r.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
-
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Pris överenskommet från (kr, exkl. moms)</mat-label>
-            <input matInput type="number" inputmode="decimal" min="0" formControlName="priceFrom" />
-            <mat-hint>{{ inclHint(form.controls.priceFrom.value) }}</mat-hint>
-          </mat-form-field>
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Pris överenskommet till (kr, exkl. moms)</mat-label>
-            <input matInput type="number" inputmode="decimal" min="0" formControlName="priceTo" />
-            <mat-hint>{{ inclHint(form.controls.priceTo.value) }}</mat-hint>
-            @if (form.errors?.['price']) {
-              <mat-error>Lägre än "från"</mat-error>
-            }
-          </mat-form-field>
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Prisförslag (kr, exkl. moms)</mat-label>
-            <input matInput type="number" inputmode="decimal" min="0" formControlName="quote" />
-            <mat-hint>{{ inclHint(form.controls.quote.value) }}</mat-hint>
+          <mat-form-field class="sm:col-span-3">
+            <mat-label>Lyft / plats</mat-label>
+            <mat-select formControlName="placeId">
+              <mat-option value="">Ingen vald</mat-option>
+              @for (r of places(); track r.id) {
+                <mat-option [value]="r.id">{{ r.name }}</mat-option>
+              }
+            </mat-select>
           </mat-form-field>
 
           <div class="mb-4 sm:col-span-6">
@@ -150,11 +152,9 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <div class="mb-2 flex flex-wrap items-center gap-2">
             <h2 class="flex-1 text-base font-semibold">Vad ska göras</h2>
-            @for (t of lineTypes; track t[0]) {
-              <button mat-stroked-button type="button" (click)="addLine(t[0])">
-                <mat-icon>add</mat-icon> {{ t[1] }}
-              </button>
-            }
+            <button mat-stroked-button type="button" (click)="addLine()">
+              <mat-icon>add</mat-icon> Lägg till rad
+            </button>
           </div>
 
           @if (card()?.stockMissing; as n) {
@@ -167,129 +167,139 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
             @for (row of lines.controls; track row; let i = $index) {
               <div
                 [formGroupName]="i"
-                class="grid items-start gap-x-3 border-t border-gray-100 pt-3 sm:grid-cols-[7rem_1fr_5.5rem_7.5rem_5.5rem_5.5rem_7rem_2.5rem_2.5rem]"
+                class="mt-3 flex flex-col gap-2 rounded-xl border border-gray-200 p-3"
+                [class.border-amber-300]="row.value.toOrder"
+                [class.bg-amber-50]="row.value.toOrder"
+                [class.bg-green-50]="row.value.done && !row.value.toOrder"
               >
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>Typ</mat-label>
-                  <mat-select formControlName="type">
-                    @for (t of lineTypes; track t[0]) {
-                      <mat-option [value]="t[0]">{{ t[1] }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{
-                    row.value.type === 'part'
-                      ? 'Artikel (sök i lagret eller skriv fritt)'
-                      : row.value.type === 'labour'
-                        ? 'Åtgärd (välj eller skriv fritt)'
-                        : row.value.type === 'environment_fee'
-                          ? 'Miljöavgift (t.ex. däck, olja, batteri)'
-                          : 'Beskrivning'
-                  }}</mat-label>
-                  <input
-                    matInput
-                    formControlName="description"
-                    [matAutocomplete]="auto"
-                    (input)="edited(row)"
-                    (focus)="typed(row)"
-                    autocomplete="off"
-                  />
-                  <mat-autocomplete
-                    #auto="matAutocomplete"
-                    (optionSelected)="picked(row, $event.option.value)"
-                  >
-                    @for (o of suggestions(row); track o.key) {
-                      <mat-option [value]="o.key">
-                        {{ o.label }}
-                        <span class="ml-2 text-xs text-gray-500">{{ o.hint }}</span>
-                      </mat-option>
-                    }
-                  </mat-autocomplete>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>{{ row.value.type === 'labour' ? 'Timmar' : 'Antal' }}</mat-label>
-                  <input matInput type="number" min="0" step="0.25" formControlName="quantity" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>À-pris (kr, exkl. moms)</mat-label>
-                  <input matInput type="number" min="0" formControlName="unitPrice" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>Rabatt %</mat-label>
-                  <input matInput type="number" min="0" max="100" formControlName="discountPercent" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>Moms %</mat-label>
-                  <mat-select formControlName="vatRate">
-                    @for (v of vatOptions; track v) {
-                      <mat-option [value]="v">{{ v }} %</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <div class="self-center text-right tabular-nums">{{ rowTotal(row) | kr }}</div>
-                <mat-checkbox formControlName="done" matTooltip="Klar" class="self-center" />
-                <button
-                  mat-icon-button
-                  type="button"
-                  (click)="removeLine(i)"
-                  aria-label="Ta bort raden"
-                >
-                  <mat-icon>delete_outline</mat-icon>
-                </button>
-                @if (row.value.type === 'part') {
-                  <div class="flex flex-wrap items-center gap-x-4 pb-2 text-sm sm:col-span-9">
-                    <mat-checkbox formControlName="toOrder">Behöver beställas</mat-checkbox>
-                    @if (row.value.articleId) {
-                      <span class="text-gray-500">
-                        {{ row.value.stockBooked ? 'Uttagen ur lagret' : 'Lagerartikel: tas ur lagret när ordern är klar' }}
-                      </span>
-                    }
+                <div class="flex items-center gap-2">
+                  <div class="relative min-w-0 flex-1">
+                    <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400"
+                      >search</mat-icon
+                    >
+                    <input
+                      formControlName="description"
+                      [matAutocomplete]="auto"
+                      (input)="edited(row)"
+                      (focus)="typed(row)"
+                      autocomplete="off"
+                      placeholder="Sök artikel i lagret, eller skriv vad som ska göras…"
+                      class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white pr-3 pl-10 shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
+                    />
+                    <mat-autocomplete
+                      #auto="matAutocomplete"
+                      (optionSelected)="picked(row, $event.option.value)"
+                    >
+                      @for (o of suggestions(row); track o.key) {
+                        <mat-option [value]="o.key">
+                          {{ o.label }}
+                          <span class="ml-2 text-xs text-gray-500">{{ o.hint }}</span>
+                        </mat-option>
+                      }
+                      @if (row.value.description && !row.value.articleId) {
+                        <mat-option
+                          [value]="'n:' + row.value.description"
+                          class="!font-medium !text-brand"
+                        >
+                          + Ny artikel "{{ row.value.description }}"
+                        </mat-option>
+                      }
+                    </mat-autocomplete>
                   </div>
-                }
+                  <label class="flex shrink-0 items-center gap-1.5 text-sm text-gray-500">
+                    Antal
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      formControlName="quantity"
+                      class="focus:ring-brand h-10 w-16 rounded-xl border-0 bg-white px-2 text-center text-gray-900 shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
+                    />
+                  </label>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="shrink-0"
+                    (click)="removeLine(i)"
+                    aria-label="Ta bort raden"
+                  >
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+                <input
+                  formControlName="instruction"
+                  autocomplete="off"
+                  placeholder="Instruktion till mekanikern (valfritt), t.ex. originaldelar"
+                  class="focus:ring-brand h-9 w-full rounded-lg border-0 bg-white px-3 text-sm shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
+                />
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    (click)="flip(row, 'toOrder')"
+                    class="flex h-8 items-center gap-1 rounded-full px-3 ring-1"
+                    [class]="
+                      row.value.toOrder
+                        ? 'bg-amber-500 text-white ring-amber-500'
+                        : 'bg-white text-gray-600 ring-gray-300'
+                    "
+                  >
+                    <mat-icon class="!h-4 !w-4 !text-base">{{
+                      row.value.toOrder ? 'shopping_cart' : 'add_shopping_cart'
+                    }}</mat-icon>
+                    {{ row.value.toOrder ? 'Saknas, ska beställas' : 'Markera som saknad' }}
+                  </button>
+                  <button
+                    type="button"
+                    (click)="flip(row, 'done')"
+                    class="flex h-8 items-center gap-1 rounded-full px-3 ring-1"
+                    [class]="
+                      row.value.done
+                        ? 'bg-green-600 text-white ring-green-600'
+                        : 'bg-white text-gray-600 ring-gray-300'
+                    "
+                  >
+                    <mat-icon class="!h-4 !w-4 !text-base">{{
+                      row.value.done ? 'check_circle' : 'radio_button_unchecked'
+                    }}</mat-icon>
+                    {{ row.value.done ? 'Klar' : 'Inte klar' }}
+                  </button>
+                  @if (row.value.articleId) {
+                    <span class="text-xs text-gray-500">
+                      {{
+                        row.value.stockBooked
+                          ? 'Uttagen ur lagret'
+                          : 'Lagerartikel, tas ur lagret när ordern är klar'
+                      }}
+                    </span>
+                  }
+                </div>
               </div>
             } @empty {
               <p class="text-sm text-gray-500">
-                Inga rader än. Lägg till vad som ska göras med knapparna ovan.
+                Inga rader än. Lägg till vad som ska göras med knappen ovan.
               </p>
             }
           </div>
+        </section>
 
-          @if (totals(); as t) {
-            <div class="mt-3 ml-auto flex max-w-sm flex-col gap-1 border-t border-gray-200 pt-3">
-              @if (t.discount > 0) {
-                <div class="flex justify-between text-sm text-gray-600">
-                  <span>Före rabatt</span><span class="tabular-nums">{{ t.gross | kr }}</span>
-                </div>
-                <div class="flex justify-between text-sm text-gray-600">
-                  <span>Rabatt</span><span class="tabular-nums">−{{ t.discount | kr }}</span>
-                </div>
-              }
-              <div class="flex justify-between">
-                <span class="text-gray-600">Summa exkl. moms</span>
-                <b class="tabular-nums">{{ t.net | kr }}</b>
-              </div>
-              @for (b of t.byRate; track b.rate) {
-                <div class="flex justify-between text-sm text-gray-600">
-                  <span>Moms {{ b.rate }} % på {{ b.base | kr }}</span>
-                  <span class="tabular-nums">{{ b.vat | kr }}</span>
-                </div>
-              }
-              <div class="flex justify-between border-t border-gray-300 pt-1 text-lg">
-                <span class="font-semibold">Att betala inkl. moms</span>
-                <b class="tabular-nums">{{ t.total | kr }}</b>
-              </div>
-              <p class="text-xs text-gray-500">
-                Moms räknas per momssats på summan av raderna och avrundas till hela ören.
-              </p>
-            </div>
-          }
-          @if (unpriced() > 0) {
-            <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-              {{ unpriced() }} {{ unpriced() === 1 ? 'rad saknar' : 'rader saknar' }} pris (0 kr).
-              Prissätt dem före fakturering.
-            </p>
-          }
+        <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
+          <h2 class="mb-1 text-base font-semibold sm:col-span-6">Pris</h2>
+          <p class="mb-3 text-sm text-gray-600 sm:col-span-6">
+            Överenskommet med kunden. Står inte på arbetsbladet.
+          </p>
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Pris för jobbet (kr, exkl. moms)</mat-label>
+            <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
+            <mat-hint>{{ inclHint(form.controls.price.value) }}</mat-hint>
+          </mat-form-field>
+          <mat-form-field class="sm:col-span-4">
+            <mat-label>Notering om priset</mat-label>
+            <input
+              matInput
+              formControlName="priceNote"
+              placeholder="t.ex. 8000 om vi köper delen, 5000 om kunden köper"
+            />
+          </mat-form-field>
         </section>
 
         @if (card(); as c) {
@@ -297,11 +307,29 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
             <h2 class="mb-2 text-base font-semibold">
               {{ customerType() === 'company' ? 'Faktura' : 'Kvitto' }}
             </h2>
+            <div class="grid gap-x-4 sm:grid-cols-6">
+              <mat-form-field class="sm:col-span-6">
+                <mat-label>Utfört (står på kvittot)</mat-label>
+                <textarea matInput rows="3" formControlName="performed"></textarea>
+                <mat-hint
+                  >t.ex. Bytt dragkrok. Fylls i från åtgärderna när ordern är klar.</mat-hint
+                >
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-6">
+                <mat-label>Garanti</mat-label>
+                <input
+                  matInput
+                  formControlName="warranty"
+                  placeholder="t.ex. 12 månaders garanti på dragkrok"
+                />
+              </mat-form-field>
+            </div>
             @if (c.invoice; as inv) {
               <div class="flex flex-wrap items-center gap-3">
                 <span>
-                  <b>{{ inv.code }}</b> · {{ inv.kind === 'invoice' ? 'faktura' : 'kvitto' }}
-                  utfärdat {{ inv.issuedAt | date: 'yyyy-MM-dd' }}
+                  <b>{{ inv.code }}</b> ·
+                  {{ inv.kind === 'invoice' ? 'faktura' : 'kvitto' }} utfärdat
+                  {{ inv.issuedAt | date: 'yyyy-MM-dd' }}
                   @if (inv.dueAt) {
                     · förfaller {{ inv.dueAt | date: 'yyyy-MM-dd' }}
                   }
@@ -323,7 +351,10 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                 } @else {
                   <mat-form-field subscriptSizing="dynamic" class="w-48">
                     <mat-label>Betalsätt</mat-label>
-                    <mat-select [value]="payMethod()" (selectionChange)="payMethod.set($event.value)">
+                    <mat-select
+                      [value]="payMethod()"
+                      (selectionChange)="payMethod.set($event.value)"
+                    >
                       @for (m of payMethods; track m[0]) {
                         <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
                       }
@@ -392,8 +423,6 @@ export class WorkOrderCard implements OnInit {
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
 
   readonly statuses = Object.entries(WORK_ORDER_STATUS_LABELS);
-  readonly lineTypes = Object.entries(WORK_ORDER_LINE_LABELS) as [WorkOrderLineType, string][];
-  readonly vatOptions = VAT_OPTIONS;
   readonly payLabels = PAYMENT_METHOD_LABELS;
   readonly payMethods = Object.entries(PAYMENT_METHOD_LABELS) as [PaymentMethod, string][];
   readonly payMethod = signal<PaymentMethod>('card');
@@ -402,7 +431,8 @@ export class WorkOrderCard implements OnInit {
   readonly busy = signal(false);
   readonly card = signal<WorkOrderDetail | null>(null);
   readonly resources = signal<Resource[]>([]);
-  private readonly serviceTypes = signal<ServiceType[]>([]);
+  readonly mechanics = computed(() => this.resources().filter((r) => r.kind === 'mechanic'));
+  readonly places = computed(() => this.resources().filter((r) => r.kind !== 'mechanic'));
   private readonly partResults = signal<Article[]>([]);
   private readonly partSearch = new Subject<string>();
   /** Räknas om när något i formuläret ändras, så att summan följer med. */
@@ -413,12 +443,14 @@ export class WorkOrderCard implements OnInit {
     {
       link: [null as PickerValue | null, Validators.required],
       resourceId: [''],
+      placeId: [''],
       status: ['open' as WorkOrderStatus],
       receivedAt: [dateInput(new Date().toISOString()), Validators.required],
       pickupAt: [''],
-      priceFrom: [null as number | null, Validators.min(0)],
-      priceTo: [null as number | null, Validators.min(0)],
-      quote: [null as number | null, Validators.min(0)],
+      price: [null as number | null, Validators.min(0)],
+      priceNote: [''],
+      performed: [''],
+      warranty: [''],
       remarks: [''],
       notes: [''],
       lines: this.lines,
@@ -428,14 +460,9 @@ export class WorkOrderCard implements OnInit {
         const v = g.getRawValue() as {
           receivedAt: string;
           pickupAt: string;
-          priceFrom: number | null;
-          priceTo: number | null;
         };
         const errors: Record<string, boolean> = {};
         if (v.receivedAt && v.pickupAt && v.pickupAt < v.receivedAt) errors['pickup'] = true;
-        if (v.priceFrom != null && v.priceTo != null && v.priceFrom > v.priceTo) {
-          errors['price'] = true;
-        }
         return Object.keys(errors).length ? errors : null;
       },
     },
@@ -454,7 +481,6 @@ export class WorkOrderCard implements OnInit {
   ngOnInit() {
     // Aktiva mekaniker, och den som redan står på ordern även om hen arkiverats.
     this.workshop.resources(true).subscribe((r) => this.resources.set(r.filter((x) => x.active)));
-    this.workshop.serviceTypes().subscribe((t) => this.serviceTypes.set(t));
     if (this.id) this.load();
   }
 
@@ -464,9 +490,7 @@ export class WorkOrderCard implements OnInit {
     type: WorkOrderLineType;
     description: string;
     quantity: number;
-    unitPrice: number | null;
-    discountPercent?: number;
-    vatRate?: number;
+    instruction?: string | null;
     done: boolean;
     toOrder?: boolean;
     stockBooked?: boolean;
@@ -479,39 +503,19 @@ export class WorkOrderCard implements OnInit {
       type: [init?.type ?? ('labour' as WorkOrderLineType)],
       description: [init?.description ?? '', Validators.required],
       quantity: [init?.quantity ?? 1, [Validators.required, Validators.min(0.01)]],
-      unitPrice: [init?.unitPrice ?? (0 as number | null), Validators.min(0)],
-      discountPercent: [
-        init?.discountPercent ?? 0,
-        [Validators.min(0), Validators.max(100)],
-      ],
-      vatRate: [init?.vatRate ?? STANDARD_VAT],
+      instruction: [init?.instruction ?? ''],
       done: [init?.done ?? false],
     });
   }
 
-  /** Förslag på raden: åtgärder för arbete, lagerartiklar för delar. */
-  suggestions(row: FormGroup): { key: string; label: string; hint: string }[] {
+  /** Förslag på raden: lagerartiklar. */
+  suggestions(_row: FormGroup): { key: string; label: string; hint: string }[] {
     this.version();
-    const v = row.getRawValue() as { type: WorkOrderLineType; description: string };
-    const q = (v.description ?? '').toLowerCase().trim();
-    if (v.type === 'labour') {
-      return this.serviceTypes()
-        .filter((t) => !q || t.name.toLowerCase().includes(q))
-        .slice(0, 8)
-        .map((t) => ({
-          key: 's:' + t.id,
-          label: t.name,
-          hint: `${t.durationMinutes} min${t.priceFrom != null ? ' · ' + t.priceFrom / 100 + ' kr' : ''}`,
-        }));
-    }
-    if (v.type === 'part') {
-      return this.partResults().map((a) => ({
-        key: 'a:' + a.id,
-        label: a.label,
-        hint: `${a.sku ?? ''} · ${a.quantity} i lager · ${a.sellPrice / 100} kr`,
-      }));
-    }
-    return [];
+    return this.partResults().map((a) => ({
+      key: 'a:' + a.id,
+      label: a.label,
+      hint: `${a.sku ?? ''} · ${a.quantity} i lager`,
+    }));
   }
 
   /** Skriver man om raden är den inte längre kopplad till en lagerartikel. */
@@ -521,35 +525,23 @@ export class WorkOrderCard implements OnInit {
   }
 
   typed(row: FormGroup) {
-    const v = row.getRawValue() as { type: WorkOrderLineType; description: string };
-    if (v.type === 'part') this.partSearch.next(v.description ?? '');
+    const v = row.getRawValue() as { description: string };
+    this.partSearch.next(v.description ?? '');
   }
 
   picked(row: FormGroup, key: string) {
-    if (key.startsWith('a:')) {
-      const a = this.partResults().find((x) => x.id === key.slice(2));
-      if (a) {
-        row.patchValue({ description: a.label, articleId: a.id, unitPrice: kr(a.sellPrice) });
-      }
-    } else if (key.startsWith('s:')) {
-      const t = this.serviceTypes().find((x) => x.id === key.slice(2));
-      if (t) {
-        // Åtgärdens tid blir antal timmar (kvartar) och priset fördelas på dem.
-        const hours = Math.max(0.25, Math.ceil(t.durationMinutes / 15) / 4);
-        row.patchValue({
-          description: t.name,
-          quantity: hours,
-          ...(t.priceFrom != null ? { unitPrice: Math.round(t.priceFrom / hours) / 100 } : {}),
-        });
-      }
+    if (key.startsWith('n:')) {
+      row.patchValue({ description: key.slice(2), articleId: null });
+      this.createArticle(row);
+      return;
     }
+    const a = this.partResults().find((x) => x.id === key.slice(2));
+    if (a) row.patchValue({ description: a.label, articleId: a.id });
     this.form.markAsDirty();
   }
 
-  addLine(type: WorkOrderLineType) {
-    this.lines.push(
-      this.newLine({ type, description: '', quantity: 1, unitPrice: 0, done: false }),
-    );
+  addLine() {
+    this.lines.push(this.newLine({ type: 'other', description: '', quantity: 1, done: false }));
     this.form.markAsDirty();
     this.settle();
   }
@@ -569,37 +561,31 @@ export class WorkOrderCard implements OnInit {
     this.settle();
   }
 
-  /** Radens belopp exkl. moms efter rabatt, öre. */
-  rowTotal(row: FormGroup): number {
-    this.version();
-    return rowNet(this.priced(row));
+  /** Slår på/av en av radens markeringar (klar, saknas). */
+  flip(row: FormGroup, key: 'done' | 'toOrder') {
+    row.patchValue({ [key]: !row.value[key] });
+    this.form.markAsDirty();
   }
 
-  private priced(row: FormGroup) {
-    const v = row.getRawValue() as {
-      quantity: number | null;
-      unitPrice: number | null;
-      discountPercent: number | null;
-      vatRate: number | null;
-    };
-    return {
-      quantity: v.quantity ?? 0,
-      unitPrice: Math.round((v.unitPrice ?? 0) * 100),
-      discountPercent: v.discountPercent ?? 0,
-      vatRate: v.vatRate ?? STANDARD_VAT,
-    };
+  /** Skapar en lagerartikel för en del som inte finns och kopplar raden till den. */
+  createArticle(row: FormGroup) {
+    const name = (row.getRawValue() as { description: string }).description;
+    this.dialog
+      .open(QuickArticleDialog, { data: { name }, width: '420px' })
+      .afterClosed()
+      .subscribe((a: Article | undefined) => {
+        if (!a) return;
+        row.patchValue({ description: a.label, articleId: a.id });
+        this.form.markAsDirty();
+        this.snack.open('Artikeln skapad och kopplad', undefined, { duration: 2000 });
+      });
   }
 
-  /** Summor medan man skriver: netto, moms per sats och belopp att betala. */
-  totals() {
-    this.version();
-    return totalsOf(this.lines.controls.map((r) => this.priced(r)));
-  }
-
-  /** Rader utan pris, t.ex. sådana mekanikern lagt till. */
-  unpriced(): number {
-    this.version();
-    return this.lines.controls.filter((r) => this.priced(r).unitPrice === 0).length;
+  /** Sätter ordern till Väntar på del och sparar. */
+  waitForParts() {
+    this.form.patchValue({ status: 'waiting_parts' });
+    this.form.markAsDirty();
+    this.save();
   }
 
   /** "= 1 250 kr inkl. moms" under ett nettopris. */
@@ -623,9 +609,7 @@ export class WorkOrderCard implements OnInit {
             type: l.type,
             description: l.description,
             quantity: l.quantity,
-            unitPrice: kr(l.unitPrice),
-            discountPercent: l.discountPercent,
-            vatRate: l.vatRate,
+            instruction: l.instruction,
             done: l.done,
           }),
         );
@@ -633,12 +617,14 @@ export class WorkOrderCard implements OnInit {
       this.form.reset({
         link: { customerId: o.customerId, vehicleId: o.vehicleId },
         resourceId: o.resourceId ?? '',
+        placeId: o.placeId ?? '',
         status: o.status,
         receivedAt: dateInput(o.receivedAt),
         pickupAt: dateInput(o.pickupAt),
-        priceFrom: kr(o.priceFrom),
-        priceTo: kr(o.priceTo),
-        quote: kr(o.quote),
+        price: kr(o.price),
+        priceNote: o.priceNote ?? '',
+        performed: o.performed ?? '',
+        warranty: o.warranty ?? '',
         remarks: o.remarks ?? '',
         notes: o.notes ?? '',
       } as never);
@@ -661,12 +647,14 @@ export class WorkOrderCard implements OnInit {
       customerId: '',
       vehicleId: '',
       resourceId: v.resourceId || null,
+      placeId: v.placeId || null,
       status: v.status,
       receivedAt: dateIso(v.receivedAt),
       pickupAt: v.pickupAt ? dateIso(v.pickupAt) : null,
-      priceFrom: ore(v.priceFrom),
-      priceTo: ore(v.priceTo),
-      quote: ore(v.quote),
+      price: ore(v.price),
+      priceNote: v.priceNote || null,
+      performed: v.performed || null,
+      warranty: v.warranty || null,
       remarks: v.remarks || null,
       notes: v.notes || null,
       lines: this.lines.controls.map((row) => {
@@ -677,25 +665,29 @@ export class WorkOrderCard implements OnInit {
           type: WorkOrderLineType;
           description: string;
           quantity: number;
-          unitPrice: number | null;
-          discountPercent: number | null;
-          vatRate: number | null;
+          instruction: string | null;
           done: boolean;
         };
         return {
           id: l.id ?? undefined,
-          articleId: l.type === 'part' ? l.articleId : null,
+          articleId: l.articleId,
           toOrder: l.toOrder,
-          type: l.type,
+          // Typen följer artikeln: kopplad till lagret = del, annars fri rad.
+          type: (l.articleId ? 'part' : l.type === 'part' ? 'other' : l.type) as WorkOrderLineType,
           description: l.description,
           quantity: l.quantity,
-          unitPrice: ore(l.unitPrice) ?? 0,
-          discountPercent: l.discountPercent ?? 0,
-          vatRate: l.vatRate ?? STANDARD_VAT,
+          instruction: l.instruction || null,
           done: l.done,
         };
       }),
     };
+    // En klar order utan "utfört" får texten från åtgärderna, redigerbar innan kvittot.
+    if (body.status === 'done' && !body.performed) {
+      body.performed = body.lines
+        .filter((l) => l.description)
+        .map((l) => l.description)
+        .join(', ');
+    }
     this.busy.set(true);
     this.links
       .resolve(v.link!)
@@ -725,7 +717,7 @@ export class WorkOrderCard implements OnInit {
         data: {
           title: company ? `Fakturera ${o.code}?` : `Skapa kvitto för ${o.code}?`,
           message:
-            'Ordern får ett löpnummer och låses: rader, priser och kund kan inte ändras efteråt. ' +
+            'Ordern får ett löpnummer och låses: rader, pris och kund kan inte ändras efteråt. ' +
             'Verkstadens och kundens uppgifter kopieras in på dokumentet.',
           confirmText: company ? 'Fakturera' : 'Skapa kvitto',
         },
@@ -746,7 +738,9 @@ export class WorkOrderCard implements OnInit {
   }
 
   setPaid(paid: boolean) {
-    this.api.setPaid(this.id!, paid, paid ? this.payMethod() : undefined).subscribe(() => this.load());
+    this.api
+      .setPaid(this.id!, paid, paid ? this.payMethod() : undefined)
+      .subscribe(() => this.load());
   }
 
   remove() {

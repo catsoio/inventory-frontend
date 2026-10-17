@@ -1,11 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
-import {
-  PAYMENT_METHOD_LABELS,
-  WORK_ORDER_LINE_LABELS,
-  WorkOrderDetail,
-} from '../../../core/models';
+import { PAYMENT_METHOD_LABELS, WorkOrderDetail } from '../../../core/models';
 
 /**
  * Fakturan (till företag) eller kvittot (till privatpersoner) för en klar arbetsorder, som A4.
@@ -44,7 +40,9 @@ import {
               }
             </div>
             <div class="text-right">
-              <h1 class="text-3xl font-bold">{{ inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }}</h1>
+              <h1 class="text-3xl font-bold">
+                {{ inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }}
+              </h1>
               <div class="text-xl font-bold tabular-nums">{{ inv.code }}</div>
               @if (inv.paidAt) {
                 <div class="mt-1 inline-block border-2 border-black px-2 font-bold uppercase">
@@ -100,36 +98,27 @@ import {
           <table class="mt-6 w-full border-collapse">
             <thead>
               <tr class="border-b-2 border-black text-left text-xs tracking-wide uppercase">
-                <th class="py-1">Beskrivning</th>
-                <th class="w-16 py-1 text-right">Antal</th>
-                <th class="w-24 py-1 text-right">À-pris exkl. moms</th>
-                <th class="w-14 py-1 text-right">Rabatt</th>
-                <th class="w-14 py-1 text-right">Moms</th>
-                <th class="w-24 py-1 text-right">Summa exkl. moms</th>
+                <th class="py-1">Utfört</th>
+                <th class="w-28 py-1 text-right">Belopp exkl. moms</th>
               </tr>
             </thead>
             <tbody>
-              @for (l of o.lines; track l.id) {
-                <tr class="border-b border-gray-300 align-top">
-                  <td class="py-1.5">
-                    {{ l.description }}
-                    <span class="text-xs text-gray-500">({{ lineLabels[l.type] }})</span>
-                  </td>
-                  <td class="py-1.5 text-right tabular-nums">{{ l.quantity }}</td>
-                  <td class="py-1.5 text-right tabular-nums">{{ l.unitPrice | kr }}</td>
-                  <td class="py-1.5 text-right tabular-nums">
-                    {{ l.discountPercent ? l.discountPercent + ' %' : '' }}
-                  </td>
-                  <td class="py-1.5 text-right tabular-nums">{{ l.vatRate }} %</td>
-                  <td class="py-1.5 text-right tabular-nums">{{ l.total | kr }}</td>
-                </tr>
-              }
+              <tr class="border-b border-gray-300 align-top">
+                <td class="py-1.5 whitespace-pre-line">
+                  {{ inv.performed || 'Arbete enligt överenskommelse' }}
+                </td>
+                <td class="py-1.5 text-right tabular-nums">{{ inv.totals.net | kr }}</td>
+              </tr>
             </tbody>
           </table>
+          @if (inv.warranty) {
+            <p class="mt-3"><b>Garanti:</b> {{ inv.warranty }}</p>
+          }
 
           <section class="mt-4 ml-auto max-w-xs">
             <div class="flex justify-between py-0.5">
-              <span>Summa exkl. moms</span><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
+              <span>Summa exkl. moms</span
+              ><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
             </div>
             @for (b of inv.totals.byRate; track b.rate) {
               <div class="flex justify-between py-0.5 text-gray-700">
@@ -146,7 +135,10 @@ import {
           <section class="mt-8 text-xs">
             @if (inv.paidAt) {
               <p>
-                Betald {{ day(inv.paidAt) }}{{ inv.paymentMethod ? ' med ' + payLabels[inv.paymentMethod].toLowerCase() : '' }}.
+                Betald {{ day(inv.paidAt)
+                }}{{
+                  inv.paymentMethod ? ' med ' + payLabels[inv.paymentMethod].toLowerCase() : ''
+                }}.
               </p>
             } @else if (inv.seller.paymentDetails) {
               <p>
@@ -168,7 +160,6 @@ import {
 export class WorkOrderInvoicePage implements OnInit {
   private readonly api = inject(WorkOrderApi);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
-  readonly lineLabels = WORK_ORDER_LINE_LABELS;
   readonly payLabels = PAYMENT_METHOD_LABELS;
   readonly order = signal<WorkOrderDetail | null>(null);
 

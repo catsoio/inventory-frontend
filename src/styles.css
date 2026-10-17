@@ -60,9 +60,9 @@ main {
 /* Mobil: kompakta fält. Felmeddelandet ligger över mellanrummet så att inget hoppar. */
 @media (max-width: 767px) {
   .mat-mdc-form-field {
-    --mat-form-field-container-height: 48px;
-    --mat-form-field-filled-with-label-container-padding-top: 20px;
-    --mat-form-field-container-vertical-padding: 12px;
+    --mat-form-field-container-height: 44px;
+    --mat-form-field-filled-with-label-container-padding-top: 18px;
+    --mat-form-field-container-vertical-padding: 10px;
     position: relative;
     margin-bottom: 10px;
   }
@@ -93,30 +93,79 @@ main {
   }
 }
 
-/* Mobil: bokningsdialogen fyller skärmen, så fälten får plats två och två och inget hamnar bakom tangentbordet. */
+/* Fält: samma i hela appen. Tunn grå kant, 44 px hög, primärfärg vid fokus. */
+:root:root {
+  --mat-form-field-container-height: 44px;
+  --mat-form-field-container-vertical-padding: 10px;
+  --mat-form-field-outlined-outline-color: #d1d5db;
+  --mat-form-field-outlined-hover-outline-color: #9ca3af;
+  --mat-form-field-outlined-focus-outline-color: var(--mat-sys-primary);
+  --mat-form-field-outlined-outline-width: 1px;
+  --mat-form-field-outlined-focus-outline-width: 2px;
+}
+
+/* Rubrik över en grupp fält i en dialog eller ett kort. */
+.sec {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* Dialoger: samma uppbyggnad överallt. Innehållet rullar, knapparna ligger fast längst ned med den
+   primära knappen (Spara) längst till höger. */
+.mat-mdc-dialog-surface form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.mat-mdc-dialog-actions {
+  gap: 8px;
+  padding: 12px 20px !important;
+  border-top: 1px solid rgb(0 0 0 / 8%);
+  justify-content: flex-end;
+  background: var(--mat-dialog-container-color, #fff);
+}
+
+/* Mobil: alla dialoger utom bekräftelsen fyller skärmen, så fälten får plats två och två, knapparna
+   ligger fast i botten och inget hamnar bakom tangentbordet. */
 @media (max-width: 767px) {
+  .cdk-overlay-pane.mat-mdc-dialog-panel:not(:has(app-confirm-dialog)),
   .dialog-sheet {
     width: 100vw !important;
     max-width: 100vw !important;
     height: 100dvh !important;
     max-height: 100dvh !important;
   }
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)) .mat-mdc-dialog-surface,
   .dialog-sheet .mat-mdc-dialog-surface {
     border-radius: 0 !important;
   }
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)) .mat-mdc-dialog-title,
   .dialog-sheet .mat-mdc-dialog-title {
     padding: 12px 16px 0;
     font-size: 20px;
     line-height: 28px;
   }
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)) .mat-mdc-dialog-content,
   .dialog-sheet .mat-mdc-dialog-content {
     max-height: none !important;
     flex: 1 1 auto;
     padding: 0 16px !important;
   }
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)) .mat-mdc-dialog-actions,
   .dialog-sheet .mat-mdc-dialog-actions {
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-    border-top: 1px solid rgb(0 0 0 / 8%);
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom)) !important;
+    flex-wrap: nowrap;
+  }
+  /* Spara tar resten av raden och är lätt att träffa med tummen. */
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)) .mat-mdc-dialog-actions .mat-mdc-unelevated-button,
+  .dialog-sheet .mat-mdc-dialog-actions .mat-mdc-unelevated-button {
+    flex: 1 1 auto;
+    min-height: 48px;
   }
   /* Plus/minus i tidsfälten: små, så siffrorna får plats i ett halvbrett fält. */
   .time-step.mat-mdc-icon-button {
@@ -188,4 +237,27 @@ full-calendar {
   --mat-card-outlined-container-shape: var(--radius-ui);
   --mat-datepicker-calendar-container-shape: var(--radius-ui);
   --mat-snack-bar-container-shape: var(--radius-ui);
+}
+
+/* Kalendern: dagens kolumn är randig och den röda linjen visar klockan nu. */
+full-calendar .fc-day-today:not(.fc-col-header-cell),
+full-calendar .fc-day-today.fc-col-header-cell {
+  background-color: color-mix(in srgb, var(--mat-sys-primary) 6%, white) !important;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 9px,
+    color-mix(in srgb, var(--mat-sys-primary) 10%, transparent) 9px 18px
+  ) !important;
+}
+/* Ledigt över lediga dagar ska inte täcka över ränderna. */
+full-calendar .fc-non-business {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+full-calendar .fc-timegrid-now-indicator-line {
+  border-top: 2px solid #ef4444 !important;
+}
+full-calendar .fc-timegrid-now-indicator-arrow {
+  border-color: #ef4444 !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
 }

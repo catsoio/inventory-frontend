@@ -75,7 +75,8 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
                         <span class="flex-1 text-base" [class.line-through]="l.done">
                           {{ l.description }}
                           <span class="text-xs text-gray-500">
-                            ({{ lineLabels[l.type] }}{{ l.addedByStaff ? ', tillagd' : '' }}{{ l.toOrder ? ', beställs' : '' }})
+                            ({{ lineLabels[l.type] }}{{ l.addedByStaff ? ', tillagd' : ''
+                            }}{{ l.toOrder ? ', beställs' : '' }})
                           </span>
                         </span>
                         <span class="text-sm text-gray-600 tabular-nums">{{ l.quantity }}</span>
@@ -94,7 +95,11 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
                       placeholder="Hittade något mer? t.ex. slitna bromsar"
                       (keydown.enter)="add(d, extra, order.checked)"
                     />
-                    <button mat-stroked-button class="!min-h-12" (click)="add(d, extra, order.checked)">
+                    <button
+                      mat-stroked-button
+                      class="!min-h-12"
+                      (click)="add(d, extra, order.checked)"
+                    >
                       <mat-icon>add</mat-icon> Lägg till
                     </button>
                   </div>

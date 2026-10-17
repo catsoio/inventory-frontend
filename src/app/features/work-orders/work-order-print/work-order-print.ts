@@ -2,16 +2,11 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
-import {
-  WORK_ORDER_LINE_LABELS,
-  WORK_ORDER_STATUS_LABELS,
-  VehicleDetail,
-  WorkOrderDetail,
-} from '../../../core/models';
+import { WORK_ORDER_STATUS_LABELS, VehicleDetail, WorkOrderDetail } from '../../../core/models';
 import { Auth } from '../../../core/auth/auth';
 
 /**
- * Arbetsordern som ett A4-blad att lämna till mekanikern: allt han behöver veta överst,
+ * Arbetsordern som ett A4-blad att lämna till mekanikern, utan pris: allt han behöver veta överst,
  * bilens bestående anmärkningar framhävda, rutor att bocka av och plats för anteckningar.
  */
 @Component({
@@ -45,6 +40,11 @@ import { Auth } from '../../../core/auth/auth';
           </div>
         </header>
 
+        <section class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div style="zoom: 2.2"><app-reg-plate [value]="o.regNo" size="lg" /></div>
+          <div class="text-xl font-semibold">{{ o.vehicle }}</div>
+        </section>
+
         <section class="mt-4 grid grid-cols-2 gap-x-8 gap-y-1">
           <div>
             @if (!auth.isMechanic()) {
@@ -54,33 +54,9 @@ import { Auth } from '../../../core/auth/auth';
           @if (!auth.isMechanic()) {
             <div><span class="text-gray-600">Telefon:</span> {{ o.phone || '–' }}</div>
           }
-          <div>
-            <span class="text-gray-600">Bil:</span> <b>{{ o.regNo }}</b>
-            {{ o.vehicle ? '· ' + o.vehicle : '' }}
-          </div>
           <div><span class="text-gray-600">Mekaniker:</span> {{ o.resourceName || '–' }}</div>
-          <div><span class="text-gray-600">Inlämnad:</span> {{ day(o.receivedAt) }}</div>
-          <div><span class="text-gray-600">Hämtas:</span> {{ day(o.pickupAt) }}</div>
-          @if (!auth.isMechanic()) {
-            <div class="col-span-2">
-              <span class="text-gray-600">Pris (exkl. moms):</span>
-              @if (o.priceFrom !== null) {
-                överenskommet
-                <b
-                  >{{ o.priceFrom | kr
-                  }}{{
-                    o.priceTo !== null && o.priceTo !== o.priceFrom ? ' – ' + (o.priceTo | kr) : ''
-                  }}</b
-                >
-              }
-              @if (o.quote !== null) {
-                · prisförslag <b>{{ o.quote | kr }}</b>
-              }
-              @if (o.priceFrom === null && o.quote === null) {
-                –
-              }
-            </div>
-          }
+          <div><span class="text-gray-600">Start:</span> {{ day(o.receivedAt) }}</div>
+          <div><span class="text-gray-600">Klar senast:</span> {{ day(o.pickupAt) }}</div>
         </section>
 
         @if (vehicle()?.notes; as note) {
@@ -104,11 +80,6 @@ import { Auth } from '../../../core/auth/auth';
               <th class="w-8 py-1">Klar</th>
               <th class="py-1">Vad ska göras</th>
               <th class="w-20 py-1 text-right">Antal</th>
-              @if (!auth.isMechanic()) {
-                <th class="w-24 py-1 text-right">À-pris exkl. moms</th>
-                <th class="w-16 py-1 text-right">Rabatt</th>
-                <th class="w-24 py-1 text-right">Summa exkl. moms</th>
-              }
             </tr>
           </thead>
           <tbody>
@@ -120,51 +91,27 @@ import { Auth } from '../../../core/auth/auth';
                   }}</span>
                 </td>
                 <td class="py-2">
-                  {{ l.description }}
-                  <span class="text-xs text-gray-500">({{ lineLabels[l.type] }})</span>
+                  <b>{{ l.description }}</b>
+                  @if (l.toOrder) {
+                    <span class="ml-1 border border-black px-1 text-xs font-bold">DEL SAKNAS</span>
+                  }
+                  @if (l.instruction) {
+                    <div class="mt-0.5 whitespace-pre-line text-gray-800">{{ l.instruction }}</div>
+                  }
                 </td>
                 <td class="py-2 text-right tabular-nums">{{ l.quantity }}</td>
-                @if (!auth.isMechanic()) {
-                  <td class="py-2 text-right tabular-nums">{{ l.unitPrice | kr }}</td>
-                  <td class="py-2 text-right tabular-nums">
-                    {{ l.discountPercent ? l.discountPercent + ' %' : '' }}
-                  </td>
-                  <td class="py-2 text-right tabular-nums">{{ l.total | kr }}</td>
-                }
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="py-4 text-gray-500">Inga rader.</td>
+                <td colspan="3" class="py-4 text-gray-500">Inga rader.</td>
               </tr>
             }
           </tbody>
-          @if (!auth.isMechanic()) {
-            <tfoot>
-              <tr>
-                <td colspan="5" class="pt-2 text-right font-bold">Summa exkl. moms</td>
-                <td class="pt-2 text-right font-bold tabular-nums">{{ o.totals.net | kr }}</td>
-              </tr>
-              @for (b of o.totals.byRate; track b.rate) {
-                <tr class="text-gray-700">
-                  <td colspan="5" class="text-right">Moms {{ b.rate }} %</td>
-                  <td class="text-right tabular-nums">{{ b.vat | kr }}</td>
-                </tr>
-              }
-              <tr>
-                <td colspan="5" class="border-t border-black pt-1 text-right font-bold">
-                  Att betala inkl. moms
-                </td>
-                <td class="border-t border-black pt-1 text-right font-bold tabular-nums">
-                  {{ o.totals.total | kr }}
-                </td>
-              </tr>
-            </tfoot>
-          }
         </table>
 
         <section class="mt-6">
           <div class="text-xs font-bold tracking-widest text-gray-600 uppercase">
-            Mekanikerns anteckningar
+            Mekanikerns anteckningar (t.ex. delar som saknas)
           </div>
           <div class="mt-1 h-40 border border-gray-400"></div>
         </section>
@@ -184,7 +131,6 @@ export class WorkOrderPrint implements OnInit {
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
 
   readonly statuses = WORK_ORDER_STATUS_LABELS;
-  readonly lineLabels = WORK_ORDER_LINE_LABELS;
   readonly order = signal<WorkOrderDetail | null>(null);
   /** Bilen, för dess bestående anmärkningar. */
   readonly vehicle = signal<VehicleDetail | null>(null);

@@ -1,9 +1,9 @@
-import { Component, Inject, inject, signal } from '@angular/core';
+import { Component, Inject, computed, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ensureValid } from '../form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Observable, forkJoin, of, switchMap } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { BookingApi } from '../../core/api/booking-api';
@@ -15,6 +15,8 @@ import {
   BookingStatus,
   Resource,
   ServiceType,
+  WORK_ORDER_STATUS_LABELS,
+  WorkOrder,
 } from '../../core/models';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-picker';
@@ -27,6 +29,9 @@ export interface BookingDialogData {
   /** Förvald tid för en ny bokning. */
   start: Date;
   end: Date;
+  /** Förvald mekaniker eller lyft/plats för en ny bokning (från resursvyn). */
+  resourceId?: string;
+  placeId?: string;
 }
 
 /** Resultat: den sparade bokningen, 'deleted' eller inget (avbrutet). */
@@ -48,98 +53,162 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
       }
     </h2>
     <form [formGroup]="form" (ngSubmit)="save()">
-      <mat-dialog-content class="!grid grid-cols-2 gap-x-3 sm:grid-cols-6 !pt-2">
-        <app-customer-vehicle-picker
-          class="col-span-2 sm:col-span-6"
-          formControlName="link"
-          [legacy]="legacy"
-        />
+      <mat-dialog-content class="!flex flex-col gap-5 !pt-2">
+        <section>
+          <h3 class="sec">Kund och bil</h3>
+          <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" />
+        </section>
 
-        <mat-form-field class="col-span-2 sm:col-span-6">
-          <mat-label>Åtgärd</mat-label>
-          <mat-select formControlName="serviceTypeId" (selectionChange)="pickService($event.value)">
-            <mat-option value="">Annat</mat-option>
-            @for (t of serviceOptions(); track t.id) {
-              <mat-option [value]="t.id">{{ t.name }}</mat-option>
+        <section>
+          <h3 class="sec">Vad ska göras</h3>
+          <mat-form-field class="w-full">
+            <mat-label>Åtgärd</mat-label>
+            <mat-select
+              formControlName="serviceTypeId"
+              (selectionChange)="pickService($event.value)"
+            >
+              <mat-option value="">Annat</mat-option>
+              @for (t of serviceOptions(); track t.id) {
+                <mat-option [value]="t.id">{{ t.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field class="w-full">
+            <mat-label>Vad ska göras</mat-label>
+            <textarea
+              matInput
+              rows="3"
+              maxlength="2000"
+              formControlName="title"
+              placeholder="En rad per åtgärd, t.ex. byt däck"
+            ></textarea>
+            <mat-error>Ange vad som ska göras</mat-error>
+          </mat-form-field>
+          <p class="-mt-2 text-xs text-gray-500 max-md:hidden">
+            Varje rad blir en kryssruta på arbetsordern.
+          </p>
+        </section>
+
+        <section>
+          <h3 class="sec">När</h3>
+          <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-6">
+            <app-date-field
+              class="col-span-2 sm:col-span-2"
+              label="Datum"
+              icon="event"
+              error="Ange datum"
+              formControlName="day"
+            />
+            <app-time-field
+              class="col-span-1 sm:col-span-2"
+              label="Från"
+              formControlName="startTime"
+            />
+            <app-time-field
+              class="col-span-1 sm:col-span-2"
+              label="Till"
+              formControlName="endTime"
+              [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
+            />
+            <app-date-field
+              class="col-span-2 sm:col-span-3"
+              label="Klar senast (om det dröjer)"
+              icon="event_available"
+              [error]="form.errors?.['due'] ? 'Före datumet' : ''"
+              formControlName="dueDay"
+            />
+            <p
+              class="col-span-2 self-center pb-4 text-xs text-gray-500 max-md:hidden sm:col-span-3"
+            >
+              Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar senast".
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="sec">Vem och var</h3>
+          <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-6">
+            <mat-form-field class="col-span-1 sm:col-span-2">
+              <mat-label>Mekaniker</mat-label>
+              <mat-select formControlName="resourceId">
+                <mat-option value="">Ingen vald</mat-option>
+                @for (r of mechanicOptions(); track r.id) {
+                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                }
+              </mat-select>
+              @if (!resourcesLoaded() || mechanicOptions().length === 0) {
+                <mat-hint>Lägg till mekaniker under Register › Mekaniker och platser</mat-hint>
+              }
+            </mat-form-field>
+            <mat-form-field class="col-span-1 sm:col-span-2">
+              <mat-label>Lyft / plats</mat-label>
+              <mat-select formControlName="placeId">
+                <mat-option value="">Ingen vald</mat-option>
+                @for (r of placeOptions(); track r.id) {
+                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="col-span-2 sm:col-span-2">
+              <mat-label>Status</mat-label>
+              <mat-select formControlName="status">
+                @for (s of statuses; track s[0]) {
+                  <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="sec">Pris och anteckning</h3>
+          <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-6">
+            <mat-form-field class="col-span-2 sm:col-span-2">
+              <mat-label>Pris (kr, exkl. moms)</mat-label>
+              <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
+              <mat-hint>{{ form.controls.price.value | inclVat }}</mat-hint>
+            </mat-form-field>
+            <mat-form-field class="col-span-2 sm:col-span-4">
+              <mat-label>Anmärkning (syns på arbetsbladet)</mat-label>
+              <textarea matInput rows="2" formControlName="notes"></textarea>
+            </mat-form-field>
+          </div>
+        </section>
+
+        @if (workOrdersOn && !legacy) {
+          <section class="rounded-xl bg-gray-50 p-3">
+            @if (data.booking) {
+              @if (order(); as o) {
+                <app-pill [tone]="o.status === 'done' ? 'green' : 'blue'">
+                  {{ o.code }} · {{ orderStatuses[o.status] }}
+                </app-pill>
+                @if (o.hasMissing && o.status !== 'done') {
+                  <app-pill tone="amber">Del saknas</app-pill>
+                }
+              } @else if (orderLoaded()) {
+                <span class="text-sm text-gray-600">Ingen arbetsorder än.</span>
+              }
+            } @else {
+              <mat-checkbox formControlName="createOrder">
+                Skapa arbetsorder när jag sparar
+              </mat-checkbox>
             }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field class="col-span-2 sm:col-span-6">
-          <mat-label>Vad ska göras</mat-label>
-          <textarea
-            matInput
-            rows="6"
-            maxlength="2000"
-            formControlName="title"
-            placeholder="Beskriv jobbet, t.ex. däckbyte, felsökning, besiktningsanmärkningar"
-          ></textarea>
-          <mat-error>Ange vad som ska göras</mat-error>
-        </mat-form-field>
-
-        <app-date-field
-          class="col-span-2 sm:col-span-2"
-          label="Datum"
-          icon="event"
-          error="Ange datum"
-          formControlName="day"
-        />
-        <app-time-field class="col-span-1 sm:col-span-2" label="Från" formControlName="startTime" />
-        <app-time-field
-          class="col-span-1 sm:col-span-2"
-          label="Till"
-          formControlName="endTime"
-          [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
-        />
-
-        <mat-form-field class="col-span-1 sm:col-span-3">
-          <mat-label>Mekaniker / plats</mat-label>
-          <mat-select formControlName="resourceId">
-            <mat-option value="">Ingen vald</mat-option>
-            @for (r of resourceOptions(); track r.id) {
-              <mat-option [value]="r.id">{{ r.name }}</mat-option>
-            }
-          </mat-select>
-          @if (!resourcesLoaded() || resourceOptions().length === 0) {
-            <mat-hint>Lägg till mekaniker under Verkstad › Mekaniker och åtgärder</mat-hint>
-          }
-        </mat-form-field>
-        <mat-form-field class="col-span-1 sm:col-span-3">
-          <mat-label>Status</mat-label>
-          <mat-select formControlName="status">
-            @for (s of statuses; track s[0]) {
-              <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field class="col-span-2 sm:col-span-3">
-          <mat-label>Pris från (kr, exkl. moms)</mat-label>
-          <input matInput type="number" inputmode="decimal" min="0" formControlName="priceFrom" />
-          <mat-hint>{{ form.controls.priceFrom.value | inclVat }}</mat-hint>
-        </mat-form-field>
-        <mat-form-field class="col-span-2 sm:col-span-3">
-          <mat-label>Pris till (kr, exkl. moms)</mat-label>
-          <input matInput type="number" inputmode="decimal" min="0" formControlName="priceTo" />
-          <mat-hint>{{ form.controls.priceTo.value | inclVat }}</mat-hint>
-          @if (form.errors?.['price']) {
-            <mat-error>Lägre än "från"</mat-error>
-          }
-        </mat-form-field>
-
-        <mat-form-field class="col-span-2 sm:col-span-6">
-          <mat-label>Anmärkning</mat-label>
-          <textarea matInput rows="3" formControlName="notes"></textarea>
-        </mat-form-field>
+          </section>
+        }
       </mat-dialog-content>
       <mat-dialog-actions>
-        @if (data.booking) {
-          @if (admin) {
-<button mat-button type="button" class="!text-red-700" (click)="remove()">Ta bort</button>
-}
+        @if (data.booking && admin) {
+          <button mat-button type="button" class="!text-red-700" (click)="remove()">Ta bort</button>
         }
         @if (data.booking && workOrdersOn && !legacy) {
-          <button mat-button type="button" [disabled]="busy()" (click)="openWorkOrder()">
-            <mat-icon>assignment</mat-icon> Arbetsorder
+          <button
+            mat-button
+            type="button"
+            [disabled]="busy() || !orderLoaded()"
+            (click)="openWorkOrder()"
+          >
+            <mat-icon>assignment</mat-icon>
+            {{ order() ? 'Öppna arbetsorder' : 'Skapa arbetsorder' }}
           </button>
         }
         <span class="flex-1"></span>
@@ -164,9 +233,19 @@ export class BookingDialog {
   private readonly ref = inject<MatDialogRef<BookingDialog, BookingDialogResult>>(MatDialogRef);
 
   readonly busy = signal(false);
+  /** Bokningens arbetsorder, om den har en. */
+  readonly order = signal<WorkOrder | null>(null);
+  readonly orderLoaded = signal(false);
+  readonly orderStatuses = WORK_ORDER_STATUS_LABELS;
   readonly statuses = Object.entries(BOOKING_STATUS_LABELS);
   readonly resourceOptions = signal<Resource[]>([]);
   readonly resourcesLoaded = signal(false);
+  readonly mechanicOptions = computed(() =>
+    this.resourceOptions().filter((r) => r.kind === 'mechanic'),
+  );
+  readonly placeOptions = computed(() =>
+    this.resourceOptions().filter((r) => r.kind !== 'mechanic'),
+  );
   readonly serviceOptions = signal<ServiceType[]>([]);
   /** Bokning från före registren: texten visas tills kund och bil väljs om. */
   readonly legacy: { customer: string; regNo: string } | null;
@@ -192,12 +271,14 @@ export class BookingDialog {
         ],
         serviceTypeId: [b?.serviceTypeId ?? ''],
         title: [b?.title ?? '', Validators.required],
-        resourceId: [b?.resourceId ?? ''],
+        resourceId: [b?.resourceId ?? data.resourceId ?? ''],
+        placeId: [b?.placeId ?? data.placeId ?? ''],
         day: [ymd(start), Validators.required],
+        dueDay: [b?.dueAt ? ymd(new Date(b.dueAt)) : ''],
         startTime: [hm(start), Validators.required],
         endTime: [hm(end), Validators.required],
-        priceFrom: [kr(b?.priceFrom) as number | null, Validators.min(0)],
-        priceTo: [kr(b?.priceTo) as number | null, Validators.min(0)],
+        price: [kr(b?.priceTo ?? b?.priceFrom) as number | null, Validators.min(0)],
+        createOrder: [environment.workOrders],
         status: [(b?.status ?? 'booked') as BookingStatus],
         notes: [b?.notes ?? ''],
       },
@@ -206,13 +287,20 @@ export class BookingDialog {
           const v = g.getRawValue();
           const errors: Record<string, boolean> = {};
           if (v.startTime && v.endTime && v.endTime <= v.startTime) errors['order'] = true;
-          if (v.priceFrom != null && v.priceTo != null && v.priceFrom > v.priceTo) {
-            errors['price'] = true;
-          }
+          if (v.dueDay && v.dueDay < v.day) errors['due'] = true;
           return Object.keys(errors).length ? errors : null;
         },
       },
     );
+    if (b && environment.workOrders) {
+      this.workOrders.list({ bookingId: b.id, limit: 1 }).subscribe({
+        next: (p) => {
+          this.order.set(p.items[0] ?? null);
+          this.orderLoaded.set(true);
+        },
+        error: () => this.orderLoaded.set(true),
+      });
+    }
     // Ändrar man dag eller starttid följer sluttiden med, så att tiden inte blir ogiltig.
     let duration = end.getTime() - start.getTime();
     const f = this.form.controls;
@@ -229,7 +317,9 @@ export class BookingDialog {
     forkJoin([this.workshop.resources(true), this.workshop.serviceTypes(true)]).subscribe(
       ([r, s]) => {
         // Arkiverade val syns bara om just den här bokningen använder dem.
-        this.resourceOptions.set(r.filter((x) => x.active || x.id === b?.resourceId));
+        this.resourceOptions.set(
+          r.filter((x) => x.active || x.id === b?.resourceId || x.id === b?.placeId),
+        );
         this.serviceOptions.set(s.filter((x) => x.active || x.id === b?.serviceTypeId));
         this.resourcesLoaded.set(true);
       },
@@ -245,8 +335,8 @@ export class BookingDialog {
     if (!f.title.value || previous) f.title.setValue(t.name);
     const start = at(f.day.value, f.startTime.value);
     f.endTime.setValue(hm(new Date(start.getTime() + t.durationMinutes * 60_000)));
-    if (f.priceFrom.value == null && t.priceFrom !== null) f.priceFrom.setValue(t.priceFrom / 100);
-    if (f.priceTo.value == null && t.priceTo !== null) f.priceTo.setValue(t.priceTo / 100);
+    const price = t.priceTo ?? t.priceFrom;
+    if (f.price.value == null && price !== null) f.price.setValue(price / 100);
   }
 
   save() {
@@ -256,13 +346,16 @@ export class BookingDialog {
     const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
     const body = {
       resourceId: v.resourceId || null,
+      placeId: v.placeId || null,
       serviceTypeId: v.serviceTypeId || null,
       title: v.title,
       start: at(v.day, v.startTime).toISOString(),
       end: at(v.day, v.endTime).toISOString(),
+      // Klar senast är en dag; mitt på dagen så att tidszonen inte flyttar den.
+      dueAt: v.dueDay ? at(v.dueDay, '12:00').toISOString() : null,
       status: v.status,
-      priceFrom: ore(v.priceFrom),
-      priceTo: ore(v.priceTo),
+      priceFrom: ore(v.price),
+      priceTo: ore(v.price),
       notes: v.notes || null,
     };
     this.busy.set(true);
@@ -279,6 +372,20 @@ export class BookingDialog {
             vehicleId: link!.vehicleId,
           });
         }),
+      )
+      .pipe(
+        // Ny bokning med kryssrutan i: arbetsordern skapas direkt från bokningen.
+        switchMap((b) =>
+          !this.data.booking && this.workOrdersOn && v.createOrder
+            ? this.workOrders.fromBooking(b.id).pipe(
+                map((o) => {
+                  this.snack.open(`${o.code} skapad`, undefined, { duration: 2500 });
+                  return b;
+                }),
+                catchError(() => of(b)),
+              )
+            : of(b),
+        ),
       )
       .subscribe({
         next: (b) => this.ref.close(b),

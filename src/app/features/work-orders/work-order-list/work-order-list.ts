@@ -18,7 +18,12 @@ const COLS: DtCol<WorkOrder>[] = [
     value: (o) => o.resourceName ?? '',
     fmt: (o) => o.resourceName || '–',
   },
-  { key: 'pickup', label: 'Hämtas', value: (o) => o.pickupAt ?? '', fmt: (o) => date(o.pickupAt) },
+  {
+    key: 'pickup',
+    label: 'Klar senast',
+    value: (o) => o.pickupAt ?? '',
+    fmt: (o) => date(o.pickupAt),
+  },
   { key: 'status', label: 'Status', value: (o) => WORK_ORDER_STATUS_LABELS[o.status] },
 ];
 
@@ -61,10 +66,14 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
         <mat-button-toggle value="in_progress">Pågår</mat-button-toggle>
         <mat-button-toggle value="waiting_parts">Väntar på del</mat-button-toggle>
         <mat-button-toggle value="done">Klara</mat-button-toggle>
+        <mat-button-toggle value="action">Behöver åtgärd</mat-button-toggle>
       </mat-button-toggle-group>
       <ng-template #cell let-o="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill [tone]="tones[o.status]">{{ text }}</app-pill>
+          @if (o.hasMissing && o.status !== 'done' && o.status !== 'cancelled') {
+            <app-pill tone="amber" class="ml-1">Del saknas</app-pill>
+          }
         } @else if (col.key === 'regNo') {
           <app-reg-plate [value]="text" size="sm" />
         } @else {
@@ -105,16 +114,24 @@ export class WorkOrderList {
   readonly items = signal<WorkOrder[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');
-  readonly status = signal<WorkOrderStatus | ''>('');
+  readonly status = signal<WorkOrderStatus | 'action' | ''>('');
 
   load() {
     this.loading.set(true);
-    this.api.list({ q: this.query(), status: this.status(), limit: 100 }).subscribe((p) => {
-      this.items.set(p.items);
-      this.loading.set(false);
-      // En enda träff öppnas direkt i panelen.
-      if (p.items.length === 1 && this.wide()) this.selected.set(p.items[0].id);
-    });
+    this.api
+      .list({
+        q: this.query(),
+        // "Behöver åtgärd" = ej klara order med en del som måste beställas.
+        status: this.status() === 'action' ? '' : (this.status() as WorkOrderStatus | ''),
+        needsAction: this.status() === 'action' || undefined,
+        limit: 100,
+      })
+      .subscribe((p) => {
+        this.items.set(p.items);
+        this.loading.set(false);
+        // En enda träff öppnas direkt i panelen.
+        if (p.items.length === 1 && this.wide()) this.selected.set(p.items[0].id);
+      });
   }
 
   private wide = () => window.matchMedia('(min-width: 1024px)').matches;

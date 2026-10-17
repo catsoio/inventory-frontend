@@ -20,7 +20,7 @@ function toParams(obj: object): HttpParams {
   return p;
 }
 
-/** Arbetsorder: lappen mekanikern får, med rader och summa. */
+/** Arbetsorder: arbetsbladet till mekanikern, med rader. Priset gäller bara admin och kund. */
 @Injectable({ providedIn: 'root' })
 export class WorkOrderApi {
   private readonly http = inject(HttpClient);
@@ -32,9 +32,12 @@ export class WorkOrderApi {
       status?: WorkOrderStatus | '';
       customerId?: string;
       vehicleId?: string;
+      bookingId?: string;
       resourceId?: string;
       /** Order som ingen fått än. För mekaniker: dessa i stället för sina egna. */
       unassigned?: boolean;
+      /** Ej klara order med en del som måste beställas. */
+      needsAction?: boolean;
       /** Inlämnad eller hämtas från (inkl.) / till (exkl.), ISO-tid. */
       from?: string;
       to?: string;

@@ -629,6 +629,8 @@ export interface Booking {
   customerId: string | null;
   vehicleId: string | null;
   resourceId: string | null;
+  /** Lyft eller plats, vid sidan av mekanikern i resourceId. */
+  placeId: string | null;
   serviceTypeId: string | null;
   title: string;
   /** Namn och regnr är kopior från när bokningen gjordes. */
@@ -637,9 +639,12 @@ export interface Booking {
   regNo: string | null;
   vehicle: string | null;
   resourceName: string | null;
+  placeName: string | null;
   /** ISO-tid. */
   start: string;
   end: string;
+  /** Klar senast (dagar senare), om jobbet tar längre än tiden. */
+  dueAt: string | null;
   status: BookingStatus;
   /** Öre. */
   priceFrom: number | null;
@@ -651,10 +656,13 @@ export interface BookingInput {
   customerId: string;
   vehicleId: string;
   resourceId: string | null;
+  /** Lyft eller plats, vid sidan av mekanikern i resourceId. */
+  placeId?: string | null;
   serviceTypeId: string | null;
   title: string;
   start: string;
   end: string;
+  dueAt?: string | null;
   status: BookingStatus;
   priceFrom: number | null;
   priceTo: number | null;
@@ -872,6 +880,9 @@ export interface WorkOrderInvoice {
   seller: InvoiceSeller;
   buyer: InvoiceBuyer;
   totals: OrderTotals;
+  /** Vad som gjorts och eventuell garanti, som det står på dokumentet. */
+  performed: string | null;
+  warranty: string | null;
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
 }
@@ -902,7 +913,7 @@ export interface VatReport {
   doneNotInvoiced: number;
 }
 
-/** En rad på arbetsordern: ett jobb, en del eller något annat. */
+/** En rad på arbetsordern: ett jobb eller en del som mekanikern ska göra. Har inget pris. */
 export interface WorkOrderLine {
   id: string;
   position: number;
@@ -911,19 +922,13 @@ export interface WorkOrderLine {
   articleId: string | null;
   /** Timmar för arbete, antal för delar. */
   quantity: number;
-  /** Öre per enhet, exkl. moms. */
-  unitPrice: number;
-  /** Rabatt på raden, 0–100 %. */
-  discountPercent: number;
-  /** Momssats i procent: 25, 12, 6 eller 0. */
-  vatRate: number;
-  /** Öre, exkl. moms, efter rabatt. */
-  total: number;
+  /** Extra instruktion till mekanikern, visas under raden. */
+  instruction: string | null;
   /** Avbockad av mekanikern. */
   done: boolean;
-  /** Tillagd av mekanikern under jobbet, utan pris tills admin prissätter. */
+  /** Tillagd av mekanikern under jobbet. */
   addedByStaff?: boolean;
-  /** Delen måste beställas hem. */
+  /** Delen saknas och måste beställas hem. */
   toOrder?: boolean;
   /** Delen är uttagen ur lagret (bokförd som försäljning när ordern blev klar). */
   stockBooked?: boolean;
@@ -938,21 +943,27 @@ export interface WorkOrder {
   vehicleId: string;
   bookingId: string | null;
   resourceId: string | null;
+  /** Lyft eller plats, vid sidan av mekanikern i resourceId. */
+  placeId: string | null;
   customerName: string;
   phone: string | null;
   regNo: string;
   vehicle: string | null;
   resourceName: string | null;
+  placeName: string | null;
   status: WorkOrderStatus;
-  /** Inlämningsdatum, ISO-tid. */
+  /** Startdatum (bilen lämnas in), ISO-tid. */
   receivedAt: string;
-  /** Hämtningsdatum, ISO-tid. */
+  /** Klar senast / hämtas, ISO-tid. */
   pickupAt: string | null;
-  /** Överenskommet prisspann, öre. */
-  priceFrom: number | null;
-  priceTo: number | null;
-  /** Vårt prisförslag, öre. */
-  quote: number | null;
+  /** Överenskommet pris för hela jobbet, öre exkl. moms. Syns aldrig på arbetsbladet. */
+  price: number | null;
+  priceNote: string | null;
+  /** Vad som gjorts (kvittot). */
+  performed: string | null;
+  warranty: string | null;
+  /** Någon rad är en del som måste beställas. */
+  hasMissing?: boolean;
   remarks: string | null;
   notes: string | null;
   /** FAK-00042 när ordern är fakturerad (då är den låst). */
@@ -963,7 +974,7 @@ export interface WorkOrder {
 
 export interface WorkOrderDetail extends WorkOrder {
   lines: WorkOrderLine[];
-  /** Radernas summa exkl. moms, öre. */
+  /** Överenskommet pris exkl. moms, öre (0 om inget pris satts). */
   total: number;
   /** Netto, moms per sats och belopp att betala. */
   totals: OrderTotals;
@@ -980,9 +991,7 @@ export interface WorkOrderLineInput {
   type: WorkOrderLineType;
   description: string;
   quantity: number;
-  unitPrice: number;
-  discountPercent?: number;
-  vatRate?: number;
+  instruction?: string | null;
   done: boolean;
 }
 
@@ -990,12 +999,15 @@ export interface WorkOrderInput {
   customerId: string;
   vehicleId: string;
   resourceId: string | null;
+  /** Lyft eller plats, vid sidan av mekanikern i resourceId. */
+  placeId?: string | null;
   status: WorkOrderStatus;
   receivedAt: string;
   pickupAt: string | null;
-  priceFrom: number | null;
-  priceTo: number | null;
-  quote: number | null;
+  price: number | null;
+  priceNote: string | null;
+  performed: string | null;
+  warranty: string | null;
   remarks: string | null;
   notes: string | null;
   lines: WorkOrderLineInput[];
