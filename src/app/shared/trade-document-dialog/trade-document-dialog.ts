@@ -1,3 +1,4 @@
+import { vatOf } from '../vat';
 import { Component, inject, signal } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { InventoryApi } from '../../core/api/inventory-api';
@@ -72,8 +73,8 @@ import { TradeDocument, TradeKind } from '../../core/models';
             <tr>
               <th class="py-2">Artikel</th>
               <th class="py-2 text-right">Antal</th>
-              <th class="py-2 text-right">À-pris</th>
-              <th class="py-2 text-right">Summa</th>
+              <th class="py-2 text-right">À-pris exkl. moms</th>
+              <th class="py-2 text-right">Summa exkl. moms</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -93,6 +94,16 @@ import { TradeDocument, TradeKind } from '../../core/models';
               <td></td>
               <td class="py-2 text-right tabular-nums">{{ d.total | kr }}</td>
             </tr>
+            @if (data.kind === 'sales') {
+              <tr class="text-gray-600">
+                <td class="py-1" colspan="3">Moms 25 %</td>
+                <td class="py-1 text-right tabular-nums">{{ vat(d.total) | kr }}</td>
+              </tr>
+              <tr class="font-semibold">
+                <td class="py-1" colspan="3">Betalt inkl. moms</td>
+                <td class="py-1 text-right tabular-nums">{{ d.total + vat(d.total) | kr }}</td>
+              </tr>
+            }
           </tfoot>
         </table>
       } @else {
@@ -105,6 +116,7 @@ import { TradeDocument, TradeKind } from '../../core/models';
   `,
 })
 export class TradeDocumentDialog {
+  protected readonly vat = (net: number) => vatOf(net);
   protected readonly data = inject<{ kind: TradeKind; number: number }>(MAT_DIALOG_DATA);
   readonly doc = signal<TradeDocument | null>(null);
 
