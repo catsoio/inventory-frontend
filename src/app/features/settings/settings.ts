@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { Auth } from '../../core/auth/auth';
 import { I18n } from '../../core/i18n/i18n';
+import { Confirm } from '../../shared/confirm';
 import { Billing } from '../../core/billing/billing';
 import { GARAGE_ROLE_LABELS, GarageMember, SEASON_LABELS } from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
@@ -15,274 +16,315 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
 @Component({
   selector: 'app-settings',
   standalone: false,
+  host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
-    <div class="flex items-center justify-between pr-2">
+    <div class="flex shrink-0 items-center justify-between pr-2">
       <h2 mat-dialog-title>Inställningar</h2>
       <button mat-icon-button mat-dialog-close aria-label="Stäng">
         <mat-icon>close</mat-icon>
       </button>
     </div>
-    <mat-dialog-content class="!bg-gray-50 !pt-4">
-      <form [formGroup]="form" (ngSubmit)="save()" class="flex flex-col gap-4">
-        <section class="rounded-xl bg-white shadow-sm">
-          <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Visning</h2>
-          <div class="flex flex-wrap items-center gap-3 px-5 pt-3">
-            <span class="text-sm">Språk</span>
-            <mat-button-toggle-group
-              [value]="i18n.lang()"
-              (change)="i18n.set($event.value)"
-              aria-label="Språk"
-              hideSingleSelectionIndicator
-            >
-              <mat-button-toggle value="sv">Svenska</mat-button-toggle>
-              <mat-button-toggle value="en">English</mat-button-toggle>
-            </mat-button-toggle-group>
-          </div>
-          <div class="grid gap-x-6 p-4 sm:grid-cols-3">
-            <mat-form-field>
-              <mat-label>Standardvy för artiklar</mat-label>
-              <mat-select formControlName="defaultView">
-                <mat-option value="auto">Automatisk (tabell på dator)</mat-option>
-                <mat-option value="table">Tabell</mat-option>
-                <mat-option value="cards">Kort</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Rader per hämtning</mat-label>
-              <mat-select formControlName="pageSize">
-                <mat-option [value]="50">50</mat-option>
-                <mat-option [value]="100">100</mat-option>
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Period på översikten</mat-label>
-              <mat-select formControlName="dashboardDays">
-                <mat-option [value]="7">7 dagar</mat-option>
-                <mat-option [value]="30">30 dagar</mat-option>
-                <mat-option [value]="90">90 dagar</mat-option>
-              </mat-select>
-            </mat-form-field>
-          </div>
-        </section>
 
-        <section class="rounded-xl bg-white shadow-sm">
-          <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Standardvärden för nya artiklar</h2>
-          <div class="grid gap-x-6 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <mat-form-field>
-              <mat-label>Säsong</mat-label>
-              <mat-select formControlName="defaultSeason">
-                @for (s of seasons; track s[0]) {
-                  <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Leverantör</mat-label>
-              <input matInput formControlName="defaultSupplier" />
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Beställningspunkt (st)</mat-label>
-              <input
-                matInput
-                type="number"
-                min="0"
-                step="1"
-                formControlName="defaultReorderLevel"
-              />
-              <mat-error>Heltal, 0 eller mer</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Påslag på inköpspris (%)</mat-label>
-              <input matInput type="number" min="0" step="1" formControlName="markupPercent" />
-              <mat-hint>Föreslår försäljningspris vid ingångslager</mat-hint>
-            </mat-form-field>
-          </div>
-        </section>
-
-        <section class="rounded-xl bg-white shadow-sm">
-          <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Däckhotell</h2>
-          <div class="grid gap-x-6 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <mat-form-field>
-              <mat-label>Standardavgift per inlämning (kr, exkl. moms)</mat-label>
-              <input matInput type="number" min="0" step="1" formControlName="defaultStorageFee" />
-              <mat-hint>Förifylls vid ny inlämning</mat-hint>
-              <mat-error>0 eller mer</mat-error>
-            </mat-form-field>
-          </div>
-        </section>
-
-        <div class="flex gap-2">
-          <button mat-flat-button color="primary" [disabled]="form.invalid">Spara</button>
-          <button mat-button type="button" (click)="reset()">Återställ standard</button>
-        </div>
-      </form>
-
-      <section class="mt-4 rounded-xl bg-white shadow-sm">
-        <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Mitt lösenord</h2>
-        <form
-          [formGroup]="pwForm"
-          (ngSubmit)="changePassword()"
-          class="grid gap-x-4 p-4 sm:grid-cols-3"
+    <!-- Flikar: lodrätt på dator, en rullbar rad på mobil. -->
+    <nav
+      class="flex shrink-0 gap-1 overflow-x-auto border-b border-gray-200 px-4 md:hidden"
+      aria-label="Inställningar"
+    >
+      @for (t of tabs(); track t.id) {
+        <button
+          type="button"
+          class="tab whitespace-nowrap"
+          [class.is-active]="tab() === t.id"
+          (click)="tab.set(t.id)"
         >
-          <mat-form-field>
-            <mat-label>Nuvarande lösenord</mat-label>
-            <input
-              matInput
-              type="password"
-              autocomplete="current-password"
-              formControlName="current"
-            />
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Nytt lösenord</mat-label>
-            <input matInput type="password" autocomplete="new-password" formControlName="next" />
-            <mat-error>Minst 8 tecken</mat-error>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>Upprepa nytt lösenord</mat-label>
-            <input matInput type="password" autocomplete="new-password" formControlName="repeat" />
-            @if (pwForm.errors?.['mismatch']) {
-              <mat-error>Lösenorden stämmer inte överens</mat-error>
-            }
-          </mat-form-field>
-          <div class="sm:col-span-3">
-            <button mat-stroked-button [disabled]="pwForm.invalid || pwBusy()">Byt lösenord</button>
-            <span class="ml-3 text-xs text-gray-500">Du loggas ut på andra enheter.</span>
+          {{ t.label }}
+        </button>
+      }
+    </nav>
+
+    <mat-dialog-content class="!max-h-none min-h-0 flex-1 !overflow-hidden !p-0">
+      <div class="flex h-full">
+        <nav
+          class="hidden w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-gray-100 p-3 md:flex"
+          aria-label="Inställningar"
+        >
+          @for (t of tabs(); track t.id) {
+            <button
+              type="button"
+              class="side-tab"
+              [class.is-active]="tab() === t.id"
+              (click)="tab.set(t.id)"
+            >
+              <mat-icon>{{ t.icon }}</mat-icon>
+              <span>{{ t.label }}</span>
+            </button>
+          }
+          <div class="mt-auto px-3 pt-4 text-xs text-gray-400 tabular-nums">
+            Version {{ version }}
           </div>
-        </form>
-      </section>
+        </nav>
 
-      @if (auth.isAdmin()) {
-        <section class="mt-4 rounded-xl bg-white shadow-sm">
-          <h2 class="px-5 pt-5 pb-1 text-base font-semibold">Fakturauppgifter</h2>
-          <p class="px-5 text-sm text-gray-600">
-            Skrivs ut på faktura (företagskunder) och kvitto (privatkunder). En faktura måste enligt
-            mervärdesskattelagen ha säljarens momsregistreringsnummer, namn och adress, så de här
-            uppgifterna krävs innan du kan fakturera. De kopieras in på varje faktura när den
-            utfärdas och ändras inte i efterhand.
-          </p>
-          <form
-            [formGroup]="sellerForm"
-            (ngSubmit)="saveSeller()"
-            class="grid gap-x-4 p-4 sm:grid-cols-6"
-          >
-            <mat-form-field class="sm:col-span-3">
-              <mat-label>Företagsnamn</mat-label>
-              <input matInput formControlName="name" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-3">
-              <mat-label>Organisationsnummer</mat-label>
-              <input matInput formControlName="orgNo" placeholder="556123-4567" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-3">
-              <mat-label>Momsregistreringsnummer</mat-label>
-              <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
-              <mat-hint>SE + organisationsnumret utan bindestreck + 01</mat-hint>
-            </mat-form-field>
-            <div class="flex items-center sm:col-span-3">
-              <mat-checkbox formControlName="fTax">Godkänd för F-skatt</mat-checkbox>
-            </div>
-            <mat-form-field class="sm:col-span-3">
-              <mat-label>Adress</mat-label>
-              <input matInput formControlName="address" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-1">
-              <mat-label>Postnr</mat-label>
-              <input matInput formControlName="postalCode" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-2">
-              <mat-label>Ort</mat-label>
-              <input matInput formControlName="city" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-3">
-              <mat-label>Telefon</mat-label>
-              <input matInput formControlName="phone" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-3">
-              <mat-label>E-post</mat-label>
-              <input matInput formControlName="email" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-4">
-              <mat-label>Betalningsuppgifter</mat-label>
-              <input matInput formControlName="paymentDetails" placeholder="Bankgiro 123-4567" />
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-2">
-              <mat-label>Betalningsvillkor (dagar)</mat-label>
-              <input matInput type="number" min="0" max="365" formControlName="paymentTermsDays" />
-              <mat-hint>Gäller företagsfaktura</mat-hint>
-            </mat-form-field>
-            <mat-form-field class="sm:col-span-6">
-              <mat-label>Text längst ned (valfritt)</mat-label>
-              <input matInput formControlName="footer" />
-            </mat-form-field>
-            <div class="sm:col-span-6">
-              <button
-                mat-flat-button
-                color="primary"
-                [disabled]="sellerForm.invalid || sellerBusy()"
-              >
-                Spara fakturauppgifter
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section class="mt-4 rounded-xl bg-white shadow-sm">
-          <h2 class="px-5 pt-5 pb-1 text-base font-semibold">
-            Personal i {{ auth.garage()?.name }}
-          </h2>
-          <div class="flex flex-col gap-3 p-4">
-            @for (m of members(); track m.userId) {
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pb-3">
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
-                    <span class="truncate font-medium">{{ label(m) }}</span>
-                    <app-pill
-                      [tone]="
-                        m.role === 'owner' ? 'blue' : m.role === 'mechanic' ? 'amber' : 'gray'
-                      "
-                      >{{ roleLabels[m.role] }}</app-pill
-                    >
-                    @if (m.status === 'blocked') {
-                      <app-pill tone="red">Spärrad</app-pill>
-                    }
-                  </div>
-                  <div class="truncate text-xs text-gray-500">
-                    {{ detail(m) }}
-                  </div>
-                </div>
-                @if (auth.isSuperAdmin()) {
-                  <button mat-button type="button" (click)="resetPassword(m)">
-                    <mat-icon>key</mat-icon> Byt lösenord
-                  </button>
-                  @if (m.userId !== auth.user()?.id) {
-                    <button
-                      mat-button
-                      type="button"
-                      [color]="m.status === 'blocked' ? 'primary' : 'warn'"
-                      (click)="toggleBlocked(m)"
-                    >
-                      <mat-icon>{{ m.status === 'blocked' ? 'lock_open' : 'block' }}</mat-icon>
-                      {{ m.status === 'blocked' ? 'Aktivera' : 'Spärra' }}
-                    </button>
-                  }
-                }
-                @if (m.role !== 'owner') {
-                  <mat-button-toggle-group
-                    hideSingleSelectionIndicator
-                    [value]="m.role"
-                    (change)="setRole(m, $event.value)"
-                    aria-label="Roll"
-                  >
-                    <mat-button-toggle value="staff">Personal</mat-button-toggle>
-                    <mat-button-toggle value="mechanic">Mekaniker</mat-button-toggle>
-                  </mat-button-toggle-group>
-                  <button mat-button type="button" (click)="remove(m)">Ta bort</button>
-                }
+        <div class="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+          <form id="prefs-form" [formGroup]="form" (ngSubmit)="save()">
+            @if (tab() === 'view') {
+              <h3 class="sec">Visning</h3>
+              <div class="mb-5 flex flex-wrap items-center gap-3">
+                <span class="text-sm">Språk</span>
+                <mat-button-toggle-group
+                  [value]="i18n.lang()"
+                  (change)="i18n.set($event.value)"
+                  aria-label="Språk"
+                  hideSingleSelectionIndicator
+                >
+                  <mat-button-toggle value="sv">Svenska</mat-button-toggle>
+                  <mat-button-toggle value="en">English</mat-button-toggle>
+                </mat-button-toggle-group>
+              </div>
+              <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Standardvy för artiklar</mat-label>
+                  <mat-select formControlName="defaultView">
+                    <mat-option value="auto">Automatisk (tabell på dator)</mat-option>
+                    <mat-option value="table">Tabell</mat-option>
+                    <mat-option value="cards">Kort</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Rader per hämtning</mat-label>
+                  <mat-select formControlName="pageSize">
+                    <mat-option [value]="50">50</mat-option>
+                    <mat-option [value]="100">100</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Period på översikten</mat-label>
+                  <mat-select formControlName="dashboardDays">
+                    <mat-option [value]="7">7 dagar</mat-option>
+                    <mat-option [value]="30">30 dagar</mat-option>
+                    <mat-option [value]="90">90 dagar</mat-option>
+                  </mat-select>
+                </mat-form-field>
               </div>
             }
+
+            @if (tab() === 'stock') {
+              <h3 class="sec">Nya artiklar</h3>
+              <div class="mb-6 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Säsong</mat-label>
+                  <mat-select formControlName="defaultSeason">
+                    @for (s of seasons; track s[0]) {
+                      <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Leverantör</mat-label>
+                  <input matInput formControlName="defaultSupplier" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Beställningspunkt (st)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    step="1"
+                    formControlName="defaultReorderLevel"
+                  />
+                  <mat-error>Heltal, 0 eller mer</mat-error>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Påslag på inköpspris (%)</mat-label>
+                  <input matInput type="number" min="0" step="1" formControlName="markupPercent" />
+                  <mat-hint>Föreslår försäljningspris vid ingångslager</mat-hint>
+                </mat-form-field>
+              </div>
+              <h3 class="sec">Däckhotell</h3>
+              <div class="grid gap-x-4 sm:grid-cols-2">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Standardavgift per inlämning (kr, exkl. moms)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    step="1"
+                    formControlName="defaultStorageFee"
+                  />
+                  <mat-hint>Förifylls vid ny inlämning</mat-hint>
+                  <mat-error>0 eller mer</mat-error>
+                </mat-form-field>
+              </div>
+            }
+          </form>
+
+          @if (tab() === 'account') {
+            <h3 class="sec">Mitt lösenord</h3>
+            <form
+              id="pw-form"
+              [formGroup]="pwForm"
+              (ngSubmit)="changePassword()"
+              class="grid max-w-md gap-y-3"
+            >
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Nuvarande lösenord</mat-label>
+                <input
+                  matInput
+                  type="password"
+                  autocomplete="current-password"
+                  formControlName="current"
+                />
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Nytt lösenord</mat-label>
+                <input
+                  matInput
+                  type="password"
+                  autocomplete="new-password"
+                  formControlName="next"
+                />
+                <mat-error>Minst 8 tecken</mat-error>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Upprepa nytt lösenord</mat-label>
+                <input
+                  matInput
+                  type="password"
+                  autocomplete="new-password"
+                  formControlName="repeat"
+                />
+                @if (pwForm.errors?.['mismatch']) {
+                  <mat-error>Lösenorden stämmer inte överens</mat-error>
+                }
+              </mat-form-field>
+              <p class="text-xs text-gray-500">Du loggas ut på andra enheter.</p>
+            </form>
+          }
+
+          @if (tab() === 'invoice' && auth.isAdmin()) {
+            <h3 class="sec">Fakturauppgifter</h3>
+            <p class="mb-4 max-w-2xl text-sm text-gray-600">
+              Skrivs ut på faktura (företagskunder) och kvitto (privatkunder). En faktura måste
+              enligt mervärdesskattelagen ha säljarens momsregistreringsnummer, namn och adress, så
+              uppgifterna krävs innan du kan fakturera. De kopieras in på varje faktura när den
+              utfärdas och ändras inte i efterhand.
+            </p>
+            <form
+              id="seller-form"
+              [formGroup]="sellerForm"
+              (ngSubmit)="saveSeller()"
+              class="grid gap-x-4 gap-y-3 sm:grid-cols-6"
+            >
+              <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+                <mat-label>Företagsnamn</mat-label>
+                <input matInput formControlName="name" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+                <mat-label>Organisationsnummer</mat-label>
+                <input matInput formControlName="orgNo" placeholder="556123-4567" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+                <mat-label>Momsregistreringsnummer</mat-label>
+                <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
+                <mat-hint>SE + organisationsnumret utan bindestreck + 01</mat-hint>
+              </mat-form-field>
+              <div class="flex items-center sm:col-span-3">
+                <mat-checkbox formControlName="fTax">Godkänd för F-skatt</mat-checkbox>
+              </div>
+              <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+                <mat-label>Adress</mat-label>
+                <input matInput formControlName="address" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-1" subscriptSizing="dynamic">
+                <mat-label>Postnr</mat-label>
+                <input matInput formControlName="postalCode" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+                <mat-label>Ort</mat-label>
+                <input matInput formControlName="city" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+                <mat-label>Telefon</mat-label>
+                <input matInput formControlName="phone" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+                <mat-label>E-post</mat-label>
+                <input matInput formControlName="email" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-4" subscriptSizing="dynamic">
+                <mat-label>Betalningsuppgifter</mat-label>
+                <input matInput formControlName="paymentDetails" placeholder="Bankgiro 123-4567" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+                <mat-label>Betalningsvillkor (dagar)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  max="365"
+                  formControlName="paymentTermsDays"
+                />
+                <mat-hint>Gäller företagsfaktura</mat-hint>
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-6" subscriptSizing="dynamic">
+                <mat-label>Text längst ned (valfritt)</mat-label>
+                <input matInput formControlName="footer" />
+              </mat-form-field>
+            </form>
+          }
+
+          @if (tab() === 'staff' && auth.isAdmin()) {
+            <h3 class="sec">Personal i {{ auth.garage()?.name }}</h3>
+            <div class="flex flex-col divide-y divide-gray-100">
+              @for (m of members(); track m.userId) {
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="truncate font-medium">{{ label(m) }}</span>
+                      <app-pill
+                        [tone]="
+                          m.role === 'owner' ? 'blue' : m.role === 'mechanic' ? 'amber' : 'gray'
+                        "
+                        >{{ roleLabels[m.role] }}</app-pill
+                      >
+                      @if (m.status === 'blocked') {
+                        <app-pill tone="red">Spärrad</app-pill>
+                      }
+                    </div>
+                    <div class="truncate text-xs text-gray-500">{{ detail(m) }}</div>
+                  </div>
+                  @if (auth.isSuperAdmin()) {
+                    <button mat-button type="button" (click)="resetPassword(m)">
+                      <mat-icon>key</mat-icon> Byt lösenord
+                    </button>
+                    @if (m.userId !== auth.user()?.id) {
+                      <button
+                        mat-button
+                        type="button"
+                        [color]="m.status === 'blocked' ? 'primary' : 'warn'"
+                        (click)="toggleBlocked(m)"
+                      >
+                        <mat-icon>{{ m.status === 'blocked' ? 'lock_open' : 'block' }}</mat-icon>
+                        {{ m.status === 'blocked' ? 'Aktivera' : 'Spärra' }}
+                      </button>
+                    }
+                  }
+                  @if (m.role !== 'owner') {
+                    <mat-button-toggle-group
+                      hideSingleSelectionIndicator
+                      [value]="m.role"
+                      (change)="setRole(m, $event.value)"
+                      aria-label="Roll"
+                    >
+                      <mat-button-toggle value="staff">Personal</mat-button-toggle>
+                      <mat-button-toggle value="mechanic">Mekaniker</mat-button-toggle>
+                    </mat-button-toggle-group>
+                    <button mat-button type="button" (click)="remove(m)">Ta bort</button>
+                  }
+                </div>
+              }
+            </div>
             @if (billing.status(); as b) {
-              <p class="text-sm text-gray-600">
+              <p class="mt-3 text-sm text-gray-600">
                 {{ b.users.current }} av {{ b.users.limit }} användare används.
                 @if (b.users.current >= b.users.limit) {
                   Ni har nått taket för er plan. Kontakta oss om ni behöver fler användare ({{
@@ -292,7 +334,7 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 }
               </p>
             }
-            <div class="flex items-center gap-3">
+            <div class="mt-3 flex flex-wrap items-center gap-3">
               <button mat-stroked-button type="button" [disabled]="seatsFull()" (click)="invite()">
                 Skapa inbjudningskod
               </button>
@@ -301,14 +343,115 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 <span class="text-xs text-gray-500">Gäller 7 dagar, kan användas en gång</span>
               }
             </div>
-          </div>
-        </section>
-      }
-      <div class="px-5 py-4 text-xs text-gray-400 tabular-nums">Version {{ version }}</div>
+          }
+          <div class="pt-6 text-xs text-gray-400 tabular-nums md:hidden">Version {{ version }}</div>
+        </div>
+      </div>
     </mat-dialog-content>
+
+    <mat-dialog-actions>
+      @if (tab() === 'view' || tab() === 'stock') {
+        <button mat-button type="button" (click)="reset()">Återställ standard</button>
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Stäng</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          form="prefs-form"
+          [disabled]="form.invalid"
+        >
+          Spara
+        </button>
+      } @else if (tab() === 'account') {
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Stäng</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          form="pw-form"
+          [disabled]="pwForm.invalid || pwBusy()"
+        >
+          Byt lösenord
+        </button>
+      } @else if (tab() === 'invoice') {
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Stäng</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          form="seller-form"
+          [disabled]="sellerForm.invalid || sellerBusy()"
+        >
+          Spara fakturauppgifter
+        </button>
+      } @else {
+        <span class="flex-1"></span>
+        <button mat-flat-button color="primary" type="button" mat-dialog-close>Klar</button>
+      }
+    </mat-dialog-actions>
+  `,
+  styles: `
+    .side-tab {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 40px;
+      padding: 0 12px;
+      border-radius: 10px;
+      font-size: 14.5px;
+      font-weight: 500;
+      color: #374151;
+      text-align: left;
+    }
+    .side-tab mat-icon {
+      color: #6b7280;
+    }
+    .side-tab:hover {
+      background: #f3f4f6;
+    }
+    .side-tab.is-active {
+      background: var(--color-brand-soft);
+      color: var(--mat-sys-primary);
+      font-weight: 600;
+    }
+    .side-tab.is-active mat-icon {
+      color: var(--mat-sys-primary);
+    }
+    .tab {
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.is-active {
+      color: var(--mat-sys-primary);
+      border-color: var(--mat-sys-primary);
+      font-weight: 600;
+    }
   `,
 })
 export class SettingsPage {
+  /** Fliken som visas; ägaren har fler. */
+  readonly tab = signal<'view' | 'stock' | 'account' | 'invoice' | 'staff'>('view');
+  readonly tabs = computed(() => {
+    const t = [
+      { id: 'view' as const, label: 'Visning', icon: 'tune' },
+      { id: 'stock' as const, label: 'Lager och däckhotell', icon: 'inventory_2' },
+      { id: 'account' as const, label: 'Konto', icon: 'lock' },
+    ];
+    return this.auth.isAdmin()
+      ? [
+          ...t,
+          { id: 'invoice' as const, label: 'Fakturauppgifter', icon: 'receipt_long' },
+          { id: 'staff' as const, label: 'Personal', icon: 'group' },
+        ]
+      : t;
+  });
+
   protected readonly version = pkg.version;
   protected readonly i18n = inject(I18n);
   private readonly settings = inject(Settings);
@@ -316,6 +459,7 @@ export class SettingsPage {
   private readonly api = inject(InventoryApi);
   protected readonly auth = inject(Auth);
   private readonly dialog = inject(MatDialog);
+  private readonly confirm = inject(Confirm);
   readonly members = signal<GarageMember[]>([]);
   readonly pwBusy = signal(false);
   readonly pwForm = inject(FormBuilder).nonNullable.group(
@@ -451,9 +595,21 @@ export class SettingsPage {
   }
 
   toggleBlocked(m: GarageMember) {
-    this.api
-      .setMemberBlocked(m.userId, m.status !== 'blocked')
-      .subscribe((list) => this.members.set(list));
+    const block = m.status !== 'blocked';
+    const run = () =>
+      this.api.setMemberBlocked(m.userId, block).subscribe((list) => this.members.set(list));
+    if (!block) {
+      run();
+      return;
+    }
+    this.confirm
+      .ask({
+        title: `Spärra ${this.label(m)}?`,
+        message: 'Personen kan inte logga in förrän du aktiverar kontot igen.',
+        confirmText: 'Spärra',
+        danger: true,
+      })
+      .subscribe((ok) => ok && run());
   }
 
   changePassword() {
@@ -470,7 +626,14 @@ export class SettingsPage {
   }
 
   remove(m: GarageMember) {
-    this.api.removeMember(m.userId).subscribe(() => this.loadMembers());
+    this.confirm
+      .ask({
+        title: `Ta bort ${this.label(m)}?`,
+        message: 'Personen förlorar åtkomsten till garaget. Det går inte att ångra.',
+        confirmText: 'Ta bort',
+        danger: true,
+      })
+      .subscribe((ok) => ok && this.api.removeMember(m.userId).subscribe(() => this.loadMembers()));
   }
 
   save() {
@@ -479,7 +642,18 @@ export class SettingsPage {
   }
 
   reset() {
-    this.settings.reset();
-    this.form.reset(this.settings.value());
+    this.confirm
+      .ask({
+        title: 'Återställa standard?',
+        message:
+          'Dina inställningar för visning, nya artiklar och däckhotell byts mot standardvärdena.',
+        confirmText: 'Återställ',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.settings.reset();
+        this.form.reset(this.settings.value());
+      });
   }
 }

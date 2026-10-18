@@ -272,6 +272,11 @@ export class CustomerCard implements OnInit {
     });
   }
 
+  /** Sidoguarden (unsavedGuard): finns det osparade ändringar? */
+  hasUnsaved() {
+    return this.form.dirty;
+  }
+
   save() {
     if (!ensureValid(this.form, this.snack)) return;
 
@@ -294,6 +299,7 @@ export class CustomerCard implements OnInit {
       next: (c) => {
         this.busy.set(false);
         this.snack.open('Sparat', undefined, { duration: 2000 });
+        this.form.markAsPristine();
         if (this.id) this.load();
         else this.router.navigate(['/customers', c.id]);
       },
@@ -318,7 +324,10 @@ export class CustomerCard implements OnInit {
         (ok) =>
           ok &&
           this.api.removeCustomer(c.id).subscribe((r) => {
-            if (!r.archived) return void this.router.navigate(['/customers']);
+            if (!r.archived) {
+              this.form.markAsPristine();
+              return void this.router.navigate(['/customers']);
+            }
             this.snack.open('Kunden har historik och arkiverades', undefined, { duration: 3000 });
             this.load();
           }),

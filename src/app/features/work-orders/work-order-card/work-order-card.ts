@@ -233,36 +233,12 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                   class="focus:ring-brand h-9 w-full rounded-lg border-0 bg-white px-3 text-sm shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
                 />
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <button
-                    type="button"
-                    (click)="flip(row, 'toOrder')"
-                    class="flex h-8 items-center gap-1 rounded-full px-3 ring-1"
-                    [class]="
-                      row.value.toOrder
-                        ? 'bg-amber-500 text-white ring-amber-500'
-                        : 'bg-white text-gray-600 ring-gray-300'
-                    "
-                  >
-                    <mat-icon class="!h-4 !w-4 !text-base">{{
-                      row.value.toOrder ? 'shopping_cart' : 'add_shopping_cart'
-                    }}</mat-icon>
-                    {{ row.value.toOrder ? 'Saknas, ska beställas' : 'Markera som saknad' }}
-                  </button>
-                  <button
-                    type="button"
-                    (click)="flip(row, 'done')"
-                    class="flex h-8 items-center gap-1 rounded-full px-3 ring-1"
-                    [class]="
-                      row.value.done
-                        ? 'bg-green-600 text-white ring-green-600'
-                        : 'bg-white text-gray-600 ring-gray-300'
-                    "
-                  >
-                    <mat-icon class="!h-4 !w-4 !text-base">{{
-                      row.value.done ? 'check_circle' : 'radio_button_unchecked'
-                    }}</mat-icon>
-                    {{ row.value.done ? 'Klar' : 'Inte klar' }}
-                  </button>
+                  <mat-checkbox [checked]="row.value.done" (change)="flip(row, 'done')">
+                    Klar
+                  </mat-checkbox>
+                  <mat-checkbox [checked]="row.value.toOrder" (change)="flip(row, 'toOrder')">
+                    Del saknas, ska beställas
+                  </mat-checkbox>
                   @if (row.value.articleId) {
                     <span class="text-xs text-gray-500">
                       {{
@@ -639,6 +615,11 @@ export class WorkOrderCard implements OnInit {
     });
   }
 
+  /** Sidoguarden (unsavedGuard): finns det osparade ändringar? */
+  hasUnsaved() {
+    return this.form.dirty;
+  }
+
   save() {
     if (!ensureValid(this.form, this.snack)) return;
 
@@ -701,6 +682,7 @@ export class WorkOrderCard implements OnInit {
         next: (o) => {
           this.busy.set(false);
           this.snack.open('Sparat', undefined, { duration: 2000 });
+          this.form.markAsPristine();
           if (this.id) this.load();
           else this.router.navigate(['/workorders', o.id]);
         },
@@ -738,9 +720,25 @@ export class WorkOrderCard implements OnInit {
   }
 
   setPaid(paid: boolean) {
-    this.api
-      .setPaid(this.id!, paid, paid ? this.payMethod() : undefined)
-      .subscribe(() => this.load());
+    const run = () =>
+      this.api
+        .setPaid(this.id!, paid, paid ? this.payMethod() : undefined)
+        .subscribe(() => this.load());
+    if (paid) {
+      run();
+      return;
+    }
+    this.dialog
+      .open(ConfirmDialog, {
+        data: {
+          title: 'Markera som obetald?',
+          message: 'Betalningen och betalsättet tas bort från fakturan.',
+          confirmText: 'Markera obetald',
+          danger: true,
+        },
+      })
+      .afterClosed()
+      .subscribe((ok) => ok && run());
   }
 
   remove() {
@@ -756,7 +754,12 @@ export class WorkOrderCard implements OnInit {
       })
       .afterClosed()
       .subscribe(
-        (ok) => ok && this.api.remove(o.id).subscribe(() => this.router.navigate(['/workorders'])),
+        (ok) =>
+          ok &&
+          this.api.remove(o.id).subscribe(() => {
+            this.form.markAsPristine();
+            this.router.navigate(['/workorders']);
+          }),
       );
   }
 }

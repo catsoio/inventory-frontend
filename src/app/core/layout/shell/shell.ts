@@ -47,13 +47,13 @@ const NAV: NavSection[] = [
     items: [{ path: '/dashboard', label: 'Hem', icon: 'home', exact: true }],
   },
   {
-    title: 'Verkstad',
+    title: 'Schema',
     items: [
       { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month' },
       {
         path: '/workorders',
         label: 'Arbetsorder',
-        icon: 'assignment',
+        icon: 'handyman',
         hidden: !environment.workOrders,
       },
     ],
@@ -71,16 +71,16 @@ const NAV: NavSection[] = [
       { path: '/inventory', label: 'Artiklar', icon: 'inventory_2' },
       { path: '/purchases', label: 'Inköp', icon: 'shopping_cart_checkout' },
       { path: '/sales', label: 'Försäljning', icon: 'point_of_sale' },
+      { path: '/suppliers', label: 'Leverantörer', icon: 'local_shipping' },
     ],
   },
   {
-    title: 'Däckhotell',
-    items: [{ path: '/storage', label: 'Förvaring', icon: 'warehouse' }],
+    title: 'Förvaring',
+    items: [{ path: '/storage', label: 'Däckhotell', icon: 'warehouse' }],
   },
   {
     title: 'Register',
     items: [
-      { path: '/suppliers', label: 'Leverantörer', icon: 'local_shipping' },
       { path: '/resources', label: 'Mekaniker och platser', icon: 'engineering' },
       { path: '/service-types', label: 'Åtgärder', icon: 'build' },
     ],
@@ -97,14 +97,20 @@ const NAV: NavSection[] = [
         match: ['/finance', '/bookkeeping'],
       },
       { path: '/reports', label: 'Logg och rapport', icon: 'bar_chart', exact: true },
-      { path: '/bookkeeping', label: 'Bokföring', icon: 'menu_book', adminOnly: true, only: 'mobile' },
+      {
+        path: '/bookkeeping',
+        label: 'Bokföring',
+        icon: 'menu_book',
+        adminOnly: true,
+        only: 'mobile',
+      },
       { path: '/activity', label: 'Aktivitetslogg', icon: 'history', adminOnly: true },
     ],
   },
 ];
 
 const MECHANIC_NAV: NavSection[] = [
-  { title: '', items: [{ path: '/workorders/mine', label: 'Mina order', icon: 'assignment' }] },
+  { title: '', items: [{ path: '/workorders/mine', label: 'Mina order', icon: 'handyman' }] },
 ];
 
 const MOBILE: { path: string; label: string; icon: string; exact: boolean }[] = [
@@ -120,8 +126,18 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 @Component({
   selector: 'app-shell',
   standalone: false,
-  host: { class: 'flex h-dvh bg-gray-50' },
+  host: { class: 'flex h-dvh flex-col bg-gray-50' },
   styles: `
+    .hdr-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      color: #fff;
+      transition: background-color 0.15s;
+    }
+    .hdr-btn:hover {
+      background: rgb(255 255 255 / 0.18);
+    }
     .nav-link {
       position: relative;
       display: flex;
@@ -280,69 +296,6 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       }
     </ng-template>
 
-    <!-- Sidomenyn (dator) -->
-    <aside
-      class="hidden shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 md:flex"
-      [class]="collapsed() ? 'w-[72px]' : 'w-64'"
-    >
-      <div
-        class="flex h-14 shrink-0 items-center gap-2 border-b border-gray-100 px-3"
-        [class.justify-center]="collapsed()"
-      >
-        <a routerLink="/dashboard" class="shrink-0" aria-label="Hem">
-          <img src="catso-logo.png" alt="Catso" class="h-8 w-8 object-contain" />
-        </a>
-        @if (!collapsed()) {
-          @if (auth.isSuperAdmin()) {
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1 text-left hover:bg-gray-100"
-              [matMenuTriggerFor]="garageMenu"
-              aria-label="Byt garage"
-            >
-              <span class="truncate text-sm font-semibold text-gray-900">{{
-                auth.garage()?.name ?? 'Däcklager'
-              }}</span>
-              <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] text-gray-500">unfold_more</mat-icon>
-            </button>
-          } @else {
-            <a
-              routerLink="/dashboard"
-              class="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900"
-              >{{ auth.garage()?.name ?? 'Däcklager' }}</a
-            >
-          }
-        }
-      </div>
-
-      <nav class="flex-1 overflow-x-hidden overflow-y-auto p-3" aria-label="Huvudmeny">
-        <ng-container
-          *ngTemplateOutlet="items; context: { $implicit: sections(), collapsed: collapsed() }"
-        />
-      </nav>
-
-      <div class="border-t border-gray-100 p-3" [class.text-center]="collapsed()">
-        <button
-          type="button"
-          class="nav-link w-full"
-          [class.justify-center]="collapsed()"
-          [class.!px-0]="collapsed()"
-          (click)="toggle()"
-          [matTooltip]="collapsed() ? 'Visa menyn' : ''"
-          matTooltipPosition="right"
-          [attr.aria-label]="collapsed() ? 'Visa menyn' : 'Dölj menyn'"
-          [attr.aria-expanded]="!collapsed()"
-        >
-          <mat-icon>{{
-            collapsed() ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left'
-          }}</mat-icon>
-          @if (!collapsed()) {
-            <span>Dölj menyn</span>
-          }
-        </button>
-      </div>
-    </aside>
-
     <mat-menu #garageMenu="matMenu">
       <div class="px-4 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
         Alla garage ({{ auth.garages().length }})
@@ -360,7 +313,12 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 
     <!-- Mobilens meny -->
     @if (drawer()) {
-      <div class="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Meny">
+      <div
+        class="fixed inset-0 z-[1000] md:hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Meny"
+      >
         <button
           type="button"
           class="absolute inset-0 bg-black/40"
@@ -429,30 +387,57 @@ const today = () => new Date().toLocaleDateString('sv-SE');
       </div>
     }
 
-    <div class="flex min-w-0 flex-1 flex-col">
-      <header
-        class="flex h-14 shrink-0 items-center gap-2 border-b px-2 md:gap-3 md:px-6"
-        [class]="auth.viewingOther() ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'"
+    <header
+      class="flex h-14 shrink-0 items-center text-white shadow-sm"
+      [class]="auth.viewingOther() ? 'bg-amber-700' : 'bg-brand'"
+    >
+      <!-- Loggan och garaget, lika brett som sidomenyn under. -->
+      <div
+        class="hidden h-full shrink-0 items-center gap-2 px-3 transition-[width] duration-200 md:flex"
+        [class]="collapsed() ? 'w-[72px] justify-center' : 'w-64'"
       >
+        <a routerLink="/dashboard" class="shrink-0 rounded-lg bg-white p-1" aria-label="Hem">
+          <img src="catso-logo.png" alt="Catso" class="h-7 w-7 object-contain" />
+        </a>
+        @if (!collapsed()) {
+          @if (auth.isSuperAdmin()) {
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1 text-left hover:bg-white/15"
+              [matMenuTriggerFor]="garageMenu"
+              aria-label="Byt garage"
+            >
+              <span class="truncate text-sm font-semibold">{{
+                auth.garage()?.name ?? 'Däcklager'
+              }}</span>
+              <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] opacity-80">unfold_more</mat-icon>
+            </button>
+          } @else {
+            <a routerLink="/dashboard" class="min-w-0 flex-1 truncate text-sm font-semibold">{{
+              auth.garage()?.name ?? 'Däcklager'
+            }}</a>
+          }
+        }
+      </div>
+
+      <div class="flex min-w-0 flex-1 items-center gap-2 px-2 md:gap-3 md:px-6">
         <button
           type="button"
-          class="grid h-10 w-10 place-items-center rounded-lg text-gray-700 hover:bg-gray-100 md:hidden"
+          class="hdr-btn grid place-items-center md:hidden"
           (click)="drawer.set(true)"
           aria-label="Öppna menyn"
         >
           <mat-icon>menu</mat-icon>
         </button>
 
-        <h1 class="min-w-0 flex-1 truncate text-lg font-semibold text-gray-900">
-          {{ pageName() ?? '' }}
-        </h1>
+        <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">{{ pageName() ?? '' }}</h1>
 
         <app-billing-banner />
 
         @for (q of quick; track q.path) {
           <a
             [routerLink]="q.path"
-            class="grid h-10 w-10 place-items-center rounded-lg text-gray-600 hover:bg-gray-100 md:hidden"
+            class="hdr-btn grid place-items-center md:hidden"
             [attr.aria-label]="q.label"
           >
             <mat-icon>{{ q.icon }}</mat-icon>
@@ -460,7 +445,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
         }
 
         <span
-          class="grid h-10 w-10 place-items-center text-gray-500 max-md:hidden"
+          class="grid h-10 w-10 place-items-center text-white/80 max-md:hidden"
           [matTooltip]="
             who() +
             ' · ' +
@@ -471,7 +456,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
         </span>
         <button
           type="button"
-          class="grid h-10 w-10 place-items-center rounded-lg text-gray-600 hover:bg-gray-100"
+          class="hdr-btn grid place-items-center"
           matTooltip="Inställningar"
           aria-label="Inställningar"
           (click)="openSettings()"
@@ -480,37 +465,73 @@ const today = () => new Date().toLocaleDateString('sv-SE');
         </button>
         <button
           type="button"
-          class="grid h-10 w-10 place-items-center rounded-lg text-gray-600 hover:bg-gray-100 max-md:hidden"
+          class="hdr-btn grid place-items-center max-md:hidden"
           matTooltip="Logga ut"
           aria-label="Logga ut"
           (click)="auth.logout()"
         >
           <mat-icon>logout</mat-icon>
         </button>
-      </header>
+      </div>
+    </header>
 
-      <main class="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 md:p-5 xl:p-6">
-        <router-outlet />
-      </main>
-
-      <nav
-        class="flex shrink-0 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_4px_rgba(0,0,0,0.06)] md:hidden"
-        aria-label="Genvägar"
+    <div class="flex min-h-0 flex-1">
+      <!-- Sidomenyn (dator) -->
+      <aside
+        class="hidden shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 md:flex"
+        [class]="collapsed() ? 'w-[72px]' : 'w-64'"
       >
-        @for (l of mobileLinks(); track l.path) {
-          <a
-            [routerLink]="l.path"
-            routerLinkActive="is-active"
-            [routerLinkActiveOptions]="{ exact: l.exact }"
-            class="mtab flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] font-medium text-gray-600"
+        <nav class="flex-1 overflow-x-hidden overflow-y-auto p-3" aria-label="Huvudmeny">
+          <ng-container
+            *ngTemplateOutlet="items; context: { $implicit: sections(), collapsed: collapsed() }"
+          />
+        </nav>
+
+        <div class="border-t border-gray-100 p-3" [class.text-center]="collapsed()">
+          <button
+            type="button"
+            class="nav-link w-full"
+            [class.justify-center]="collapsed()"
+            [class.!px-0]="collapsed()"
+            (click)="toggle()"
+            [matTooltip]="collapsed() ? 'Visa menyn' : ''"
+            matTooltipPosition="right"
+            [attr.aria-label]="collapsed() ? 'Visa menyn' : 'Dölj menyn'"
+            [attr.aria-expanded]="!collapsed()"
           >
-            <span class="mpill grid h-8 w-16 place-items-center rounded-lg transition-colors">
-              <mat-icon>{{ l.icon }}</mat-icon>
-            </span>
-            {{ l.label }}
-          </a>
-        }
-      </nav>
+            <mat-icon>{{
+              collapsed() ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left'
+            }}</mat-icon>
+            @if (!collapsed()) {
+              <span>Dölj menyn</span>
+            }
+          </button>
+        </div>
+      </aside>
+      <div class="flex min-w-0 flex-1 flex-col">
+        <main class="relative z-0 min-h-0 min-w-0 flex-1 overflow-y-auto p-3 md:p-5 xl:p-6">
+          <router-outlet />
+        </main>
+
+        <nav
+          class="flex shrink-0 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_4px_rgba(0,0,0,0.06)] md:hidden"
+          aria-label="Genvägar"
+        >
+          @for (l of mobileLinks(); track l.path) {
+            <a
+              [routerLink]="l.path"
+              routerLinkActive="is-active"
+              [routerLinkActiveOptions]="{ exact: l.exact }"
+              class="mtab flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] font-medium text-gray-600"
+            >
+              <span class="mpill grid h-8 w-16 place-items-center rounded-lg transition-colors">
+                <mat-icon>{{ l.icon }}</mat-icon>
+              </span>
+              {{ l.label }}
+            </a>
+          }
+        </nav>
+      </div>
     </div>
   `,
 })
@@ -531,7 +552,6 @@ export class Shell {
     : [
         { path: '/customers', label: 'Kunder', icon: 'groups' },
         { path: '/vehicles', label: 'Bilar', icon: 'directions_car' },
-        { path: '/service-types', label: 'Åtgärder', icon: 'build' },
       ];
   /** Nuvarande adress (utan query), för att veta vilken grupp som ska vara öppen. */
   private readonly url = signal(this.router.url.split(/[?#]/)[0]);
@@ -594,7 +614,13 @@ export class Shell {
   }
 
   openSettings() {
-    this.dialog.open(SettingsPage, { width: '960px', maxWidth: '95vw', maxHeight: '90vh' });
+    this.dialog.open(SettingsPage, {
+      width: '1040px',
+      height: '720px',
+      maxWidth: '96vw',
+      maxHeight: '92vh',
+      panelClass: 'dialog-sheet',
+    });
   }
 
   private refresh() {
@@ -652,7 +678,7 @@ export class Shell {
         (i) =>
           !i.hidden &&
           (!i.adminOnly || admin) &&
-          (!i.only || i.only === (mobile ? 'mobile' : 'desktop')) &&
+          (!i.only || i.only === (mobile ? 'mobile' : 'desktop')),
       ),
     })).filter((s) => s.items.length);
   }
@@ -669,7 +695,7 @@ export class Shell {
   /** Mekanikern har bara sina arbetsorder i bottenmenyn. */
   readonly mobileLinks = computed(() =>
     this.auth.isMechanic()
-      ? [{ path: '/workorders/mine', label: 'Order', icon: 'assignment', exact: false }]
+      ? [{ path: '/workorders/mine', label: 'Order', icon: 'handyman', exact: false }]
       : MOBILE,
   );
 

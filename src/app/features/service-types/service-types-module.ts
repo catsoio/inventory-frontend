@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
 import { ServiceTypeCard } from './service-type-card/service-type-card';
 import { ServiceTypeList } from './service-type-list/service-type-list';
@@ -10,8 +11,13 @@ import { ServiceTypeList } from './service-type-list/service-type-list';
     SharedModule,
     RouterModule.forChild([
       { path: '', component: ServiceTypeList },
-      { path: 'new', title: 'Ny åtgärd', component: ServiceTypeCard },
-      { path: ':id', title: 'Åtgärd', component: ServiceTypeCard },
+      {
+        path: 'new',
+        title: 'Ny åtgärd',
+        component: ServiceTypeCard,
+        canDeactivate: [unsavedGuard],
+      },
+      { path: ':id', title: 'Åtgärd', component: ServiceTypeCard, canDeactivate: [unsavedGuard] },
     ]),
   ],
 })

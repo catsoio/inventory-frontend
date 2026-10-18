@@ -119,6 +119,11 @@ export class ResourceCard implements OnInit {
     });
   }
 
+  /** Sidoguarden (unsavedGuard): finns det osparade ändringar? */
+  hasUnsaved() {
+    return this.form.dirty;
+  }
+
   save() {
     if (!ensureValid(this.form, this.snack)) return;
 
@@ -129,6 +134,7 @@ export class ResourceCard implements OnInit {
       next: (r) => {
         this.busy.set(false);
         this.snack.open('Sparat', undefined, { duration: 2000 });
+        this.form.markAsPristine();
         if (this.id) this.load();
         else this.router.navigate(['/resources', r.id]);
       },
@@ -152,7 +158,10 @@ export class ResourceCard implements OnInit {
         (ok) =>
           ok &&
           this.api.removeResource(r.id).subscribe((a) => {
-            if (!a.archived) return void this.router.navigate(['/resources']);
+            if (!a.archived) {
+              this.form.markAsPristine();
+              return void this.router.navigate(['/resources']);
+            }
             this.snack.open('Används i bokningar och arkiverades', undefined, { duration: 3000 });
             this.load();
           }),

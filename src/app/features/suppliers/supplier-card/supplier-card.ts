@@ -125,6 +125,11 @@ export class SupplierCard implements OnInit {
     });
   }
 
+  /** Sidoguarden (unsavedGuard): finns det osparade ändringar? */
+  hasUnsaved() {
+    return this.form.dirty;
+  }
+
   save() {
     if (!ensureValid(this.form, this.snack)) return;
 
@@ -142,6 +147,7 @@ export class SupplierCard implements OnInit {
       next: (s) => {
         this.busy.set(false);
         this.snack.open('Sparat', undefined, { duration: 2000 });
+        this.form.markAsPristine();
         if (this.id) this.load();
         else this.router.navigate(['/suppliers', s.id]);
       },
@@ -165,7 +171,10 @@ export class SupplierCard implements OnInit {
         (ok) =>
           ok &&
           this.api.removeSupplier(s.id).subscribe((r) => {
-            if (!r.archived) return void this.router.navigate(['/suppliers']);
+            if (!r.archived) {
+              this.form.markAsPristine();
+              return void this.router.navigate(['/suppliers']);
+            }
             this.snack.open('Leverantören har historik och arkiverades', undefined, {
               duration: 3000,
             });

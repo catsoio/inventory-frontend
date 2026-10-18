@@ -22,6 +22,7 @@ import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-picker';
 import { LinkResolver, type ResolvedLink } from '../customer-vehicle-picker/link-resolver';
 import { Auth } from '../../core/auth/auth';
+import { Confirm } from '../confirm';
 
 export interface BookingDialogData {
   /** Befintlig bokning, eller null för en ny. */
@@ -203,12 +204,12 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             [disabled]="busy() || !orderLoaded()"
             (click)="openWorkOrder()"
           >
-            <mat-icon>assignment</mat-icon>
+            <mat-icon>handyman</mat-icon>
             {{ order() ? 'Öppna arbetsorder' : 'Skapa arbetsorder' }}
           </button>
         }
         <span class="flex-1"></span>
-        <button mat-button type="button" mat-dialog-close>Avbryt</button>
+        <button mat-button type="button" (click)="tryClose()">Avbryt</button>
         <button mat-flat-button color="primary" [disabled]="busy()">Spara</button>
       </mat-dialog-actions>
     </form>
@@ -225,10 +226,24 @@ export class BookingDialog {
   private readonly links = inject(LinkResolver);
   private readonly workOrders = inject(WorkOrderApi);
   private readonly router = inject(Router);
+  private readonly confirm = inject(Confirm);
   readonly workOrdersOn = environment.workOrders;
   private readonly ref = inject<MatDialogRef<BookingDialog, BookingDialogResult>>(MatDialogRef);
 
   readonly busy = signal(false);
+
+  /** Stänger direkt, eller frågar först om formuläret har ändrats. */
+  tryClose() {
+    if (!this.form.dirty) return this.ref.close();
+    this.confirm
+      .ask({
+        title: 'Släng ändringarna?',
+        message: 'Bokningen är inte sparad. Det du fyllt i försvinner.',
+        confirmText: 'Släng',
+        danger: true,
+      })
+      .subscribe((ok) => ok && this.ref.close());
+  }
   /** Bokningens arbetsorder, om den har en. */
   readonly order = signal<WorkOrder | null>(null);
   readonly orderLoaded = signal(false);
@@ -248,6 +263,10 @@ export class BookingDialog {
   readonly form;
 
   constructor(@Inject(MAT_DIALOG_DATA) public data: BookingDialogData) {
+    // Klick utanför eller Esc stänger inte tyst om man har skrivit något.
+    this.ref.disableClose = true;
+    this.ref.backdropClick().subscribe(() => this.tryClose());
+    this.ref.keydownEvents().subscribe((e) => e.key === 'Escape' && this.tryClose());
     const b = data.booking;
     const start = b ? new Date(b.start) : data.start;
     const end = b ? new Date(b.end) : data.end;

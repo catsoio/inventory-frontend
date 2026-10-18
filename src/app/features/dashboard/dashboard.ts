@@ -2,6 +2,10 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { ChartConfiguration } from 'chart.js';
+import { brandColor } from '../../shared/chart/chart';
+import { loadTrades } from '../finance/invoices';
+import { TradeRow } from '../../core/models';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
@@ -170,7 +174,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
       </section>
     </div>
 
-    <div class="grid items-start gap-4 lg:grid-cols-3">
+    <div class="grid gap-4 lg:min-h-[28rem] lg:flex-1 lg:grid-cols-3">
       <div class="flex min-w-0 flex-col gap-4 lg:col-span-2">
         @if (workOrdersOn) {
           <section
@@ -179,7 +183,7 @@ const BOOKING_COLS: DtCol<Booking>[] = [
             <div class="mb-3 flex flex-wrap items-center gap-2">
               <h2 class="text-sm font-semibold">
                 <a routerLink="/workorders" class="flex items-center gap-2 hover:underline">
-                  <mat-icon class="kpi-icon text-gray-400">assignment</mat-icon>
+                  <mat-icon class="kpi-icon text-gray-400">handyman</mat-icon>
                   Arbetsorder idag
                   <span class="font-normal text-gray-500">· {{ activeOrders() }} pågående</span>
                 </a>
@@ -230,9 +234,22 @@ const BOOKING_COLS: DtCol<Booking>[] = [
             </div>
           </section>
         }
+        @if (admin) {
+          <section
+            class="min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 max-md:hidden"
+          >
+            <div class="mb-3 flex items-baseline gap-2">
+              <h2 class="text-sm font-semibold">Försäljning och inköp per vecka</h2>
+              <span class="text-xs text-gray-500">exkl. moms, senaste 12 veckorna</span>
+            </div>
+            <div class="h-64">
+              <app-chart [config]="weeklyChart()" label="Försäljning och inköp per vecka" />
+            </div>
+          </section>
+        }
       </div>
 
-      <div class="flex min-w-0 flex-col gap-4">
+      <div class="flex min-w-0 flex-col gap-4 lg:min-h-0">
         <section class="min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
           <div class="mb-3 flex flex-wrap items-center gap-2">
             <h2 class="text-sm font-semibold">
@@ -343,14 +360,20 @@ const BOOKING_COLS: DtCol<Booking>[] = [
           </section>
         }
 
-        <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+        <section
+          class="flex flex-col rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 lg:min-h-40 lg:flex-1"
+        >
           <div class="mb-1 flex items-center justify-between">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
               <mat-icon class="kpi-icon text-gray-400">history</mat-icon> Senaste händelser
             </h2>
             <a routerLink="/reports" class="text-xs text-gray-500 hover:underline">Visa logg</a>
           </div>
-          <app-movement-list [compact]="true" [pageSize]="5" />
+          <app-movement-list
+            class="flex min-h-0 flex-col lg:flex-1"
+            [compact]="true"
+            [pageSize]="20"
+          />
         </section>
       </div>
     </div>
@@ -361,6 +384,74 @@ export class Dashboard {
   /** Försäljning och rapporter är bara för ägare. */
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(InventoryApi);
+  private readonly sales = signal<TradeRow[]>([]);
+  private readonly purchases = signal<TradeRow[]>([]);
+
+  /** Försäljning och inköp per vecka, tolv veckor bakåt. */
+  readonly weeklyChart = computed<ChartConfiguration>(() => {
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const weeks = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() - 7 * (11 - i));
+      return d;
+    });
+    const sum = (rows: TradeRow[], from: Date) => {
+      const to = new Date(from);
+      to.setDate(from.getDate() + 7);
+      return (
+        rows
+          .filter((r) => new Date(r.createdAt) >= from && new Date(r.createdAt) < to)
+          .reduce((t, r) => t + r.total, 0) / 100
+      );
+    };
+    const week = (d: Date) => {
+      const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+      return Math.ceil(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
+    };
+    return {
+      type: 'bar',
+      data: {
+        labels: weeks.map((d) => `v. ${week(d)}`),
+        datasets: [
+          {
+            label: 'Försäljning',
+            data: weeks.map((d) => sum(this.sales(), d)),
+            backgroundColor: brandColor(),
+            borderRadius: 4,
+            maxBarThickness: 18,
+          },
+          {
+            label: 'Inköp',
+            data: weeks.map((d) => sum(this.purchases(), d)),
+            backgroundColor: '#94a3b8',
+            borderRadius: 4,
+            maxBarThickness: 18,
+          },
+        ],
+      },
+      options: {
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (c) => `${c.dataset.label}: ${this.kr.transform((c.parsed.y ?? 0) * 100)}`,
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => `${Number(v).toLocaleString('sv-SE')} kr` },
+          },
+        },
+      },
+    };
+  });
   private readonly storage = inject(StorageApi);
   private readonly bookings = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
@@ -475,6 +566,14 @@ export class Dashboard {
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
     this.load();
     this.loadBookings();
+    if (this.admin) {
+      loadTrades(this.api, 'sales')
+        .pipe(catchError(() => of([] as TradeRow[])))
+        .subscribe((r) => this.sales.set(r));
+      loadTrades(this.api, 'purchases')
+        .pipe(catchError(() => of([] as TradeRow[])))
+        .subscribe((r) => this.purchases.set(r));
+    }
     if (this.workOrdersOn) {
       this.workOrderApi
         .list({ limit: 100 })

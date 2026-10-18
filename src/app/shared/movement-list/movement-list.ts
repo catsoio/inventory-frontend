@@ -31,9 +31,12 @@ const when = (m: Movement) =>
   `,
   template: `
     @if (compact) {
-      <div class="flex flex-col divide-y divide-gray-100">
-        @for (m of items(); track m.id; let i = $index) {
-          <div class="flex items-center gap-3 py-2.5 text-sm" [class.max-md:hidden]="i >= 4">
+      <div
+        class="flex max-h-80 flex-col divide-y divide-gray-100 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1"
+        (scroll)="onScroll($event)"
+      >
+        @for (m of items(); track m.id) {
+          <div class="flex items-center gap-3 py-2.5 text-sm">
             <span
               class="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
               [class]="typeCls[m.type]"
@@ -162,6 +165,18 @@ export class MovementList implements OnChanges {
       { key: 'note', label: 'Anteckning', value: (m) => m.note ?? '', fmt: (m) => m.note || '–' },
     );
     return cols;
+  }
+
+  /** Kompakt lista: hämta fler när man rullat nästan till botten. */
+  onScroll(e: Event) {
+    const el = e.target as HTMLElement;
+    if (
+      this.hasNext() &&
+      !this.loading() &&
+      el.scrollTop + el.clientHeight >= el.scrollHeight - 40
+    ) {
+      this.load(false);
+    }
   }
 
   ngOnChanges() {

@@ -126,44 +126,50 @@ export interface DtCol<T = any> {
           (click)="clickable && rowClick.emit(r)"
           (keydown.enter)="clickable && rowClick.emit(r)"
         >
-          @if (colsSig()[0]; as first) {
-            <div class="flex items-start justify-between gap-2 text-base font-semibold">
-              <span class="min-w-0">
-                @if (cell) {
-                  <ng-container
-                    [ngTemplateOutlet]="cell"
-                    [ngTemplateOutletContext]="{ row: r, col: first, text: text(r, first) }"
-                  />
-                } @else {
-                  {{ text(r, first) }}
+          @if (card) {
+            <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ row: r }" />
+          } @else {
+            @if (colsSig()[0]; as first) {
+              <div class="flex items-start justify-between gap-2 text-base font-semibold">
+                <span class="min-w-0">
+                  @if (cell) {
+                    <ng-container
+                      [ngTemplateOutlet]="cell"
+                      [ngTemplateOutletContext]="{ row: r, col: first, text: text(r, first) }"
+                    />
+                  } @else {
+                    {{ text(r, first) }}
+                  }
+                </span>
+                @if (clickable) {
+                  <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-300"
+                    >chevron_right</mat-icon
+                  >
                 }
-              </span>
-              @if (clickable) {
-                <mat-icon class="!h-5 !w-5 shrink-0 !text-xl text-gray-300">chevron_right</mat-icon>
+              </div>
+            }
+            <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+              @for (c of colsSig().slice(1); track c.key) {
+                @if (filled(r, c)) {
+                  <div class="min-w-0">
+                    <div class="text-[11px] font-medium tracking-wide text-gray-500 uppercase">
+                      {{ c.label }}
+                    </div>
+                    <div class="truncate">
+                      @if (cell) {
+                        <ng-container
+                          [ngTemplateOutlet]="cell"
+                          [ngTemplateOutletContext]="{ row: r, col: c, text: text(r, c) }"
+                        />
+                      } @else {
+                        {{ text(r, c) }}
+                      }
+                    </div>
+                  </div>
+                }
               }
             </div>
           }
-          <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-            @for (c of colsSig().slice(1); track c.key) {
-              @if (filled(r, c)) {
-                <div class="min-w-0">
-                  <div class="text-[11px] font-medium tracking-wide text-gray-500 uppercase">
-                    {{ c.label }}
-                  </div>
-                  <div class="truncate">
-                    @if (cell) {
-                      <ng-container
-                        [ngTemplateOutlet]="cell"
-                        [ngTemplateOutletContext]="{ row: r, col: c, text: text(r, c) }"
-                      />
-                    } @else {
-                      {{ text(r, c) }}
-                    }
-                  </div>
-                </div>
-              }
-            }
-          </div>
         </div>
       } @empty {
         <p class="rounded-xl bg-white px-3 py-8 text-center text-gray-500 shadow-sm">
@@ -193,6 +199,8 @@ export class DataTable {
   @Input() scrollClass = 'flex-1';
   @Output() rowClick = new EventEmitter<any>();
   @ContentChild('cell') cell?: TemplateRef<unknown>;
+  /** Valfritt eget kort för mobilen: `row` i mallens kontext. Annars byggs ett av kolumnerna. */
+  @Input() card?: TemplateRef<unknown>;
 
   readonly showFilters = signal(false);
   readonly filters = signal<Record<string, string>>({});

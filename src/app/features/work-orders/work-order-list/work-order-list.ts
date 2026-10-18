@@ -90,7 +90,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
           <div
             class="flex flex-col items-center gap-2 rounded-xl bg-white p-10 text-center text-sm text-gray-500 shadow-sm ring-1 ring-black/5"
           >
-            <mat-icon class="!h-10 !w-10 !text-4xl text-gray-300">assignment</mat-icon>
+            <mat-icon class="!h-10 !w-10 !text-4xl text-gray-300">handyman</mat-icon>
             Välj en arbetsorder i listan för att byta status och mekaniker, bocka av rader och lägga
             till rader här.
           </div>

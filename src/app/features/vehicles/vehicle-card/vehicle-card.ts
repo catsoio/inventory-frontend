@@ -260,6 +260,11 @@ export class VehicleCard implements OnInit {
     this.note.set(null);
   }
 
+  /** Sidoguarden (unsavedGuard): finns det osparade ändringar? */
+  hasUnsaved() {
+    return this.form.dirty;
+  }
+
   save() {
     if (this.taken()) {
       this.snack.open('Regnumret finns redan på en annan bil', undefined, { duration: 4000 });
@@ -299,6 +304,7 @@ export class VehicleCard implements OnInit {
         next: (c) => {
           this.busy.set(false);
           this.snack.open('Sparat', undefined, { duration: 2000 });
+          this.form.markAsPristine();
           if (this.id) this.load();
           else this.router.navigate(['/vehicles', c.id]);
         },
@@ -322,7 +328,10 @@ export class VehicleCard implements OnInit {
         (ok) =>
           ok &&
           this.api.removeVehicle(c.id).subscribe((r) => {
-            if (!r.archived) return void this.router.navigate(['/vehicles']);
+            if (!r.archived) {
+              this.form.markAsPristine();
+              return void this.router.navigate(['/vehicles']);
+            }
             this.snack.open('Bilen har historik och arkiverades', undefined, { duration: 3000 });
             this.load();
           }),

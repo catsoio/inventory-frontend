@@ -68,6 +68,7 @@ import type { DtCol } from '../data-table/data-table';
         [clickable]="true"
         [accent]="accent"
         [highlight]="highlight"
+        [card]="cardTpl"
         [emptyText]="loading ? 'Laddar…' : emptyText"
         (rowClick)="rowClick.emit($event)"
       >
@@ -108,6 +109,8 @@ export class ListPage implements OnInit {
   @Output() rowClick = new EventEmitter<any>();
   /** Valfri mall för egna celler: `<ng-template #cell let-row="row" let-col="col" let-text="text">`. */
   @ContentChild('cell') cellTpl?: TemplateRef<unknown>;
+  /** Valfritt eget kort för mobilen: `<ng-template #card let-row="row">`. */
+  @ContentChild('card') cardTpl?: TemplateRef<unknown>;
 
   readonly query = new FormControl('', { nonNullable: true });
   archived = false;

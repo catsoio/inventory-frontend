@@ -32,7 +32,35 @@ const time = (iso: string) =>
       "
       (search)="query.set($event)"
       (rowClick)="open($event)"
-    />
+    >
+      <!-- Mobilens kort: det viktigaste först, resten som en rad. -->
+      <ng-template #card let-r="row">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            @if (sell && r.vehicle) {
+              <app-reg-plate [value]="r.vehicle.regNo" size="sm" />
+            }
+            <div class="truncate text-base font-semibold" [class.mt-1]="sell && r.vehicle">
+              {{ party(r) }}
+            </div>
+          </div>
+          <div class="shrink-0 text-right">
+            <div class="text-base font-semibold tabular-nums">{{ shownTotal(r) }}</div>
+            <div class="text-[11px] text-gray-500">{{ sell ? 'inkl. moms' : 'exkl. moms' }}</div>
+          </div>
+        </div>
+        <div class="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
+          <span class="font-medium text-gray-700">{{ r.code }}</span>
+          <span>·</span>
+          <span>{{ when(r.createdAt) }}</span>
+          <span>·</span>
+          <span>{{ r.lines }} rader, {{ r.units }} st</span>
+        </div>
+        @if (r.reference || r.note) {
+          <div class="mt-1 truncate text-xs text-gray-500">{{ r.reference || r.note }}</div>
+        }
+      </ng-template>
+    </app-list-page>
   `,
 })
 export class TradeLedger {
@@ -111,6 +139,20 @@ export class TradeLedger {
       : []),
     { key: 'note', label: 'Anteckning', value: (r) => r.note ?? '', fmt: (r) => r.note || '–' },
   ]);
+
+  /** Kortets rubrik: kunden (eller Kontant) på försäljning, leverantören på inköp. */
+  party(r: TradeRow) {
+    return this.sell
+      ? r.customer?.name || 'Kontant'
+      : r.supplier?.name || r.supplierName || 'Okänd leverantör';
+  }
+  /** Försäljning visas inkl. moms (det kunden betalar), inköp exkl. moms. */
+  shownTotal(r: TradeRow) {
+    return kr.transform(this.sell ? withVat(r.total) : r.total);
+  }
+  when(iso: string) {
+    return `${day(iso)} ${time(iso)}`;
+  }
 
   readonly rows = signal<TradeRow[]>([]);
   readonly loading = signal(true);

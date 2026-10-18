@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
 import { CustomerCard } from './customer-card/customer-card';
 import { CustomerList } from './customer-list/customer-list';
@@ -10,8 +11,8 @@ import { CustomerList } from './customer-list/customer-list';
     SharedModule,
     RouterModule.forChild([
       { path: '', component: CustomerList },
-      { path: 'new', title: 'Ny kund', component: CustomerCard },
-      { path: ':id', title: 'Kund', component: CustomerCard },
+      { path: 'new', title: 'Ny kund', component: CustomerCard, canDeactivate: [unsavedGuard] },
+      { path: ':id', title: 'Kund', component: CustomerCard, canDeactivate: [unsavedGuard] },
     ]),
   ],
 })

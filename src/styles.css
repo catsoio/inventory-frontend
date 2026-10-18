@@ -247,24 +247,68 @@ full-calendar {
   --mat-snack-bar-container-shape: var(--radius-ui);
 }
 
-/* Kalendern (Schedule-X): garagets färg, våra fältgrå kanter och full höjd. */
+/* Kalendern (Schedule-X): samma lugna uttryck som resten av appen. Mjuka linjer, ingen ram,
+   garagets färg och rundade händelser. Färgerna styrs av variablerna nedan. */
 .sx__calendar-wrapper {
   --sx-color-primary: var(--mat-sys-primary);
   --sx-color-primary-container: color-mix(in srgb, var(--mat-sys-primary) 12%, white);
   --sx-color-on-primary-container: var(--mat-sys-primary);
   --sx-color-outline: #d1d5db;
-  --sx-color-outline-variant: #e5e7eb;
+  /* Rutnätets linjer (timmar, dagar, veckor). */
+  --sx-color-outline-variant: #eef0f3;
+  --sx-border: 1px solid #eef0f3;
+  --sx-color-neutral: #9ca3af;
   --sx-color-surface: #fff;
   --sx-color-background: #fff;
-  --sx-rounding-extra-small: 6px;
+  --sx-rounding-extra-small: 8px;
   --sx-font-small: 0.8125rem;
   width: 100%;
   height: 100%;
   max-height: none;
+  font-family: inherit;
+}
+.sx__week-grid__hour,
+.sx__time-grid-day,
+.sx__month-grid-week,
+.sx__month-grid-day,
+.sx__month-agenda-week {
+  border-color: #eef0f3 !important;
+}
+.sx__calendar {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  font-family: inherit;
+}
+/* Dagrubriken: tätare, så att mer av dagen syns. */
+.sx__week-grid__date {
+  padding: 6px 0 8px;
+}
+.sx__week-grid__date-number {
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+.sx__week-header-border {
+  border-bottom-color: var(--sx-color-outline);
+}
+/* Timlinjerna lite tydligare än halvtimmarna; ingen hård ram runt rutorna. */
+.sx__week-grid__hour {
+  border-top-style: solid;
+}
+.sx__week-grid__hour-text {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+/* Händelser: ljus fyllning, smal färgkant, ingen skugga. */
+.sx__event {
+  font-weight: 500;
+  box-shadow: none;
+}
+.sx__time-grid-event {
+  border-left-width: 3px;
+  padding: 4px 6px;
+}
+.sx__month-grid-day__header-date {
+  color: #6b7280;
 }
 sx-calendar {
   display: block;
@@ -273,12 +317,4 @@ sx-calendar {
 sx-calendar .sx-angular-calendar-wrapper,
 sx-calendar > div {
   height: 100%;
-}
-/* Händelser: tät text, avrundade, utan tung kant. */
-.sx__event {
-  font-weight: 500;
-  border-radius: 6px;
-}
-.sx__time-grid-event {
-  border-left-width: 4px;
 }

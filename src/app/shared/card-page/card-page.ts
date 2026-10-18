@@ -11,7 +11,7 @@ import { Component, Input } from '@angular/core';
   template: `
     <!-- Headern följer med vid scroll, så att Spara alltid är nåbar. -->
     <header
-      class="sticky top-0 z-10 -mx-3 -mt-3 mb-4 border-b border-gray-200 bg-gray-50/95 px-3 py-2 backdrop-blur md:-mx-5 md:-mt-5 md:px-5 xl:-mx-6 xl:-mt-6 xl:px-6"
+      class="sticky top-0 z-10 before:pointer-events-none before:absolute before:inset-x-0 before:-top-6 before:h-6 before:bg-gray-50 before:content-[''] -mx-3 -mt-3 mb-4 border-b border-gray-200 bg-gray-50 px-3 py-2 md:-mx-5 md:-mt-5 md:px-5 xl:-mx-6 xl:-mt-6 xl:px-6"
     >
       <div class="mx-auto flex max-w-4xl items-center gap-2">
         <a
