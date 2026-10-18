@@ -6,7 +6,10 @@ import { createViewDay, createViewMonthGrid, createViewWeek } from '@schedule-x/
 import { createCurrentTimePlugin } from '@schedule-x/current-time';
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop';
 import { createResizePlugin } from '@schedule-x/resize';
-import { Temporal } from 'temporal-polyfill';
+// Schedule-X letar efter ett globalt `Temporal`. Webbläsare som har det på riktigt använder det,
+// övriga får polyfillen. Importera aldrig Temporal från paketet: då blir det en annan klass och
+// kalenderns `instanceof`-kontroller misslyckas.
+import 'temporal-polyfill/global';
 import { catchError, firstValueFrom, forkJoin, of } from 'rxjs';
 import { Auth } from '../../../core/auth/auth';
 import type { BoardColumn } from '../booking-board/booking-board';
@@ -23,8 +26,8 @@ import {
 
 /** Kalendervyerna (Schedule-X) och resursvyn (egen komponent). */
 type CalView = 'day' | 'week' | 'month-grid';
-type Mode = CalView | 'board';
-const VIEWS: Mode[] = ['board', 'day', 'week', 'month-grid'];
+type Mode = CalView | 'board' | 'list';
+const VIEWS: Mode[] = ['board', 'day', 'week', 'month-grid', 'list'];
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -60,30 +63,34 @@ const dayKey = (d: Date) =>
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <div class="flex items-center gap-1">
-        <button mat-icon-button (click)="step(-1)" aria-label="Föregående">
-          <mat-icon>chevron_left</mat-icon>
-        </button>
-        <button mat-stroked-button (click)="today()">Idag</button>
-        <button mat-icon-button (click)="step(1)" aria-label="Nästa">
-          <mat-icon>chevron_right</mat-icon>
-        </button>
-        <span class="ml-2 text-lg font-semibold first-letter:uppercase">{{ title() }}</span>
-      </div>
+      <app-booking-views [value]="mode()" (pick)="setMode($event)" />
+
+      @if (mode() !== 'list') {
+        <div class="flex items-center gap-1">
+          <button mat-icon-button (click)="step(-1)" aria-label="Föregående">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <button mat-stroked-button (click)="today()">Idag</button>
+          <button mat-icon-button (click)="step(1)" aria-label="Nästa">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+          <span class="ml-2 text-lg font-semibold first-letter:uppercase">{{ title() }}</span>
+        </div>
+      }
 
       <span class="flex-1"></span>
 
-      <app-booking-views [value]="mode()" (pick)="setMode($event)" />
-
-      <mat-form-field class="w-44 max-md:min-w-0 max-md:flex-1" subscriptSizing="dynamic">
-        <mat-label>Visa</mat-label>
-        <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
-          <mat-option value="">Alla</mat-option>
-          @for (r of resources(); track r.id) {
-            <mat-option [value]="r.id">{{ r.name }}{{ mine(r) ? ' (jag)' : '' }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
+      @if (mode() !== 'list') {
+        <mat-form-field class="w-44 max-md:min-w-0 max-md:flex-1" subscriptSizing="dynamic">
+          <mat-label>Visa</mat-label>
+          <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
+            <mat-option value="">Alla</mat-option>
+            @for (r of resources(); track r.id) {
+              <mat-option [value]="r.id">{{ r.name }}{{ mine(r) ? ' (jag)' : '' }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
 
       <button
         mat-flat-button
@@ -96,7 +103,9 @@ const dayKey = (d: Date) =>
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col rounded-xl bg-white p-3 shadow-sm">
-      @if (mode() === 'board') {
+      @if (mode() === 'list') {
+        <app-booking-list class="min-h-0 flex-1" [embedded]="true" />
+      } @else if (mode() === 'board') {
         <app-booking-board
           [day]="date()"
           [filter]="filter()"
@@ -163,10 +172,6 @@ export class BookingCalendar implements OnInit {
 
   /** Byt vy utan att tappa dag eller filter. */
   setMode(pick: string) {
-    if (pick === 'list') {
-      this.router.navigate(['/bookings/list']);
-      return;
-    }
     const m = pick as Mode;
     if (!VIEWS.includes(m) || m === this.mode()) return;
     try {
@@ -174,10 +179,10 @@ export class BookingCalendar implements OnInit {
     } catch {
       /* sparas bara som bekvämlighet */
     }
-    const wasBoard = this.mode() === 'board';
+    const wasBoard = this.mode() === 'board' || this.mode() === 'list';
     this.mode.set(m);
     this.router.navigate([], { queryParams: { view: m }, replaceUrl: true });
-    if (m === 'board') {
+    if (m === 'board' || m === 'list') {
       this.title.set(this.titleFor());
     } else if (wasBoard || !this.$app) {
       // Kalendern byggs om och startar på dagen som visades.

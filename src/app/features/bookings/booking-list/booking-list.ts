@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, Input, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { BookingApi } from '../../../core/api/booking-api';
@@ -51,7 +51,7 @@ const DAY = 86_400_000;
   host: { class: 'block h-full' },
   template: `
     <app-list-page
-      title="Bokningar"
+      [title]="embedded ? '' : 'Bokningar'"
       [columns]="cols"
       [rows]="shown()"
       [loading]="loading()"
@@ -62,7 +62,9 @@ const DAY = 86_400_000;
       (rowClick)="open($event)"
     >
       <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-        <app-booking-views value="list" (pick)="goView($event)" />
+        @if (!embedded) {
+          <app-booking-views value="list" (pick)="goView($event)" />
+        }
         <mat-button-toggle-group
           hideSingleSelectionIndicator
           [value]="range()"
@@ -72,9 +74,11 @@ const DAY = 86_400_000;
           <mat-button-toggle value="upcoming">Kommande 30 dagar</mat-button-toggle>
           <mat-button-toggle value="past">Senaste 30 dagarna</mat-button-toggle>
         </mat-button-toggle-group>
-        <button mat-flat-button color="primary" (click)="create()">
-          <mat-icon>add</mat-icon> Ny bokning
-        </button>
+        @if (!embedded) {
+          <button mat-flat-button color="primary" (click)="create()">
+            <mat-icon>add</mat-icon> Ny bokning
+          </button>
+        }
       </div>
       <ng-template #cell let-b="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
@@ -100,6 +104,8 @@ const DAY = 86_400_000;
   `,
 })
 export class BookingList {
+  /** Visas inuti kalendersidan: då äger kalenderns verktygsrad vyväljare och Ny bokning. */
+  @Input() embedded = false;
   private readonly api = inject(BookingApi);
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);

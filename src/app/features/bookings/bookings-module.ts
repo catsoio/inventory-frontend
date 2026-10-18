@@ -15,7 +15,8 @@ import { BookingViews } from './booking-views/booking-views';
     RouterModule.forChild([
       // Vyn (Resurser/Dag/Vecka/Månad) väljs i kalenderns verktygsfält via ?view=.
       { path: '', title: 'Tidsbokning', component: BookingCalendar },
-      { path: 'list', title: 'Bokningar', component: BookingList },
+      // Gamla adressen: listan är nu en vy i kalendern (?view=list).
+      { path: 'list', redirectTo: '', pathMatch: 'full' },
     ]),
   ],
 })
