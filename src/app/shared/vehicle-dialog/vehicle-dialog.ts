@@ -74,9 +74,7 @@ export interface VehicleDialogData {
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
-        <button mat-flat-button color="primary" [disabled]="busy()">
-          Spara
-        </button>
+        <button mat-flat-button color="primary" [disabled]="busy()">Spara</button>
       </mat-dialog-actions>
     </form>
   `,
@@ -107,7 +105,8 @@ export class VehicleDialog {
       notes: [v?.notes ?? ''],
     });
     // Ny bil med regnr, eller en sparad bil som bara har regnr: hämta bilinfon.
-    if (this.form.controls.regNo.value && (!v || this.autofill.missingInfo(this.form))) this.lookup();
+    if (this.form.controls.regNo.value && (!v || this.autofill.missingInfo(this.form)))
+      this.lookup();
   }
 
   /** När man lämnat regnr-fältet: finns bilen redan, annars hämtas bilinfo och fälten låses. */

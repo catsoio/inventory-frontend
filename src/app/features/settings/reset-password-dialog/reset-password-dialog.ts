@@ -46,9 +46,7 @@ function generate(length = 12): string {
       </mat-dialog-content>
       <mat-dialog-actions align="end">
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
-        <button mat-flat-button color="primary" [disabled]="busy()">
-          Byt lösenord
-        </button>
+        <button mat-flat-button color="primary" [disabled]="busy()">Byt lösenord</button>
       </mat-dialog-actions>
     </form>
   `,

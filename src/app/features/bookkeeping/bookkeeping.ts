@@ -20,6 +20,7 @@ const statusText = (c: Closing) =>
   selector: 'app-bookkeeping',
   standalone: false,
   template: `
+    <app-finance-tabs />
     <div class="mx-auto max-w-[1400px]">
       <h1 class="mb-1 text-2xl font-semibold">Bokföring</h1>
       <p class="mb-4 max-w-3xl text-sm text-gray-600">

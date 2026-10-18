@@ -104,9 +104,7 @@ const ACTION_LABELS: Record<string, string> = {
 })
 export class Activity implements OnInit {
   private readonly api = inject(ActivityApi);
-  readonly entities = Object.entries(ENTITY_LABELS).filter(
-    ([k]) => k !== 'preferences',
-  );
+  readonly entities = Object.entries(ENTITY_LABELS).filter(([k]) => k !== 'preferences');
   readonly rows = signal<ActivityEntry[]>([]);
   readonly more = signal(false);
   readonly loading = signal(false);

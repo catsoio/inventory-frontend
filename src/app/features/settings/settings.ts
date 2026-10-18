@@ -216,7 +216,11 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
               <input matInput formControlName="footer" />
             </mat-form-field>
             <div class="sm:col-span-6">
-              <button mat-flat-button color="primary" [disabled]="sellerForm.invalid || sellerBusy()">
+              <button
+                mat-flat-button
+                color="primary"
+                [disabled]="sellerForm.invalid || sellerBusy()"
+              >
                 Spara fakturauppgifter
               </button>
             </div>

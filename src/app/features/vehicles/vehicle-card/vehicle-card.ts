@@ -34,27 +34,25 @@ import { PENDING_CUSTOMER } from '../../../shared/customer-select/customer-selec
         @if (card(); as c) {
           @if (c.active) {
             @if (admin) {
-<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
-}
+              <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            }
           } @else {
             <button mat-stroked-button (click)="restore()">Återställ</button>
           }
         }
-        <button
-          mat-flat-button
-          color="primary"
-          (click)="save()"
-          [disabled]="busy()"
-        >
-          Spara
-        </button>
+        <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">Spara</button>
       </div>
 
       <form
         [formGroup]="form"
         class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6"
       >
-        <app-customer-select class="sm:col-span-4" [allowNew]="true" label="Ägare" formControlName="customerId" />
+        <app-customer-select
+          class="sm:col-span-4"
+          [allowNew]="true"
+          label="Ägare"
+          formControlName="customerId"
+        />
         <mat-form-field class="sm:col-span-2">
           <mat-label>Registreringsnummer</mat-label>
           <app-sv-flag matPrefix class="mr-2" />
@@ -298,14 +296,14 @@ export class VehicleCard implements OnInit {
         }),
       )
       .subscribe({
-      next: (c) => {
-        this.busy.set(false);
-        this.snack.open('Sparat', undefined, { duration: 2000 });
-        if (this.id) this.load();
-        else this.router.navigate(['/vehicles', c.id]);
-      },
-      error: () => this.busy.set(false),
-    });
+        next: (c) => {
+          this.busy.set(false);
+          this.snack.open('Sparat', undefined, { duration: 2000 });
+          if (this.id) this.load();
+          else this.router.navigate(['/vehicles', c.id]);
+        },
+        error: () => this.busy.set(false),
+      });
   }
 
   remove() {

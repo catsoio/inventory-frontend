@@ -54,7 +54,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
             [disabled]="form.dirty"
             [matTooltip]="form.dirty ? 'Spara först' : ''"
           >
-            <mat-icon>print</mat-icon> Skriv ut arbetsblad
+            <mat-icon>print</mat-icon> Skriv ut<span class="max-md:hidden">&nbsp;arbetsblad</span>
           </a>
         }
         @if (!card()?.invoice) {

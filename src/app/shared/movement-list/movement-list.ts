@@ -41,9 +41,7 @@ const when = (m: Movement) =>
             >
             <div class="min-w-0 flex-1">
               <div class="truncate font-medium">{{ m.articleLabel ?? m.label ?? '–' }}</div>
-              <div class="text-xs text-gray-500">
-                {{ labels[m.type] }} · {{ m.quantity }} st
-              </div>
+              <div class="text-xs text-gray-500">{{ labels[m.type] }} · {{ m.quantity }} st</div>
             </div>
             <span class="shrink-0 text-xs text-gray-400">{{
               m.createdAt | date: 'd MMM HH:mm'

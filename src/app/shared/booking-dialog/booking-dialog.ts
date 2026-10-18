@@ -53,130 +53,126 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
       }
     </h2>
     <form [formGroup]="form" (ngSubmit)="save()">
-      <mat-dialog-content class="!flex flex-col gap-5 !pt-2">
-        <section>
-          <h3 class="sec">Kund och bil</h3>
-          <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" />
-        </section>
+      <mat-dialog-content class="!grid gap-x-10 gap-y-5 !pt-2 md:grid-cols-2 md:items-start">
+        <div class="flex flex-col gap-5">
+          <section class="flex flex-col gap-3">
+            <h3 class="sec">Kund och bil</h3>
+            <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" />
+          </section>
 
-        <section>
-          <h3 class="sec">Vad ska göras</h3>
-          <mat-form-field class="w-full">
-            <mat-label>Åtgärd</mat-label>
-            <mat-select
-              formControlName="serviceTypeId"
-              (selectionChange)="pickService($event.value)"
-            >
-              <mat-option value="">Annat</mat-option>
-              @for (t of serviceOptions(); track t.id) {
-                <mat-option [value]="t.id">{{ t.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field class="w-full">
-            <mat-label>Vad ska göras</mat-label>
-            <textarea
-              matInput
-              rows="3"
-              maxlength="2000"
-              formControlName="title"
-              placeholder="En rad per åtgärd, t.ex. byt däck"
-            ></textarea>
-            <mat-error>Ange vad som ska göras</mat-error>
-          </mat-form-field>
-          <p class="-mt-2 text-xs text-gray-500 max-md:hidden">
-            Varje rad blir en kryssruta på arbetsordern.
-          </p>
-        </section>
-
-        <section>
-          <h3 class="sec">När</h3>
-          <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-6">
-            <app-date-field
-              class="col-span-2 sm:col-span-2"
-              label="Datum"
-              icon="event"
-              error="Ange datum"
-              formControlName="day"
-            />
-            <app-time-field
-              class="col-span-1 sm:col-span-2"
-              label="Från"
-              formControlName="startTime"
-            />
-            <app-time-field
-              class="col-span-1 sm:col-span-2"
-              label="Till"
-              formControlName="endTime"
-              [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
-            />
-            <app-date-field
-              class="col-span-2 sm:col-span-3"
-              label="Klar senast (om det dröjer)"
-              icon="event_available"
-              [error]="form.errors?.['due'] ? 'Före datumet' : ''"
-              formControlName="dueDay"
-            />
-            <p
-              class="col-span-2 self-center pb-4 text-xs text-gray-500 max-md:hidden sm:col-span-3"
-            >
-              Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar senast".
+          <section class="flex flex-col gap-3">
+            <h3 class="sec">Vad ska göras</h3>
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+              <mat-label>Åtgärd</mat-label>
+              <mat-select
+                formControlName="serviceTypeId"
+                (selectionChange)="pickService($event.value)"
+              >
+                <mat-option value="">Annat</mat-option>
+                @for (t of serviceOptions(); track t.id) {
+                  <mat-option [value]="t.id">{{ t.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+              <mat-label>Vad ska göras</mat-label>
+              <textarea
+                matInput
+                rows="4"
+                maxlength="2000"
+                formControlName="title"
+                placeholder="En rad per åtgärd, t.ex. byt däck"
+              ></textarea>
+              <mat-error>Ange vad som ska göras</mat-error>
+            </mat-form-field>
+            <p class="-mt-2 text-xs text-gray-500 max-md:hidden">
+              Varje rad blir en kryssruta på arbetsordern.
             </p>
-          </div>
-        </section>
+          </section>
+          <section class="flex flex-col gap-3">
+            <h3 class="sec">Pris och anteckning</h3>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
+              <mat-form-field class="col-span-2" subscriptSizing="dynamic">
+                <mat-label>Pris (kr, exkl. moms)</mat-label>
+                <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
+                <mat-hint>{{ form.controls.price.value | inclVat }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field class="col-span-2" subscriptSizing="dynamic">
+                <mat-label>Anmärkning (syns på arbetsbladet)</mat-label>
+                <textarea matInput rows="2" formControlName="notes"></textarea>
+              </mat-form-field>
+            </div>
+          </section>
+        </div>
+        <div class="flex flex-col gap-5">
+          <section class="flex flex-col gap-3">
+            <h3 class="sec">När</h3>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
+              <app-date-field
+                class="col-span-2"
+                label="Datum"
+                icon="event"
+                error="Ange datum"
+                formControlName="day"
+              />
+              <app-time-field class="col-span-1" label="Från" formControlName="startTime" />
+              <app-time-field
+                class="col-span-1"
+                label="Till"
+                formControlName="endTime"
+                [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
+              />
+              <app-date-field
+                class="col-span-2"
+                label="Klar senast (om det dröjer)"
+                icon="event_available"
+                [error]="form.errors?.['due'] ? 'Före datumet' : ''"
+                formControlName="dueDay"
+              />
+              <p class="col-span-2 -mt-3 pb-3 text-xs text-gray-500">
+                Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar
+                senast".
+              </p>
+            </div>
+          </section>
 
-        <section>
-          <h3 class="sec">Vem och var</h3>
-          <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-6">
-            <mat-form-field class="col-span-1 sm:col-span-2">
-              <mat-label>Mekaniker</mat-label>
-              <mat-select formControlName="resourceId">
-                <mat-option value="">Ingen vald</mat-option>
-                @for (r of mechanicOptions(); track r.id) {
-                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
+          <section class="flex flex-col gap-3">
+            <h3 class="sec">Vem och var</h3>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
+              <mat-form-field class="col-span-1" subscriptSizing="dynamic">
+                <mat-label>Mekaniker</mat-label>
+                <mat-select formControlName="resourceId">
+                  <mat-option value="">Ingen vald</mat-option>
+                  @for (r of mechanicOptions(); track r.id) {
+                    <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                  }
+                </mat-select>
+                @if (!resourcesLoaded() || mechanicOptions().length === 0) {
+                  <mat-hint>Lägg till mekaniker under Register › Mekaniker och platser</mat-hint>
                 }
-              </mat-select>
-              @if (!resourcesLoaded() || mechanicOptions().length === 0) {
-                <mat-hint>Lägg till mekaniker under Register › Mekaniker och platser</mat-hint>
-              }
-            </mat-form-field>
-            <mat-form-field class="col-span-1 sm:col-span-2">
-              <mat-label>Lyft / plats</mat-label>
-              <mat-select formControlName="placeId">
-                <mat-option value="">Ingen vald</mat-option>
-                @for (r of placeOptions(); track r.id) {
-                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field class="col-span-2 sm:col-span-2">
-              <mat-label>Status</mat-label>
-              <mat-select formControlName="status">
-                @for (s of statuses; track s[0]) {
-                  <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          </div>
-        </section>
-
-        <section>
-          <h3 class="sec">Pris och anteckning</h3>
-          <div class="grid grid-cols-2 gap-x-3 sm:grid-cols-6">
-            <mat-form-field class="col-span-2 sm:col-span-2">
-              <mat-label>Pris (kr, exkl. moms)</mat-label>
-              <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
-              <mat-hint>{{ form.controls.price.value | inclVat }}</mat-hint>
-            </mat-form-field>
-            <mat-form-field class="col-span-2 sm:col-span-4">
-              <mat-label>Anmärkning (syns på arbetsbladet)</mat-label>
-              <textarea matInput rows="2" formControlName="notes"></textarea>
-            </mat-form-field>
-          </div>
-        </section>
-
+              </mat-form-field>
+              <mat-form-field class="col-span-1" subscriptSizing="dynamic">
+                <mat-label>Lyft / plats</mat-label>
+                <mat-select formControlName="placeId">
+                  <mat-option value="">Ingen vald</mat-option>
+                  @for (r of placeOptions(); track r.id) {
+                    <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field class="col-span-2" subscriptSizing="dynamic">
+                <mat-label>Status</mat-label>
+                <mat-select formControlName="status">
+                  @for (s of statuses; track s[0]) {
+                    <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </section>
+        </div>
         @if (workOrdersOn && !legacy) {
-          <section class="rounded-xl bg-gray-50 p-3">
+          <section class="rounded-xl md:col-span-2 bg-gray-50 p-3">
             @if (data.booking) {
               @if (order(); as o) {
                 <app-pill [tone]="o.status === 'done' ? 'green' : 'blue'">

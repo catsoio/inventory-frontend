@@ -121,21 +121,21 @@ type Field = [label: string, value: string | number];
             <div class="mt-1 text-xs text-gray-500">Beställningspunkt: {{ a.reorderLevel }} st</div>
           </mat-card>
           @if (admin) {
-          <mat-card class="p-4">
-            <div class="mb-2 font-semibold">Nyckeltal (belopp exkl. moms)</div>
-            <div class="flex justify-between py-1">
-              <span class="text-gray-500">Lagervärde</span><b>{{ a.stockValue | kr }}</b>
-            </div>
-            <div class="flex justify-between py-1">
-              <span class="text-gray-500">Marginal/st</span><b>{{ a.margin | kr }}</b>
-            </div>
-            <div class="flex justify-between py-1">
-              <span class="text-gray-500">Marginal</span
-              ><b>{{
-                a.marginPercent == null ? '–' : (a.marginPercent | number: '1.0-1') + ' %'
-              }}</b>
-            </div>
-          </mat-card>
+            <mat-card class="p-4">
+              <div class="mb-2 font-semibold">Nyckeltal (belopp exkl. moms)</div>
+              <div class="flex justify-between py-1">
+                <span class="text-gray-500">Lagervärde</span><b>{{ a.stockValue | kr }}</b>
+              </div>
+              <div class="flex justify-between py-1">
+                <span class="text-gray-500">Marginal/st</span><b>{{ a.margin | kr }}</b>
+              </div>
+              <div class="flex justify-between py-1">
+                <span class="text-gray-500">Marginal</span
+                ><b>{{
+                  a.marginPercent == null ? '–' : (a.marginPercent | number: '1.0-1') + ' %'
+                }}</b>
+              </div>
+            </mat-card>
           }
           <mat-card class="p-4">
             <div class="mb-1 font-semibold">Senaste händelser</div>

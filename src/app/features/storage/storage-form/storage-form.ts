@@ -284,12 +284,7 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
       </section>
 
       <div class="flex gap-2">
-        <button
-          mat-flat-button
-          color="primary"
-          class="!h-12 max-md:flex-1"
-          [disabled]="busy()"
-        >
+        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="busy()">
           Spara
         </button>
         <a mat-button class="!h-12" [routerLink]="id ? ['/storage', id] : '/storage'">Avbryt</a>
@@ -468,7 +463,18 @@ export class StorageForm {
   }
 
   save() {
-    if (!ensureValid(this.form, this.snack, this.form.errors?.['link'] ? 'Välj kund och bil' : this.form.errors?.['pickup'] ? 'Hämtdatum ligger före inlämningsdatum' : undefined)) return;
+    if (
+      !ensureValid(
+        this.form,
+        this.snack,
+        this.form.errors?.['link']
+          ? 'Välj kund och bil'
+          : this.form.errors?.['pickup']
+            ? 'Hämtdatum ligger före inlämningsdatum'
+            : undefined,
+      )
+    )
+      return;
 
     const v = this.form.getRawValue();
     const opt = <T>(x: T | null | '') => (x === null || x === '' ? undefined : x);

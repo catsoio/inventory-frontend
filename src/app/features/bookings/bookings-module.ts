@@ -1,37 +1,20 @@
 import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { FullCalendarModule } from '@fullcalendar/angular';
+import { CalendarComponent } from '@schedule-x/angular';
 import { SharedModule } from '../../shared/shared-module';
 import { BookingCalendar } from './booking-calendar/booking-calendar';
 import { BookingBoard } from './booking-board/booking-board';
 import { BookingList } from './booking-list/booking-list';
+import { BookingViews } from './booking-views/booking-views';
 
 @NgModule({
-  declarations: [BookingCalendar, BookingBoard, BookingList],
+  declarations: [BookingCalendar, BookingBoard, BookingList, BookingViews],
   imports: [
     SharedModule,
-    FullCalendarModule,
+    CalendarComponent,
     RouterModule.forChild([
-      // Vyerna ligger i sidomenyn; samma sida, olika startvy.
-      { path: '', component: BookingCalendar, data: { view: 'board' } },
-      {
-        path: 'day',
-        title: 'Tidsbokning',
-        component: BookingCalendar,
-        data: { view: 'timeGridDay' },
-      },
-      {
-        path: 'week',
-        title: 'Tidsbokning',
-        component: BookingCalendar,
-        data: { view: 'timeGridWeek' },
-      },
-      {
-        path: 'month',
-        title: 'Tidsbokning',
-        component: BookingCalendar,
-        data: { view: 'dayGridMonth' },
-      },
+      // Vyn (Resurser/Dag/Vecka/Månad) väljs i kalenderns verktygsfält via ?view=.
+      { path: '', title: 'Tidsbokning', component: BookingCalendar },
       { path: 'list', title: 'Bokningar', component: BookingList },
     ]),
   ],

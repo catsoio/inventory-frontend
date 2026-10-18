@@ -1,4 +1,7 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
@@ -80,6 +83,27 @@ const BOOKING_COLS: DtCol<Booking>[] = [
   standalone: false,
   host: { class: 'flex h-full flex-col gap-4 overflow-auto' },
   styles: `
+    .order-card {
+      cursor: grab;
+    }
+    .cdk-drag-preview {
+      box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+      border-radius: 8px;
+      cursor: grabbing;
+    }
+    .cdk-drag-placeholder {
+      opacity: 0.35;
+    }
+    .cdk-drag-animating {
+      transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+    }
+    .cdk-drop-list-dragging .order-card:not(.cdk-drag-placeholder) {
+      transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+    }
+    .drop-over {
+      outline: 2px dashed var(--mat-sys-primary);
+      outline-offset: -2px;
+    }
     /* Ikonen i en fast ruta: Material-ikoner klipps annars av radhöjden. */
     .kpi-icon {
       width: 20px;
@@ -90,8 +114,6 @@ const BOOKING_COLS: DtCol<Booking>[] = [
     }
   `,
   template: `
-    <h1 class="shrink-0 text-2xl font-semibold max-md:hidden">Hem</h1>
-
     <ng-template #kpi let-c>
       <a [routerLink]="c.link" [queryParams]="c.params" class="block min-w-0">
         <div
@@ -148,129 +170,147 @@ const BOOKING_COLS: DtCol<Booking>[] = [
       </section>
     </div>
 
-    @if (workOrdersOn) {
-      <section class="mb-4 min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-          <h2 class="flex items-center gap-2 text-sm font-semibold">
-            <mat-icon class="kpi-icon text-gray-400">assignment</mat-icon>
-            Arbetsorder idag
-            <span class="font-normal text-gray-500">· {{ activeOrders() }} pågående</span>
-          </h2>
-          <span class="flex-1"></span>
-          <a mat-button routerLink="/workorders">Alla arbetsorder</a>
-        </div>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          @for (col of orderColumns(); track col.status) {
-            <div class="min-w-0 rounded-xl bg-gray-50 p-2.5">
-              <div class="mb-2 flex items-center justify-between px-1 text-xs font-semibold">
-                <span class="text-gray-600 uppercase">{{ col.label }}</span>
-                <app-pill [tone]="col.tone">{{ col.items.length }}</app-pill>
-              </div>
-              <div class="flex flex-col gap-1.5">
-                @for (o of col.items; track o.id) {
-                  <a
-                    [routerLink]="['/workorders', o.id]"
-                    class="block rounded-lg bg-white p-2 text-sm shadow-sm ring-1 ring-black/5"
-                  >
-                    <span class="flex items-center justify-between gap-2">
-                      <app-reg-plate [value]="o.regNo" size="sm" />
-                      <span class="text-xs text-gray-500">{{ o.code }}</span>
-                    </span>
-                    <span class="mt-1 block truncate">{{ o.vehicle || '–' }}</span>
-                    <span class="block truncate text-xs text-gray-500">
-                      {{ o.customerName }} · {{ o.resourceName || 'Ej tilldelad' }}
-                    </span>
-                  </a>
-                } @empty {
-                  <p class="px-1 py-2 text-xs text-gray-400">Inga.</p>
-                }
-              </div>
+    <div class="grid items-start gap-4 lg:grid-cols-3">
+      <div class="flex min-w-0 flex-col gap-4 lg:col-span-2">
+        @if (workOrdersOn) {
+          <section
+            class="min-w-0 max-md:hidden rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5"
+          >
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+              <h2 class="text-sm font-semibold">
+                <a routerLink="/workorders" class="flex items-center gap-2 hover:underline">
+                  <mat-icon class="kpi-icon text-gray-400">assignment</mat-icon>
+                  Arbetsorder idag
+                  <span class="font-normal text-gray-500">· {{ activeOrders() }} pågående</span>
+                </a>
+              </h2>
+              <span class="flex-1"></span>
+              <a mat-button routerLink="/workorders/new"><mat-icon>add</mat-icon> Ny arbetsorder</a>
             </div>
-          }
-        </div>
-      </section>
-    }
-
-    <div class="grid gap-4 lg:grid-cols-3">
-      <section class="min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 lg:col-span-2">
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-          <h2 class="flex items-center gap-2 text-sm font-semibold">
-            <mat-icon class="kpi-icon text-gray-400">calendar_month</mat-icon>
-            Verkstaden idag
-            <span class="font-normal text-gray-500">
-              · {{ shown().length }} bokningar, {{ left() }} kvar
-            </span>
-          </h2>
-          <span class="flex-1"></span>
-          <button mat-flat-button color="primary" class="max-md:!hidden" (click)="open(null)">
-            <mat-icon>add</mat-icon> Ny bokning
-          </button>
-          <a mat-button routerLink="/bookings" class="max-md:!hidden">Kalender</a>
-        </div>
-        <div class="flex flex-col gap-1.5 md:hidden">
-          @for (b of shown(); track b.id) {
-            <button
-              type="button"
-              (click)="open(b)"
-              class="flex items-center gap-3 rounded-xl bg-gray-50 p-2.5 text-left"
-              [class.opacity-55]="past(b) || b.status === 'done'"
-            >
-              <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{
-                hhmm(b.start)
-              }}</span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm">{{ b.title }}</span>
-                <span class="block truncate text-xs text-gray-500">
-                  {{ b.regNo || '–' }} · {{ b.customerName }}
-                </span>
-              </span>
-              @if (b.status === 'done') {
-                <app-pill tone="green">Klar</app-pill>
-              } @else if (past(b)) {
-                <app-pill tone="gray">Passerad</app-pill>
-              } @else if (b.status === 'arrived') {
-                <app-pill tone="amber">Här</app-pill>
+            <div cdkDropListGroup class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              @for (col of orderColumns(); track col.status) {
+                <div class="min-w-0 rounded-xl bg-gray-50 p-2.5">
+                  <div class="mb-2 flex items-center justify-between px-1 text-xs font-semibold">
+                    <span class="text-gray-600 uppercase">{{ col.label }}</span>
+                    <app-pill [tone]="col.tone">{{ col.items.length }}</app-pill>
+                  </div>
+                  <div
+                    cdkDropList
+                    [cdkDropListData]="col.status"
+                    (cdkDropListDropped)="drop($event, col.status)"
+                    class="flex h-48 flex-col gap-1.5 overflow-y-auto rounded-lg"
+                  >
+                    @for (o of col.items; track o.id) {
+                      <div
+                        cdkDrag
+                        [cdkDragData]="o"
+                        [cdkDragStartDelay]="{ touch: 250, mouse: 0 }"
+                        (cdkDragStarted)="dragging = true"
+                        (click)="openOrder(o)"
+                        (keydown.enter)="openOrder(o)"
+                        tabindex="0"
+                        role="link"
+                        class="order-card block rounded-lg bg-white p-2 text-sm shadow-sm ring-1 ring-black/5"
+                      >
+                        <span class="flex items-center justify-between gap-2">
+                          <app-reg-plate [value]="o.regNo" size="sm" />
+                          <span class="text-xs text-gray-500">{{ o.code }}</span>
+                        </span>
+                        <span class="mt-1 block truncate">{{ o.vehicle || '–' }}</span>
+                        <span class="block truncate text-xs text-gray-500">
+                          {{ o.customerName }} · {{ o.resourceName || 'Ej tilldelad' }}
+                        </span>
+                      </div>
+                    } @empty {
+                      <p class="px-1 py-2 text-xs text-gray-400">Inga. Dra hit en order.</p>
+                    }
+                  </div>
+                </div>
               }
-            </button>
-          } @empty {
-            <p class="py-2 text-sm text-gray-500">Inga bokningar idag.</p>
-          }
-          <button mat-stroked-button class="mt-1" (click)="open(null)">
-            <mat-icon>add</mat-icon> Ny bokning
-          </button>
-        </div>
-        <app-data-table
-          class="hidden md:block"
-          [columns]="bookingCols"
-          [rows]="shown()"
-          [clickable]="true"
-          emptyText="Inga bokningar idag."
-          (rowClick)="open($event)"
-        >
-          <ng-template #cell let-b="row" let-c="col" let-text="text">
-            @if (c.key === 'status') {
-              <app-pill
-                [tone]="
-                  b.status === 'done'
-                    ? 'green'
-                    : b.status === 'arrived'
-                      ? 'amber'
-                      : b.status === 'booked'
-                        ? 'blue'
-                        : 'gray'
-                "
-                >{{ text }}</app-pill
-              >
-            } @else if (c.key === 'regNo' && b.regNo) {
-              <app-reg-plate [value]="text" size="sm" />
-            } @else {
-              {{ text }}
-            }
-          </ng-template>
-        </app-data-table>
-      </section>
+            </div>
+          </section>
+        }
+      </div>
 
       <div class="flex min-w-0 flex-col gap-4">
+        <section class="min-w-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <h2 class="text-sm font-semibold">
+              <a routerLink="/bookings" class="flex items-center gap-2 hover:underline">
+                <mat-icon class="kpi-icon text-gray-400">calendar_month</mat-icon>
+                Verkstaden idag
+                <span class="font-normal text-gray-500">
+                  · {{ shown().length }} bokningar, {{ left() }} kvar
+                </span>
+              </a>
+            </h2>
+            <span class="flex-1"></span>
+            <button mat-button class="max-md:!hidden" (click)="open(null)">
+              <mat-icon>add</mat-icon> Ny bokning
+            </button>
+          </div>
+          <div class="flex flex-col gap-1.5 md:hidden">
+            @for (b of shown(); track b.id) {
+              <button
+                type="button"
+                (click)="open(b)"
+                class="flex items-center gap-3 rounded-xl bg-gray-50 p-2.5 text-left"
+                [class.opacity-55]="past(b) || b.status === 'done'"
+              >
+                <span class="w-12 shrink-0 text-sm font-semibold tabular-nums">{{
+                  hhmm(b.start)
+                }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm">{{ b.title }}</span>
+                  <span class="block truncate text-xs text-gray-500">
+                    {{ b.regNo || '–' }} · {{ b.customerName }}
+                  </span>
+                </span>
+                @if (b.status === 'done') {
+                  <app-pill tone="green">Klar</app-pill>
+                } @else if (past(b)) {
+                  <app-pill tone="gray">Passerad</app-pill>
+                } @else if (b.status === 'arrived') {
+                  <app-pill tone="amber">Här</app-pill>
+                }
+              </button>
+            } @empty {
+              <p class="py-2 text-sm text-gray-500">Inga bokningar idag.</p>
+            }
+            <button mat-stroked-button class="mt-1" (click)="open(null)">
+              <mat-icon>add</mat-icon> Ny bokning
+            </button>
+          </div>
+          <app-data-table
+            class="hidden md:block"
+            [columns]="bookingCols"
+            [rows]="shown()"
+            [clickable]="true"
+            emptyText="Inga bokningar idag."
+            (rowClick)="open($event)"
+          >
+            <ng-template #cell let-b="row" let-c="col" let-text="text">
+              @if (c.key === 'status') {
+                <app-pill
+                  [tone]="
+                    b.status === 'done'
+                      ? 'green'
+                      : b.status === 'arrived'
+                        ? 'amber'
+                        : b.status === 'booked'
+                          ? 'blue'
+                          : 'gray'
+                  "
+                  >{{ text }}</app-pill
+                >
+              } @else if (c.key === 'regNo' && b.regNo) {
+                <app-reg-plate [value]="text" size="sm" />
+              } @else {
+                {{ text }}
+              }
+            </ng-template>
+          </app-data-table>
+        </section>
         @if (admin) {
           <section class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
             <div class="mb-2 flex items-center justify-between gap-2">
@@ -371,10 +411,53 @@ export class Dashboard {
         'done',
         'Klara idag',
         'green',
-        (o) => this.isToday(o.pickupAt) || this.isToday(o.receivedAt),
+        (o) => this.isToday(o.pickupAt) || this.isToday(o.receivedAt) || this.movedDone().has(o.id),
       ),
     ];
   });
+  /** Order som dragits till Klara: ska stanna kvar i kolumnen även om de inte hör till idag. */
+  private readonly movedDone = signal<Set<string>>(new Set());
+  /** Sant medan ett kort dras, så att släppet inte räknas som klick. */
+  dragging = false;
+  private readonly snack = inject(MatSnackBar);
+
+  openOrder(o: WorkOrder) {
+    if (this.dragging) return;
+    this.router.navigate(['/workorders', o.id]);
+  }
+
+  /** Släpp i en annan kolumn: statusen ändras direkt, och tas tillbaka om servern säger nej. */
+  drop(e: CdkDragDrop<WorkOrderStatus>, to: WorkOrderStatus) {
+    setTimeout(() => (this.dragging = false));
+    const o = e.item.data as WorkOrder;
+    if (o.status === to) return;
+    const apply = () => {
+      const from = o.status;
+      this.orders.update((l) => l.map((x) => (x.id === o.id ? { ...x, status: to } : x)));
+      if (to === 'done') this.movedDone.update((m) => new Set(m).add(o.id));
+      this.workOrderApi.update(o.id, { status: to }).subscribe({
+        error: (err) => {
+          this.orders.update((l) => l.map((x) => (x.id === o.id ? { ...x, status: from } : x)));
+          this.snack.open(err?.error?.message ?? 'Kunde inte ändra status', 'Stäng', {
+            duration: 5000,
+          });
+        },
+      });
+    };
+    if (to !== 'done') return apply();
+    // Klar bokar lagerdelarna som en försäljning, så det frågas en gång.
+    this.dialog
+      .open(ConfirmDialog, {
+        data: {
+          title: `Markera ${o.code} som klar?`,
+          message: 'Delarna på ordern tas ut ur lagret och bokas som en försäljning.',
+          confirmText: 'Markera klar',
+        },
+      })
+      .afterClosed()
+      .subscribe((ok) => ok && apply());
+  }
+
   readonly activeOrders = computed(
     () => this.orders().filter((o) => o.status === 'open' || o.status === 'in_progress').length,
   );
@@ -416,7 +499,7 @@ export class Dashboard {
     this.dialog
       .open<BookingDialog, BookingDialogData, BookingDialogResult>(BookingDialog, {
         data,
-        width: '720px',
+        width: '1040px',
         maxWidth: '96vw',
         panelClass: 'dialog-sheet',
       })

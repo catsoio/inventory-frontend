@@ -91,7 +91,9 @@ type PaymentFilter = PaymentStatus | '';
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
       <h1 class="mr-2 hidden text-2xl font-semibold md:block">Däckhotell</h1>
-      <div class="relative order-first w-full min-w-0 md:order-none md:max-w-md md:min-w-56 md:w-auto md:flex-1">
+      <div
+        class="relative order-first w-full min-w-0 md:order-none md:max-w-md md:min-w-56 md:w-auto md:flex-1"
+      >
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
         <input
           type="search"

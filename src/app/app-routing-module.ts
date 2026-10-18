@@ -97,6 +97,13 @@ const routes: Routes = [
           import('./features/bookkeeping/bookkeeping-module').then((m) => m.BookkeepingModule),
       },
       {
+        path: 'finance',
+        title: 'Ekonomi',
+        canActivate: [adminGuard],
+        loadChildren: () =>
+          import('./features/finance/finance-module').then((m) => m.FinanceModule),
+      },
+      {
         path: 'activity',
         title: 'Aktivitetslogg',
         canActivate: [adminGuard],

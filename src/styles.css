@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '@schedule-x/theme-default/dist/index.css';
 
 @theme inline {
   /* En enda radie för knappar, fält, kort, menyer och dialoger. Cirklar (avatarer, prickar) är undantag. */
@@ -101,6 +102,10 @@ main {
   --mat-form-field-outlined-hover-outline-color: #9ca3af;
   --mat-form-field-outlined-focus-outline-color: var(--mat-sys-primary);
   --mat-form-field-outlined-outline-width: 1px;
+  /* Kanter på knappar och växlare: samma grå som fälten, inte Materials mörka standard. */
+  --mat-button-outlined-outline-color: #d1d5db;
+  --mat-button-toggle-divider-color: #d1d5db;
+  --mat-button-toggle-height: 44px;
   --mat-form-field-outlined-focus-outline-width: 2px;
 }
 
@@ -128,6 +133,19 @@ main {
   border-top: 1px solid rgb(0 0 0 / 8%);
   justify-content: flex-end;
   background: var(--mat-dialog-container-color, #fff);
+}
+
+/* Plus/minus i tidsfälten: små, så siffrorna får plats i ett halvbrett fält. */
+.time-step.mat-mdc-icon-button {
+  --mdc-icon-button-state-layer-size: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+}
+.time-step .mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
 }
 
 /* Mobil: alla dialoger utom bekräftelsen fyller skärmen, så fälten får plats två och två, knapparna
@@ -162,22 +180,12 @@ main {
     flex-wrap: nowrap;
   }
   /* Spara tar resten av raden och är lätt att träffa med tummen. */
-  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)) .mat-mdc-dialog-actions .mat-mdc-unelevated-button,
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog))
+    .mat-mdc-dialog-actions
+    .mat-mdc-unelevated-button,
   .dialog-sheet .mat-mdc-dialog-actions .mat-mdc-unelevated-button {
     flex: 1 1 auto;
     min-height: 48px;
-  }
-  /* Plus/minus i tidsfälten: små, så siffrorna får plats i ett halvbrett fält. */
-  .time-step.mat-mdc-icon-button {
-    --mdc-icon-button-state-layer-size: 32px;
-    width: 32px;
-    height: 32px;
-    padding: 4px;
-  }
-  .time-step .mat-icon {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
   }
   .mat-mdc-form-field-icon-suffix {
     padding-right: 2px;
@@ -239,25 +247,38 @@ full-calendar {
   --mat-snack-bar-container-shape: var(--radius-ui);
 }
 
-/* Kalendern: dagens kolumn är randig och den röda linjen visar klockan nu. */
-full-calendar .fc-day-today:not(.fc-col-header-cell),
-full-calendar .fc-day-today.fc-col-header-cell {
-  background-color: color-mix(in srgb, var(--mat-sys-primary) 6%, white) !important;
-  background-image: repeating-linear-gradient(
-    135deg,
-    transparent 0 9px,
-    color-mix(in srgb, var(--mat-sys-primary) 10%, transparent) 9px 18px
-  ) !important;
+/* Kalendern (Schedule-X): garagets färg, våra fältgrå kanter och full höjd. */
+.sx__calendar-wrapper {
+  --sx-color-primary: var(--mat-sys-primary);
+  --sx-color-primary-container: color-mix(in srgb, var(--mat-sys-primary) 12%, white);
+  --sx-color-on-primary-container: var(--mat-sys-primary);
+  --sx-color-outline: #d1d5db;
+  --sx-color-outline-variant: #e5e7eb;
+  --sx-color-surface: #fff;
+  --sx-color-background: #fff;
+  --sx-rounding-extra-small: 6px;
+  --sx-font-small: 0.8125rem;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-family: inherit;
 }
-/* Ledigt över lediga dagar ska inte täcka över ränderna. */
-full-calendar .fc-non-business {
-  background: rgba(0, 0, 0, 0.04) !important;
+sx-calendar {
+  display: block;
+  min-height: 0;
 }
-full-calendar .fc-timegrid-now-indicator-line {
-  border-top: 2px solid #ef4444 !important;
+sx-calendar .sx-angular-calendar-wrapper,
+sx-calendar > div {
+  height: 100%;
 }
-full-calendar .fc-timegrid-now-indicator-arrow {
-  border-color: #ef4444 !important;
-  border-left-color: transparent !important;
-  border-right-color: transparent !important;
+/* Händelser: tät text, avrundade, utan tung kant. */
+.sx__event {
+  font-weight: 500;
+  border-radius: 6px;
+}
+.sx__time-grid-event {
+  border-left-width: 4px;
 }

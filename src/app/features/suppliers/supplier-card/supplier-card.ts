@@ -26,20 +26,13 @@ import { Auth } from '../../../core/auth/auth';
         @if (card(); as c) {
           @if (c.active) {
             @if (admin) {
-<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
-}
+              <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            }
           } @else {
             <button mat-stroked-button (click)="restore()">Återställ</button>
           }
         }
-        <button
-          mat-flat-button
-          color="primary"
-          (click)="save()"
-          [disabled]="busy()"
-        >
-          Spara
-        </button>
+        <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">Spara</button>
       </div>
 
       <form

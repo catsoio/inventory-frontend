@@ -189,7 +189,12 @@ const COLS: Col[] = [
         }
       </button>
       @if (view() === 'table') {
-        <button class="max-md:!hidden" mat-icon-button [matMenuTriggerFor]="colMenu" title="Välj kolumner">
+        <button
+          class="max-md:!hidden"
+          mat-icon-button
+          [matMenuTriggerFor]="colMenu"
+          title="Välj kolumner"
+        >
           <mat-icon>view_column</mat-icon>
         </button>
         <button
@@ -344,9 +349,7 @@ const COLS: Col[] = [
           }
         </div>
 
-        <div
-          class="min-h-0 flex-1 overflow-auto md:rounded-xl md:bg-white md:shadow-sm"
-        >
+        <div class="min-h-0 flex-1 overflow-auto md:rounded-xl md:bg-white md:shadow-sm">
           @if (view() === 'table') {
             <div class="flex flex-col gap-2 md:hidden">
               @for (a of rows(); track a.id) {

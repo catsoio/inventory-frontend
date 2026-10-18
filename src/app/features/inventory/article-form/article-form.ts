@@ -24,10 +24,20 @@ const signedInt = Validators.pattern(/^-?\d+$/);
   selector: 'app-article-form',
   standalone: false,
   template: `
-    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">{{ id ? 'Ändra artikel' : 'Ny artikel' }}</h1>
-    <form [formGroup]="form" (ngSubmit)="save()" class="grid grid-cols-6 gap-x-3 pb-4 sm:grid-cols-2 sm:gap-x-4 lg:grid-cols-3">
+    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">
+      {{ id ? 'Ändra artikel' : 'Ny artikel' }}
+    </h1>
+    <form
+      [formGroup]="form"
+      (ngSubmit)="save()"
+      class="grid grid-cols-6 gap-x-3 pb-4 sm:grid-cols-2 sm:gap-x-4 lg:grid-cols-3"
+    >
       <div class="col-span-6 mb-3 sm:col-span-2 md:mb-4 lg:col-span-3">
-        <mat-button-toggle-group formControlName="category" hideSingleSelectionIndicator class="w-full md:w-auto">
+        <mat-button-toggle-group
+          formControlName="category"
+          hideSingleSelectionIndicator
+          class="w-full md:w-auto"
+        >
           @for (c of categories; track c[0]) {
             <mat-button-toggle [value]="c[0]" class="flex-1">{{ c[1] }}</mat-button-toggle>
           }
@@ -228,22 +238,22 @@ const signedInt = Validators.pattern(/^-?\d+$/);
       /></mat-form-field>
 
       @if (admin || !id) {
-      <mat-form-field class="col-span-3 sm:col-span-1"
-        ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label
-        ><mat-icon matPrefix class="mr-2 text-gray-400">shopping_cart</mat-icon>
-        <input
-          matInput
-          type="number"
-          inputmode="decimal"
-          step="0.01"
-          min="0"
-          formControlName="averageCost"
-        />
-        @if (id) {
-          <mat-hint>Snittpris. Tidigare försäljningar påverkas inte.</mat-hint>
-        }
-        <mat-error>Krävs om ingångslager anges</mat-error></mat-form-field
-      >
+        <mat-form-field class="col-span-3 sm:col-span-1"
+          ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label
+          ><mat-icon matPrefix class="mr-2 text-gray-400">shopping_cart</mat-icon>
+          <input
+            matInput
+            type="number"
+            inputmode="decimal"
+            step="0.01"
+            min="0"
+            formControlName="averageCost"
+          />
+          @if (id) {
+            <mat-hint>Snittpris. Tidigare försäljningar påverkas inte.</mat-hint>
+          }
+          <mat-error>Krävs om ingångslager anges</mat-error></mat-form-field
+        >
       }
       <mat-form-field class="col-span-3 sm:col-span-1"
         ><mat-label>Försäljningspris (kr, exkl. moms)</mat-label

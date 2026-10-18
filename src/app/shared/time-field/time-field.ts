@@ -46,28 +46,28 @@ export const parseTime = (raw: string): string | null => {
         (keydown.arrowdown)="step(-15); $event.preventDefault()"
         (focus)="$any($event.target).select()"
       />
-      <button
-        matIconSuffix
-        type="button"
-        mat-icon-button
-        class="time-step"
-        tabindex="-1"
-        aria-label="Kvart tidigare"
-        (click)="step(-15)"
-      >
-        <mat-icon>remove</mat-icon>
-      </button>
-      <button
-        matIconSuffix
-        type="button"
-        mat-icon-button
-        class="time-step"
-        tabindex="-1"
-        aria-label="Kvart senare"
-        (click)="step(15)"
-      >
-        <mat-icon>add</mat-icon>
-      </button>
+      <span matSuffix class="flex items-center">
+        <button
+          type="button"
+          mat-icon-button
+          class="time-step"
+          tabindex="-1"
+          aria-label="Kvart tidigare"
+          (click)="step(-15)"
+        >
+          <mat-icon>remove</mat-icon>
+        </button>
+        <button
+          type="button"
+          mat-icon-button
+          class="time-step"
+          tabindex="-1"
+          aria-label="Kvart senare"
+          (click)="step(15)"
+        >
+          <mat-icon>add</mat-icon>
+        </button>
+      </span>
       @if (error) {
         <mat-error>{{ error }}</mat-error>
       }

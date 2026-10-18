@@ -33,20 +33,13 @@ import { Auth } from '../../../core/auth/auth';
         @if (card(); as c) {
           @if (c.active) {
             @if (admin) {
-<button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
-}
+              <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            }
           } @else {
             <button mat-stroked-button (click)="restore()">Återställ</button>
           }
         }
-        <button
-          mat-flat-button
-          color="primary"
-          (click)="save()"
-          [disabled]="busy()"
-        >
-          Spara
-        </button>
+        <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">Spara</button>
       </div>
 
       <form
@@ -82,7 +75,11 @@ import { Auth } from '../../../core/auth/auth';
           </mat-form-field>
         }
         <mat-form-field class="sm:col-span-2">
-          <mat-label>Adress{{ form.controls.type.value === 'company' ? ' (krävs på faktura)' : '' }}</mat-label>
+          <mat-label
+            >Adress{{
+              form.controls.type.value === 'company' ? ' (krävs på faktura)' : ''
+            }}</mat-label
+          >
           <input matInput formControlName="address" autocomplete="off" />
         </mat-form-field>
         <mat-form-field>
@@ -96,9 +93,9 @@ import { Auth } from '../../../core/auth/auth';
         <p class="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2">
           @if (form.controls.type.value === 'company') {
             <b>Företag:</b> får faktura med organisationsnummer och förfallodatum. Svenska företag
-            betalar 25 % moms precis som privatpersoner, men kan normalt dra av den i sin egen
-            moms. Företaget ser därför priser exkl. moms först. Utländska (EU-)företag hanteras inte automatiskt –
-            fakturera dem utanför systemet.
+            betalar 25 % moms precis som privatpersoner, men kan normalt dra av den i sin egen moms.
+            Företaget ser därför priser exkl. moms först. Utländska (EU-)företag hanteras inte
+            automatiskt – fakturera dem utanför systemet.
           } @else {
             <b>Privatperson:</b> får kvitto. Priser till privatpersoner anges inklusive moms (25 %)
             – det är den summan som ska stå först.

@@ -38,6 +38,8 @@ import { KrPipe } from './kr-pipe';
 import { InclVatPipe } from './incl-vat-pipe';
 import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
+import { ChartView } from './chart/chart';
+import { FinanceTabs } from './finance-tabs/finance-tabs';
 import { RegPlate, SvFlag } from './reg-plate/reg-plate';
 import { ResetPasswordDialog } from '../features/settings/reset-password-dialog/reset-password-dialog';
 import { SettingsPage } from '../features/settings/settings';
@@ -88,6 +90,8 @@ const MATERIAL = [
     StockBadge,
     MovementList,
     Pill,
+    ChartView,
+    FinanceTabs,
     ItemIcon,
     RegPlate,
     SvFlag,
@@ -120,6 +124,8 @@ const MATERIAL = [
     StockBadge,
     MovementList,
     Pill,
+    ChartView,
+    FinanceTabs,
     ItemIcon,
     RegPlate,
     SvFlag,

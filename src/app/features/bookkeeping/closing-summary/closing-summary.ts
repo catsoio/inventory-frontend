@@ -54,7 +54,9 @@ interface Row {
       </section>
 
       <section>
-        <h3 class="mb-2 text-sm font-semibold tracking-wide text-gray-500 uppercase">Däckhotell (belopp exkl. moms)</h3>
+        <h3 class="mb-2 text-sm font-semibold tracking-wide text-gray-500 uppercase">
+          Däckhotell (belopp exkl. moms)
+        </h3>
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
           @for (t of hotel(); track t[0]) {
             <div class="rounded-xl bg-white p-4 shadow-sm">

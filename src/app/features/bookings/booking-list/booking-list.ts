@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { BookingApi } from '../../../core/api/booking-api';
 import { BOOKING_STATUS_LABELS, Booking } from '../../../core/models';
@@ -60,7 +61,8 @@ const DAY = 86_400_000;
       (search)="query.set($event)"
       (rowClick)="open($event)"
     >
-      <div class="mb-3 flex shrink-0 items-center gap-3">
+      <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
+        <app-booking-views value="list" (pick)="goView($event)" />
         <mat-button-toggle-group
           hideSingleSelectionIndicator
           [value]="range()"
@@ -100,6 +102,7 @@ const DAY = 86_400_000;
 export class BookingList {
   private readonly api = inject(BookingApi);
   private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
 
   readonly cols = COLS;
   private readonly items = signal<Booking[]>([]);
@@ -144,6 +147,10 @@ export class BookingList {
     });
   }
 
+  goView(v: string) {
+    this.router.navigate(['/bookings'], { queryParams: { view: v } });
+  }
+
   open(booking: Booking) {
     this.show({ booking, start: new Date(booking.start), end: new Date(booking.end) });
   }
@@ -158,7 +165,7 @@ export class BookingList {
     this.dialog
       .open<BookingDialog, BookingDialogData, BookingDialogResult>(BookingDialog, {
         data,
-        width: '720px',
+        width: '1040px',
         maxWidth: '96vw',
         panelClass: 'dialog-sheet',
       })

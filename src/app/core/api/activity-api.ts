@@ -21,9 +21,15 @@ export interface ActivityEntry {
 export class ActivityApi {
   private readonly http = inject(HttpClient);
 
-  list(opts: { entity?: string; limit?: number; offset?: number }): Observable<Page<ActivityEntry>> {
+  list(opts: {
+    entity?: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<Page<ActivityEntry>> {
     let params = new HttpParams();
     for (const [k, v] of Object.entries(opts)) if (v) params = params.set(k, String(v));
-    return this.http.get<Page<ActivityEntry>>(`${environment.apiUrl}/inventory/activity`, { params });
+    return this.http.get<Page<ActivityEntry>>(`${environment.apiUrl}/inventory/activity`, {
+      params,
+    });
   }
 }

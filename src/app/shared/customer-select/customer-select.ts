@@ -44,7 +44,9 @@ export const PENDING_CUSTOMER = 'new:';
         <mat-option [value]="NEW" class="!font-medium !text-brand">+ Ny kund</mat-option>
       </mat-autocomplete>
       @if (pendingName(); as n) {
-        <mat-hint>Ny kund "{{ n }}" skapas när du sparar. Du kan komplettera uppgifterna sen.</mat-hint>
+        <mat-hint
+          >Ny kund "{{ n }}" skapas när du sparar. Du kan komplettera uppgifterna sen.</mat-hint
+        >
       }
       <mat-error>{{ allowNew ? 'Ange en kund' : 'Välj en kund ur listan' }}</mat-error>
     </mat-form-field>
