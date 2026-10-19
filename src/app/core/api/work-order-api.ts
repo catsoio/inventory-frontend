@@ -7,6 +7,7 @@ import {
   PaymentMethod,
   WorkOrder,
   WorkOrderDetail,
+  WorkOrderInvoice,
   WorkOrderInput,
   WorkOrderLineType,
   WorkOrderStatus,
@@ -75,6 +76,25 @@ export class WorkOrderApi {
     },
   ): Observable<WorkOrderDetail> {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/progress`, body);
+  }
+
+  /** Lägger till en gammal faktura/kvitto: skapar en klar order och bokför den direkt. */
+  importInvoice(body: {
+    customerId: string;
+    vehicleId: string;
+    date: string;
+    performed: string;
+    price: number;
+    warranty?: string;
+    paid?: boolean;
+    method?: string;
+  }): Observable<WorkOrderDetail> {
+    return this.http.post<WorkOrderDetail>(`${this.base}/import-invoice`, body);
+  }
+
+  /** Utkastet till faktura/kvitto som det blir om det bokförs nu. Inget sparas. */
+  invoicePreview(id: string): Observable<WorkOrderInvoice> {
+    return this.http.get<WorkOrderInvoice>(`${this.base}/${id}/invoice-preview`);
   }
 
   /** Fakturerar (företag) eller kvitterar (privat) en klar order. Därefter är ordern låst. */

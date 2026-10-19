@@ -32,6 +32,8 @@ interface NavItem {
   only?: 'desktop' | 'mobile';
   /** Markeras också när någon av dessa adresser är öppen. */
   match?: string[];
+  /** Markeras inte när någon av dessa adresser är öppen (de har en egen länk). */
+  except?: string[];
   /** Undermeny: föräldern fälls ut och markeras när en av barnen är öppen. */
   children?: NavItem[];
 }
@@ -63,6 +65,13 @@ const NAV: NavSection[] = [
     items: [
       { path: '/customers', label: 'Kunder', icon: 'groups' },
       { path: '/vehicles', label: 'Bilar', icon: 'directions_car' },
+      {
+        path: '/finance/invoices',
+        label: 'Fakturor',
+        icon: 'receipt_long',
+        adminOnly: true,
+        only: 'desktop',
+      },
     ],
   },
   {
@@ -95,6 +104,7 @@ const NAV: NavSection[] = [
         adminOnly: true,
         only: 'desktop',
         match: ['/finance', '/bookkeeping'],
+        except: ['/finance/invoices'],
       },
       { path: '/reports', label: 'Logg och rapport', icon: 'bar_chart', exact: true },
       {
@@ -688,7 +698,8 @@ export class Shell {
   /** Någon av länkens adresser är öppen (t.ex. Ekonomi över flera sidor). */
   matches(item: NavItem): boolean {
     const u = this.url();
-    return !!item.match?.some((p) => u === p || u.startsWith(p + '/'));
+    const hit = (p: string) => u === p || u.startsWith(p + '/');
+    return !!item.match?.some(hit) && !item.except?.some(hit);
   }
 
   /** Mobilens bottenfält är alltid detsamma: det som används mest i verkstaden. */

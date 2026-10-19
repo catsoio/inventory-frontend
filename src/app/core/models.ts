@@ -860,6 +860,7 @@ export interface InvoiceSeller {
 
 export interface InvoiceBuyer {
   type: CustomerType;
+  customerCode?: string;
   name: string;
   orgNo: string | null;
   vatNumber: string | null;
@@ -870,9 +871,11 @@ export interface InvoiceBuyer {
 
 /** Fakturan (företag) eller kvittot (privat) som låser ordern. */
 export interface WorkOrderInvoice {
-  /** FAK-00042 */
-  code: string;
-  number: number;
+  /** FAK-00042. Null på ett utkast som inte är bokfört. */
+  code: string | null;
+  number?: number;
+  /** Sant för förhandsvisningen: inget nummer, inget sparat, ordern går att ändra. */
+  draft?: boolean;
   kind: 'invoice' | 'receipt';
   issuedAt: string;
   supplyDate: string;

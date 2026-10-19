@@ -152,7 +152,12 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <div class="mb-2 flex flex-wrap items-center gap-2">
             <h2 class="flex-1 text-base font-semibold">Vad ska göras</h2>
-            <button mat-stroked-button type="button" (click)="addLine()">
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="!!card()?.invoice"
+              (click)="addLine()"
+            >
               <mat-icon>add</mat-icon> Lägg till rad
             </button>
           </div>
@@ -220,6 +225,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                     mat-icon-button
                     type="button"
                     class="shrink-0"
+                    [disabled]="!!card()?.invoice"
                     (click)="removeLine(i)"
                     aria-label="Ta bort raden"
                   >
@@ -233,10 +239,18 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                   class="focus:ring-brand h-9 w-full rounded-lg border-0 bg-white px-3 text-sm shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
                 />
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <mat-checkbox [checked]="row.value.done" (change)="flip(row, 'done')">
+                  <mat-checkbox
+                    [checked]="row.value.done"
+                    [disabled]="!!card()?.invoice"
+                    (change)="flip(row, 'done')"
+                  >
                     Klar
                   </mat-checkbox>
-                  <mat-checkbox [checked]="row.value.toOrder" (change)="flip(row, 'toOrder')">
+                  <mat-checkbox
+                    [checked]="row.value.toOrder"
+                    [disabled]="!!card()?.invoice"
+                    (change)="flip(row, 'toOrder')"
+                  >
                     Del saknas, ska beställas
                   </mat-checkbox>
                   @if (row.value.articleId) {
@@ -356,7 +370,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                 } @else {
                   Privatkund får kvitto med priset inklusive moms.
                 }
-                När den är utfärdad får fakturanummer och går inte att ändra.
+                Tills du bokför kan ordern ändras och förhandsvisas som utkast. När den är bokförd får den fakturanummer och går inte att ändra.
               </p>
               @if (form.dirty) {
                 <p class="mb-3 text-sm text-amber-800">Spara ändringarna först.</p>
@@ -369,8 +383,16 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                 (click)="issue()"
               >
                 <mat-icon>receipt_long</mat-icon>
-                {{ customerType() === 'company' ? 'Fakturera' : 'Skapa kvitto' }}
+                {{ customerType() === 'company' ? 'Bokför faktura' : 'Bokför kvitto' }}
               </button>
+              <a
+                mat-stroked-button
+                class="ml-2"
+                [routerLink]="['/workorders', c.id, 'invoice']"
+                [class.pointer-events-none]="form.dirty"
+              >
+                <mat-icon>visibility</mat-icon> Förhandsgranska utkast
+              </a>
             } @else {
               <p class="text-sm text-gray-600">
                 Sätt ordern till <b>Klar</b> och spara för att kunna
@@ -697,11 +719,11 @@ export class WorkOrderCard implements OnInit {
     this.dialog
       .open(ConfirmDialog, {
         data: {
-          title: company ? `Fakturera ${o.code}?` : `Skapa kvitto för ${o.code}?`,
+          title: company ? `Bokför faktura för ${o.code}?` : `Bokför kvitto för ${o.code}?`,
           message:
             'Ordern får ett löpnummer och låses: rader, pris och kund kan inte ändras efteråt. ' +
             'Verkstadens och kundens uppgifter kopieras in på dokumentet.',
-          confirmText: company ? 'Fakturera' : 'Skapa kvitto',
+          confirmText: 'Bokför',
         },
       })
       .afterClosed()

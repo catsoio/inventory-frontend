@@ -53,10 +53,10 @@ type Filter = 'all' | 'unpaid' | 'paid';
         [columns]="cols"
         [rows]="shown()"
         [loading]="loading()"
-        emptyText="Inga fakturor än. De skapas från en klar arbetsorder."
+        emptyText="Inga fakturor än. De skapas från en klar arbetsorder, eller lägg till en gammal med knappen."
         searchPlaceholder="Sök nummer, kund eller regnr…"
         (search)="query.set($event)"
-        (rowClick)="router.navigate(['/workorders', $event.id])"
+        (rowClick)="router.navigate(['/finance/invoices', $event.id])"
       >
         <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
           <mat-button-toggle-group
@@ -72,6 +72,10 @@ type Filter = 'all' | 'unpaid' | 'paid';
           <span class="text-sm text-gray-600">
             {{ shown().length }} st · {{ sum() }} att betala
           </span>
+          <span class="flex-1"></span>
+          <a mat-flat-button color="primary" routerLink="/finance/invoices/new">
+            <mat-icon>add</mat-icon> Lägg till faktura
+          </a>
         </div>
         <ng-template #cell let-o="row" let-col="col" let-text="text">
           @if (col.key === 'paid') {
