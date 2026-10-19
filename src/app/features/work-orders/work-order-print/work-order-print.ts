@@ -25,9 +25,9 @@ import { Auth } from '../../../core/auth/auth';
 
     @if (order(); as o) {
       <article
-        class="mx-auto max-w-[210mm] bg-white p-8 text-[13px] leading-snug text-black shadow-sm print:max-w-none print:p-0 print:shadow-none"
+        class="mx-auto max-w-[210mm] bg-white p-8 text-[13px] leading-snug text-[#4b5563] shadow-sm print:max-w-none print:p-0 print:shadow-none [print-color-adjust:exact]"
       >
-        <header class="flex items-start justify-between border-b-2 border-black pb-3">
+        <header class="flex items-start justify-between border-b-2 border-[#4b5563] pb-3">
           <div>
             <div class="text-xs tracking-widest text-gray-600 uppercase">
               {{ auth.garage()?.name }}
@@ -60,7 +60,7 @@ import { Auth } from '../../../core/auth/auth';
         </section>
 
         @if (vehicle()?.notes; as note) {
-          <section class="mt-4 border-2 border-black p-3">
+          <section class="mt-4 border-2 border-[#4b5563] p-3">
             <div class="text-xs font-bold tracking-widest uppercase">Obs! Om bilen</div>
             <div class="mt-1 text-base font-semibold">{{ note }}</div>
           </section>
@@ -76,7 +76,7 @@ import { Auth } from '../../../core/auth/auth';
 
         <table class="mt-5 w-full border-collapse">
           <thead>
-            <tr class="border-b-2 border-black text-left text-xs tracking-wide uppercase">
+            <tr class="border-b-2 border-[#4b5563] text-left text-xs tracking-wide uppercase">
               <th class="w-8 py-1">Klar</th>
               <th class="py-1">Vad ska göras</th>
               <th class="w-20 py-1 text-right">Antal</th>
@@ -86,17 +86,17 @@ import { Auth } from '../../../core/auth/auth';
             @for (l of o.lines; track l.id) {
               <tr class="border-b border-gray-300 align-top">
                 <td class="py-2">
-                  <span class="inline-block h-4 w-4 border-2 border-black text-center leading-3">{{
+                  <span class="inline-block h-4 w-4 border-2 border-[#4b5563] text-center leading-3">{{
                     l.done ? '✓' : ''
                   }}</span>
                 </td>
                 <td class="py-2">
                   <b>{{ l.description }}</b>
                   @if (l.toOrder) {
-                    <span class="ml-1 border border-black px-1 text-xs font-bold">DEL SAKNAS</span>
+                    <span class="ml-1 border border-[#4b5563] px-1 text-xs font-bold">DEL SAKNAS</span>
                   }
                   @if (l.instruction) {
-                    <div class="mt-0.5 whitespace-pre-line text-gray-800">{{ l.instruction }}</div>
+                    <div class="mt-0.5 whitespace-pre-line text-[#4b5563]">{{ l.instruction }}</div>
                   }
                 </td>
                 <td class="py-2 text-right tabular-nums">{{ l.quantity }}</td>
@@ -117,8 +117,8 @@ import { Auth } from '../../../core/auth/auth';
         </section>
 
         <footer class="mt-8 grid grid-cols-2 gap-10 text-xs text-gray-600">
-          <div class="border-t border-black pt-1">Mekaniker (signatur)</div>
-          <div class="border-t border-black pt-1">Datum</div>
+          <div class="border-t border-[#4b5563] pt-1">Mekaniker (signatur)</div>
+          <div class="border-t border-[#4b5563] pt-1">Datum</div>
         </footer>
       </article>
     }
