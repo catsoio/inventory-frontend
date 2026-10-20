@@ -1,3 +1,4 @@
+import { appLocale } from '../../core/i18n/locale';
 import { Component, Input, OnChanges, inject, signal } from '@angular/core';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { MOVEMENT_LABELS, Movement, MovementType } from '../../core/models';
@@ -15,7 +16,7 @@ const TYPE_CLS: Record<MovementType, string> = {
 const kr = new KrPipe();
 const unit = (m: Movement) => m.unitPrice ?? m.unitCost ?? null;
 const when = (m: Movement) =>
-  new Date(m.createdAt).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
+  new Date(m.createdAt).toLocaleString(appLocale(), { dateStyle: 'short', timeStyle: 'short' });
 
 @Component({
   selector: 'app-movement-list',

@@ -1,3 +1,4 @@
+import { appLocale } from '../../../core/i18n/locale';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -81,7 +82,7 @@ const dayKey = (d: Date) =>
       <span class="flex-1"></span>
 
       @if (mode() !== 'list') {
-        <mat-form-field class="w-44 max-md:min-w-0 max-md:flex-1" subscriptSizing="dynamic">
+        <mat-form-field class="w-44 max-md:min-w-40 max-md:flex-1 max-md:basis-40" subscriptSizing="dynamic">
           <mat-label>Visa</mat-label>
           <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
             <mat-option value="">Alla</mat-option>
@@ -222,7 +223,7 @@ export class BookingCalendar implements OnInit {
     }
     const app = createCalendar(
       {
-        locale: 'sv-SE',
+        locale: appLocale(),
         timezone: TZ as never,
         firstDayOfWeek: 1,
         showWeekNumbers: true,
@@ -291,7 +292,7 @@ export class BookingCalendar implements OnInit {
     const d = this.date();
     const m = this.mode();
     if (m === 'month-grid') {
-      return d.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' });
+      return d.toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' });
     }
     if (m === 'week') {
       const from = new Date(d);
@@ -299,14 +300,14 @@ export class BookingCalendar implements OnInit {
       const to = new Date(from);
       to.setDate(from.getDate() + 6);
       const f = (x: Date, y = false) =>
-        x.toLocaleDateString('sv-SE', {
+        x.toLocaleDateString(appLocale(), {
           day: 'numeric',
           month: 'short',
           ...(y ? { year: 'numeric' } : {}),
         });
       return `${f(from)} – ${f(to, true)}`;
     }
-    return d.toLocaleDateString('sv-SE', {
+    return d.toLocaleDateString(appLocale(), {
       weekday: 'long',
       day: 'numeric',
       month: 'long',

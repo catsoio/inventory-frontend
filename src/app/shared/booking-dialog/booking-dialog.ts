@@ -54,14 +54,16 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
       }
     </h2>
     <form [formGroup]="form" (ngSubmit)="save()">
-      <mat-dialog-content class="!grid gap-x-10 gap-y-5 !pt-2 md:grid-cols-2 md:items-start">
-        <div class="flex flex-col gap-5">
-          <section class="flex flex-col gap-3">
+      <mat-dialog-content
+        class="!grid content-start gap-x-10 gap-y-5 !pt-2 md:grid-cols-2 md:items-start"
+      >
+        <div class="flex flex-col gap-5 max-md:contents">
+          <section class="flex flex-col gap-3 max-md:order-1">
             <h3 class="sec">Kund och bil</h3>
             <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" />
           </section>
 
-          <section class="flex flex-col gap-3">
+          <section class="flex flex-col gap-3 max-md:order-2">
             <h3 class="sec">Vad ska göras</h3>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
               <mat-label>Åtgärd</mat-label>
@@ -79,7 +81,7 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
               <mat-label>Vad ska göras</mat-label>
               <textarea
                 matInput
-                rows="4"
+                rows="3"
                 maxlength="2000"
                 formControlName="title"
                 placeholder="En rad per åtgärd, t.ex. byt däck"
@@ -90,7 +92,7 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
               Varje rad blir en kryssruta på arbetsordern.
             </p>
           </section>
-          <section class="flex flex-col gap-3">
+          <section class="flex flex-col gap-3 max-md:order-6" [class]="moreCls()">
             <h3 class="sec">Pris och anteckning</h3>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <mat-form-field class="col-span-2" subscriptSizing="dynamic">
@@ -105,8 +107,8 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             </div>
           </section>
         </div>
-        <div class="flex flex-col gap-5">
-          <section class="flex flex-col gap-3">
+        <div class="flex flex-col gap-5 max-md:contents">
+          <section class="flex flex-col gap-3 max-md:order-3">
             <h3 class="sec">När</h3>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <app-date-field
@@ -123,21 +125,22 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
                 formControlName="endTime"
                 [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
               />
-              <app-date-field
-                class="col-span-2"
-                label="Klar senast (om det dröjer)"
-                icon="event_available"
-                [error]="form.errors?.['due'] ? 'Före datumet' : ''"
-                formControlName="dueDay"
-              />
-              <p class="col-span-2 -mt-3 pb-3 text-xs text-gray-500">
-                Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar
-                senast".
-              </p>
+              <div class="col-span-2 flex flex-col gap-3" [class]="moreCls()">
+                <app-date-field
+                  label="Klar senast (om det dröjer)"
+                  icon="event_available"
+                  [error]="form.errors?.['due'] ? 'Före datumet' : ''"
+                  formControlName="dueDay"
+                />
+                <p class="-mt-2 text-xs text-gray-500">
+                  Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar
+                  senast".
+                </p>
+              </div>
             </div>
           </section>
 
-          <section class="flex flex-col gap-3">
+          <section class="flex flex-col gap-3 max-md:order-7" [class]="moreCls()">
             <h3 class="sec">Vem och var</h3>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <mat-form-field class="col-span-1" subscriptSizing="dynamic">
@@ -173,7 +176,7 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
           </section>
         </div>
         @if (workOrdersOn && !legacy) {
-          <section class="rounded-xl md:col-span-2 bg-gray-50 p-3">
+          <section class="rounded-xl bg-gray-50 p-3 max-md:order-4 md:col-span-2">
             @if (data.booking) {
               @if (order(); as o) {
                 <app-pill [tone]="o.status === 'done' ? 'green' : 'blue'">
@@ -192,6 +195,22 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             }
           </section>
         }
+        <!-- Mobil: det mesta man behöver vid ett snabbt samtal syns direkt, resten ligger här. -->
+        <div class="flex flex-col gap-1 pb-1 max-md:order-5 md:hidden">
+          <button
+            mat-stroked-button
+            type="button"
+            class="self-start"
+            (click)="more.set(!more())"
+            [attr.aria-expanded]="more()"
+          >
+            <mat-icon>{{ more() ? 'expand_less' : 'expand_more' }}</mat-icon>
+            {{ more() ? 'Färre val' : 'Fler val' }}
+          </button>
+          @if (!more() && moreSummary()) {
+            <span class="text-xs text-gray-500">{{ moreSummary() }}</span>
+          }
+        </div>
       </mat-dialog-content>
       <mat-dialog-actions>
         @if (data.booking && admin) {
@@ -231,6 +250,28 @@ export class BookingDialog {
   private readonly ref = inject<MatDialogRef<BookingDialog, BookingDialogResult>>(MatDialogRef);
 
   readonly busy = signal(false);
+  /** Mobil: visar pris, anmärkning, klar senast, mekaniker och status. */
+  readonly more = signal(false);
+  moreCls() {
+    return this.more() ? '' : 'max-md:hidden';
+  }
+
+  /** En rad om vad som redan är ifyllt under "Fler val", så att man ser det utan att öppna. */
+  moreSummary() {
+    if (!this.form) return '';
+    const v = this.form.getRawValue();
+    const mech = this.resourceOptions().find((r) => r.id === v.resourceId)?.name;
+    const place = this.resourceOptions().find((r) => r.id === v.placeId)?.name;
+    return [
+      v.price ? `Pris ${v.price} kr` : '',
+      mech ?? '',
+      place ?? '',
+      v.dueDay ? `Klar senast ${v.dueDay}` : '',
+      v.notes?.trim() ? 'Anmärkning' : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
 
   /** Stänger direkt, eller frågar först om formuläret har ändrats. */
   tryClose() {
@@ -355,6 +396,8 @@ export class BookingDialog {
   }
 
   save() {
+    // Ett fel i ett dolt fält ska synas: öppna "Fler val" då.
+    if (this.form.errors?.['due'] || this.form.controls.price.invalid) this.more.set(true);
     if (!ensureValid(this.form, this.snack)) return;
 
     const v = this.form.getRawValue();

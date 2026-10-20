@@ -70,17 +70,11 @@ main {
   .mat-mdc-form-field-bottom-align::before {
     display: none;
   }
+  /* Felet tar plats under fältet (inget ligger över nästa fält). Utan fel är raden tom och tar ingen plats. */
   .mat-mdc-form-field-subscript-wrapper {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    height: 0;
-    overflow: visible;
-    margin-top: 1px;
-    line-height: 12px;
-    font-size: 11px;
-    pointer-events: none;
+    margin-top: 2px;
+    line-height: 14px;
+    font-size: 12px;
   }
   .mat-mdc-form-field-subscript-wrapper .mat-mdc-form-field-hint-wrapper,
   .mat-mdc-form-field-subscript-wrapper .mat-mdc-form-field-error-wrapper {
@@ -89,8 +83,14 @@ main {
   .mat-mdc-form-field-hint-wrapper mat-hint {
     display: none;
   }
-  .mat-mdc-form-field-icon-prefix > .mat-icon {
+  /* Ikonen i fältet döljs på mobil. Material tar bort fältets vänsterkant när det finns en ikon,
+     så utan den här raden hamnar texten kant i kant med ramen och första tecknet klipps. */
+  .mat-mdc-form-field-icon-prefix {
     display: none;
+  }
+  .mat-mdc-form-field.mat-mdc-form-field-has-icon-prefix .mat-mdc-text-field-wrapper {
+    padding-left: 16px;
+    --mat-mdc-form-field-label-offset-x: 0px;
   }
 }
 

@@ -1,3 +1,4 @@
+import { appLocale } from '../../core/i18n/locale';
 import { Component, Input } from '@angular/core';
 import { PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../core/models';
 
@@ -212,7 +213,7 @@ export class InvoiceDocument {
   readonly payLabels = PAYMENT_METHOD_LABELS;
 
   day(iso: string | null) {
-    return iso ? new Date(iso).toLocaleDateString('sv-SE') : '–';
+    return iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
   }
 
   /** Rabatten på hela kortet: radernas summa minus det som ska betalas. */

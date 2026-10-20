@@ -41,12 +41,15 @@ export class I18n {
   }
 
   set(lang: Lang): void {
+    const changed = lang !== this.lang();
     try {
       localStorage.setItem(KEY, lang);
     } catch {
       /* ignoreras */
     }
     this.lang.set(lang);
+    // Datum, månads- och dagnamn och kalendern läses vid start, så appen laddas om på det nya språket.
+    if (changed) location.reload();
   }
 
   /** För text som byggs i kod (snackbars m.m.). */

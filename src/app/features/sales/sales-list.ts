@@ -1,3 +1,4 @@
+import { appLocale } from '../../core/i18n/locale';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { SalesCardApi } from '../../core/api/sales-card-api';
@@ -7,7 +8,7 @@ import { KrPipe } from '../../shared/kr-pipe';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleDateString('sv-SE') : '–';
+  iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
 
 const statusOf = (c: SalesCardItem) =>
   c.status === 'draft' ? 'Utkast' : c.paidAt ? 'Betald' : 'Obetald';

@@ -1,5 +1,6 @@
 import { registerLocaleData } from '@angular/common';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import localeEnGb from '@angular/common/locales/en-GB';
 import localeSv from '@angular/common/locales/sv';
 import { LOCALE_ID, NgModule, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { TitleStrategy } from '@angular/router';
@@ -17,9 +18,11 @@ import { authTokenInterceptor } from './core/http/auth-token-interceptor';
 import { envelopeInterceptor } from './core/http/envelope-interceptor';
 import { errorInterceptor } from './core/http/error-interceptor';
 import { garageHeaderInterceptor } from './core/http/garage-header-interceptor';
+import { appLocale } from './core/i18n/locale';
 import { SharedModule } from './shared/shared-module';
 
 registerLocaleData(localeSv);
+registerLocaleData(localeEnGb);
 
 @NgModule({
   declarations: [App, Shell, BillingBanner, PlansDialog],
@@ -27,8 +30,9 @@ registerLocaleData(localeSv);
   providers: [
     provideBrowserGlobalErrorListeners(),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
-    { provide: LOCALE_ID, useValue: 'sv-SE' },
-    { provide: MAT_DATE_LOCALE, useValue: 'sv-SE' },
+    // Språket läses vid start; byts språk laddas appen om (se I18n.set).
+    { provide: LOCALE_ID, useFactory: appLocale },
+    { provide: MAT_DATE_LOCALE, useFactory: appLocale },
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline' } },
     // Ordning: svar passerar authToken (refresh/retry) -> error (mappning) -> envelope (uppackning).
     provideHttpClient(

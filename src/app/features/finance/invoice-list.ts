@@ -1,3 +1,4 @@
+import { appLocale } from '../../core/i18n/locale';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { WorkOrderApi } from '../../core/api/work-order-api';
@@ -9,7 +10,7 @@ import { InvoiceItem, loadInvoices } from './invoices';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleDateString('sv-SE') : '–';
+  iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
 
 const COLS: DtCol<InvoiceItem>[] = [
   { key: 'code', label: 'Nr', value: (o) => o.code },

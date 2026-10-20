@@ -1,3 +1,4 @@
+import { appLocale } from '../../../core/i18n/locale';
 import { Component, Input, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -13,7 +14,7 @@ import {
 
 const kr = new KrPipe();
 const when = (iso: string) =>
-  new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
+  new Date(iso).toLocaleString(appLocale(), { dateStyle: 'short', timeStyle: 'short' });
 
 const COLS: DtCol<Booking>[] = [
   { key: 'code', label: 'Nr', value: (b) => b.number, fmt: (b) => b.code },

@@ -1,3 +1,4 @@
+import { appLocale } from '../../../core/i18n/locale';
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
@@ -5,7 +6,7 @@ import { Auth } from '../../../core/auth/auth';
 import { WORK_ORDER_STATUS_LABELS, WorkOrder, WorkOrderStatus } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
 
-const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('sv-SE') : '–');
+const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(appLocale()) : '–');
 
 const COLS: DtCol<WorkOrder>[] = [
   { key: 'code', label: 'Nr', value: (o) => o.number, fmt: (o) => o.code },

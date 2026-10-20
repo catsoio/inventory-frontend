@@ -1,3 +1,4 @@
+import { appLocale } from '../../core/i18n/locale';
 import { ClosingBlocked, ClosingWarning } from '../../core/models';
 import { KrPipe } from '../../shared/kr-pipe';
 
@@ -5,7 +6,7 @@ const TZ = 'Europe/Stockholm';
 const kr = new KrPipe();
 
 export const dayText = (iso: string): string =>
-  new Date(iso).toLocaleDateString('sv-SE', {
+  new Date(iso).toLocaleDateString(appLocale(), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -13,11 +14,11 @@ export const dayText = (iso: string): string =>
   });
 
 export const dateTimeText = (iso: string): string =>
-  new Date(iso).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short', timeZone: TZ });
+  new Date(iso).toLocaleString(appLocale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: TZ });
 
 /** YYYY-MM-DD i Stockholm, för <input type="date">. */
 export const dayInput = (iso: string | Date): string =>
-  new Date(iso).toLocaleDateString('sv-SE', { timeZone: TZ });
+  new Date(iso).toLocaleDateString(appLocale(), { timeZone: TZ });
 
 /** Slutpunkten är exklusiv, så visa sista dagen som faktiskt ingår. */
 export const periodLabel = (from: string, to: string): string => {
