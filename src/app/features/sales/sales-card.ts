@@ -744,7 +744,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       this.depositsHint.set('Välj en kund först för att se kundens däckhotell.');
       return;
     }
-    this.storage.deposits({ status: 'stored', paymentStatus: 'unpaid', limit: 200 }).subscribe((p) => {
+    this.storage.deposits({ status: 'stored', paymentStatus: 'unpaid', limit: 100 }).subscribe((p) => {
       const taken = new Set(this.rows().map((r) => r.depositId));
       const list = p.items.filter((d) => d.customerId === customerId && !taken.has(d.id));
       this.deposits.set(list);

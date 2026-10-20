@@ -49,11 +49,11 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
         ),
     ),
   );
-  const fromCards = cards.list({ status: 'posted', limit: 200, offset: 0 }).pipe(
+  const fromCards = cards.list({ status: 'posted', limit: PAGE, offset: 0 }).pipe(
     expand((p) => {
       const next = p.pagination.offset + p.pagination.limit;
       return next < p.pagination.total && next < 1000
-        ? cards.list({ status: 'posted', limit: 200, offset: next })
+        ? cards.list({ status: 'posted', limit: PAGE, offset: next })
         : EMPTY;
     }),
     reduce((all, p) => all.concat(p.items), [] as SalesCardItem[]),

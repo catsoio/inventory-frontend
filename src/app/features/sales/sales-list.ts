@@ -108,7 +108,7 @@ export class SalesList {
         q: this.q() || undefined,
         status: f === 'draft' ? 'draft' : undefined,
         paid: f === 'paid' ? true : f === 'unpaid' ? false : undefined,
-        limit: 200,
+        limit: 100,
       })
       .subscribe({
         next: (p) => {
