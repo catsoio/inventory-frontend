@@ -3,7 +3,7 @@ import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
 import { API_URL, InventoryApi } from '../api/inventory-api';
-import { AuthTokens, AuthUser, Garage, GarageListItem, Role } from '../models';
+import { AuthTokens, AuthUser, Company, Garage, GarageListItem, Role } from '../models';
 
 const KEY = 'garagestock.auth';
 const ACTING_KEY = 'garagestock.actingGarage';
@@ -54,6 +54,12 @@ export class Auth {
   readonly ownGarage = signal<Garage | null>(null);
   /** Alla garage, för superadmin. */
   readonly garages = signal<GarageListItem[]>([]);
+  /** Bolagen ägaren kan växla mellan (minst två för att det ska vara aktuellt). */
+  readonly companies = signal<Company[]>([]);
+  /** Namnet från Fakturauppgifter för bolaget man är i; tomt tills det är ifyllt. */
+  readonly sellerName = signal<string>('');
+  /** Bolagets namn överst: fakturauppgiftens namn, annars garagets. */
+  readonly companyName = computed(() => this.sellerName() || this.garage()?.name || '');
   readonly isSuperAdmin = computed(() => !!this.ownGarage()?.superAdmin);
   /** Garage-id som skickas som X-Garage-Id; null när man jobbar i sitt eget. */
   readonly actingGarageId = signal<string | null>(localStorage.getItem(ACTING_KEY));
@@ -128,8 +134,26 @@ export class Auth {
         this.ownGarage.set(own);
         this.garage.set(own);
         if (own.superAdmin) this.loadGarages();
+        else if (own.role === 'owner') this.loadCompanies();
       }),
     );
+  }
+
+  /** Ägarens bolag; ett sparat val tillämpas, okänt val rensas. */
+  private loadCompanies(): void {
+    this.api.companies().subscribe({
+      next: (list) => {
+        this.companies.set(list);
+        const id = this.actingGarageId();
+        const target = id ? list.find((c) => c.id === id) : undefined;
+        if (target && target.id !== this.ownGarage()?.id) {
+          this.garage.set({ id: target.id, name: target.name, role: 'owner' });
+        } else if (id) {
+          this.setActing(null);
+        }
+      },
+      error: () => this.setActing(null),
+    });
   }
 
   /** Hämtar alla garage och tillämpar ett sparat val; okänt val rensas. */
@@ -158,6 +182,17 @@ export class Auth {
   switchGarage(id: string): void {
     this.setActing(id === this.ownGarage()?.id ? null : id);
     this.router.navigateByUrl('/dashboard').then(() => location.reload());
+  }
+
+  /** Bolagets namn följer Fakturauppgifter: byt det i menyn och listorna direkt. */
+  renameGarage(name: string): void {
+    const id = this.garage()?.id;
+    if (!id || !name.trim()) return;
+    const set = (g: Garage | null) => (g && g.id === id ? { ...g, name } : g);
+    this.garage.update(set);
+    this.ownGarage.update(set);
+    this.garages.update((l) => l.map((g) => (g.id === id ? { ...g, name } : g)));
+    this.companies.update((l) => l.map((c) => (c.id === id ? { ...c, name } : c)));
   }
 
   setGarage(g: Garage): void {
@@ -191,6 +226,7 @@ export class Auth {
     this.garage.set(null);
     this.ownGarage.set(null);
     this.garages.set([]);
+    this.companies.set([]);
     this.router.navigate(['/login']);
   }
 

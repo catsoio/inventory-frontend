@@ -2,13 +2,15 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { ClosingApi } from '../../core/api/closing-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
-import { VatReport, WorkOrder } from '../../core/models';
+import { SalesCardApi } from '../../core/api/sales-card-api';
+import { VatReport } from '../../core/models';
 import { ChartConfiguration } from 'chart.js';
 import { brandColor } from '../../shared/chart/chart';
 import { KrPipe } from '../../shared/kr-pipe';
+import { netOf } from '../../shared/vat';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { TradeRow } from '../../core/models';
-import { grossOf, loadInvoices, loadTrades } from './invoices';
+import { InvoiceItem, loadInvoices, loadTrades } from './invoices';
 
 const kr = new KrPipe();
 const MONTHS = 12;
@@ -71,22 +73,23 @@ const ymd = (d: Date) =>
 })
 export class FinanceOverview {
   private readonly orders = inject(WorkOrderApi);
+  private readonly cards = inject(SalesCardApi);
   private readonly closings = inject(ClosingApi);
   private readonly inventory = inject(InventoryApi);
   private readonly sales = signal<TradeRow[]>([]);
   private readonly purchases = signal<TradeRow[]>([]);
   readonly months = MONTHS;
-  private readonly invoices = signal<WorkOrder[]>([]);
+  private readonly invoices = signal<InvoiceItem[]>([]);
   private readonly vat = signal<VatReport | null>(null);
 
   readonly kpis = computed(() => {
     const unpaid = this.invoices().filter((o) => !o.paidAt);
-    const unpaidSum = unpaid.reduce((s, o) => s + grossOf(o.price ?? 0), 0);
+    const unpaidSum = unpaid.reduce((s, o) => s + o.total, 0);
     const now = new Date();
     const monthNet = this.invoices()
 
       .filter((o) => this.sameMonth(o.invoicedAt, now))
-      .reduce((s, o) => s + (o.price ?? 0), 0);
+      .reduce((s, o) => s + o.total, 0);
     const v = this.vat();
     return [
       {
@@ -99,7 +102,7 @@ export class FinanceOverview {
       {
         label: 'Fakturerat i månaden',
         value: kr.transform(monthNet),
-        hint: 'exkl. moms',
+        hint: 'inkl. moms',
         tone: '',
         link: '/finance/invoices',
       },
@@ -121,10 +124,10 @@ export class FinanceOverview {
   });
 
   readonly chart = computed(() => {
-    const sum = (d: Date, at: (o: WorkOrder) => string | null | undefined) =>
+    const sum = (d: Date, at: (o: InvoiceItem) => string | null | undefined) =>
       this.invoices()
         .filter((o) => this.sameMonth(at(o), d))
-        .reduce((t, o) => t + (o.price ?? 0), 0) / 100;
+        .reduce((t, o) => t + o.total, 0) / 100;
     return this.monthly(
       { label: 'Fakturerat', color: brandColor(), value: (d) => sum(d, (o) => o.invoicedAt) },
       { label: 'Betalt', color: '#16a34a', value: (d) => sum(d, (o) => o.paidAt) },
@@ -203,14 +206,14 @@ export class FinanceOverview {
   readonly salesChart = computed(() =>
     this.monthly(
       {
-        label: 'Försäljning',
+        label: 'Försäljning (inkl. moms)',
         color: brandColor(),
         value: (d) => this.tradeSum(this.sales(), d, (r) => r.total),
       },
       {
-        label: 'Vinst',
+        label: 'Vinst (exkl. moms)',
         color: '#16a34a',
-        value: (d) => this.tradeSum(this.sales(), d, (r) => r.total - r.cost),
+        value: (d) => this.tradeSum(this.sales(), d, (r) => netOf(r.total) - r.cost),
       },
     ),
   );
@@ -230,8 +233,8 @@ export class FinanceOverview {
   }
 
   constructor() {
-    loadInvoices(this.orders)
-      .pipe(catchError(() => of([] as WorkOrder[])))
+    loadInvoices(this.orders, this.cards)
+      .pipe(catchError(() => of([] as InvoiceItem[])))
       .subscribe((l) => this.invoices.set(l));
     loadTrades(this.inventory, 'sales')
       .pipe(catchError(() => of([] as TradeRow[])))

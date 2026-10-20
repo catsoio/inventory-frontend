@@ -1,3 +1,4 @@
+import { STANDARD_VAT } from '../../../shared/vat';
 import { Component, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -256,10 +257,10 @@ const signedInt = Validators.pattern(/^-?\d+$/);
         >
       }
       <mat-form-field class="col-span-3 sm:col-span-1"
-        ><mat-label>Försäljningspris (kr, exkl. moms)</mat-label
+        ><mat-label>Försäljningspris (kr, inkl. moms)</mat-label
         ><mat-icon matPrefix class="mr-2 text-gray-400">sell</mat-icon>
         <input matInput type="number" inputmode="decimal" step="0.01" formControlName="sellPrice" />
-        <mat-hint>{{ form.controls.sellPrice.value | inclVat }}</mat-hint>
+        <mat-hint>{{ form.controls.sellPrice.value | vatPart }}</mat-hint>
         <mat-error>Ange pris (0 eller mer)</mat-error></mat-form-field
       >
       @if (id) {
@@ -394,7 +395,10 @@ export class ArticleForm {
       // Föreslå försäljningspris från inköpspris + påslag så länge priset inte fyllts i.
       this.form.controls.averageCost.valueChanges.pipe(takeUntilDestroyed()).subscribe((cost) => {
         if (cost != null && !this.form.controls.sellPrice.dirty) {
-          this.form.controls.sellPrice.setValue(Math.round(cost * (1 + d.markupPercent / 100)));
+          // Inköpspriset är exkl. moms, försäljningspriset inkl. 25 % moms.
+          this.form.controls.sellPrice.setValue(
+            Math.round(cost * (1 + d.markupPercent / 100) * (1 + STANDARD_VAT / 100)),
+          );
         }
       });
       this.form.controls.averageCost.addValidators((c) =>

@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormBuilder, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { AbstractControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -142,7 +142,7 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
               <h3 class="sec">Däckhotell</h3>
               <div class="grid gap-x-4 sm:grid-cols-2">
                 <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>Standardavgift per inlämning (kr, exkl. moms)</mat-label>
+                  <mat-label>Standardavgift per inlämning (kr, inkl. moms)</mat-label>
                   <input
                     matInput
                     type="number"
@@ -270,6 +270,42 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 <input matInput formControlName="footer" />
               </mat-form-field>
             </form>
+          }
+
+          @if (tab() === 'companies' && showCompanies()) {
+            <h3 class="sec">Bolag</h3>
+            <div class="flex flex-col divide-y divide-gray-100">
+              @for (c of auth.isSuperAdmin() ? auth.garages() : auth.companies(); track c.id) {
+                <div class="flex items-center gap-3 py-3">
+                  <span class="min-w-0 flex-1 truncate font-medium">{{ c.name }}</span>
+                  @if (c.id === auth.garage()?.id) {
+                    <span class="text-xs text-gray-500">Du är här</span>
+                  } @else {
+                    <button mat-stroked-button type="button" (click)="auth.switchGarage(c.id)">
+                      Växla
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+            @if (auth.isSuperAdmin()) {
+              <h3 class="sec mt-6">Lägg till bolag i {{ auth.garage()?.name }}s organisation</h3>
+              <div class="flex items-start gap-3">
+                <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                  <mat-label>Bolagets namn</mat-label>
+                  <input matInput [formControl]="companyName" />
+                </mat-form-field>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="companyName.invalid || companyBusy()"
+                  (click)="addCompany()"
+                >
+                  Lägg till
+                </button>
+              </div>
+            }
           }
 
           @if (tab() === 'staff' && auth.isAdmin()) {
@@ -436,20 +472,31 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
 })
 export class SettingsPage {
   /** Fliken som visas; ägaren har fler. */
-  readonly tab = signal<'view' | 'stock' | 'account' | 'invoice' | 'staff'>('view');
+  /** Superadmin eller en ägare med fler än ett bolag. */
+  readonly showCompanies = computed(
+    () => this.auth.isSuperAdmin() || this.auth.companies().length > 1,
+  );
+  readonly companyName = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.minLength(2)],
+  });
+  readonly companyBusy = signal(false);
+  readonly tab = signal<'view' | 'stock' | 'account' | 'invoice' | 'staff' | 'companies'>('view');
   readonly tabs = computed(() => {
     const t = [
       { id: 'view' as const, label: 'Visning', icon: 'tune' },
       { id: 'stock' as const, label: 'Lager och däckhotell', icon: 'inventory_2' },
       { id: 'account' as const, label: 'Konto', icon: 'lock' },
     ];
-    return this.auth.isAdmin()
-      ? [
-          ...t,
-          { id: 'invoice' as const, label: 'Fakturauppgifter', icon: 'receipt_long' },
-          { id: 'staff' as const, label: 'Personal', icon: 'group' },
-        ]
-      : t;
+    if (!this.auth.isAdmin()) return t;
+    const owner = [
+      ...t,
+      { id: 'invoice' as const, label: 'Fakturauppgifter', icon: 'receipt_long' },
+      { id: 'staff' as const, label: 'Personal', icon: 'group' },
+    ];
+    return this.showCompanies()
+      ? [...owner, { id: 'companies' as const, label: 'Bolag', icon: 'storefront' }]
+      : owner;
   });
 
   protected readonly version = pkg.version;
@@ -482,13 +529,13 @@ export class SettingsPage {
   readonly seasons = Object.entries(SEASON_LABELS);
   readonly sellerBusy = signal(false);
   readonly sellerForm = inject(FormBuilder).nonNullable.group({
-    name: ['', Validators.required],
-    orgNo: ['', Validators.required],
+    name: [''],
+    orgNo: [''],
     vatNumber: ['', Validators.pattern(/^(SE\s?\d{12})?$/i)],
     fTax: [true],
-    address: ['', Validators.required],
-    postalCode: ['', Validators.required],
-    city: ['', Validators.required],
+    address: [''],
+    postalCode: [''],
+    city: [''],
     phone: [''],
     email: [''],
     paymentDetails: [''],
@@ -514,11 +561,19 @@ export class SettingsPage {
   });
 
   constructor() {
+    if (!this.auth.isAdmin()) {
+      // Företagets standardvärden gäller alla; bara ägaren ändrar dem.
+      for (const k of ['defaultSeason', 'defaultSupplier', 'defaultReorderLevel', 'markupPercent', 'defaultStorageFee'] as const) {
+        this.form.controls[k].disable();
+      }
+    }
     if (this.auth.isAdmin()) {
       this.loadMembers();
       this.api.seller().subscribe((s) =>
         this.sellerForm.patchValue({
           ...s,
+          // Tomt namn fylls i med garagets namn så ägaren bara behöver komplettera.
+          name: s.name || this.auth.garage()?.name || '',
           vatNumber: s.vatNumber ?? '',
           phone: s.phone ?? '',
           email: s.email ?? '',
@@ -533,7 +588,9 @@ export class SettingsPage {
     this.sellerBusy.set(true);
     const v = this.sellerForm.getRawValue();
     this.api.saveSeller(v).subscribe({
-      next: () => {
+      next: (s) => {
+        this.auth.sellerName.set(s.name);
+        this.auth.renameGarage(s.name);
         this.sellerBusy.set(false);
         this.snack.open('Fakturauppgifterna sparades', undefined, { duration: 2500 });
       },
@@ -634,6 +691,21 @@ export class SettingsPage {
         danger: true,
       })
       .subscribe((ok) => ok && this.api.removeMember(m.userId).subscribe(() => this.loadMembers()));
+  }
+
+  addCompany() {
+    const id = this.auth.garage()?.id;
+    if (!id) return;
+    this.companyBusy.set(true);
+    this.api.addCompany(id, this.companyName.value).subscribe({
+      next: (c) => {
+        this.companyBusy.set(false);
+        this.companyName.reset('');
+        this.snack.open(`${c.name} lades till`, undefined, { duration: 2500 });
+        this.api.allGarages().subscribe((l) => this.auth.garages.set(l));
+      },
+      error: () => this.companyBusy.set(false),
+    });
   }
 
   save() {

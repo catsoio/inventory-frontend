@@ -6,13 +6,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { InventoryApi } from '../../../core/api/inventory-api';
+import { SalesCardApi } from '../../../core/api/sales-card-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import {
   Article,
-  CustomerType,
-  PAYMENT_METHOD_LABELS,
-  PaymentMethod,
   Resource,
+  SalesCardItem,
   WORK_ORDER_STATUS_LABELS,
   WorkOrderDetail,
   WorkOrderInput,
@@ -25,7 +24,7 @@ import { Subject, debounceTime, switchMap } from 'rxjs';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../../storage/storage-format';
 import { Auth } from '../../../core/auth/auth';
-import { totalsOf, withVat } from '../../../shared/vat';
+import { totalsOf, vatIn } from '../../../shared/vat';
 import { QuickArticleDialog } from '../quick-article-dialog/quick-article-dialog';
 
 const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
@@ -278,7 +277,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
             Överenskommet med kunden. Står inte på arbetsbladet.
           </p>
           <mat-form-field class="sm:col-span-2">
-            <mat-label>Pris för jobbet (kr, exkl. moms)</mat-label>
+            <mat-label>Pris för jobbet (kr, inkl. moms)</mat-label>
             <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
             <mat-hint>{{ inclHint(form.controls.price.value) }}</mat-hint>
           </mat-form-field>
@@ -294,9 +293,7 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
 
         @if (card(); as c) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-2 text-base font-semibold">
-              {{ customerType() === 'company' ? 'Faktura' : 'Kvitto' }}
-            </h2>
+            <h2 class="mb-2 text-base font-semibold">Säljkort</h2>
             <div class="grid gap-x-4 sm:grid-cols-6">
               <mat-form-field class="sm:col-span-6">
                 <mat-label>Utfört (står på kvittot)</mat-label>
@@ -315,62 +312,26 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
               </mat-form-field>
             </div>
             @if (c.invoice; as inv) {
+              <p class="text-sm">
+                Fakturerad som <b>{{ inv.code }}</b> på arbetsordern (äldre sätt).
+                <a class="text-brand" [routerLink]="['/finance/invoices', c.id]">Öppna fakturan</a>
+              </p>
+            } @else if (salesCard(); as sc) {
               <div class="flex flex-wrap items-center gap-3">
                 <span>
-                  <b>{{ inv.code }}</b> ·
-                  {{ inv.kind === 'invoice' ? 'faktura' : 'kvitto' }} utfärdat
-                  {{ inv.issuedAt | date: 'yyyy-MM-dd' }}
-                  @if (inv.dueAt) {
-                    · förfaller {{ inv.dueAt | date: 'yyyy-MM-dd' }}
-                  }
-                  · <b>{{ inv.totals.total | kr }}</b> inkl. moms
+                  <b>{{ sc.code }}</b> · {{ sc.total | kr }} inkl. moms
                 </span>
-                <a mat-stroked-button [routerLink]="['/workorders', c.id, 'invoice']">
-                  <mat-icon>receipt_long</mat-icon> Visa / skriv ut
+                <app-pill [tone]="sc.status === 'draft' ? 'gray' : sc.paidAt ? 'green' : 'amber'">
+                  {{ sc.status === 'draft' ? 'Utkast' : sc.paidAt ? 'Betald' : 'Obetald' }}
+                </app-pill>
+                <a mat-flat-button color="primary" [routerLink]="['/sales', sc.id]">
+                  <mat-icon>receipt_long</mat-icon> Öppna säljkort
                 </a>
               </div>
-              <div class="mt-3 flex flex-wrap items-center gap-3">
-                @if (inv.paidAt) {
-                  <app-pill tone="green"
-                    >Betald {{ inv.paidAt | date: 'yyyy-MM-dd' }}
-                    @if (inv.paymentMethod) {
-                      · {{ payLabels[inv.paymentMethod] }}
-                    }
-                  </app-pill>
-                  <button mat-button type="button" (click)="setPaid(false)">Ångra betalning</button>
-                } @else {
-                  <mat-form-field subscriptSizing="dynamic" class="w-48">
-                    <mat-label>Betalsätt</mat-label>
-                    <mat-select
-                      [value]="payMethod()"
-                      (selectionChange)="payMethod.set($event.value)"
-                    >
-                      @for (m of payMethods; track m[0]) {
-                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                  <button mat-flat-button color="primary" type="button" (click)="setPaid(true)">
-                    Markera betald
-                  </button>
-                }
-              </div>
-              @if (inv.kind === 'receipt' && payMethod() !== 'invoice') {
-                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                  <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
-                  kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
-                  prisbasbelopp inkl. moms (236 800 kr för 2026). Det här systemet är inget
-                  kassaregister. Kontrollera med Skatteverket eller er revisor hur ni ska göra.
-                </p>
-              }
-            } @else if (c.status === 'done') {
+            } @else {
               <p class="mb-3 text-sm text-gray-600">
-                @if (customerType() === 'company') {
-                  Företag får faktura med organisationsnummer, momsbelopp och förfallodatum.
-                } @else {
-                  Privatkund får kvitto med priset inklusive moms.
-                }
-                Tills du bokför kan ordern ändras och förhandsvisas som utkast. När den är bokförd får den fakturanummer och går inte att ändra.
+                Priset, rabatten, fakturan eller kvittot och betalningen hanteras på säljkortet.
+                Skapa det när jobbet är klart, så följer kund, bil och pris med.
               </p>
               @if (form.dirty) {
                 <p class="mb-3 text-sm text-amber-800">Spara ändringarna först.</p>
@@ -379,25 +340,11 @@ const kr = (o: number | null | undefined) => (o == null ? null : o / 100);
                 mat-flat-button
                 color="primary"
                 type="button"
-                [disabled]="form.dirty || busy() || !admin"
-                (click)="issue()"
+                [disabled]="form.dirty || busy()"
+                (click)="createSalesCard()"
               >
-                <mat-icon>receipt_long</mat-icon>
-                {{ customerType() === 'company' ? 'Bokför faktura' : 'Bokför kvitto' }}
+                <mat-icon>receipt_long</mat-icon> Skapa säljkort
               </button>
-              <a
-                mat-stroked-button
-                class="ml-2"
-                [routerLink]="['/workorders', c.id, 'invoice']"
-                [class.pointer-events-none]="form.dirty"
-              >
-                <mat-icon>visibility</mat-icon> Förhandsgranska utkast
-              </a>
-            } @else {
-              <p class="text-sm text-gray-600">
-                Sätt ordern till <b>Klar</b> och spara för att kunna
-                {{ customerType() === 'company' ? 'fakturera' : 'skapa kvitto' }}.
-              </p>
             }
           </section>
         }
@@ -410,6 +357,7 @@ export class WorkOrderCard implements OnInit {
   /** Bara ägare får ta bort. */
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkOrderApi);
+  private readonly salesApi = inject(SalesCardApi);
   private readonly links = inject(LinkResolver);
   private readonly workshop = inject(WorkshopApi);
   private readonly inventory = inject(InventoryApi);
@@ -421,11 +369,8 @@ export class WorkOrderCard implements OnInit {
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
 
   readonly statuses = Object.entries(WORK_ORDER_STATUS_LABELS);
-  readonly payLabels = PAYMENT_METHOD_LABELS;
-  readonly payMethods = Object.entries(PAYMENT_METHOD_LABELS) as [PaymentMethod, string][];
-  readonly payMethod = signal<PaymentMethod>('card');
-  /** Privat → kvitto med pris inkl. moms; företag → faktura. */
-  readonly customerType = signal<CustomerType>('private');
+  /** Säljkortet som fakturerar ordern, om det finns. */
+  readonly salesCard = signal<SalesCardItem | null>(null);
   readonly busy = signal(false);
   readonly card = signal<WorkOrderDetail | null>(null);
   readonly resources = signal<Resource[]>([]);
@@ -586,11 +531,10 @@ export class WorkOrderCard implements OnInit {
     this.save();
   }
 
-  /** "= 1 250 kr inkl. moms" under ett nettopris. */
-  inclHint(netKr: number | null | undefined): string {
-    if (netKr == null || Number.isNaN(netKr)) return '';
-    const ore = Math.round(netKr * 100);
-    return `= ${(withVat(ore) / 100).toLocaleString('sv-SE')} kr inkl. moms`;
+  /** "varav moms 199 kr" under ett pris inkl. moms. */
+  inclHint(grossKr: number | null | undefined): string {
+    if (grossKr == null || Number.isNaN(grossKr) || grossKr === 0) return '';
+    return `varav moms ${(vatIn(Math.round(grossKr * 100)) / 100).toLocaleString('sv-SE')} kr`;
   }
 
   private load() {
@@ -629,8 +573,9 @@ export class WorkOrderCard implements OnInit {
       // En fakturerad order är låst.
       if (o.invoice) this.form.disable({ emitEvent: false });
       else this.form.enable({ emitEvent: false });
-      this.payMethod.set(o.invoice?.paymentMethod ?? 'card');
-      this.workshop.customer(o.customerId).subscribe((c) => this.customerType.set(c.type));
+      this.salesApi
+        .list({ workOrderId: o.id, limit: 1 })
+        .subscribe((p) => this.salesCard.set(p.items[0] ?? null));
       this.version.update((n) => n + 1);
       // Raderna byggs om efter varje laddning (även efter spara): samma extra rendering som vid +.
       this.settle();
@@ -712,55 +657,16 @@ export class WorkOrderCard implements OnInit {
       });
   }
 
-  /** Fakturerar (företag) eller kvitterar (privat) och låser ordern. */
-  issue() {
-    const o = this.card()!;
-    const company = this.customerType() === 'company';
-    this.dialog
-      .open(ConfirmDialog, {
-        data: {
-          title: company ? `Bokför faktura för ${o.code}?` : `Bokför kvitto för ${o.code}?`,
-          message:
-            'Ordern får ett löpnummer och låses: rader, pris och kund kan inte ändras efteråt. ' +
-            'Verkstadens och kundens uppgifter kopieras in på dokumentet.',
-          confirmText: 'Bokför',
-        },
-      })
-      .afterClosed()
-      .subscribe((ok) => {
-        if (!ok) return;
-        this.busy.set(true);
-        this.api.issueInvoice(o.id).subscribe({
-          next: () => {
-            this.busy.set(false);
-            this.snack.open('Utfärdat', undefined, { duration: 2000 });
-            this.load();
-          },
-          error: () => this.busy.set(false),
-        });
-      });
-  }
-
-  setPaid(paid: boolean) {
-    const run = () =>
-      this.api
-        .setPaid(this.id!, paid, paid ? this.payMethod() : undefined)
-        .subscribe(() => this.load());
-    if (paid) {
-      run();
-      return;
-    }
-    this.dialog
-      .open(ConfirmDialog, {
-        data: {
-          title: 'Markera som obetald?',
-          message: 'Betalningen och betalsättet tas bort från fakturan.',
-          confirmText: 'Markera obetald',
-          danger: true,
-        },
-      })
-      .afterClosed()
-      .subscribe((ok) => ok && run());
+  /** Skapar säljkortet för ordern (eller öppnar det som finns) och går dit. */
+  createSalesCard() {
+    this.busy.set(true);
+    this.salesApi.create({ workOrderId: this.id! }).subscribe({
+      next: (c) => {
+        this.busy.set(false);
+        void this.router.navigate(['/sales', c.id]);
+      },
+      error: () => this.busy.set(false),
+    });
   }
 
   remove() {

@@ -112,7 +112,12 @@ const routes: Routes = [
       },
       {
         path: 'sales',
-        title: 'Sälj',
+        title: 'Försäljning',
+        loadChildren: () => import('./features/sales/sales-module').then((m) => m.SalesModule),
+      },
+      {
+        path: 'sales-legacy',
+        title: 'Äldre försäljningar',
         data: { mode: 'sell' },
         loadChildren: () => import('./features/trade/trade-module').then((m) => m.TradeModule),
       },

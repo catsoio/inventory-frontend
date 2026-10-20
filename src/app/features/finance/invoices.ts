@@ -1,27 +1,81 @@
-import { Observable, expand, map, reduce } from 'rxjs';
+import { Observable, expand, forkJoin, map, reduce } from 'rxjs';
 import { EMPTY } from 'rxjs';
 import { WorkOrderApi } from '../../core/api/work-order-api';
+import { SalesCardApi } from '../../core/api/sales-card-api';
 import { InventoryApi } from '../../core/api/inventory-api';
-import { TradeKind, TradeRow, WorkOrder } from '../../core/models';
+import { SalesCardItem, TradeKind, TradeRow, WorkOrder } from '../../core/models';
 
-/** Moms på ordern: normalsats 25 %, samma som fakturan. */
-export const grossOf = (netOre: number) => Math.round(netOre * 1.25);
+/** Ett utfärdat dokument, från ett säljkort eller (äldre) en arbetsorder. Belopp i öre inkl. moms. */
+export interface InvoiceItem {
+  /** Kortets eller ordern id. */
+  id: string;
+  kind: 'card' | 'order';
+  code: string;
+  invoicedAt: string | null;
+  paidAt: string | null;
+  customerName: string;
+  regNo: string;
+  /** SK-00042 eller AO-00042. */
+  ref: string;
+  total: number;
+}
 
-/** Alla utfärdade fakturor och kvitton (klara order med dokument), nyast först. */
-export function loadInvoices(api: WorkOrderApi): Observable<WorkOrder[]> {
+/** Alla utfärdade fakturor och kvitton (säljkort och äldre arbetsorder), nyast först. */
+export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observable<InvoiceItem[]> {
   const PAGE = 100;
-  return api.list({ status: 'done', limit: PAGE, offset: 0 }).pipe(
+  const fromOrders = orders.list({ status: 'done', limit: PAGE, offset: 0 }).pipe(
     expand((p) => {
       const next = p.pagination.offset + p.pagination.limit;
       return next < p.pagination.total && next < 1000
-        ? api.list({ status: 'done', limit: PAGE, offset: next })
+        ? orders.list({ status: 'done', limit: PAGE, offset: next })
         : EMPTY;
     }),
     reduce((all, p) => all.concat(p.items), [] as WorkOrder[]),
     map((all) =>
       all
         .filter((o) => !!o.invoiceCode)
-        .sort((a, b) => (b.invoicedAt ?? '').localeCompare(a.invoicedAt ?? '')),
+        .map(
+          (o): InvoiceItem => ({
+            id: o.id,
+            kind: 'order',
+            code: o.invoiceCode!,
+            invoicedAt: o.invoicedAt ?? null,
+            paidAt: o.paidAt ?? null,
+            customerName: o.customerName,
+            regNo: o.regNo,
+            ref: o.code,
+            total: o.price ?? 0,
+          }),
+        ),
+    ),
+  );
+  const fromCards = cards.list({ status: 'posted', limit: 200, offset: 0 }).pipe(
+    expand((p) => {
+      const next = p.pagination.offset + p.pagination.limit;
+      return next < p.pagination.total && next < 1000
+        ? cards.list({ status: 'posted', limit: 200, offset: next })
+        : EMPTY;
+    }),
+    reduce((all, p) => all.concat(p.items), [] as SalesCardItem[]),
+    map((all) =>
+      all.map(
+        (c): InvoiceItem => ({
+          id: c.id,
+          kind: 'card',
+          code: c.invoiceCode ?? c.code,
+          invoicedAt: c.invoicedAt,
+          paidAt: c.paidAt,
+          customerName: c.customerName ?? 'Kontantkund',
+          regNo: c.regNo ?? '',
+          ref: c.code,
+          total: c.total,
+        }),
+      ),
+    ),
+  );
+  return forkJoin([fromOrders, fromCards]).pipe(
+    map(([a, b]) =>
+      [...a, ...b].sort((x, y) => (y.invoicedAt ?? '').localeCompare(x.invoicedAt ?? '')),
     ),
   );
 }

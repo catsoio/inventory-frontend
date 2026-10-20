@@ -295,6 +295,12 @@ export interface Garage {
   superAdmin?: boolean;
 }
 
+/** Ett bolag i ägarens organisation (Sthlm, Luleå …). */
+export interface Company {
+  id: string;
+  name: string;
+}
+
 export interface GarageListItem {
   id: string;
   name: string;
@@ -886,8 +892,20 @@ export interface WorkOrderInvoice {
   /** Vad som gjorts och eventuell garanti, som det står på dokumentet. */
   performed: string | null;
   warranty: string | null;
+  /** Rad för rad, när dokumentet kommer från ett säljkort. */
+  rows?: InvoiceDocRow[];
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+}
+
+/** En rad på ett utfärdat dokument. Belopp i öre, inkl. moms. */
+export interface InvoiceDocRow {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  vatRate: number;
+  total: number;
 }
 
 /** Verkstadens uppgifter på fakturan. */
@@ -1036,4 +1054,98 @@ export type SupplierInput = Partial<
 export interface SupplierDetail extends Supplier {
   purchases: TradeRow[];
   purchaseCount: number;
+}
+
+// --- Säljkort ---
+
+export type SalesCardStatus = 'draft' | 'posted';
+export type SalesLineType = 'article' | 'service' | 'storage' | 'free';
+
+export interface SalesLine {
+  id: string;
+  type: SalesLineType;
+  description: string;
+  articleId: string | null;
+  depositId: string | null;
+  quantity: number;
+  /** Öre per styck, inkl. moms. */
+  unitPrice: number;
+  discountPercent: number;
+  vatRate: number;
+  stockBooked: boolean;
+  /** Vad raden kostar efter radens och kortets rabatt, öre inkl. moms. */
+  amount: number;
+}
+
+export interface SalesDiscount {
+  type: 'percent' | 'amount';
+  /** Procent, eller öre inkl. moms. */
+  value: number;
+  reason: string | null;
+}
+
+/** Säljkortet i listor. */
+export interface SalesCardItem {
+  id: string;
+  number: number;
+  /** SK-00042. */
+  code: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  customerName: string | null;
+  regNo: string | null;
+  vehicle: string | null;
+  workOrderId: string | null;
+  status: SalesCardStatus;
+  lineCount: number;
+  /** Att betala, öre inkl. moms. */
+  total: number;
+  /** FAK-00042 när kortet är bokfört. */
+  invoiceCode: string | null;
+  invoicedAt: string | null;
+  paidAt: string | null;
+  kind: 'invoice' | 'receipt' | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalesCardLinks {
+  customer: { id: string; code: string; name: string } | null;
+  vehicle: { id: string; regNo: string; label: string | null } | null;
+  workOrder: { id: string; code: string } | null;
+  deposits: { id: string; code: string; regNo: string }[];
+}
+
+export interface SalesCardDetail extends SalesCardItem {
+  lines: SalesLine[];
+  discount: SalesDiscount | null;
+  totals: OrderTotals;
+  performed: string | null;
+  warranty: string | null;
+  invoice: WorkOrderInvoice | null;
+  links: SalesCardLinks;
+}
+
+export interface SalesLineInput {
+  id?: string;
+  type: SalesLineType;
+  description?: string;
+  articleId?: string;
+  depositId?: string;
+  quantity?: number;
+  unitPrice?: number;
+  discountPercent?: number;
+  vatRate?: number;
+}
+
+export interface SalesCardInput {
+  customerId?: string | null;
+  vehicleId?: string | null;
+  workOrderId?: string;
+  lines?: SalesLineInput[];
+  discount?: { type: 'percent' | 'amount'; value: number; reason?: string } | null;
+  note?: string;
+  performed?: string;
+  warranty?: string;
 }

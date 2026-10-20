@@ -36,7 +36,9 @@ import { TimeField } from './time-field/time-field';
 import { DataTable } from './data-table/data-table';
 import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
-import { InclVatPipe } from './incl-vat-pipe';
+import { VatPartPipe } from './vat-part-pipe';
+import { InvoiceDocument } from './invoice-document/invoice-document';
+import { SalesCardHistory } from './sales-card-history/sales-card-history';
 import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
 import { ChartView } from './chart/chart';
@@ -88,7 +90,9 @@ const MATERIAL = [
     CustomerSelect,
     VehicleDialog,
     KrPipe,
-    InclVatPipe,
+    VatPartPipe,
+    InvoiceDocument,
+    SalesCardHistory,
     StockBadge,
     MovementList,
     Pill,
@@ -122,7 +126,9 @@ const MATERIAL = [
     CustomerSelect,
     VehicleDialog,
     KrPipe,
-    InclVatPipe,
+    VatPartPipe,
+    InvoiceDocument,
+    SalesCardHistory,
     StockBadge,
     MovementList,
     Pill,

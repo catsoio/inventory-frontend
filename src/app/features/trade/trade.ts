@@ -1,4 +1,4 @@
-import { vatOf } from '../../shared/vat';
+import { vatIn } from '../../shared/vat';
 import {
   Component,
   DestroyRef,
@@ -99,7 +99,7 @@ interface Line {
         <ng-template #priceField let-l="l" let-i="i">
           <mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>{{
-              sell ? 'Pris/st (kr, exkl. moms)' : 'Inköpspris/st (kr, exkl. moms)'
+              sell ? 'Pris/st (kr, inkl. moms)' : 'Inköpspris/st (kr, exkl. moms)'
             }}</mat-label>
             <input
               matInput
@@ -126,7 +126,7 @@ interface Line {
                 <th class="px-3 py-2 text-right">I lager</th>
                 <th class="w-28 px-3 py-2 text-right">Antal</th>
                 <th class="w-44 px-3 py-2 text-right">Pris/st (kr)</th>
-                <th class="px-3 py-2 text-right">Summa exkl. moms</th>
+                <th class="px-3 py-2 text-right">{{ sell ? 'Summa inkl. moms' : 'Summa exkl. moms' }}</th>
                 <th class="w-10 px-3 py-2"></th>
               </tr>
             </thead>
@@ -209,7 +209,7 @@ interface Line {
                 <div class="mt-3 text-xs text-red-600">{{ qtyHint(l) }}</div>
               }
               <div class="mt-2 flex justify-between border-t pt-2 text-sm">
-                <span class="text-gray-600">Summa exkl. moms</span>
+                <span class="text-gray-600">{{ sell ? 'Summa inkl. moms' : 'Summa exkl. moms' }}</span>
                 <b>{{ lineOre(l) | kr }}</b>
               </div>
             </div>
@@ -250,14 +250,15 @@ interface Line {
             <span>Antal</span><b>{{ units() }} st</b>
           </div>
           <div class="flex justify-between py-2 text-xl font-semibold">
-            <span>Totalt exkl. moms</span><span>{{ totalOre() | kr }}</span>
+            <span>{{ sell ? 'Totalt inkl. moms' : 'Totalt exkl. moms' }}</span
+            ><span>{{ totalOre() | kr }}</span>
           </div>
           @if (sell) {
             <div class="flex justify-between text-sm text-gray-600">
-              <span>Moms 25 %</span><span>{{ vatOre() | kr }}</span>
+              <span>Varav moms 25 %</span><span>{{ vatOre() | kr }}</span>
             </div>
             <div class="flex justify-between pb-2 font-semibold">
-              <span>Att betala inkl. moms</span><span>{{ totalOre() + vatOre() | kr }}</span>
+              <span>Att betala inkl. moms</span><span>{{ totalOre() | kr }}</span>
             </div>
           }
           <button
@@ -301,8 +302,8 @@ export class Trade {
 
   readonly units = computed(() => this.lines().reduce((n, l) => n + (l.qty || 0), 0));
   readonly totalOre = computed(() => this.lines().reduce((n, l) => n + this.lineOre(l), 0));
-  /** Moms på försäljningen (25 %), avrundad en gång på summan. */
-  readonly vatOre = computed(() => vatOf(this.totalOre()));
+  /** Momsen som ingår i försäljningen (25 %), avrundad en gång på summan. */
+  readonly vatOre = computed(() => vatIn(this.totalOre()));
   readonly valid = computed(
     () => this.lines().length > 0 && this.lines().every((l) => this.qtyOk(l) && l.price >= 0),
   );

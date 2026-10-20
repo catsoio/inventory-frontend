@@ -32,7 +32,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
           <mat-error>Obligatoriskt</mat-error>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Försäljningspris (kr, exkl. moms)</mat-label>
+          <mat-label>Försäljningspris (kr, inkl. moms)</mat-label>
           <input matInput type="number" inputmode="decimal" min="0" formControlName="sellPrice" />
           <mat-error>Ange pris (0 eller mer)</mat-error>
         </mat-form-field>

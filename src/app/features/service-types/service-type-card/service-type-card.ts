@@ -56,14 +56,14 @@ import { Auth } from '../../../core/auth/auth';
           <mat-error>Minst 5 minuter</mat-error>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris från (kr, exkl. moms)</mat-label>
+          <mat-label>Pris från (kr, inkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceFrom" />
-          <mat-hint>{{ form.controls.priceFrom.value | inclVat }}</mat-hint>
+          <mat-hint>{{ form.controls.priceFrom.value | vatPart }}</mat-hint>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris till (kr, exkl. moms)</mat-label>
+          <mat-label>Pris till (kr, inkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceTo" />
-          <mat-hint>{{ form.controls.priceTo.value | inclVat }}</mat-hint>
+          <mat-hint>{{ form.controls.priceTo.value | vatPart }}</mat-hint>
           @if (form.errors?.['price']) {
             <mat-error>Lägre än "från"</mat-error>
           }

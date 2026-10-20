@@ -243,10 +243,10 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
         </h2>
         <div class="grid grid-cols-6 gap-x-3 p-3 sm:grid-cols-2 sm:gap-x-4 md:p-4 lg:grid-cols-3">
           <mat-form-field class="col-span-3 sm:col-span-1"
-            ><mat-label>Avgift (kr, exkl. moms)</mat-label
+            ><mat-label>Avgift (kr, inkl. moms)</mat-label
             ><mat-icon matPrefix class="mr-2 text-gray-400">payments</mat-icon>
             <input matInput type="number" inputmode="decimal" step="0.01" formControlName="fee" />
-            <mat-hint>{{ form.controls.fee.value | inclVat }}</mat-hint>
+            <mat-hint>{{ form.controls.fee.value | vatPart }}</mat-hint>
             <mat-error>0 eller mer</mat-error></mat-form-field
           >
           <div class="col-span-3 mb-3 flex items-center sm:col-span-1 md:mb-4">

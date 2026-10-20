@@ -94,9 +94,9 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             <h3 class="sec">Pris och anteckning</h3>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <mat-form-field class="col-span-2" subscriptSizing="dynamic">
-                <mat-label>Pris (kr, exkl. moms)</mat-label>
+                <mat-label>Pris (kr, inkl. moms)</mat-label>
                 <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
-                <mat-hint>{{ form.controls.price.value | inclVat }}</mat-hint>
+                <mat-hint>{{ form.controls.price.value | vatPart }}</mat-hint>
               </mat-form-field>
               <mat-form-field class="col-span-2" subscriptSizing="dynamic">
                 <mat-label>Anmärkning (syns på arbetsbladet)</mat-label>

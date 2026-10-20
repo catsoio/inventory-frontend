@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { NavigationEnd, Router } from '@angular/router';
@@ -8,6 +8,7 @@ import { StorageApi } from '../../api/storage-api';
 import { GARAGE_ROLE_LABELS, Report, StorageSummary, Summary } from '../../models';
 import { Auth } from '../../auth/auth';
 import { PageTitle } from '../../page-title';
+import { Settings } from '../../settings';
 import { SettingsPage } from '../../../features/settings/settings';
 import { environment } from '../../../../environments/environment';
 
@@ -70,7 +71,6 @@ const NAV: NavSection[] = [
         label: 'Fakturor',
         icon: 'receipt_long',
         adminOnly: true,
-        only: 'desktop',
       },
     ],
   },
@@ -346,7 +346,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
             >
             <div class="min-w-0 flex-1 leading-tight">
               <div class="truncate text-sm font-semibold">
-                {{ auth.garage()?.name ?? 'Däcklager' }}
+                {{ (auth.companyName() || 'Däcklager') }}
               </div>
               <div class="truncate text-xs text-white/80">
                 {{ who() }} ·
@@ -418,13 +418,13 @@ const today = () => new Date().toLocaleDateString('sv-SE');
               aria-label="Byt garage"
             >
               <span class="truncate text-sm font-semibold">{{
-                auth.garage()?.name ?? 'Däcklager'
+                (auth.companyName() || 'Däcklager')
               }}</span>
               <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] opacity-80">unfold_more</mat-icon>
             </button>
           } @else {
             <a routerLink="/dashboard" class="min-w-0 flex-1 truncate text-sm font-semibold">{{
-              auth.garage()?.name ?? 'Däcklager'
+              (auth.companyName() || 'Däcklager')
             }}</a>
           }
         }
@@ -608,6 +608,18 @@ export class Shell {
   });
 
   constructor() {
+    // Bolagsnamnet överst följer Fakturauppgifter för det bolag man är i.
+    effect(() => {
+      const id = this.auth.garage()?.id;
+      this.auth.sellerName.set('');
+      if (id && this.auth.isAdmin()) {
+        this.api.seller().subscribe({
+          next: (s) => this.auth.sellerName.set(s.name),
+          error: () => {},
+        });
+      }
+    });
+    inject(Settings).loadCompany();
     // Uppdateras vid start och efter varje sidbyte (t.ex. efter en försäljning).
     this.router.events
       .pipe(

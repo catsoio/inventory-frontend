@@ -82,7 +82,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         }
         @if (data.action === 'sell') {
           <mat-form-field
-            ><mat-label>Pris per styck (kr, exkl. moms)</mat-label>
+            ><mat-label>Pris per styck (kr, inkl. moms)</mat-label>
             <input
               matInput
               type="number"
@@ -92,7 +92,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
               formControlName="unitPrice"
               (focus)="$any($event.target).select()"
             />
-            <mat-hint>{{ form.controls.unitPrice.value | inclVat }}</mat-hint></mat-form-field
+            <mat-hint>{{ form.controls.unitPrice.value | vatPart }}</mat-hint></mat-form-field
           >
         }
         <mat-form-field

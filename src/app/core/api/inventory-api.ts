@@ -8,8 +8,10 @@ import {
   ArticleQuery,
   ArticleUpdate,
   Facets,
+  Company,
   Garage,
   GarageInvite,
+  Season,
   GarageListItem,
   GarageMember,
   Movement,
@@ -34,6 +36,14 @@ function toParams(obj: object): HttpParams {
   return p;
 }
 
+export interface CompanySettings {
+  defaultMarkupPercent: number | null;
+  defaultReorderLevel: number | null;
+  defaultSupplier: string | null;
+  defaultSeason: Season | null;
+  defaultStorageFee: number | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryApi {
   private readonly http = inject(HttpClient);
@@ -42,6 +52,15 @@ export class InventoryApi {
   /** Verkstadens uppgifter på faktura och kvitto. */
   seller(): Observable<SellerDetails> {
     return this.http.get<SellerDetails>(`${this.base}/seller`);
+  }
+
+  /** Företagets gemensamma standardvärden (gäller alla användare). */
+  companySettings(): Observable<CompanySettings> {
+    return this.http.get<CompanySettings>(`${this.base}/settings`);
+  }
+
+  saveCompanySettings(body: Partial<CompanySettings>): Observable<CompanySettings> {
+    return this.http.put<CompanySettings>(`${this.base}/settings`, body);
   }
 
   saveSeller(body: Partial<SellerDetails>): Observable<SellerDetails> {
@@ -116,6 +135,16 @@ export class InventoryApi {
   /** Alla garage (bara superadmin). */
   allGarages(): Observable<GarageListItem[]> {
     return this.http.get<GarageListItem[]>(`${this.base}/garage/all`);
+  }
+
+  /** Bolagen i ägarens organisation. */
+  companies(): Observable<Company[]> {
+    return this.http.get<Company[]>(`${this.base}/garage/companies`);
+  }
+
+  /** Lägger till ett bolag i samma organisation (bara superadmin). */
+  addCompany(siblingGarageId: string, name: string): Observable<Company> {
+    return this.http.post<Company>(`${this.base}/garage/admin/garages`, { siblingGarageId, name });
   }
 
   createGarage(name: string, signupCode?: string): Observable<Garage> {

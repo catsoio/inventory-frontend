@@ -5,7 +5,7 @@ import { InventoryApi } from '../../core/api/inventory-api';
 import { TradeKind, TradeRow } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
-import { vatOf, withVat } from '../../shared/vat';
+import { netOf, vatIn } from '../../shared/vat';
 import { TradeDocumentDialog } from '../../shared/trade-document-dialog/trade-document-dialog';
 
 const kr = new KrPipe();
@@ -114,7 +114,7 @@ export class TradeLedger {
     { key: 'units', label: 'Antal', right: true, value: (r) => r.units },
     {
       key: 'total',
-      label: 'Summa exkl. moms',
+      label: this.sell ? 'Summa inkl. moms' : 'Summa exkl. moms',
       right: true,
       value: (r) => r.total,
       fmt: (r) => kr.transform(r.total),
@@ -123,17 +123,17 @@ export class TradeLedger {
       ? [
           {
             key: 'vat',
-            label: 'Moms 25 %',
+            label: 'Varav moms 25 %',
             right: true,
-            value: (r: TradeRow) => vatOf(r.total),
-            fmt: (r: TradeRow) => kr.transform(vatOf(r.total)),
+            value: (r: TradeRow) => vatIn(r.total),
+            fmt: (r: TradeRow) => kr.transform(vatIn(r.total)),
           },
           {
             key: 'gross',
-            label: 'Inkl. moms',
+            label: 'Exkl. moms',
             right: true,
-            value: (r: TradeRow) => withVat(r.total),
-            fmt: (r: TradeRow) => kr.transform(withVat(r.total)),
+            value: (r: TradeRow) => netOf(r.total),
+            fmt: (r: TradeRow) => kr.transform(netOf(r.total)),
           },
         ]
       : []),
@@ -148,7 +148,7 @@ export class TradeLedger {
   }
   /** Försäljning visas inkl. moms (det kunden betalar), inköp exkl. moms. */
   shownTotal(r: TradeRow) {
-    return kr.transform(this.sell ? withVat(r.total) : r.total);
+    return kr.transform(r.total);
   }
   when(iso: string) {
     return `${day(iso)} ${time(iso)}`;

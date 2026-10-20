@@ -134,22 +134,22 @@ import { PENDING_CUSTOMER } from '../../../shared/customer-select/customer-selec
 
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <div class="mb-2 flex items-center">
-            <h2 class="flex-1 text-lg font-semibold">Försäljningar</h2>
+            <h2 class="flex-1 text-lg font-semibold">Säljkort</h2>
             @if (c.active) {
               <a
                 mat-stroked-button
                 routerLink="/sales/new"
                 [queryParams]="{ customerId: c.customerId, vehicleId: c.id }"
               >
-                <mat-icon>add</mat-icon> Ny försäljning
+                <mat-icon>add</mat-icon> Nytt säljkort
               </a>
             }
           </div>
-          <app-trade-history
-            [rows]="c.sales"
-            kind="sales"
-            empty="Inget sålt till den här bilen än."
-          />
+          <app-sales-card-history [vehicleId]="c.id" empty="Inget sålt till den här bilen än." />
+          @if (olderSales(c.sales).length) {
+            <h3 class="mt-4 mb-1 text-sm font-semibold text-gray-600">Äldre lagerförsäljningar</h3>
+            <app-trade-history [rows]="olderSales(c.sales)" kind="sales" />
+          }
         </section>
 
         <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -340,5 +340,10 @@ export class VehicleCard implements OnInit {
 
   restore() {
     this.api.updateVehicle(this.id!, { active: true }).subscribe(() => this.load());
+  }
+
+  /** Lagerförsäljningar från före säljkorten; de som säljkort och arbetsorder bokat visas på sina kort. */
+  olderSales<T extends { reference: string | null }>(rows: T[]): T[] {
+    return rows.filter((r) => !/^(SK|AO)-/.test(r.reference ?? ''));
   }
 }

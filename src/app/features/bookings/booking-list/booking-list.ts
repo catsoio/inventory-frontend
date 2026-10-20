@@ -29,7 +29,7 @@ const COLS: DtCol<Booking>[] = [
   },
   {
     key: 'price',
-    label: 'Pris exkl. moms',
+    label: 'Pris inkl. moms',
     right: true,
     value: (b) => b.priceFrom ?? 0,
     fmt: (b) =>

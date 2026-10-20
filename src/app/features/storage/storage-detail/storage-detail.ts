@@ -1,4 +1,4 @@
-import { vatOf, withVat } from '../../../shared/vat';
+import { vatIn } from '../../../shared/vat';
 import { Component, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -67,6 +67,11 @@ type Field = [label: string, value: string | number];
         </button>
         <span class="mx-1 hidden h-6 border-l sm:block"></span>
         <a mat-button routerLink="edit"><mat-icon>edit</mat-icon> Ändra</a>
+        @if (d.paymentStatus === 'unpaid') {
+          <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ depositId: d.id }">
+            <mat-icon>receipt_long</mat-icon> Lägg på säljkort
+          </a>
+        }
         @if (admin) {
           <button mat-button color="warn" (click)="remove(d)">
             <mat-icon>delete</mat-icon> Ta bort
@@ -175,11 +180,11 @@ export class StorageDetail {
     }
     sections.push(
       {
-        title: 'Avgift och betalning (exkl. moms)',
+        title: 'Avgift och betalning',
         fields: [
-          ['Avgift (exkl. moms)', this.kr.transform(d.fee)],
-          ['Moms 25 %', this.kr.transform(vatOf(d.fee))],
-          ['Att betala (inkl. moms)', this.kr.transform(withVat(d.fee))],
+          ['Avgift (inkl. moms)', this.kr.transform(d.fee)],
+          ['Varav moms 25 %', this.kr.transform(vatIn(d.fee))],
+          ['Att betala (inkl. moms)', this.kr.transform(d.fee)],
           ['Status', PAYMENT_STATUS_LABELS[d.paymentStatus]],
           ['Betalsätt', d.paymentMethod ? PAYMENT_METHOD_LABELS[d.paymentMethod] : '–'],
           ['Betaldatum', dateText(d.paidAt)],

@@ -188,7 +188,7 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
         <footer class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
           <div class="mr-auto text-sm">
             @if (o.price !== null) {
-              <span class="text-gray-500">Pris exkl. moms</span>
+              <span class="text-gray-500">Pris inkl. moms</span>
               <b class="ml-2 text-base tabular-nums">{{ o.price | kr }}</b>
               @if (o.priceNote) {
                 <div class="text-xs text-gray-500">{{ o.priceNote }}</div>

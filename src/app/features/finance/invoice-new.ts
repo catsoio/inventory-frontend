@@ -45,7 +45,7 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
             formControlName="date"
           />
           <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-            <mat-label>Belopp (kr, exkl. moms)</mat-label>
+            <mat-label>Belopp (kr, inkl. moms)</mat-label>
             <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
             <mat-hint>{{ inclHint() }}</mat-hint>
             <mat-error>Ange belopp över 0</mat-error>
@@ -103,7 +103,7 @@ export class InvoiceNew implements HasUnsaved {
 
   inclHint() {
     const p = this.form.controls.price.value;
-    return p > 0 ? `= ${(p * 1.25).toLocaleString('sv-SE')} kr inkl. moms` : '';
+    return p > 0 ? `varav moms ${(p * 0.2).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} kr` : '';
   }
 
   save() {
