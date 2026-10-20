@@ -250,9 +250,21 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 <mat-label>E-post</mat-label>
                 <input matInput formControlName="email" />
               </mat-form-field>
+              <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+                <mat-label>Bankgiro</mat-label>
+                <input matInput formControlName="bankgiro" placeholder="123-4567" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+                <mat-label>Bankkonto</mat-label>
+                <input matInput formControlName="bankAccount" placeholder="Bank, clearing, kontonr" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+                <mat-label>Betala med Swish (nummer)</mat-label>
+                <input matInput formControlName="swish" placeholder="123 456 78 90" />
+              </mat-form-field>
               <mat-form-field class="sm:col-span-4" subscriptSizing="dynamic">
-                <mat-label>Betalningsuppgifter</mat-label>
-                <input matInput formControlName="paymentDetails" placeholder="Bankgiro 123-4567" />
+                <mat-label>Övrig betalningsinfo (valfritt)</mat-label>
+                <input matInput formControlName="paymentDetails" />
               </mat-form-field>
               <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
                 <mat-label>Betalningsvillkor (dagar)</mat-label>
@@ -538,6 +550,9 @@ export class SettingsPage {
     city: [''],
     phone: [''],
     email: [''],
+    bankgiro: [''],
+    bankAccount: [''],
+    swish: [''],
     paymentDetails: [''],
     paymentTermsDays: [30, [Validators.min(0), Validators.max(365)]],
     footer: [''],
@@ -577,6 +592,9 @@ export class SettingsPage {
           vatNumber: s.vatNumber ?? '',
           phone: s.phone ?? '',
           email: s.email ?? '',
+          bankgiro: s.bankgiro ?? '',
+          bankAccount: s.bankAccount ?? '',
+          swish: s.swish ?? '',
           paymentDetails: s.paymentDetails ?? '',
           footer: s.footer ?? '',
         }),

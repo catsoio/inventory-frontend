@@ -1,6 +1,6 @@
 import { appLocale } from '../../core/i18n/locale';
 import { Component, Input } from '@angular/core';
-import { PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../core/models';
+import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../core/models';
 
 /**
  * Fakturan (till företag) eller kvittot (till privatpersoner) som A4. Allt på sidan är det
@@ -162,9 +162,17 @@ import { PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../core/models';
                 inv.paymentMethod ? ' med ' + payLabels[inv.paymentMethod].toLowerCase() : ''
               }}.
             </p>
-          } @else if (inv.seller.paymentDetails) {
+          } @else if (
+            inv.seller.bankgiro ||
+            inv.seller.bankAccount ||
+            inv.seller.swish ||
+            inv.seller.paymentDetails
+          ) {
             <p>
-              Betalning till <b>{{ inv.seller.paymentDetails }}</b
+              Betalning till
+              <b>{{
+                payTo(inv.seller)
+              }}</b
               >. {{ inv.code ? 'Ange ' + inv.code + ' som referens.' : '' }}
             </p>
           }
@@ -197,6 +205,15 @@ import { PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../core/models';
             }
           </div>
           <div>
+            @if (inv.seller.bankgiro) {
+              <div>Bankgiro {{ inv.seller.bankgiro }}</div>
+            }
+            @if (inv.seller.bankAccount) {
+              <div>Bankkonto {{ inv.seller.bankAccount }}</div>
+            }
+            @if (inv.seller.swish) {
+              <div>Betala med Swish {{ inv.seller.swish }}</div>
+            }
             @if (inv.seller.paymentDetails) {
               <div>{{ inv.seller.paymentDetails }}</div>
             }
@@ -211,6 +228,18 @@ export class InvoiceDocument {
   /** Referensrader högst upp till höger, t.ex. ["Arbetsorder", "AO-00002"]. */
   @Input() meta: [string, string][] = [];
   readonly payLabels = PAYMENT_METHOD_LABELS;
+
+  /** Betalningssätten i en rad: "Bankgiro 123-4567, Swish 123 456 78 90". */
+  payTo(s: InvoiceSeller): string {
+    return [
+      s.bankgiro && `Bankgiro ${s.bankgiro}`,
+      s.bankAccount && `Bankkonto ${s.bankAccount}`,
+      s.swish && `Swish ${s.swish}`,
+      s.paymentDetails,
+    ]
+      .filter(Boolean)
+      .join(', ');
+  }
 
   day(iso: string | null) {
     return iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';

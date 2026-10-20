@@ -860,6 +860,9 @@ export interface InvoiceSeller {
   phone: string | null;
   email: string | null;
   fTax: boolean;
+  bankgiro?: string | null;
+  bankAccount?: string | null;
+  swish?: string | null;
   paymentDetails: string | null;
   footer: string | null;
 }
@@ -910,6 +913,9 @@ export interface InvoiceDocRow {
 
 /** Verkstadens uppgifter på fakturan. */
 export interface SellerDetails extends Omit<InvoiceSeller, 'footer' | 'paymentDetails'> {
+  bankgiro: string | null;
+  bankAccount: string | null;
+  swish: string | null;
   paymentDetails: string | null;
   footer: string | null;
   /** Dagar till förfallodatum på företagsfaktura. */
