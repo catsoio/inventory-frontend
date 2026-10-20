@@ -5,6 +5,8 @@ import { NavigationEnd, Router } from '@angular/router';
 import { catchError, debounceTime, filter, merge, of } from 'rxjs';
 import { InventoryApi } from '../../api/inventory-api';
 import { StorageApi } from '../../api/storage-api';
+import { SalesCardApi } from '../../api/sales-card-api';
+import { WorkOrderApi } from '../../api/work-order-api';
 import { GARAGE_ROLE_LABELS, Report, StorageSummary, Summary } from '../../models';
 import { Auth } from '../../auth/auth';
 import { PageTitle } from '../../page-title';
@@ -552,6 +554,8 @@ export class Shell {
   readonly pageName = inject(PageTitle).page;
   private readonly api = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
+  private readonly orders = inject(WorkOrderApi);
+  private readonly cards = inject(SalesCardApi);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   /** Menyn som glider in på mobilen. */
@@ -570,6 +574,11 @@ export class Shell {
   private readonly stock = signal<Summary | null>(null);
   private readonly hotel = signal<StorageSummary | null>(null);
   private readonly soldToday = signal<Report | null>(null);
+  /** Antal nya order, order med del som saknas, utkast på säljkort och obetalda fakturor. */
+  private readonly openOrders = signal(0);
+  private readonly missingOrders = signal(0);
+  private readonly draftCards = signal(0);
+  private readonly unpaidInvoices = signal(0);
 
   /** Siffror bredvid menyvalen så att man ser läget utan att öppna sidan. */
   readonly badges = computed<Record<string, Badge>>(() => {
@@ -595,8 +604,43 @@ export class Shell {
           (h.unpaid > 0 ? `, ${h.unpaid} obetalda` : ''),
       };
     }
+    const missing = this.missingOrders();
+    const fresh = this.openOrders();
+    if (missing > 0 || fresh > 0) {
+      out['/workorders'] =
+        missing > 0
+          ? {
+              text: String(missing),
+              tone: 'bg-amber-100 text-amber-800',
+              dot: 'bg-amber-500',
+              hint: `${missing} order har en del som saknas` + (fresh ? `, ${fresh} nya` : ''),
+            }
+          : {
+              text: String(fresh),
+              tone: 'bg-blue-100 text-blue-800',
+              dot: 'bg-blue-500',
+              hint: `${fresh} nya order`,
+            };
+    }
+    const unpaid = this.unpaidInvoices();
+    if (unpaid > 0) {
+      out['/finance/invoices'] = {
+        text: String(unpaid),
+        tone: 'bg-red-100 text-red-800',
+        dot: 'bg-red-500',
+        hint: `${unpaid} obetalda fakturor`,
+      };
+    }
+    const drafts = this.draftCards();
     const r = this.soldToday();
-    if (r && r.soldUnits > 0) {
+    if (drafts > 0) {
+      out['/sales'] = {
+        text: `${drafts} utkast`,
+        tone: 'bg-amber-100 text-amber-800',
+        dot: 'bg-amber-500',
+        hint: `${drafts} säljkort väntar på att bokföras`,
+      };
+    } else if (r && r.soldUnits > 0) {
       out['/sales'] = {
         text: `${r.soldUnits} idag`,
         tone: 'bg-green-100 text-green-800',
@@ -656,12 +700,30 @@ export class Shell {
       .summary()
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.hotel.set(x));
+    if (environment.workOrders) {
+      this.orders
+        .list({ needsAction: true, limit: 1 })
+        .pipe(catchError(() => of(null)))
+        .subscribe((x) => this.missingOrders.set(x?.pagination.total ?? 0));
+      this.orders
+        .list({ status: 'open', limit: 1 })
+        .pipe(catchError(() => of(null)))
+        .subscribe((x) => this.openOrders.set(x?.pagination.total ?? 0));
+    }
+    this.cards
+      .list({ status: 'draft', limit: 1 })
+      .pipe(catchError(() => of(null)))
+      .subscribe((x) => this.draftCards.set(x?.pagination.total ?? 0));
     // Försäljningssiffror är bara för ägare; personal får annars 403 på varje sida.
     if (!this.auth.isAdmin() && !this.auth.isSuperAdmin()) return;
     this.api
       .report(today(), today())
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.soldToday.set(x));
+    this.cards
+      .list({ status: 'posted', paid: false, limit: 1 })
+      .pipe(catchError(() => of(null)))
+      .subscribe((x) => this.unpaidInvoices.set(x?.pagination.total ?? 0));
   }
 
   /** Hopfälld meny (bara ikoner); valet sparas per webbläsare. */

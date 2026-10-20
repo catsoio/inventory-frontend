@@ -43,7 +43,7 @@ import { Component, Input } from '@angular/core';
         </div>
       </div>
     </header>
-    <div class="mx-auto flex max-w-4xl flex-col gap-4">
+    <div class="mx-auto flex max-w-4xl flex-col gap-4 pt-6">
       <ng-content />
     </div>
   `,

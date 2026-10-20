@@ -15,9 +15,9 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
   template: `
     @if (doc; as inv) {
       <article
-        class="mx-auto flex min-h-[297mm] max-w-[210mm] flex-col bg-white p-10 text-[13px] leading-snug text-black shadow-sm print:min-h-[272mm] print:max-w-none print:p-0 print:shadow-none"
+        class="mx-auto flex min-h-[297mm] max-w-[210mm] flex-col bg-white p-10 text-[13px] leading-snug text-[#4b5563] shadow-sm print:min-h-[272mm] print:max-w-none print:p-0 print:shadow-none [print-color-adjust:exact]"
       >
-        <header class="flex items-start justify-between border-b-2 border-black pb-3">
+        <header class="flex items-start justify-between border-b-2 border-[#4b5563] pb-3">
           <div>
             <div class="text-lg font-bold">{{ inv.seller.name }}</div>
           </div>
@@ -26,14 +26,14 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
               {{ inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }}
             </h1>
             @if (inv.draft) {
-              <div class="mt-1 inline-block border-2 border-[#555] px-2 font-bold uppercase">
+              <div class="mt-1 inline-block border-2 border-[#4b5563] px-2 font-bold uppercase">
                 Utkast – ej bokfört
               </div>
             } @else {
               <div class="text-xl font-bold tabular-nums">{{ inv.code }}</div>
             }
             @if (inv.paidAt) {
-              <div class="mt-1 inline-block border-2 border-black px-2 font-bold uppercase">
+              <div class="mt-1 inline-block border-2 border-[#4b5563] px-2 font-bold uppercase">
                 Betald
               </div>
             }
@@ -79,7 +79,7 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
         @if (inv.rows?.length) {
           <table class="mt-10 w-full border-collapse">
             <thead>
-              <tr class="border-b-2 border-black text-left text-xs tracking-wide uppercase">
+              <tr class="border-b-2 border-[#4b5563] text-left text-xs tracking-wide uppercase">
                 <th class="py-1">Beskrivning</th>
                 <th class="w-14 py-1 text-right">Antal</th>
                 <th class="w-28 py-1 text-right whitespace-nowrap">À-pris</th>
@@ -116,7 +116,7 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
         } @else {
           <table class="mt-10 w-full border-collapse">
             <thead>
-              <tr class="border-b-2 border-black text-left text-xs tracking-wide uppercase">
+              <tr class="border-b-2 border-[#4b5563] text-left text-xs tracking-wide uppercase">
                 <th class="py-1">Utfört</th>
                 <th class="w-44 py-1 text-right whitespace-nowrap">Belopp exkl. moms</th>
               </tr>
@@ -141,13 +141,13 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
             ><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
           </div>
           @for (b of inv.totals.byRate; track b.rate) {
-            <div class="flex justify-between py-0.5 text-gray-700">
+            <div class="flex justify-between py-0.5 text-[#4b5563]">
               <span>Moms {{ b.rate }} % på {{ b.base | kr }}</span>
               <span class="tabular-nums">{{ b.vat | kr }}</span>
             </div>
           }
           <div
-            class="mt-1 flex justify-between gap-6 border-t-2 border-black pt-1 text-lg font-bold"
+            class="mt-1 flex justify-between gap-6 border-t-2 border-[#4b5563] pt-1 text-lg font-bold"
           >
             <span>{{ inv.draft ? 'Att betala (utkast)' : 'Att betala' }} inkl. moms</span>
             <span class="tabular-nums">{{ inv.totals.total | kr }}</span>
@@ -182,10 +182,10 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
         </section>
 
         <footer
-          class="mt-auto grid grid-cols-4 gap-6 border-t-2 border-black pt-3 text-[11px] text-gray-700"
+          class="mt-auto grid grid-cols-4 gap-6 border-t-2 border-[#4b5563] pt-3 text-[11px] text-[#4b5563]"
         >
           <div>
-            <div class="font-bold text-black">{{ inv.seller.name }}</div>
+            <div class="font-bold text-[#4b5563]">{{ inv.seller.name }}</div>
             <div>{{ inv.seller.address }}</div>
             <div>{{ inv.seller.postalCode }} {{ inv.seller.city }}</div>
           </div>
