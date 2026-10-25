@@ -1,6 +1,6 @@
 import { appLocale } from '../../core/i18n/locale';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { SalesCardItem } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
@@ -73,6 +73,29 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
           <mat-icon>history</mat-icon> Äldre försäljningar
         </a>
       </div>
+      <!-- Mobil: ett kompakt kort i stället för alla kolumner under varandra. -->
+      <ng-template #card let-c="row">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-baseline gap-2">
+              <span class="font-semibold">{{ c.code }}</span>
+              <span class="text-xs text-gray-500">{{ dateOf(c) }}</span>
+            </div>
+            <div class="truncate text-sm text-gray-700">{{ c.customerName ?? 'Kontantkund' }}</div>
+            @if (c.regNo) {
+              <app-reg-plate class="mt-1" [value]="c.regNo" size="sm" />
+            }
+          </div>
+          <div class="shrink-0 text-right">
+            <div class="font-semibold tabular-nums">{{ kr(c.total) }}</div>
+            <app-pill
+              class="mt-1 inline-block"
+              [tone]="c.status === 'draft' ? 'gray' : c.paidAt ? 'green' : 'amber'"
+              >{{ statusOf(c) }}</app-pill
+            >
+          </div>
+        </div>
+      </ng-template>
       <ng-template #cell let-c="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill [tone]="c.status === 'draft' ? 'gray' : c.paidAt ? 'green' : 'amber'">{{
@@ -91,14 +114,23 @@ export class SalesList {
   private readonly api = inject(SalesCardApi);
   readonly router = inject(Router);
   readonly cols = COLS;
+  readonly statusOf = statusOf;
+  readonly kr = (ore: number) => kr.transform(ore);
+  readonly dateOf = (c: SalesCardItem) => day(c.invoicedAt ?? c.createdAt);
   readonly items = signal<SalesCardItem[]>([]);
   readonly loading = signal(true);
   readonly q = signal('');
-  readonly filter = signal<Filter>('all');
+  /** Startfilter från adressen (`?show=unpaid`), t.ex. från Hem. */
+  readonly filter = signal<Filter>(this.initialFilter());
   readonly sum = computed(() => kr.transform(this.items().reduce((s, c) => s + c.total, 0)));
 
   constructor() {
     this.load();
+  }
+
+  private initialFilter(): Filter {
+    const v = inject(ActivatedRoute).snapshot.queryParamMap.get('show');
+    return v === 'draft' || v === 'unpaid' || v === 'paid' ? v : 'all';
   }
 
   load() {

@@ -24,7 +24,9 @@ import type { DtCol } from '../data-table/data-table';
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <h1 class="mr-2 hidden text-2xl font-semibold md:block">{{ title }}</h1>
+      @if (title) {
+        <h1 class="mr-2 hidden text-2xl font-semibold md:block">{{ title }}</h1>
+      }
       <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
         <input
@@ -67,6 +69,7 @@ import type { DtCol } from '../data-table/data-table';
         [rows]="rows"
         [clickable]="true"
         [accent]="accent"
+        [defaultSort]="defaultSort"
         [highlight]="highlight"
         [card]="cardTpl"
         [emptyText]="loading ? 'Laddar…' : emptyText"
@@ -91,7 +94,8 @@ import type { DtCol } from '../data-table/data-table';
 export class ListPage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
-  @Input({ required: true }) title = '';
+  /** Sidans rubrik på dator; tom när sidan redan har flikar eller en rubrik i topbaren. */
+  @Input() title = '';
   @Input({ required: true }) columns: DtCol[] = [];
   @Input() rows: unknown[] | null = [];
   @Input() loading = false;
@@ -103,6 +107,8 @@ export class ListPage implements OnInit {
   /** Markerar hela raden, t.ex. den som visas i panelen bredvid. */
   @Input() highlight?: (row: any) => boolean;
   @Input() searchPlaceholder = 'Sök…';
+  /** Se `DataTable.defaultSort`: standard är nyast först (högsta numret). */
+  @Input() defaultSort?: { key: string; dir: 1 | -1 } | null;
   /** Visa kryssrutan "Visa arkiverade". */
   @Input() archivable = false;
   @Output() search = new EventEmitter<string>();

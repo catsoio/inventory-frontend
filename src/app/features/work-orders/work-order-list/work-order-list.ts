@@ -1,10 +1,11 @@
 import { appLocale } from '../../../core/i18n/locale';
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { Auth } from '../../../core/auth/auth';
 import { WORK_ORDER_STATUS_LABELS, WorkOrder, WorkOrderStatus } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
+import { ORDER_TABS } from '../../../shared/section-tabs/tabs';
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(appLocale()) : '–');
 
@@ -39,11 +40,12 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
 @Component({
   selector: 'app-work-order-list',
   standalone: false,
-  host: { class: 'block h-full' },
+  host: { class: 'flex h-full flex-col' },
   template: `
+    <app-section-tabs [tabs]="tabs" label="Arbetsorder" />
     <app-list-page
-      class="min-w-0"
-      title="Arbetsorder"
+      class="min-h-0 min-w-0 flex-1"
+      title=""
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
@@ -130,11 +132,12 @@ export class WorkOrderList {
   }
 
   readonly cols = COLS;
+  readonly tabs = ORDER_TABS;
   readonly tones = TONES;
   readonly items = signal<WorkOrder[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');
-  readonly status = signal<WorkOrderStatus | 'action' | ''>('');
+  readonly status = signal<WorkOrderStatus | 'action' | ''>(this.initialStatus());
 
   load() {
     this.loading.set(true);
@@ -152,6 +155,14 @@ export class WorkOrderList {
         // En enda träff öppnas direkt i panelen.
         if (p.items.length === 1 && this.wide()) this.selected.set(p.items[0].id);
       });
+  }
+
+  /** Startfilter från adressen (`?status=action`), t.ex. från Hem. */
+  private initialStatus(): WorkOrderStatus | 'action' | '' {
+    const v = inject(ActivatedRoute).snapshot.queryParamMap.get('status');
+    return v && ['open', 'in_progress', 'waiting_parts', 'done', 'action'].includes(v)
+      ? (v as WorkOrderStatus | 'action')
+      : '';
   }
 
   private wide = () => window.matchMedia('(min-width: 1024px)').matches;

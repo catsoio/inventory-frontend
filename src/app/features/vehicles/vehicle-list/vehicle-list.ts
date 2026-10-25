@@ -37,6 +37,26 @@ const COLS: DtCol<Vehicle>[] = [
       (archivedChange)="archived.set($event); load()"
       (rowClick)="open($event)"
     >
+      <!-- Mobil: skylt, bil och ägare med en knapp för att ringa ägaren. -->
+      <ng-template #card let-v="row">
+        <div class="flex items-center gap-3">
+          <app-reg-plate [value]="v.regNo" class="shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="truncate font-medium">{{ car(v) }}</div>
+            <div class="truncate text-sm text-gray-600">{{ v.customer?.name || '–' }}</div>
+          </div>
+          @if (v.customer?.phone) {
+            <a
+              [href]="'tel:' + v.customer.phone"
+              class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"
+              [attr.aria-label]="'Ring ' + v.customer.name"
+              (click)="$event.stopPropagation()"
+            >
+              <mat-icon>call</mat-icon>
+            </a>
+          }
+        </div>
+      </ng-template>
       <ng-template #cell let-v="row" let-col="col" let-text="text">
         @if (col.key === 'regNo') {
           <app-reg-plate [value]="text" size="sm" />
@@ -54,6 +74,7 @@ export class VehicleList {
   private readonly router = inject(Router);
 
   readonly cols = COLS;
+  readonly car = (v: Vehicle) => [v.make, v.model, v.year].filter(Boolean).join(' ') || '–';
   readonly items = signal<Vehicle[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');

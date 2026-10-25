@@ -51,7 +51,7 @@ type Filter = 'all' | 'unpaid' | 'paid';
     <app-finance-tabs />
     <div class="min-h-0 flex-1">
       <app-list-page
-        title="Fakturor"
+        title=""
         [columns]="cols"
         [rows]="shown()"
         [loading]="loading()"
@@ -79,6 +79,27 @@ type Filter = 'all' | 'unpaid' | 'paid';
             <mat-icon>add</mat-icon> Lägg till faktura
           </a>
         </div>
+        <!-- Mobil: ett kompakt kort i stället för alla kolumner under varandra. -->
+        <ng-template #card let-o="row">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-baseline gap-2">
+                <span class="font-semibold">{{ o.code }}</span>
+                <span class="text-xs text-gray-500">{{ dateOf(o) }}</span>
+              </div>
+              <div class="truncate text-sm text-gray-700">{{ o.customerName }}</div>
+              <div class="truncate text-xs text-gray-500">
+                {{ o.ref }}{{ o.regNo ? ' · ' + o.regNo : '' }}
+              </div>
+            </div>
+            <div class="shrink-0 text-right">
+              <div class="font-semibold tabular-nums">{{ money(o.total) }}</div>
+              <app-pill class="mt-1 inline-block" [tone]="o.paidAt ? 'green' : 'amber'">{{
+                o.paidAt ? 'Betald' : 'Obetald'
+              }}</app-pill>
+            </div>
+          </div>
+        </ng-template>
         <ng-template #cell let-o="row" let-col="col" let-text="text">
           @if (col.key === 'paid') {
             <app-pill [tone]="o.paidAt ? 'green' : 'amber'">{{ text }}</app-pill>
@@ -95,6 +116,8 @@ export class InvoiceList {
   private readonly cardsApi = inject(SalesCardApi);
   readonly router = inject(Router);
   readonly cols = COLS;
+  readonly dateOf = (o: InvoiceItem) => day(o.invoicedAt);
+  readonly money = (ore: number) => kr.transform(ore);
   private readonly items = signal<InvoiceItem[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');

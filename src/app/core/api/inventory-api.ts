@@ -19,8 +19,11 @@ import {
   Movement,
   MovementQuery,
   Page,
+  GroupedReport,
   Report,
+  ReportGroupBy,
   SellerDetails,
+  StockHistoryPoint,
   TradeDocument,
   TradeKind,
   TradeRow,
@@ -209,5 +212,19 @@ export class InventoryApi {
 
   report(from?: string, to?: string): Observable<Report> {
     return this.http.get<Report>(`${this.base}/report`, { params: toParams({ from, to }) });
+  }
+
+  /** Samma rapport uppdelad per dag, vecka, märke eller artikel (säljare först för märke och artikel). */
+  reportBy(groupBy: ReportGroupBy, from?: string, to?: string): Observable<GroupedReport> {
+    return this.http.get<GroupedReport>(`${this.base}/report`, {
+      params: toParams({ groupBy, from, to }),
+    });
+  }
+
+  /** Lagrets antal och värde i slutet av varje dag (bara ägare). */
+  stockHistory(from?: string, to?: string): Observable<StockHistoryPoint[]> {
+    return this.http.get<StockHistoryPoint[]>(`${this.base}/summary/history`, {
+      params: toParams({ from, to }),
+    });
   }
 }

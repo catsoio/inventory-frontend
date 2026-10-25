@@ -2,8 +2,7 @@ import { Observable, expand, forkJoin, map, reduce } from 'rxjs';
 import { EMPTY } from 'rxjs';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
-import { InventoryApi } from '../../core/api/inventory-api';
-import { SalesCardItem, TradeKind, TradeRow, WorkOrder } from '../../core/models';
+import { SalesCardItem, WorkOrder } from '../../core/models';
 
 /** Ett utfärdat dokument, från ett säljkort eller (äldre) en arbetsorder. Belopp i öre inkl. moms. */
 export interface InvoiceItem {
@@ -77,19 +76,5 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
     map(([a, b]) =>
       [...a, ...b].sort((x, y) => (y.invoicedAt ?? '').localeCompare(x.invoicedAt ?? '')),
     ),
-  );
-}
-
-/** Alla försäljningar eller inköp (upp till 1000 dokument), för diagram per månad. */
-export function loadTrades(api: InventoryApi, kind: TradeKind): Observable<TradeRow[]> {
-  const PAGE = 100;
-  return api.tradeRows(kind, { limit: PAGE, offset: 0 }).pipe(
-    expand((p) => {
-      const next = p.pagination.offset + p.pagination.limit;
-      return next < p.pagination.total && next < 1000
-        ? api.tradeRows(kind, { limit: PAGE, offset: next })
-        : EMPTY;
-    }),
-    reduce((all, p) => all.concat(p.items), [] as TradeRow[]),
   );
 }

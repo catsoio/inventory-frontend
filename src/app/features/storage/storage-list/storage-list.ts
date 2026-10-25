@@ -21,6 +21,7 @@ import { Settings } from '../../../core/settings';
 import { DtCol } from '../../../shared/data-table/data-table';
 import type { ItemKind } from '../../../shared/item-icon/item-icon';
 import { KrPipe } from '../../../shared/kr-pipe';
+import { HOTEL_TABS } from '../../../shared/section-tabs/tabs';
 import { contentsText, dateText } from '../storage-format';
 
 const kr = new KrPipe();
@@ -91,8 +92,8 @@ type PaymentFilter = PaymentStatus | '';
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
+    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Däckhotell" />
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <h1 class="mr-2 hidden text-2xl font-semibold md:block">Däckhotell</h1>
       <div
         class="relative order-first w-full min-w-0 md:order-none md:max-w-md md:min-w-56 md:w-auto md:flex-1"
       >
@@ -286,6 +287,7 @@ type PaymentFilter = PaymentStatus | '';
   `,
 })
 export class StorageList implements OnInit {
+  readonly tabs = HOTEL_TABS;
   openRecall() {
     this.dialog.open(StorageRecallDialog, { width: '720px', maxWidth: '95vw' });
   }

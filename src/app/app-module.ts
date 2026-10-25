@@ -11,7 +11,10 @@ import { App } from './app';
 import { AppRoutingModule } from './app-routing-module';
 import { BillingBanner } from './core/billing/billing-banner';
 import { PlansDialog } from './core/billing/plans-dialog';
+import { GarageMenu } from './core/layout/shell/garage-menu';
+import { MobileNav } from './core/layout/shell/mobile-nav';
 import { Shell } from './core/layout/shell/shell';
+import { Sidebar } from './core/layout/shell/sidebar';
 import { AppTitleStrategy } from './core/page-title';
 import { appIdInterceptor } from './core/http/app-id-interceptor';
 import { authTokenInterceptor } from './core/http/auth-token-interceptor';
@@ -25,7 +28,7 @@ registerLocaleData(localeSv);
 registerLocaleData(localeEnGb);
 
 @NgModule({
-  declarations: [App, Shell, BillingBanner, PlansDialog],
+  declarations: [App, Shell, Sidebar, MobileNav, GarageMenu, BillingBanner, PlansDialog],
   imports: [BrowserModule, AppRoutingModule, SharedModule],
   providers: [
     provideBrowserGlobalErrorListeners(),

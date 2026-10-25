@@ -285,6 +285,27 @@ export interface Report {
   writtenOffCost: number;
 }
 
+/** En grupp i en rapport: en vecka (`2026-W43`), en dag, ett märke eller en artikel. */
+export interface ReportGroup extends Report {
+  key: string;
+  label: string;
+}
+
+export type ReportGroupBy = 'day' | 'week' | 'brand' | 'article';
+
+export interface GroupedReport extends Report {
+  groups?: ReportGroup[];
+}
+
+/** Lagret i slutet av en dag (ur lagerloggen). Värde i öre, snittinköpspris exkl. moms. */
+export interface StockHistoryPoint {
+  /** YYYY-MM-DD */
+  date: string;
+  articles: number;
+  units: number;
+  stockValue: number;
+}
+
 export type StockAction = 'receive' | 'sell' | 'return' | 'write-off' | 'adjust';
 
 export type GarageRole = 'owner' | 'staff' | 'mechanic';

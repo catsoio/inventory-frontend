@@ -52,6 +52,7 @@ const DAY = 86_400_000;
   host: { class: 'block h-full' },
   template: `
     <app-list-page
+      [defaultSort]="{ key: 'start', dir: -1 }"
       [title]="embedded ? '' : 'Bokningar'"
       [columns]="cols"
       [rows]="shown()"

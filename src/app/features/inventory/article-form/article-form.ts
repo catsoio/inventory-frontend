@@ -1,5 +1,5 @@
 import { netOf } from '../../../shared/vat';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, Validators } from '@angular/forms';
@@ -357,6 +357,7 @@ export class ArticleForm {
   private readonly snack = inject(MatSnackBar);
   private readonly settings = inject(Settings);
   private readonly pricing = inject(Pricing);
+  private readonly destroyRef = inject(DestroyRef);
   readonly admin = inject(Auth).isAdmin();
   private readonly fb = inject(FormBuilder);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
@@ -512,18 +513,22 @@ export class ArticleForm {
       reorderLevel: d.defaultReorderLevel || null,
     });
     // Föreslå försäljningspris från inköpspris + påslag så länge priset inte fyllts i.
-    this.form.controls.cost.valueChanges.pipe(takeUntilDestroyed()).subscribe((cost) => {
-      if (cost != null && !this.form.controls.sellPrice.dirty) {
-        // Påslaget räknas på nettot; försäljningspriset blir inkl. 25 % moms.
-        const net = this.pricing.costNet(Math.round(cost * 100)) / 100;
-        this.form.controls.sellPrice.setValue(Math.round(net * (1 + d.markupPercent / 100) * 1.25));
-      }
-    });
+    this.form.controls.cost.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((cost) => {
+        if (cost != null && !this.form.controls.sellPrice.dirty) {
+          // Påslaget räknas på nettot; försäljningspriset blir inkl. 25 % moms.
+          const net = this.pricing.costNet(Math.round(cost * 100)) / 100;
+          this.form.controls.sellPrice.setValue(
+            Math.round(net * (1 + d.markupPercent / 100) * 1.25),
+          );
+        }
+      });
     this.form.controls.cost.addValidators((c) =>
       this.form?.value.initialQuantity && c.value == null ? { required: true } : null,
     );
     this.form.controls.initialQuantity.valueChanges
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.form.controls.cost.updateValueAndValidity());
   }
 

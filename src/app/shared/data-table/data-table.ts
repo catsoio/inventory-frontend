@@ -23,6 +23,21 @@ export interface DtCol<T = any> {
     tr.selected-row > td {
       background-color: var(--color-brand-soft, #e3f0ee);
     }
+    /* Första kolumnen (nr) står kvar när tabellen rullas i sidled. */
+    td:first-child,
+    th:first-child {
+      position: sticky;
+      left: 0;
+      background-color: inherit;
+    }
+    thead th:first-child {
+      z-index: 2;
+      background-color: #fff;
+    }
+    tbody tr:not(.selected-row) > td:first-child {
+      z-index: 1;
+      box-shadow: 1px 0 0 rgb(0 0 0 / 6%);
+    }
     tr.selected-row > td:first-child {
       box-shadow: inset 4px 0 0 var(--mat-sys-primary, #1f6f6b);
     }
@@ -82,7 +97,7 @@ export interface DtCol<T = any> {
         <tbody class="divide-y divide-gray-100">
           @for (r of view(); track $index) {
             <tr
-              class="h-12 md:h-11"
+              class="h-12 bg-white md:h-11"
               [class]="clickable ? 'cursor-pointer hover:bg-brand-soft' : 'hover:bg-gray-50'"
               [class.selected-row]="!!highlight && highlight(r)"
               (click)="clickable && rowClick.emit(r)"
@@ -207,7 +222,18 @@ export class DataTable {
 
   readonly showFilters = signal(false);
   readonly filters = signal<Record<string, string>>({});
+  /**
+   * Sorteringen när ingen kolumn valts: nyast först, alltså högsta numret (kolumnen "code" eller
+   * "nr") överst. Skicka en egen, eller `null` för att behålla radernas ordning.
+   */
+  @Input() defaultSort?: { key: string; dir: 1 | -1 } | null;
   readonly sort = signal<{ key: string; dir: 1 | -1 } | null>(null);
+  private readonly fallback = computed(() => {
+    if (this.defaultSort !== undefined) return this.defaultSort;
+    const nr = this.colsSig().find((c) => c.key === 'code' || c.key === 'nr');
+    return nr ? { key: nr.key, dir: -1 as const } : null;
+  });
+  readonly activeSort = computed(() => this.sort() ?? this.fallback());
 
   readonly filtered = computed(() => Object.values(this.filters()).some((v) => v.trim()));
   readonly view = computed(() => {
@@ -222,7 +248,7 @@ export class DataTable {
         }),
       );
     }
-    const s = this.sort();
+    const s = this.activeSort();
     const col = s && cols.find((c) => c.key === s.key);
     if (!s || !col) return rows;
     return [...rows].sort((a, b) => {
@@ -257,7 +283,7 @@ export class DataTable {
   }
 
   arrow(key: string) {
-    const s = this.sort();
+    const s = this.activeSort();
     return s?.key === key ? (s.dir === 1 ? ' ▲' : ' ▼') : '';
   }
 }

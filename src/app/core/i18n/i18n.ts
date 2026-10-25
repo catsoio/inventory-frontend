@@ -1,5 +1,4 @@
 import { Injectable, effect, signal } from '@angular/core';
-import { EN } from './en';
 
 export type Lang = 'sv' | 'en';
 
@@ -16,12 +15,14 @@ interface Rec {
 /**
  * Språkval (svenska/engelska). Texten i mallarna är svenska; på engelska byter
  * `apply` ut synlig text och attribut mot ordlistan i `en.ts`. Det som saknas i
- * ordlistan visas oförändrat på svenska.
+ * ordlistan visas oförändrat på svenska. Ordlistan hämtas först när engelska är valt, så att den
+ * inte väger i det första paketet.
  */
 @Injectable({ providedIn: 'root' })
 export class I18n {
   readonly lang = signal<Lang>(this.load());
-  private readonly dict = new Map(Object.entries(EN).map(([k, v]) => [norm(k), v]));
+  private dict = new Map<string, string>();
+  private dictLoaded?: Promise<void>;
   private readonly texts = new WeakMap<Text, Rec>();
   private readonly attrs = new WeakMap<Element, Map<string, Rec>>();
   private observer?: MutationObserver;
@@ -31,8 +32,12 @@ export class I18n {
       const lang = this.lang();
       document.documentElement.lang = lang;
       if (lang === 'en') {
-        this.walk(document.body, true);
-        this.observe();
+        void this.ensureDict().then(() => {
+          // Hann man byta tillbaka till svenska innan ordlistan kom lämnas sidan som den är.
+          if (this.lang() !== 'en') return;
+          this.walk(document.body, true);
+          this.observe();
+        });
       } else {
         this.observer?.disconnect();
         this.walk(document.body, false);
@@ -52,7 +57,14 @@ export class I18n {
     if (changed) location.reload();
   }
 
-  /** För text som byggs i kod (snackbars m.m.). */
+  private ensureDict(): Promise<void> {
+    this.dictLoaded ??= import('./en').then(({ EN }) => {
+      this.dict = new Map(Object.entries(EN).map(([k, v]) => [norm(k), v]));
+    });
+    return this.dictLoaded;
+  }
+
+  /** För text som byggs i kod (snackbars m.m.). Svenska tills ordlistan har hämtats. */
   t(sv: string): string {
     return this.lang() === 'en' ? (this.dict.get(norm(sv)) ?? sv) : sv;
   }

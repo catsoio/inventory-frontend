@@ -3,6 +3,7 @@ import { FormBuilder } from '@angular/forms';
 import { Auth } from '../../core/auth/auth';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { MOVEMENT_LABELS, MovementType, Report } from '../../core/models';
+import { STOCK_TABS } from '../../shared/section-tabs/tabs';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -11,7 +12,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <h1 class="mb-4 shrink-0 text-2xl font-semibold">Logg och rapport</h1>
+    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
     <form [formGroup]="form" class="mb-4 flex shrink-0 flex-wrap items-center gap-3">
       <app-date-field label="Från" formControlName="from" />
       <app-date-field label="Till" formControlName="to" />
@@ -57,6 +58,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 export class Reports {
   private readonly api = inject(InventoryApi);
   private readonly auth = inject(Auth);
+  readonly tabs = STOCK_TABS;
   readonly types = Object.entries(MOVEMENT_LABELS);
   readonly form = inject(FormBuilder).group({
     from: [iso(new Date(Date.now() - 30 * 864e5))],

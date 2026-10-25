@@ -29,6 +29,7 @@ import {
 } from '../../../core/models';
 import { KrPipe } from '../../../shared/kr-pipe';
 import { Settings } from '../../../core/settings';
+import { STOCK_TABS } from '../../../shared/section-tabs/tabs';
 
 type Sel = Record<string, string | number | boolean | undefined>;
 type Status = '' | 'in' | 'low' | 'out';
@@ -160,8 +161,8 @@ const COLS: Col[] = [
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
+    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <h1 class="mr-2 hidden text-2xl font-semibold md:block">Artiklar</h1>
       <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
         <input
@@ -499,6 +500,7 @@ const COLS: Col[] = [
   `,
 })
 export class ArticleList implements OnInit {
+  readonly tabs = STOCK_TABS;
   private readonly api = inject(InventoryApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
@@ -599,7 +601,9 @@ export class ArticleList implements OnInit {
 
   constructor() {
     afterNextRender(() => {
-      if (window.innerWidth >= 768) this.searchEl()?.nativeElement.focus();
+      // Dator: sökfältet är redo direkt. Mobil: bara när man kom för att söka (`?focus=1`, från Hem).
+      if (window.innerWidth >= 768 || this.route.snapshot.queryParamMap.get('focus') === '1')
+        this.searchEl()?.nativeElement.focus();
     });
   }
 
@@ -649,6 +653,11 @@ export class ArticleList implements OnInit {
         ...s,
         lowStock: flag('lowStock') || undefined,
         inStock: flag('inStock'),
+        // Länkar från översikten: en stapel i ett diagram öppnar listan filtrerad på den.
+        category: q.get('category') ?? undefined,
+        season: q.get('season') ?? undefined,
+        brand: q.get('brand') ?? undefined,
+        rimDiameter: q.has('rimDiameter') ? Number(q.get('rimDiameter')) : undefined,
       }));
       this.load$.next(0);
     });

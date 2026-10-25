@@ -4,6 +4,7 @@ import { QuoteApi } from '../../core/api/quote-api';
 import { appLocale } from '../../core/i18n/locale';
 import { QUOTE_STATUS_LABELS, Quote, QuoteShownStatus } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
+import { ORDER_TABS } from '../../shared/section-tabs/tabs';
 import { KrPipe } from '../../shared/kr-pipe';
 
 const kr = new KrPipe();
@@ -53,8 +54,10 @@ type Filter = '' | 'draft' | 'given' | 'approved' | 'declined';
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
+    <app-section-tabs [tabs]="tabs" label="Arbetsorder" />
     <app-list-page
-      title="Kostnadsförslag"
+      class="min-h-0 flex-1"
+      title=""
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
@@ -96,6 +99,7 @@ export class QuoteList {
   private readonly api = inject(QuoteApi);
   readonly router = inject(Router);
   readonly cols = COLS;
+  readonly tabs = ORDER_TABS;
   readonly tones = TONES;
   readonly items = signal<Quote[]>([]);
   readonly loading = signal(true);

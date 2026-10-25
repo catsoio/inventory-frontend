@@ -44,9 +44,12 @@ import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
 import { ChartView } from './chart/chart';
 import { FinanceTabs } from './finance-tabs/finance-tabs';
+import { MixBar } from './mix-bar/mix-bar';
+import { Panel } from './panel/panel';
+import { SectionTabs } from './section-tabs/section-tabs';
+import { Spark } from './spark/spark';
+import { Stat } from './stat/stat';
 import { RegPlate, SvFlag } from './reg-plate/reg-plate';
-import { ResetPasswordDialog } from '../features/settings/reset-password-dialog/reset-password-dialog';
-import { SettingsPage } from '../features/settings/settings';
 import { SupplierDialog } from './supplier-dialog/supplier-dialog';
 import { SupplierSelect } from './supplier-select/supplier-select';
 import { TradeDocumentDialog } from './trade-document-dialog/trade-document-dialog';
@@ -100,11 +103,14 @@ const MATERIAL = [
     Pill,
     ChartView,
     FinanceTabs,
+    MixBar,
+    Panel,
+    SectionTabs,
+    Spark,
+    Stat,
     ItemIcon,
     RegPlate,
     SvFlag,
-    SettingsPage,
-    ResetPasswordDialog,
     SupplierDialog,
     SupplierSelect,
     TradeDocumentDialog,
@@ -136,6 +142,11 @@ const MATERIAL = [
     Pill,
     ChartView,
     FinanceTabs,
+    MixBar,
+    Panel,
+    SectionTabs,
+    Spark,
+    Stat,
     ItemIcon,
     RegPlate,
     SvFlag,

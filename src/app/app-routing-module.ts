@@ -94,8 +94,14 @@ const routes: Routes = [
           import('./features/work-orders/work-orders-module').then((m) => m.WorkOrdersModule),
       },
       {
+        path: 'register',
+        title: 'Register',
+        loadChildren: () =>
+          import('./features/register/register-module').then((m) => m.RegisterModule),
+      },
+      {
         path: 'reports',
-        title: 'Logg och rapport',
+        title: 'Lagerlogg',
         loadChildren: () =>
           import('./features/reports/reports-module').then((m) => m.ReportsModule),
       },
@@ -137,7 +143,8 @@ const routes: Routes = [
         data: { mode: 'receive' },
         loadChildren: () => import('./features/trade/trade-module').then((m) => m.TradeModule),
       },
-      { path: 'settings', redirectTo: 'dashboard' },
+      { path: 'settings', redirectTo: '' },
+      { path: 'settings/:section', redirectTo: '' },
     ],
   },
   { path: '**', redirectTo: '' },
