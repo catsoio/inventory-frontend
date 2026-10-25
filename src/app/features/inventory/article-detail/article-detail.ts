@@ -1,3 +1,4 @@
+import { Pricing } from '../../../core/pricing';
 import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -163,6 +164,7 @@ export class ArticleDetail {
   private readonly pageTitle = inject(PageTitle);
 
   readonly admin = inject(Auth).isAdmin();
+  private readonly pricing = inject(Pricing);
   readonly a = signal<Article | null>(null);
   readonly kind = (a: Article) => itemKind(a.category);
 
@@ -197,8 +199,8 @@ export class ArticleDetail {
         ['Mått', r.sizeLabel ?? ''],
         ['Diameter', `${r.diameter}"`],
         ['Bredd', `${r.width}J`],
-        ['Bultmönster', `${r.boltCount}x${r.boltCircle}`],
-        ['Offset', `ET${r.offset}`],
+        ['Bultmönster', r.boltCount && r.boltCircle ? `${r.boltCount}x${r.boltCircle}` : '–'],
+        ['Offset', r.offset != null ? `ET${r.offset}` : '–'],
         ['Centrumhål', r.centerBore != null ? `${r.centerBore} mm` : '–'],
         ['Material', RIM_MATERIAL_LABELS[r.material]],
         ['Färg', r.color || '–'],
@@ -209,8 +211,8 @@ export class ArticleDetail {
         title: 'Artikel',
         fields: [
           ['Typ', CATEGORY_LABELS[a.category]],
-          ['Artikelnummer', a.code || '–'],
-          ['Egen kod', a.sku || '–'],
+          ['Artikelnummer', a.sku || '–'],
+          ['Internt nr', a.code || '–'],
           ['Märke', a.brand],
           ['Modell', a.model],
           ...spec,
@@ -220,8 +222,8 @@ export class ArticleDetail {
         title: 'Lagersaldo',
         fields: [
           ['Lager', `${a.quantity} st`],
-          ['Hyllplats', a.location || '–'],
-          ['Beställningspunkt', a.reorderLevel],
+          ['Lager och plats', a.location || '–'],
+          ['Påminn när det är kvar', a.reorderLevel ? `${a.reorderLevel} st` : '–'],
           [
             'Senaste inköp',
             a.lastPurchasedAt ? new Date(a.lastPurchasedAt).toLocaleDateString('sv-SE') : '–',
@@ -229,22 +231,22 @@ export class ArticleDetail {
         ],
       },
       {
-        title: 'Kostnader och prissättning (alla belopp exkl. moms)',
+        title: 'Pris',
         fields: [
           ...((this.admin
             ? [
-                ['Inköpspris (snitt, exkl. moms)', kr(a.averageCost)],
-                ['Försäljningspris (exkl. moms)', kr(a.sellPrice)],
-                ['Marginal', kr(a.margin)],
+                ['Inköpspris (snitt, inkl. moms)', kr(this.pricing.costIncl(a.averageCost ?? 0))],
+                ['Försäljningspris (inkl. moms)', kr(a.sellPrice)],
+                ['Marginal (exkl. moms)', kr(a.margin)],
                 [
                   'Marginal %',
                   a.marginPercent == null
                     ? '–'
                     : `${a.marginPercent.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`,
                 ],
-                ['Lagervärde', kr(a.stockValue)],
+                ['Lagervärde (exkl. moms)', kr(a.stockValue)],
               ]
-            : [['Försäljningspris (exkl. moms)', kr(a.sellPrice)]]) as Field[]),
+            : [['Försäljningspris (inkl. moms)', kr(a.sellPrice)]]) as Field[]),
         ],
       },
       {

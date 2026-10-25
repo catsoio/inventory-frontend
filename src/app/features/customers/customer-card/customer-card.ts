@@ -33,7 +33,15 @@ import { Auth } from '../../../core/auth/auth';
         @if (card(); as c) {
           @if (c.active) {
             @if (admin) {
-              <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+              <button
+                mat-icon-button
+                class="!text-red-700"
+                aria-label="Ta bort"
+                matTooltip="Ta bort"
+                (click)="remove()"
+              >
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             }
           } @else {
             <button mat-stroked-button (click)="restore()">Återställ</button>
@@ -94,8 +102,7 @@ import { Auth } from '../../../core/auth/auth';
           @if (form.controls.type.value === 'company') {
             <b>Företag:</b> får faktura med organisationsnummer och förfallodatum. Svenska företag
             betalar 25 % moms precis som privatpersoner, men kan normalt dra av den i sin egen moms.
-            Utländska (EU-)företag hanteras inte
-            automatiskt – fakturera dem utanför systemet.
+            Utländska (EU-)företag hanteras inte automatiskt – fakturera dem utanför systemet.
           } @else {
             <b>Privatperson:</b> får kvitto. Priser till privatpersoner anges inklusive moms (25 %)
             – det är den summan som ska stå först.
@@ -113,6 +120,18 @@ import { Auth } from '../../../core/auth/auth';
         <mat-form-field class="sm:col-span-2">
           <mat-label>Anmärkning</mat-label>
           <textarea matInput rows="2" formControlName="notes"></textarea>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Kundrabatt på arbete (%)</mat-label>
+          <input matInput type="number" min="0" max="100" formControlName="labourDiscount" />
+          <mat-hint>Förifylls på nya arbetsrader</mat-hint>
+          <mat-error>0–100</mat-error>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Kundrabatt på delar (%)</mat-label>
+          <input matInput type="number" min="0" max="100" formControlName="partsDiscount" />
+          <mat-hint>Förifylls på nya delar</mat-hint>
+          <mat-error>0–100</mat-error>
         </mat-form-field>
       </form>
 
@@ -243,6 +262,8 @@ export class CustomerCard implements OnInit {
     phone: [''],
     email: ['', Validators.email],
     notes: [''],
+    labourDiscount: [null as number | null, [Validators.min(0), Validators.max(100)]],
+    partsDiscount: [null as number | null, [Validators.min(0), Validators.max(100)]],
   });
 
   ngOnInit() {
@@ -271,6 +292,8 @@ export class CustomerCard implements OnInit {
         phone: c.phone ?? '',
         email: c.email ?? '',
         notes: c.notes ?? '',
+        labourDiscount: c.labourDiscount ?? null,
+        partsDiscount: c.partsDiscount ?? null,
       });
     });
   }
@@ -295,6 +318,8 @@ export class CustomerCard implements OnInit {
       phone: v.phone || null,
       email: v.email || null,
       notes: v.notes || null,
+      labourDiscount: v.labourDiscount ? Number(v.labourDiscount) : null,
+      partsDiscount: v.partsDiscount ? Number(v.partsDiscount) : null,
     };
     this.busy.set(true);
     const req = this.id ? this.api.updateCustomer(this.id, body) : this.api.createCustomer(body);

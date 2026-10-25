@@ -22,9 +22,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
           läggs in under Artiklar.
         </p>
         <mat-form-field>
-          <mat-label>Märke</mat-label>
+          <mat-label>Märke (valfritt)</mat-label>
           <input matInput formControlName="brand" />
-          <mat-error>Obligatoriskt</mat-error>
         </mat-form-field>
         <mat-form-field>
           <mat-label>Benämning</mat-label>
@@ -55,7 +54,7 @@ export class QuickArticleDialog {
   private readonly ref = inject<MatDialogRef<QuickArticleDialog, Article>>(MatDialogRef);
   readonly busy = signal(false);
   readonly form = inject(FormBuilder).nonNullable.group({
-    brand: ['', Validators.required],
+    brand: [''],
     model: ['', Validators.required],
     sellPrice: [0, [Validators.required, Validators.min(0)]],
     initialQuantity: [0, [Validators.min(0)]],

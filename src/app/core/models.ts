@@ -84,10 +84,11 @@ export interface TyreSpec {
 export interface RimSpec {
   diameter: number;
   width: number;
-  boltCount: number;
-  boltCircle: number;
+  /** Null när det inte är känt. */
+  boltCount: number | null;
+  boltCircle: number | null;
   centerBore?: number | null;
-  offset: number;
+  offset: number | null;
   material: RimMaterial;
   color?: string | null;
   sizeLabel?: string;
@@ -109,6 +110,9 @@ export interface Article {
   tyre: TyreSpec | null;
   rim: RimSpec | null;
   location: string | null;
+  typeId?: string | null;
+  warehouseId?: string | null;
+  locationId?: string | null;
   quantity: number;
   stockLevel: StockLevel;
   reorderLevel: number;
@@ -126,13 +130,17 @@ export interface Article {
 
 export interface ArticleInput {
   category: Category;
-  brand: string;
-  model: string;
+  brand?: string;
+  model?: string;
   sku?: string;
   /** null rensar specen (vid byte av kategori). */
   tyre?: Omit<TyreSpec, 'sizeLabel'> | null;
   rim?: Omit<RimSpec, 'sizeLabel'> | null;
   location?: string;
+  /** Artikeltypen (register) och platsen (lager, plats). */
+  typeId?: string | null;
+  warehouseId?: string | null;
+  locationId?: string | null;
   reorderLevel?: number;
   sellPrice: number;
   /** Inköpspris per styck, öre. */
@@ -356,6 +364,15 @@ export const STORAGE_CONTENTS_LABELS: Record<StorageContents, string> = {
   complete_wheels: 'Kompletta hjul',
 };
 
+/** Hur setet såg ut när det kom in. */
+export type DepositCondition = 'good' | 'worn' | 'damaged';
+
+export const DEPOSIT_CONDITION_LABELS: Record<DepositCondition, string> = {
+  good: 'Bra',
+  worn: 'Slitna',
+  damaged: 'Skadade',
+};
+
 export const ACCESSORY_LABELS: Record<StorageAccessory, string> = {
   hubcaps: 'Navkapslar',
   locking_nuts: 'Låsbultar',
@@ -399,9 +416,15 @@ export interface StorageDeposit {
   rims: StoredRims | null;
   accessories: StorageAccessory[];
   location: string | null;
+  /** Lager (för kundgods) och plats i registret. */
+  warehouseId: string | null;
+  locationId: string | null;
+  conditionGrade: DepositCondition | null;
   condition: string | null;
   depositedAt: string;
   expectedPickupAt: string | null;
+  /** När nästa årsavgift ska betalas. */
+  nextPaymentAt: string | null;
   pickedUpAt: string | null;
   daysStored: number;
   overdue: boolean;
@@ -411,6 +434,27 @@ export interface StorageDeposit {
   paymentMethod: PaymentMethod | null;
   paidAt: string | null;
   notes: string | null;
+  /** Senaste inkallnings-SMS, annars null. */
+  recalledAt?: string | null;
+}
+
+export interface RecallRecipient {
+  phone: string;
+  name: string;
+  depositIds: string[];
+  codes: string[];
+  regNos: string[];
+  recalledAt: string | null;
+}
+
+export interface RecallPreview {
+  recipients: RecallRecipient[];
+  withoutPhone: number;
+}
+
+export interface RecallResult {
+  sent: number;
+  failed: { name: string; phone: string }[];
 }
 
 export interface StorageDepositInput {
@@ -425,9 +469,13 @@ export interface StorageDepositInput {
   rims?: StoredRims | null;
   accessories?: StorageAccessory[];
   location?: string | null;
+  warehouseId?: string | null;
+  locationId?: string | null;
+  conditionGrade?: DepositCondition | null;
   condition?: string | null;
   depositedAt?: string;
   expectedPickupAt?: string | null;
+  nextPaymentAt?: string | null;
   fee?: number;
   paymentStatus?: PaymentStatus;
   paymentMethod?: PaymentMethod | null;
@@ -701,6 +749,10 @@ export interface Customer {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  /** Kundrabatt i % på arbete; förifylls på nya rader. */
+  labourDiscount?: number | null;
+  /** Kundrabatt i % på delar. */
+  partsDiscount?: number | null;
   active: boolean;
 }
 
@@ -717,6 +769,8 @@ export type CustomerInput = Partial<
     | 'phone'
     | 'email'
     | 'notes'
+    | 'labourDiscount'
+    | 'partsDiscount'
     | 'active'
   >
 >;
@@ -732,6 +786,11 @@ export interface Vehicle {
   model: string | null;
   year: number | null;
   vin: string | null;
+  /** Däckdimension, t.ex. "205/55 R16". */
+  tyreSize?: string | null;
+  rimSize?: string | null;
+  /** Alla tekniska rader från fordonsuppslaget (t.ex. första registrering). */
+  specs?: Record<string, string> | null;
   /** Bestående anmärkningar som följer bilen. */
   notes: string | null;
   active: boolean;
@@ -806,7 +865,53 @@ export interface ServiceType {
   /** Öre. */
   priceFrom: number | null;
   priceTo: number | null;
+  /** Operationskod på dokumenten, t.ex. 01500060. */
+  opCode?: string | null;
+  /** Mallrader som läggs på ett jobb på en gång. */
+  lines?: ServiceTemplateLine[];
   active: boolean;
+}
+
+/** En mallrad på en åtgärd (som Standard Service Line i Business Central). */
+export interface ServiceTemplateLine {
+  type: 'labour' | 'part' | 'fee';
+  code: string | null;
+  description: string;
+  articleId: string | null;
+  quantity: number;
+  /** Öre per styck INKL. moms; null = artikelns eget pris. */
+  unitPrice: number | null;
+  /** Tid, bara internt. */
+  minutes: number | null;
+}
+
+// --- Prissättning ---
+
+/** Hur verkstaden prissätter och skriver ut (Inställningar → Prissättning). */
+export interface PricingSettings {
+  profile: 'service' | 'workshop' | 'custom';
+  /** order = ett pris för hela ordern; lines = jobb med prissatta rader. */
+  priceEntry: 'order' | 'lines';
+  privatePricesIncludeVat: boolean;
+  companyPricesIncludeVat: boolean;
+  roundToKrona: boolean;
+  consumablesPercent: number | null;
+  /** Öre. */
+  consumablesMax: number | null;
+  consumablesText: string;
+  quoteValidDays: number;
+  quoteTolerancePercent: number;
+  quoteTerms: string | null;
+  /** Öre. */
+  defaultJobLimit: number | null;
+  showVin: boolean;
+  showMileage: boolean;
+  requireMileage: boolean;
+  /** Öre exkl. moms per timme, bara internt. */
+  internalHourlyCost: number | null;
+  stockOut: 'work_order_done' | 'sales_card_posted';
+  /** Moms på inköp, %. Inköpspriser skrivs och visas inkl. den, lagras utan. */
+  purchaseVatRate: number;
 }
 
 // --- Arbetsorder ---
@@ -821,12 +926,13 @@ export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   cancelled: 'Avbruten',
 };
 
-export type WorkOrderLineType = 'labour' | 'part' | 'environment_fee' | 'other';
+export type WorkOrderLineType = 'labour' | 'part' | 'environment_fee' | 'fee' | 'other';
 
 export const WORK_ORDER_LINE_LABELS: Record<WorkOrderLineType, string> = {
   labour: 'Arbete',
   part: 'Del',
   environment_fee: 'Miljöavgift',
+  fee: 'Avgift',
   other: 'Annat',
 };
 
@@ -839,15 +945,20 @@ export interface VatBucket {
 
 /** Summor för en order eller faktura. Alla belopp i öre. */
 export interface OrderTotals {
-  /** Före rabatt, exkl. moms. */
+  /** Före rabatt och fasta priser, i dokumentets prisläge. */
   gross: number;
+  /** Vad rabatter och fasta priser tog bort (negativt om ett fast pris är högre än raderna). */
   discount: number;
   /** Momspliktigt belopp efter rabatt, exkl. moms. */
   net: number;
   vat: number;
-  /** Att betala, inkl. moms. */
+  /** Öresutjämning; saknas på äldre dokument. */
+  rounding?: number;
+  /** Att betala, inkl. moms och öresutjämning. */
   total: number;
   byRate: VatBucket[];
+  /** Hur dokumentet var prissatt; saknas på äldre dokument = inkl. moms. */
+  pricesIncludeVat?: boolean;
 }
 
 export interface InvoiceSeller {
@@ -897,12 +1008,26 @@ export interface WorkOrderInvoice {
   warranty: string | null;
   /** Rad för rad, när dokumentet kommer från ett säljkort. */
   rows?: InvoiceDocRow[];
+  /** Jobben raderna är grupperade under, med delsumma. */
+  sections?: InvoiceDocSection[];
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
 }
 
-/** En rad på ett utfärdat dokument. Belopp i öre, inkl. moms. */
+/** En rubrik (jobb) på dokumentet med delsumma, öre i dokumentets prisläge. */
+export interface InvoiceDocSection {
+  id: string;
+  title: string;
+  total: number;
+  /** Fast pris: raderna skrivs ut utan pris. */
+  fixed: boolean;
+}
+
+/** En rad på ett utfärdat dokument. Belopp i öre, i dokumentets prisläge (`totals.pricesIncludeVat`). */
 export interface InvoiceDocRow {
+  code?: string | null;
+  sectionId?: string | null;
+  hidePrice?: boolean;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -940,7 +1065,64 @@ export interface VatReport {
   doneNotInvoiced: number;
 }
 
-/** En rad på arbetsordern: ett jobb eller en del som mekanikern ska göra. Har inget pris. */
+/** Kundens svar på ett jobb i kostnadsförslaget. */
+export interface JobApproval {
+  status: 'approved' | 'declined';
+  at: string;
+  method: 'phone' | 'sms' | 'email' | 'in_person' | 'link' | null;
+  note: string | null;
+}
+
+export const APPROVAL_METHOD_LABELS: Record<NonNullable<JobApproval['method']>, string> = {
+  phone: 'Telefon',
+  sms: 'SMS',
+  email: 'E-post',
+  in_person: 'På plats / underskriven utskrift',
+  link: 'Länk',
+};
+
+/** Hur en admin kan skriva ner ett svar (länken sätts av kundens egen sida). */
+export type AnswerMethod = Exclude<NonNullable<JobApproval['method']>, 'link'>;
+
+/** Läget på ett kostnadsförslag. */
+export type QuoteStatus = 'none' | 'given' | 'approved' | 'declined';
+
+/** Ett jobb på ordern: ett kundklagomål och vad som görs (KUND ANM). */
+export interface WorkOrderJob {
+  id: string;
+  /** Kundens ord, t.ex. "Motorlampa lyser, går som vanligt". */
+  title: string;
+  /** Instruktion till mekanikern, t.ex. "Felsök / rep max 3000 kr". */
+  instruction: string | null;
+  /** Kunden ska godkänna innan jobbet blir dyrare än så här. Öre, orderns prisläge. */
+  limit?: number | null;
+  /** Jobbet kostar exakt så här. Öre, orderns prisläge. */
+  fixedPrice?: number | null;
+  approval?: JobApproval | null;
+}
+
+/** Ett kostnadsförslag som det lämnades. */
+export interface WorkOrderQuote {
+  givenAt: string;
+  validUntil: string;
+  tolerancePercent: number;
+  total: number;
+  net: number;
+  jobs: { id: string; title: string; total: number }[];
+  /** Kundens svar på hela förslaget; saknas medan vi väntar. */
+  approval?: JobApproval | null;
+}
+
+/** Vad jobbet tjänade, bara internt. Öre exkl. moms. */
+export interface AfterCalculation {
+  revenue: number;
+  partsCost: number;
+  minutes: number;
+  labourCost: number | null;
+  margin: number;
+}
+
+/** En rad på arbetsordern: arbete, en del eller en avgift. Priset står aldrig på arbetsbladet. */
 export interface WorkOrderLine {
   id: string;
   position: number;
@@ -959,6 +1141,19 @@ export interface WorkOrderLine {
   toOrder?: boolean;
   /** Delen är uttagen ur lagret (bokförd som försäljning när ordern blev klar). */
   stockBooked?: boolean;
+  jobId?: string | null;
+  /** Operations- eller artikelkod. */
+  code?: string | null;
+  /** Öre per styck i orderns prisläge; null = utan pris. */
+  unitPrice?: number | null;
+  discountPercent?: number;
+  vatRate?: number;
+  /** Används men debiteras inte (garanti, goodwill). */
+  noCharge?: boolean;
+  /** Tid i minuter, bara internt. */
+  minutes?: number | null;
+  /** Systemets rad (förbrukningsmaterial), räknas om vid varje sparning. */
+  system?: boolean;
 }
 
 export interface WorkOrder {
@@ -983,9 +1178,24 @@ export interface WorkOrder {
   receivedAt: string;
   /** Klar senast / hämtas, ISO-tid. */
   pickupAt: string | null;
-  /** Överenskommet pris för hela jobbet, öre exkl. moms. Syns aldrig på arbetsbladet. */
+  /** Ett överenskommet pris för hela ordern, öre i orderns prisläge. Syns aldrig på arbetsbladet. */
   price: number | null;
   priceNote: string | null;
+  /** Priserna på ordern är inkl. moms (standard) eller exkl. moms. */
+  pricesIncludeVat?: boolean;
+  roundToKrona?: boolean;
+  /** Mätarställning, km. */
+  mileage?: number | null;
+  yourReference?: string | null;
+  ourReference?: string | null;
+  jobs?: WorkOrderJob[];
+  quote?: WorkOrderQuote | null;
+  /** Inget förslag, lämnat (väntar på svar), godkänt eller nekat. */
+  quoteStatus?: QuoteStatus;
+  /** Kostnadsförslaget (KF-…) som ordern gjordes av. */
+  quoteId?: string | null;
+  /** Fakturerad (gammal faktura eller bokfört säljkort): ordern är låst. */
+  locked?: boolean;
   /** Vad som gjorts (kvittot). */
   performed: string | null;
   warranty: string | null;
@@ -1001,10 +1211,19 @@ export interface WorkOrder {
 
 export interface WorkOrderDetail extends WorkOrder {
   lines: WorkOrderLine[];
-  /** Överenskommet pris exkl. moms, öre (0 om inget pris satts). */
+  /** Att betala, öre inkl. moms. */
   total: number;
   /** Netto, moms per sats och belopp att betala. */
   totals: OrderTotals;
+  /** Vad varje rad kostar efter rabatt och fasta priser, per rad-id. */
+  amounts?: Record<string, number>;
+  /** Delsumma per jobb. */
+  jobTotals?: Record<string, number>;
+  /** Jobb över sin gräns som kunden inte godkänt. */
+  needsApproval?: string[];
+  /** Över kostnadsförslaget med mer än det tillät. */
+  overQuote?: boolean;
+  afterCalculation?: AfterCalculation | null;
   invoice: WorkOrderInvoice | null;
   /** Lagerdelar på en klar order som inte kunde tas ur lagret (saknas eller arkiverad). */
   stockMissing?: number;
@@ -1020,6 +1239,21 @@ export interface WorkOrderLineInput {
   quantity: number;
   instruction?: string | null;
   done: boolean;
+  jobId?: string | null;
+  code?: string | null;
+  unitPrice?: number | null;
+  discountPercent?: number;
+  vatRate?: number;
+  noCharge?: boolean;
+  minutes?: number | null;
+}
+
+export interface WorkOrderJobInput {
+  id: string;
+  title: string;
+  instruction?: string | null;
+  limit?: number | null;
+  fixedPrice?: number | null;
 }
 
 export interface WorkOrderInput {
@@ -1037,6 +1271,12 @@ export interface WorkOrderInput {
   warranty: string | null;
   remarks: string | null;
   notes: string | null;
+  pricesIncludeVat?: boolean;
+  roundToKrona?: boolean;
+  mileage?: number | null;
+  yourReference?: string | null;
+  ourReference?: string | null;
+  jobs?: WorkOrderJobInput[];
   lines: WorkOrderLineInput[];
 }
 
@@ -1065,22 +1305,31 @@ export interface SupplierDetail extends Supplier {
 // --- Säljkort ---
 
 export type SalesCardStatus = 'draft' | 'posted';
-export type SalesLineType = 'article' | 'service' | 'storage' | 'free';
+export type SalesLineType = 'article' | 'service' | 'labour' | 'storage' | 'free';
 
 export interface SalesLine {
   id: string;
   type: SalesLineType;
+  code?: string | null;
+  sectionId?: string | null;
   description: string;
   articleId: string | null;
   depositId: string | null;
   quantity: number;
-  /** Öre per styck, inkl. moms. */
+  /** Öre per styck, i kortets prisläge. */
   unitPrice: number;
   discountPercent: number;
   vatRate: number;
   stockBooked: boolean;
-  /** Vad raden kostar efter radens och kortets rabatt, öre inkl. moms. */
+  /** Vad raden kostar efter radens och kortets rabatt, öre i kortets prisläge. */
   amount: number;
+}
+
+/** En rubrik (jobb) på säljkortet. Med fast pris skrivs raderna ut utan pris. */
+export interface SalesSection {
+  id: string;
+  title: string;
+  fixedPrice: number | null;
 }
 
 export interface SalesDiscount {
@@ -1125,6 +1374,10 @@ export interface SalesCardLinks {
 
 export interface SalesCardDetail extends SalesCardItem {
   lines: SalesLine[];
+  sections?: SalesSection[];
+  sectionTotals?: Record<string, number>;
+  pricesIncludeVat?: boolean;
+  roundToKrona?: boolean;
   discount: SalesDiscount | null;
   totals: OrderTotals;
   performed: string | null;
@@ -1136,6 +1389,8 @@ export interface SalesCardDetail extends SalesCardItem {
 export interface SalesLineInput {
   id?: string;
   type: SalesLineType;
+  code?: string | null;
+  sectionId?: string | null;
   description?: string;
   articleId?: string;
   depositId?: string;
@@ -1154,4 +1409,199 @@ export interface SalesCardInput {
   note?: string;
   performed?: string;
   warranty?: string;
+  pricesIncludeVat?: boolean;
+  roundToKrona?: boolean;
+  sections?: SalesSection[];
 }
+
+// --- Artikeltyper och lager ---
+
+export type ArticleField = 'brand' | 'model' | 'sku' | 'supplier' | 'warehouse';
+/** Krävs, valfritt eller dolt på artikelkortet för en typ. */
+export type FieldMode = 'required' | 'optional' | 'hidden';
+export type ArticleSpec = 'tyre' | 'rim' | 'none';
+
+export const ARTICLE_FIELD_LABELS: Record<ArticleField, string> = {
+  brand: 'Märke',
+  model: 'Benämning / modell',
+  sku: 'Artikelnummer',
+  supplier: 'Leverantör',
+  warehouse: 'Lager och plats',
+};
+export const FIELD_MODE_LABELS: Record<FieldMode, string> = {
+  required: 'Krävs',
+  optional: 'Valfritt',
+  hidden: 'Dölj',
+};
+export const SPEC_LABELS: Record<ArticleSpec, string> = {
+  tyre: 'Däckmått',
+  rim: 'Fälgmått',
+  none: 'Inga mått',
+};
+
+/** En artikeltyp (register): styr vilka fält artikelkortet kräver och vilka mått det frågar efter. */
+export interface ArticleType {
+  id: string;
+  /** TYP-001 */
+  code: string;
+  number: number;
+  name: string;
+  spec: ArticleSpec;
+  fields: Record<ArticleField, FieldMode>;
+  active: boolean;
+}
+
+export type WarehouseKind = 'own' | 'customer';
+export const WAREHOUSE_KIND_LABELS: Record<WarehouseKind, string> = {
+  own: 'Eget lager (varor att sälja)',
+  customer: 'Kundgods (t.ex. däckhotell)',
+};
+
+export interface WarehouseLocation {
+  id: string;
+  name: string;
+}
+
+/** Ett lager med sina platser (hyllor, rum). */
+export interface Warehouse {
+  id: string;
+  /** LAG-001 */
+  code: string;
+  number: number;
+  name: string;
+  kind: WarehouseKind;
+  notes: string | null;
+  locations: WarehouseLocation[];
+  active: boolean;
+}
+
+// --- Kostnadsförslag ---
+
+/** Var förslaget står. `expired` = lämnat men giltighetstiden har gått ut. */
+export type QuoteDocStatus = 'draft' | 'given' | 'approved' | 'declined';
+export type QuoteShownStatus = QuoteDocStatus | 'expired';
+
+export const QUOTE_STATUS_LABELS: Record<QuoteShownStatus, string> = {
+  draft: 'Utkast',
+  given: 'Väntar på svar',
+  approved: 'Godkänt',
+  declined: 'Nekat',
+  expired: 'Utgånget',
+};
+
+export interface QuoteJob {
+  id: string;
+  title: string;
+  /** Öre i förslagets prisläge. */
+  fixedPrice: number | null;
+}
+
+export interface QuoteLine {
+  id: string;
+  jobId: string | null;
+  type: WorkOrderLineType;
+  description: string;
+  articleId: string | null;
+  code: string | null;
+  quantity: number;
+  /** Öre per styck i förslagets prisläge. */
+  unitPrice: number;
+  discountPercent: number;
+  vatRate: number;
+  system: boolean;
+}
+
+export interface Quote {
+  id: string;
+  number: number;
+  /** KF-00042 */
+  code: string;
+  customerId: string;
+  vehicleId: string;
+  customerName: string;
+  phone: string | null;
+  regNo: string;
+  vehicle: string | null;
+  status: QuoteDocStatus;
+  shownStatus: QuoteShownStatus;
+  pricesIncludeVat: boolean;
+  roundToKrona: boolean;
+  remarks: string | null;
+  mileage: number | null;
+  yourReference: string | null;
+  ourReference: string | null;
+  givenAt: string | null;
+  validUntil: string | null;
+  tolerancePercent: number;
+  givenTotal: number | null;
+  approval: JobApproval | null;
+  workOrderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Att betala, öre inkl. moms. */
+  total: number;
+}
+
+export interface QuoteDetail extends Quote {
+  jobs: QuoteJob[];
+  lines: QuoteLine[];
+  totals: OrderTotals;
+  /** Vad varje rad kostar efter rabatt, per rad-id. */
+  amounts: Record<string, number>;
+  /** Delsumma per jobb. */
+  jobTotals: Record<string, number>;
+}
+
+export interface QuoteInput {
+  customerId: string;
+  vehicleId: string;
+  remarks?: string | null;
+  mileage?: number | null;
+  yourReference?: string | null;
+  ourReference?: string | null;
+  pricesIncludeVat?: boolean;
+  jobs?: { id: string; title: string; fixedPrice?: number | null }[];
+  lines?: {
+    id?: string;
+    jobId: string | null;
+    type: WorkOrderLineType;
+    description: string;
+    articleId: string | null;
+    code: string | null;
+    quantity: number;
+    unitPrice: number | null;
+    discountPercent: number;
+    vatRate: number;
+  }[];
+}
+
+// --- Däckhotell: förval ---
+
+/** Vad en ny inlämning börjar med (Inställningar → Däckhotell). */
+export interface StorageDefaults {
+  contents: StorageContents;
+  quantity: number;
+  studded: boolean;
+  condition: DepositCondition;
+  accessories: StorageAccessory[];
+  warehouseId: string | null;
+  locationId: string | null;
+  winterPickupMonth: number;
+  summerPickupMonth: number;
+  paymentCycleMonths: number;
+}
+
+export const MONTH_LABELS = [
+  'Januari',
+  'Februari',
+  'Mars',
+  'April',
+  'Maj',
+  'Juni',
+  'Juli',
+  'Augusti',
+  'September',
+  'Oktober',
+  'November',
+  'December',
+];

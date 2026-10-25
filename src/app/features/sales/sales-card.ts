@@ -10,30 +10,45 @@ import { StorageApi } from '../../core/api/storage-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import {
   Article,
+  Customer,
   PAYMENT_METHOD_LABELS,
   PaymentMethod,
   SalesCardDetail,
   SalesCardInput,
   SalesLineType,
+  SalesSection,
   ServiceType,
   StorageDeposit,
 } from '../../core/models';
+import { Pricing } from '../../core/pricing';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
 import { type PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
-import { rowAmounts, STANDARD_VAT, totalsOf, VAT_OPTIONS } from '../../shared/vat';
+import {
+  groupAmounts,
+  inMode,
+  netOf,
+  rowAmounts,
+  STANDARD_VAT,
+  totalsOf,
+  VAT_OPTIONS,
+  vatLabel,
+  vatOn,
+} from '../../shared/vat';
 
-/** En rad som den redigeras: priset i kronor inkl. moms. */
+/** En rad som den redigeras: priset i kronor i kortets prisläge. */
 interface Row {
   key: string;
   id?: string;
   type: SalesLineType;
+  code?: string | null;
+  sectionId?: string | null;
   description: string;
   articleId?: string;
   depositId?: string;
   quantity: number;
-  /** Kronor per styck, inkl. moms. */
+  /** Kronor per styck, i kortets prisläge. */
   price: number;
   discountPercent: number;
   vatRate: number;
@@ -55,6 +70,7 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
   standalone: false,
   template: `
     <app-card-page
+      [wide]="true"
       listLink="/sales"
       listLabel="Försäljning"
       newTitle="Nytt säljkort"
@@ -64,7 +80,15 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
           @if (c.status === 'draft') {
-            <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+            <button
+              mat-icon-button
+              class="!text-red-700"
+              aria-label="Ta bort"
+              matTooltip="Ta bort"
+              (click)="remove()"
+            >
+              <mat-icon>delete_outline</mat-icon>
+            </button>
           }
           @if (c.status === 'posted') {
             <a mat-stroked-button [routerLink]="['/sales', c.id, 'invoice']">
@@ -125,7 +149,7 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
                 [formControl]="search"
                 (keydown.enter)="addFirst()"
                 placeholder="Lägg till artikel: storlek, märke, artikelnummer…"
-                class="focus:ring-brand h-11 w-full rounded-xl border-0 bg-white pr-3 pl-11 shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
+                class="h-11 w-full pr-3 pl-11 field"
               />
               @if (results().length) {
                 <div
@@ -160,6 +184,9 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
               (menuOpened)="loadDeposits()"
             >
               <mat-icon>warehouse</mat-icon> Däckhotell
+            </button>
+            <button mat-stroked-button type="button" (click)="addLabour()">
+              <mat-icon>schedule</mat-icon> Arbete
             </button>
             <button mat-stroked-button type="button" (click)="addFree()">
               <mat-icon>add</mat-icon> Fri rad
@@ -199,91 +226,123 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
                 <tr>
                   <th class="py-2">Beskrivning</th>
                   <th class="w-20 py-2 text-right">Antal</th>
-                  <th class="w-32 py-2 text-right">À-pris inkl. moms</th>
+                  <th class="w-32 py-2 text-right">À-pris</th>
                   <th class="w-24 py-2 text-right">Rabatt %</th>
                   <th class="w-28 py-2 text-right">Summa</th>
                   <th class="w-10 py-2"></th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
-                @for (r of rows(); track r.key; let i = $index) {
-                  <tr class="align-top">
-                    <td class="py-2 pr-2">
-                      @if (readOnly() || r.type === 'storage') {
-                        <div class="py-2">{{ r.description }}</div>
-                      } @else {
-                        <input
-                          class="focus:ring-brand h-10 w-full rounded-lg border-0 px-2 ring-1 ring-gray-200 outline-none focus:ring-2"
-                          [value]="r.description"
-                          (input)="edit(i, { description: $any($event.target).value })"
-                        />
-                      }
-                      @if (r.type === 'article' && r.maxQty !== undefined && r.quantity > r.maxQty) {
-                        <div class="text-xs text-red-600">Bara {{ r.maxQty }} st i lager.</div>
-                      }
-                    </td>
-                    <td class="py-2 pr-2 text-right">
-                      @if (readOnly() || r.type === 'storage') {
-                        <div class="py-2 tabular-nums">{{ r.quantity }}</div>
-                      } @else {
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          class="focus:ring-brand h-10 w-full rounded-lg border-0 px-2 text-right ring-1 ring-gray-200 outline-none focus:ring-2"
-                          [value]="r.quantity"
-                          (focus)="$any($event.target).select()"
-                          (input)="edit(i, { quantity: $any($event.target).valueAsNumber })"
-                        />
-                      }
-                    </td>
-                    <td class="py-2 pr-2 text-right">
-                      @if (readOnly()) {
-                        <div class="py-2 tabular-nums">{{ r.price * 100 | kr }}</div>
-                      } @else {
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          class="focus:ring-brand h-10 w-full rounded-lg border-0 px-2 text-right ring-1 ring-gray-200 outline-none focus:ring-2"
-                          [value]="r.price"
-                          (focus)="$any($event.target).select()"
-                          (input)="edit(i, { price: $any($event.target).valueAsNumber })"
-                        />
-                      }
-                    </td>
-                    <td class="py-2 pr-2 text-right">
-                      @if (readOnly()) {
-                        <div class="py-2 tabular-nums">{{ r.discountPercent || '' }}</div>
-                      } @else {
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="1"
-                          class="focus:ring-brand h-10 w-full rounded-lg border-0 px-2 text-right ring-1 ring-gray-200 outline-none focus:ring-2"
-                          [value]="r.discountPercent || ''"
-                          (focus)="$any($event.target).select()"
-                          (input)="edit(i, { discountPercent: $any($event.target).valueAsNumber || 0 })"
-                        />
-                      }
-                    </td>
-                    <td class="py-2 text-right tabular-nums">
-                      <div class="py-2">{{ amounts()[i] | kr }}</div>
-                    </td>
-                    <td class="py-2 text-right">
-                      @if (!readOnly()) {
-                        <button
-                          mat-icon-button
-                          type="button"
-                          (click)="removeRow(i)"
-                          aria-label="Ta bort raden"
-                        >
-                          <mat-icon>close</mat-icon>
-                        </button>
-                      }
-                    </td>
-                  </tr>
+                @for (g of display(); track g.key) {
+                  @for (it of g.items; track it.r.key) {
+                    @let r = it.r;
+                    @let i = it.i;
+                    <tr class="align-top">
+                      <td class="py-2 pr-2">
+                        @if (readOnly() || r.type === 'storage') {
+                          <div class="py-2">{{ r.description }}</div>
+                        } @else {
+                          <input
+                            class="h-10 w-full px-2 field"
+                            [value]="r.description"
+                            (input)="edit(i, { description: $any($event.target).value })"
+                          />
+                        }
+                        @if (
+                          r.type === 'article' && r.maxQty !== undefined && r.quantity > r.maxQty
+                        ) {
+                          <div class="text-xs text-red-600">Bara {{ r.maxQty }} st i lager.</div>
+                        }
+                      </td>
+                      <td class="py-2 pr-2 text-right">
+                        @if (readOnly() || r.type === 'storage') {
+                          <div class="py-2 tabular-nums">{{ r.quantity }}</div>
+                        } @else {
+                          <input
+                            type="number"
+                            min="0"
+                            [step]="r.type === 'article' ? 1 : 0.25"
+                            class="h-10 w-full px-2 text-right field"
+                            [value]="r.quantity"
+                            (focus)="$any($event.target).select()"
+                            (input)="edit(i, { quantity: $any($event.target).valueAsNumber })"
+                          />
+                        }
+                      </td>
+                      <td class="py-2 pr-2 text-right">
+                        @if (readOnly()) {
+                          <div class="py-2 tabular-nums">{{ r.price * 100 | kr }}</div>
+                        } @else {
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            class="h-10 w-full px-2 text-right field"
+                            [value]="r.price"
+                            (focus)="$any($event.target).select()"
+                            (input)="edit(i, { price: $any($event.target).valueAsNumber })"
+                          />
+                        }
+                      </td>
+                      <td class="py-2 pr-2 text-right">
+                        @if (readOnly()) {
+                          <div class="py-2 tabular-nums">{{ r.discountPercent || '' }}</div>
+                        } @else {
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            class="h-10 w-full px-2 text-right field"
+                            [value]="r.discountPercent || ''"
+                            (focus)="$any($event.target).select()"
+                            (input)="
+                              edit(i, { discountPercent: $any($event.target).valueAsNumber || 0 })
+                            "
+                          />
+                        }
+                      </td>
+                      <td class="py-2 text-right tabular-nums">
+                        <div class="py-2">{{ amounts()[i] | kr }}</div>
+                      </td>
+                      <td class="py-2 text-right">
+                        @if (!readOnly()) {
+                          <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeRow(i)"
+                            aria-label="Ta bort raden"
+                          >
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                  @if (g.section; as sec) {
+                    <tr class="bg-gray-50">
+                      <td class="py-2 pl-2 font-semibold" colspan="3">Delsumma {{ sec.title }}</td>
+                      <td class="py-2 pr-2 text-right text-xs text-gray-500" colspan="1">
+                        @if (readOnly()) {
+                          {{ sec.fixedPrice != null ? 'Fast pris' : '' }}
+                        } @else {
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Fast pris"
+                            aria-label="Fast pris för jobbet"
+                            class="h-9 w-full px-2 text-right field"
+                            [value]="sec.fixedPrice != null ? sec.fixedPrice / 100 : ''"
+                            (input)="setFixed(sec.id, $any($event.target).value)"
+                          />
+                        }
+                      </td>
+                      <td class="py-2 text-right font-semibold tabular-nums">
+                        {{ sectionTotals()[sec.id] ?? 0 | kr }}
+                      </td>
+                      <td></td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
@@ -296,76 +355,84 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
         }
       </section>
 
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-2 text-base font-semibold">Rabatt på hela kortet</h2>
-        @if (readOnly()) {
-          <p class="text-sm">
-            @if (card()?.discount; as d) {
-              {{ d.type === 'percent' ? d.value + ' %' : (d.value | kr) }}
-              @if (d.reason) {
-                <span class="text-gray-500"> · {{ d.reason }}</span>
+      <div class="grid items-start gap-4 lg:grid-cols-2">
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-2 text-base font-semibold">Rabatt på hela kortet</h2>
+          @if (readOnly()) {
+            <p class="text-sm">
+              @if (card()?.discount; as d) {
+                {{ d.type === 'percent' ? d.value + ' %' : (d.value | kr) }}
+                @if (d.reason) {
+                  <span class="text-gray-500"> · {{ d.reason }}</span>
+                }
+              } @else {
+                Ingen rabatt.
               }
-            } @else {
-              Ingen rabatt.
-            }
-          </p>
-        } @else {
-          <div class="flex flex-wrap items-start gap-3">
-            <mat-button-toggle-group
-              hideSingleSelectionIndicator
-              [value]="discType()"
-              (change)="discType.set($event.value); touch()"
-              aria-label="Typ av rabatt"
-            >
-              <mat-button-toggle value="percent">%</mat-button-toggle>
-              <mat-button-toggle value="amount">kr</mat-button-toggle>
-            </mat-button-toggle-group>
-            <mat-form-field subscriptSizing="dynamic" class="w-36">
-              <mat-label>{{ discType() === 'percent' ? 'Procent' : 'Kronor' }}</mat-label>
-              <input
-                matInput
-                type="number"
-                min="0"
-                [value]="discValue() || ''"
-                (input)="discValue.set($any($event.target).valueAsNumber || 0); touch()"
-              />
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic" class="min-w-52 flex-1">
-              <mat-label>Anledning (syns inte på kvittot)</mat-label>
-              <input
-                matInput
-                [value]="discReason()"
-                (input)="discReason.set($any($event.target).value); touch()"
-                placeholder="t.ex. 4 bilar på däckhotell"
-              />
-            </mat-form-field>
-          </div>
-        }
-      </section>
+            </p>
+          } @else {
+            <div class="flex flex-wrap items-start gap-3">
+              <mat-button-toggle-group
+                hideSingleSelectionIndicator
+                [value]="discType()"
+                (change)="discType.set($event.value); touch()"
+                aria-label="Typ av rabatt"
+              >
+                <mat-button-toggle value="percent">%</mat-button-toggle>
+                <mat-button-toggle value="amount">kr</mat-button-toggle>
+              </mat-button-toggle-group>
+              <mat-form-field subscriptSizing="dynamic" class="w-36">
+                <mat-label>{{ discType() === 'percent' ? 'Procent' : 'Kronor' }}</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  [value]="discValue() || ''"
+                  (input)="discValue.set($any($event.target).valueAsNumber || 0); touch()"
+                />
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic" class="min-w-52 flex-1">
+                <mat-label>Anledning (syns inte på kvittot)</mat-label>
+                <input
+                  matInput
+                  [value]="discReason()"
+                  (input)="discReason.set($any($event.target).value); touch()"
+                  placeholder="t.ex. 4 bilar på däckhotell"
+                />
+              </mat-form-field>
+            </div>
+          }
+        </section>
 
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="ml-auto max-w-sm text-sm">
-          @if (totals().discount > 0) {
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <div class="ml-auto max-w-sm text-sm">
+            @if (totals().discount > 0) {
+              <div class="flex justify-between py-0.5 text-gray-600">
+                <span>Före rabatt</span><span>{{ totals().gross | kr }}</span>
+              </div>
+              <div class="flex justify-between py-0.5 text-green-700">
+                <span>Rabatt</span><span>−{{ totals().discount | kr }}</span>
+              </div>
+            }
             <div class="flex justify-between py-0.5 text-gray-600">
-              <span>Före rabatt</span><span>{{ totals().gross | kr }}</span>
+              <span>Summa exkl. moms</span><span>{{ totals().net | kr }}</span>
             </div>
-            <div class="flex justify-between py-0.5 text-green-700">
-              <span>Rabatt</span><span>−{{ totals().discount | kr }}</span>
+            @for (b of totals().byRate; track b.rate) {
+              <div class="flex justify-between py-0.5 text-gray-600">
+                <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span
+                ><span>{{ b.vat | kr }}</span>
+              </div>
+            }
+            @if (totals().rounding) {
+              <div class="flex justify-between py-0.5 text-gray-600">
+                <span>Öresutjämning</span><span>{{ totals().rounding! | kr }}</span>
+              </div>
+            }
+            <div class="mt-1 flex justify-between gap-6 border-t pt-1 text-lg font-semibold">
+              <span>Att betala inkl. moms</span><span>{{ totals().total | kr }}</span>
             </div>
-          }
-          <div class="flex justify-between py-0.5 text-gray-600">
-            <span>Summa exkl. moms</span><span>{{ totals().net | kr }}</span>
           </div>
-          @for (b of totals().byRate; track b.rate) {
-            <div class="flex justify-between py-0.5 text-gray-600">
-              <span>Varav moms {{ b.rate }} %</span><span>{{ b.vat | kr }}</span>
-            </div>
-          }
-          <div class="mt-1 flex justify-between gap-6 border-t pt-1 text-lg font-semibold">
-            <span>Att betala inkl. moms</span><span>{{ totals().total | kr }}</span>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <section class="rounded-xl bg-white p-5 shadow-sm">
         <h2 class="mb-2 text-base font-semibold">Text och anteckning</h2>
@@ -412,7 +479,7 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
               ändra. Tills dess kan du förhandsgranska utkastet.
             </p>
             @if (dirty()) {
-              <p class="mb-3 text-sm text-amber-800">Spara ändringarna först.</p>
+              <p class="mb-3 text-sm text-gray-500">Spara ändringarna först.</p>
             }
             <div class="flex flex-wrap gap-2">
               <button
@@ -493,7 +560,12 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
                 <mat-icon>warehouse</mat-icon> {{ d.code }} · {{ d.regNo }}
               </a>
             }
-            @if (!c.links.customer && !c.links.vehicle && !c.links.workOrder && !c.links.deposits.length) {
+            @if (
+              !c.links.customer &&
+              !c.links.vehicle &&
+              !c.links.workOrder &&
+              !c.links.deposits.length
+            ) {
               <span class="text-gray-500">Kontantförsäljning utan kund.</span>
             }
           </div>
@@ -507,6 +579,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   private readonly inventory = inject(InventoryApi);
   private readonly storage = inject(StorageApi);
   private readonly workshop = inject(WorkshopApi);
+  private readonly pricing = inject(Pricing);
   private readonly links = inject(LinkResolver);
   private readonly snack = inject(MatSnackBar);
   private readonly confirm = inject(Confirm);
@@ -518,6 +591,14 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly payLabels = PAYMENT_METHOD_LABELS;
   readonly payMethods = Object.entries(PAYMENT_METHOD_LABELS) as [PaymentMethod, string][];
   readonly vatOptions = VAT_OPTIONS;
+  readonly vatLabel = vatLabel;
+  /** Kortets prisläge: inkl. moms (standard) eller exkl. moms. */
+  readonly incl = signal(true);
+  /** Valt för hand eller kommer från ett sparat kort, så kundbyte inte ändrar det. */
+  private inclFixed = false;
+  readonly sections = signal<SalesSection[]>([]);
+  /** Kunden, för kundtyp och kundrabatt. */
+  private readonly customer = signal<Customer | null>(null);
 
   readonly card = signal<SalesCardDetail | null>(null);
   readonly rows = signal<Row[]>([]);
@@ -552,7 +633,33 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       unitPrice: ore(r.price),
       discountPercent: r.discountPercent || 0,
       vatRate: r.vatRate,
+      group: r.sectionId ?? null,
     })),
+  );
+  private readonly groups = computed(() =>
+    this.sections()
+      .filter((x) => x.fixedPrice != null)
+      .map((x) => ({ id: x.id, fixedPrice: x.fixedPrice })),
+  );
+  /** Raderna under sina jobb, sedan raderna utan jobb; med radens index. */
+  readonly display = computed(() => {
+    const items = this.rows().map((r, i) => ({ r, i }));
+    const ids = new Set(this.sections().map((x) => x.id));
+    return [
+      ...this.sections().map((section) => ({
+        key: section.id,
+        section,
+        items: items.filter((x) => x.r.sectionId === section.id),
+      })),
+      {
+        key: '_',
+        section: null,
+        items: items.filter((x) => !x.r.sectionId || !ids.has(x.r.sectionId)),
+      },
+    ].filter((g) => g.items.length || g.section);
+  });
+  readonly sectionTotals = computed(() =>
+    groupAmounts(this.priced(), rowAmounts(this.priced(), null, this.groups())),
   );
   private readonly discount = computed(() =>
     this.discValue() > 0
@@ -562,12 +669,16 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         }
       : null,
   );
-  readonly amounts = computed(() => rowAmounts(this.priced(), this.discount()));
+  readonly amounts = computed(() => rowAmounts(this.priced(), this.discount(), this.groups()));
   /** Summan medan man skriver; efter bokföring gäller det som frystes. */
   readonly totals = computed(() =>
     this.readOnly() && this.card()?.invoice
       ? this.card()!.invoice!.totals
-      : totalsOf(this.priced(), this.discount()),
+      : totalsOf(this.priced(), this.discount(), {
+          pricesIncludeVat: this.incl(),
+          roundToKrona: this.card()?.roundToKrona ?? this.pricing.value().roundToKrona,
+          groups: this.groups(),
+        }),
   );
 
   constructor() {
@@ -583,6 +694,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       .subscribe((p) => this.results.set(p?.items ?? []));
     this.linkCtl.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => {
       this.link.set(v);
+      this.loadCustomer(v?.customerId);
       this.touch();
     });
   }
@@ -616,6 +728,55 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     return this.dirty();
   }
 
+  /** Kundtypen styr ett nytt korts prisläge (Prissättning); kundens rabatt förifyller rader. */
+  private loadCustomer(customerId: string | undefined) {
+    if (!customerId) {
+      this.customer.set(null);
+      if (!this.inclFixed) this.setIncl(this.pricing.includeVatFor(false));
+      return;
+    }
+    this.workshop.customer(customerId).subscribe((c) => {
+      this.customer.set(c);
+      if (!this.inclFixed) this.setIncl(this.pricing.includeVatFor(c.type === 'company'));
+    });
+  }
+
+  /** Byter prisläge och räknar om radernas priser så att kunden betalar detsamma. */
+  private setIncl(toIncl: boolean) {
+    if (toIncl === this.incl()) return;
+    const conv = (k: number, rate: number) => {
+      const o = ore(k);
+      return (toIncl ? o + vatOn(o, rate) : netOf(o, rate)) / 100;
+    };
+    this.rows.update((rs) => rs.map((r) => ({ ...r, price: conv(r.price, r.vatRate) })));
+    this.sections.update((xs) =>
+      xs.map((x) =>
+        x.fixedPrice == null
+          ? x
+          : { ...x, fixedPrice: Math.round(conv(x.fixedPrice / 100, STANDARD_VAT) * 100) },
+      ),
+    );
+    if (this.discType() === 'amount' && this.discValue()) {
+      this.discValue.set(conv(this.discValue(), STANDARD_VAT));
+    }
+    this.incl.set(toIncl);
+  }
+
+  switchVat(toIncl: boolean) {
+    this.inclFixed = true;
+    this.setIncl(toIncl);
+    this.touch();
+  }
+
+  /** Fast pris på ett jobb (kr i kortets prisläge); tomt = radernas egna priser. */
+  setFixed(id: string, value: string) {
+    const o = value === '' ? null : Math.round(Number(value) * 100);
+    this.sections.update((xs) =>
+      xs.map((x) => (x.id === id ? { ...x, fixedPrice: Number.isNaN(o) ? null : o } : x)),
+    );
+    this.touch();
+  }
+
   touch() {
     this.dirty.set(true);
   }
@@ -626,11 +787,16 @@ export class SalesCardPage implements OnInit, HasUnsaved {
 
   private apply(c: SalesCardDetail) {
     this.card.set(c);
+    this.inclFixed = true;
+    this.incl.set(c.pricesIncludeVat ?? true);
+    this.sections.set(c.sections ?? []);
     this.rows.set(
       c.lines.map((l) => ({
         key: key(),
         id: l.id,
         type: l.type,
+        code: l.code ?? null,
+        sectionId: l.sectionId ?? null,
         description: l.description,
         articleId: l.articleId ?? undefined,
         depositId: l.depositId ?? undefined,
@@ -647,6 +813,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       { emitEvent: false },
     );
     this.link.set(this.linkCtl.value);
+    if (c.customerId && this.customer()?.id !== c.customerId) this.loadCustomer(c.customerId);
     this.discType.set(c.discount?.type ?? 'percent');
     this.discValue.set(
       c.discount ? (c.discount.type === 'amount' ? c.discount.value / 100 : c.discount.value) : 0,
@@ -686,8 +853,9 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         description: `${a.sizeLabel} ${a.brand ?? ''} ${a.model ?? ''}`.replace(/\s+/g, ' ').trim(),
         articleId: a.id,
         quantity: 1,
-        price: a.sellPrice / 100,
-        discountPercent: 0,
+        code: a.sku,
+        price: inMode(a.sellPrice, this.incl()) / 100,
+        discountPercent: this.customer()?.partsDiscount ?? 0,
         vatRate: STANDARD_VAT,
         maxQty: a.quantity,
       });
@@ -704,10 +872,26 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   addService(s: ServiceType) {
     this.push({
       type: 'service',
+      code: s.opCode ?? null,
       description: s.name,
       quantity: 1,
-      price: (s.priceFrom ?? 0) / 100,
-      discountPercent: 0,
+      price: inMode(s.priceFrom ?? 0, this.incl()) / 100,
+      discountPercent: this.customer()?.labourDiscount ?? 0,
+      vatRate: STANDARD_VAT,
+    });
+  }
+
+  /**
+   * Arbetsrad: en åtgärd med ett pris. Kunden ser aldrig timmar eller timpris, så raden har
+   * antal 1 och det pris arbetet kostar.
+   */
+  addLabour() {
+    this.push({
+      type: 'labour',
+      description: 'Arbete',
+      quantity: 1,
+      price: 0,
+      discountPercent: this.customer()?.labourDiscount ?? 0,
       vatRate: STANDARD_VAT,
     });
   }
@@ -730,7 +914,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       description: `Däckhotell ${d.vehicle.regNo}`,
       depositId: d.id,
       quantity: 1,
-      price: d.fee / 100,
+      price: inMode(d.fee, this.incl()) / 100,
       discountPercent: 0,
       vatRate: STANDARD_VAT,
     });
@@ -744,12 +928,14 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       this.depositsHint.set('Välj en kund först för att se kundens däckhotell.');
       return;
     }
-    this.storage.deposits({ status: 'stored', paymentStatus: 'unpaid', limit: 100 }).subscribe((p) => {
-      const taken = new Set(this.rows().map((r) => r.depositId));
-      const list = p.items.filter((d) => d.customerId === customerId && !taken.has(d.id));
-      this.deposits.set(list);
-      this.depositsHint.set('Kunden har inga obetalda däckhotell att lägga till.');
-    });
+    this.storage
+      .deposits({ status: 'stored', paymentStatus: 'unpaid', limit: 100 })
+      .subscribe((p) => {
+        const taken = new Set(this.rows().map((r) => r.depositId));
+        const list = p.items.filter((d) => d.customerId === customerId && !taken.has(d.id));
+        this.deposits.set(list);
+        this.depositsHint.set('Kunden har inga obetalda däckhotell att lägga till.');
+      });
   }
 
   // --- spara och bokför ---
@@ -760,9 +946,13 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     return {
       customerId: resolved?.customerId || null,
       vehicleId: resolved?.vehicleId || null,
+      pricesIncludeVat: this.incl(),
+      sections: this.sections(),
       lines: this.rows().map((r) => ({
         id: r.id,
         type: r.type,
+        code: r.code || null,
+        sectionId: r.sectionId ?? null,
         description: r.description || undefined,
         articleId: r.articleId,
         depositId: r.depositId,
@@ -831,7 +1021,9 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     const c = this.card();
     if (!c) return;
     const run = () =>
-      this.api.setPaid(c.id, paid, paid ? this.payMethod() : undefined).subscribe((r) => this.apply(r));
+      this.api
+        .setPaid(c.id, paid, paid ? this.payMethod() : undefined)
+        .subscribe((r) => this.apply(r));
     if (paid) {
       run();
       return;
@@ -864,5 +1056,4 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         });
       });
   }
-
 }

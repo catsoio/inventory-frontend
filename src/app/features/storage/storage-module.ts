@@ -5,9 +5,10 @@ import { StorageActionDialog } from './storage-action-dialog/storage-action-dial
 import { StorageDetail } from './storage-detail/storage-detail';
 import { StorageForm } from './storage-form/storage-form';
 import { StorageList } from './storage-list/storage-list';
+import { StorageRecallDialog } from './storage-recall-dialog/storage-recall-dialog';
 
 @NgModule({
-  declarations: [StorageList, StorageForm, StorageDetail, StorageActionDialog],
+  declarations: [StorageList, StorageForm, StorageDetail, StorageActionDialog, StorageRecallDialog],
   imports: [
     SharedModule,
     RouterModule.forChild([

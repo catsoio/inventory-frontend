@@ -9,6 +9,7 @@ import { WorkOrderList } from './work-order-list/work-order-list';
 import { WorkOrderPrint } from './work-order-print/work-order-print';
 import { QuickArticleDialog } from './quick-article-dialog/quick-article-dialog';
 import { WorkOrderInvoicePage } from './work-order-invoice/work-order-invoice';
+import { WorkOrderQuote } from './work-order-quote/work-order-quote';
 
 @NgModule({
   declarations: [
@@ -18,6 +19,7 @@ import { WorkOrderInvoicePage } from './work-order-invoice/work-order-invoice';
     WorkOrderMine,
     WorkOrderQuick,
     WorkOrderInvoicePage,
+    WorkOrderQuote,
     QuickArticleDialog,
   ],
   imports: [
@@ -39,6 +41,7 @@ import { WorkOrderInvoicePage } from './work-order-invoice/work-order-invoice';
       },
       { path: ':id/print', title: 'Arbetsorder', component: WorkOrderPrint },
       { path: ':id/invoice', title: 'Faktura', component: WorkOrderInvoicePage },
+      { path: ':id/quote', title: 'Kostnadsförslag', component: WorkOrderQuote },
     ]),
   ],
 })

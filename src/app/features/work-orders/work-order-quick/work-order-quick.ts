@@ -1,18 +1,19 @@
 import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
+import { QuoteApi } from '../../../core/api/quote-api';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
+import { Auth } from '../../../core/auth/auth';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import {
   Resource,
-  WORK_ORDER_LINE_LABELS,
-  WORK_ORDER_STATUS_LABELS,
   WorkOrderDetail,
   WorkOrderInput,
   WorkOrderLine,
   WorkOrderLineInput,
-  WorkOrderLineType,
   WorkOrderStatus,
 } from '../../../core/models';
+import { Confirm } from '../../../shared/confirm';
 import { dateInput, dateIso } from '../../storage/storage-format';
 
 const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
@@ -28,8 +29,8 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
 });
 
 /**
- * Snabbpanelen bredvid listan: byt status, mekaniker och datum, bocka av rader, lägg till en
- * rad och skriv en intern anteckning utan att lämna listan. Varje ändring sparas direkt.
+ * Snabbpanelen bredvid listan: byt status, mekaniker och datum, bocka av rader och lägg till en
+ * rad utan att lämna listan. Varje ändring sparas direkt.
  * Pris och kund ändras på hela ordern.
  */
 @Component({
@@ -38,8 +39,54 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
   host: { class: 'block' },
   template: `
     @if (order(); as o) {
-      <article class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-        <header class="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <article class="overflow-hidden rounded-xl bg-white shadow-sm">
+        <div class="flex items-center gap-1 border-b border-gray-100 px-3 py-1.5">
+          @if (admin && !o.locked) {
+            <button
+              mat-icon-button
+              type="button"
+              class="!text-red-700"
+              matTooltip="Ta bort"
+              aria-label="Ta bort"
+              [disabled]="busy() || o.locked"
+              (click)="remove(o)"
+            >
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          }
+          <span class="flex-1"></span>
+          @if (o.quoteId || o.quote) {
+            <button
+              mat-icon-button
+              type="button"
+              matTooltip="Öppna kostnadsförslag"
+              aria-label="Öppna kostnadsförslag"
+              [disabled]="busy() || o.locked"
+              (click)="openQuote(o)"
+            >
+              <mat-icon>request_quote</mat-icon>
+            </button>
+          }
+          <a
+            mat-icon-button
+            [routerLink]="['/workorders', o.id, 'print']"
+            matTooltip="Skriv ut arbetsblad"
+            aria-label="Skriv ut arbetsblad"
+          >
+            <mat-icon>print</mat-icon>
+          </a>
+          <a mat-flat-button color="primary" class="ml-2" [routerLink]="['/workorders', o.id]">
+            Öppna order
+            <mat-icon iconPositionEnd>arrow_forward</mat-icon>
+          </a>
+        </div>
+
+        @if (o.locked) {
+          <p class="flex items-center gap-2 bg-blue-50 px-5 py-2 text-sm text-blue-900">
+            <mat-icon class="shrink-0">lock</mat-icon> Fakturerad och låst
+          </p>
+        }
+        <header class="flex items-center gap-4 p-5">
           <app-reg-plate [value]="o.regNo" />
           <div class="min-w-0 flex-1">
             <div class="truncate font-semibold">{{ o.vehicle || '–' }}</div>
@@ -47,162 +94,162 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
               {{ o.customerName }}{{ o.phone ? ' · ' + o.phone : '' }}
             </div>
           </div>
-          <span class="text-sm text-gray-500 tabular-nums">{{ o.code }}</span>
+          <span class="self-start text-sm font-medium text-gray-400 tabular-nums">{{
+            o.code
+          }}</span>
         </header>
 
-        <mat-button-toggle-group
-          class="mt-3 w-full flex-wrap"
-          hideSingleSelectionIndicator
-          [value]="o.status"
-          [disabled]="busy()"
-          (change)="patch({ status: $event.value })"
-          aria-label="Status"
-        >
-          @for (s of statuses; track s[0]) {
-            <mat-button-toggle class="flex-1" [value]="s[0]">{{ s[1] }}</mat-button-toggle>
+        <div class="px-5 pb-5">
+          <div class="sec">Status</div>
+          <mat-button-toggle-group
+            class="w-full"
+            hideSingleSelectionIndicator
+            [value]="o.status"
+            [disabled]="busy() || o.locked"
+            (change)="patch({ status: $event.value })"
+            aria-label="Status"
+          >
+            @for (s of statuses; track s[0]) {
+              <mat-button-toggle class="flex-1" [value]="s[0]">{{ s[1] }}</mat-button-toggle>
+            }
+          </mat-button-toggle-group>
+          @if (o.stockMissing) {
+            <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+              {{ o.stockMissing }} {{ o.stockMissing === 1 ? 'del' : 'delar' }} kunde inte tas ur
+              lagret. Justera lagret och öppna ordern för att spara om.
+            </p>
           }
-        </mat-button-toggle-group>
-
-        @if (o.stockMissing) {
-          <p class="mt-3 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">
-            {{ o.stockMissing }} {{ o.stockMissing === 1 ? 'del' : 'delar' }} kunde inte tas ur
-            lagret. Justera lagret och öppna ordern för att spara om.
-          </p>
-        }
-
-        <div class="mt-3 grid gap-3 sm:grid-cols-2">
-          <label class="block text-xs text-gray-500">
-            Mekaniker
-            <select
-              class="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900"
-              [value]="o.resourceId ?? ''"
-              [disabled]="busy()"
-              (change)="patch({ resourceId: $any($event.target).value || null })"
-            >
-              <option value="">Ingen vald</option>
-              @for (r of resources(); track r.id) {
-                @if (r.kind === 'mechanic') {
-                  <option [value]="r.id" [selected]="r.id === o.resourceId">{{ r.name }}</option>
-                }
-              }
-            </select>
-          </label>
-          <label class="block text-xs text-gray-500">
-            Lyft / plats
-            <select
-              class="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900"
-              [value]="o.placeId ?? ''"
-              [disabled]="busy()"
-              (change)="patch({ placeId: $any($event.target).value || null })"
-            >
-              <option value="">Ingen vald</option>
-              @for (r of resources(); track r.id) {
-                @if (r.kind !== 'mechanic') {
-                  <option [value]="r.id" [selected]="r.id === o.placeId">{{ r.name }}</option>
-                }
-              }
-            </select>
-          </label>
-          <label class="block text-xs text-gray-500">
-            Hämtas
-            <input
-              type="date"
-              class="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900"
-              [value]="day(o.pickupAt)"
-              [disabled]="busy()"
-              (change)="
-                patch({
-                  pickupAt: $any($event.target).value ? iso($any($event.target).value) : null,
-                })
-              "
-            />
-          </label>
         </div>
 
-        @if (o.remarks) {
-          <div class="mt-3 rounded-lg bg-amber-50 p-2 text-sm whitespace-pre-line">
-            {{ o.remarks }}
+        <section class="border-t border-gray-100 p-5">
+          <div class="grid gap-x-3 gap-y-4 sm:grid-cols-2">
+            <label class="block">
+              <span class="sec !mb-1 block">Mekaniker</span>
+              <select
+                class="h-11 w-full px-3 text-sm text-gray-900 field"
+                [disabled]="busy() || o.locked"
+                (change)="patch({ resourceId: $any($event.target).value || null })"
+              >
+                <option value="" [selected]="!o.resourceId">Ingen vald</option>
+                @for (r of resources(); track r.id) {
+                  @if (r.kind === 'mechanic') {
+                    <option [value]="r.id" [selected]="r.id === o.resourceId">{{ r.name }}</option>
+                  }
+                }
+              </select>
+            </label>
+            <label class="block">
+              <span class="sec !mb-1 block">Lyft / plats</span>
+              <select
+                class="h-11 w-full px-3 text-sm text-gray-900 field"
+                [disabled]="busy() || o.locked"
+                (change)="patch({ placeId: $any($event.target).value || null })"
+              >
+                <option value="" [selected]="!o.placeId">Ingen vald</option>
+                @for (r of resources(); track r.id) {
+                  @if (r.kind !== 'mechanic') {
+                    <option [value]="r.id" [selected]="r.id === o.placeId">{{ r.name }}</option>
+                  }
+                }
+              </select>
+            </label>
+            <label class="block sm:col-span-2">
+              <span class="sec !mb-1 block">Klar senast</span>
+              <input
+                type="date"
+                class="h-11 w-full px-3 text-sm text-gray-900 field"
+                [value]="day(o.pickupAt)"
+                [disabled]="busy() || o.locked"
+                (change)="
+                  patch({
+                    pickupAt: $any($event.target).value ? iso($any($event.target).value) : null,
+                  })
+                "
+              />
+            </label>
           </div>
+        </section>
+
+        @if (o.remarks) {
+          <section class="border-t border-gray-100 p-5">
+            <div class="sec">Kundanmärkning</div>
+            <div class="rounded-lg bg-gray-50 p-3 text-sm whitespace-pre-line text-gray-900">
+              {{ o.remarks }}
+            </div>
+          </section>
         }
 
-        <h3 class="mt-4 mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
-          Vad ska göras
-        </h3>
-        <ul class="divide-y divide-gray-100">
-          @for (l of o.lines; track l.id) {
-            <li class="flex items-center gap-3 py-1.5">
-              <input
-                type="checkbox"
-                class="h-5 w-5 shrink-0 accent-teal-700"
-                [checked]="l.done"
-                [disabled]="busy() || !!o.invoice"
-                (change)="toggle(o, l, $any($event.target).checked)"
-                [attr.aria-label]="'Klar: ' + l.description"
-              />
-              <span class="min-w-0 flex-1 text-sm" [class.line-through]="l.done">
-                {{ l.description }}
-                <span class="text-xs text-gray-500">
-                  ({{ lineLabels[l.type] }}{{ l.toOrder ? ', beställs' : ''
-                  }}{{ l.stockBooked ? ', uttagen' : '' }})
-                </span>
-                @if (l.toOrder) {
-                  <app-pill tone="amber">Del saknas</app-pill>
+        <section class="border-t border-gray-100 p-5">
+          <div class="sec">Vad ska göras</div>
+          <div class="space-y-3">
+            @for (g of groups(o); track g.id) {
+              <div class="rounded-lg bg-gray-50 p-3">
+                @if (g.title) {
+                  <div class="mb-1 flex items-baseline gap-2">
+                    <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ g.title }}</span>
+                    @if (g.total !== null) {
+                      <span class="text-sm text-gray-600 tabular-nums">{{ g.total | kr }}</span>
+                    }
+                  </div>
                 }
-                @if (l.instruction) {
-                  <span class="block text-xs text-gray-500">{{ l.instruction }}</span>
-                }
-              </span>
-              <span class="text-sm text-gray-600 tabular-nums">{{ l.quantity }}</span>
-            </li>
-          } @empty {
-            <li class="py-2 text-sm text-gray-500">Inga rader än.</li>
-          }
-        </ul>
-
-        <form class="mt-2 flex gap-2" (submit)="$event.preventDefault(); add(o, text, type.value)">
-          <input
-            #text
-            class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm"
-            placeholder="Lägg till rad…"
-          />
-          <select #type class="h-10 rounded-lg border border-gray-300 bg-white px-2 text-sm">
-            @for (t of lineTypes; track t[0]) {
-              <option [value]="t[0]">{{ t[1] }}</option>
+                <ul>
+                  @for (l of g.lines; track l.id) {
+                    <li class="flex items-start gap-3 py-1.5">
+                      <input
+                        type="checkbox"
+                        class="mt-0.5 h-5 w-5 shrink-0 accent-teal-700"
+                        [checked]="l.done"
+                        [disabled]="busy() || o.locked"
+                        (change)="toggle(o, l, $any($event.target).checked)"
+                        [attr.aria-label]="'Klar: ' + l.description"
+                      />
+                      <span class="min-w-0 flex-1 text-sm" [class.text-gray-400]="l.done">
+                        <span [class.line-through]="l.done">{{ l.description }}</span>
+                        @if (l.toOrder) {
+                          <app-pill tone="amber">Del saknas</app-pill>
+                        }
+                        @if (l.instruction) {
+                          <span class="block text-xs text-gray-500">{{ l.instruction }}</span>
+                        }
+                      </span>
+                      @if (l.quantity !== 1) {
+                        <span class="text-sm text-gray-500 tabular-nums">{{ l.quantity }} st</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            } @empty {
+              <p class="text-sm text-gray-500">Inga rader än.</p>
             }
-          </select>
-          <button mat-stroked-button type="submit" [disabled]="busy()">
-            <mat-icon>add</mat-icon>
-          </button>
-        </form>
+          </div>
 
-        <label class="mt-4 block text-xs text-gray-500">
-          Intern anteckning
-          <textarea
-            rows="2"
-            class="mt-1 w-full rounded-lg border border-gray-300 p-2 text-sm text-gray-900"
-            [value]="o.notes ?? ''"
-            (blur)="saveNotes(o, $any($event.target).value)"
-          ></textarea>
-        </label>
+          <form class="mt-3 flex gap-2" (submit)="$event.preventDefault(); add(o, text)">
+            <input
+              #text
+              class="h-11 min-w-0 flex-1 px-3 text-sm field"
+              placeholder="Lägg till rad…"
+            />
+            <button mat-stroked-button type="submit" class="!h-11" [disabled]="busy() || o.locked">
+              <mat-icon>add</mat-icon> Lägg till
+            </button>
+          </form>
+        </section>
 
-        <footer class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-          <div class="mr-auto text-sm">
-            @if (o.price !== null) {
-              <span class="text-gray-500">Pris inkl. moms</span>
-              <b class="ml-2 text-base tabular-nums">{{ o.price | kr }}</b>
+        <footer
+          class="flex flex-wrap items-center gap-x-3 gap-y-3 border-t border-gray-100 bg-gray-50 p-5"
+        >
+          <div class="mr-auto">
+            @if (o.total > 0) {
+              <div class="text-xs text-gray-500">Att betala</div>
+              <div class="text-lg font-semibold tabular-nums">{{ o.total | kr }}</div>
               @if (o.priceNote) {
                 <div class="text-xs text-gray-500">{{ o.priceNote }}</div>
               }
             } @else {
-              <span class="text-gray-500">Inget pris satt</span>
+              <span class="text-sm text-gray-500">Inget pris satt</span>
             }
           </div>
-          <a mat-stroked-button [routerLink]="['/workorders', o.id, 'print']">
-            <mat-icon>print</mat-icon> Arbetsblad
-          </a>
-          <a mat-flat-button color="primary" [routerLink]="['/workorders', o.id]">
-            Öppna hela ordern
-          </a>
         </footer>
       </article>
     } @else {
@@ -214,10 +261,19 @@ export class WorkOrderQuick implements OnInit {
   private readonly api = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly snack = inject(MatSnackBar);
+  private readonly quotes = inject(QuoteApi);
+  private readonly router = inject(Router);
+  private readonly confirm = inject(Confirm);
+  private readonly auth = inject(Auth);
 
-  readonly statuses = Object.entries(WORK_ORDER_STATUS_LABELS);
-  readonly lineLabels = WORK_ORDER_LINE_LABELS;
-  readonly lineTypes = Object.entries(WORK_ORDER_LINE_LABELS) as [WorkOrderLineType, string][];
+  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
+
+  readonly statuses: [WorkOrderStatus, string][] = [
+    ['open', 'Öppen'],
+    ['in_progress', 'Pågår'],
+    ['waiting_parts', 'Pausad'],
+    ['done', 'Klar'],
+  ];
   readonly order = signal<WorkOrderDetail | null>(null);
   readonly resources = signal<Resource[]>([]);
   readonly busy = signal(false);
@@ -229,9 +285,26 @@ export class WorkOrderQuick implements OnInit {
   }
   /** Något sparades: listan bör läsas om. */
   @Output() changed = new EventEmitter<void>();
+  /** Ordern togs bort: listan ska läsas om och panelen stängas. */
+  @Output() removed = new EventEmitter<void>();
 
   ngOnInit() {
     this.workshop.resources().subscribe((r) => this.resources.set(r.filter((x) => x.active)));
+  }
+
+  /** Raderna under sitt jobb (kundanmärkning) med delsumma; rader utan jobb samlas sist. Systemraden döljs. */
+  groups(o: WorkOrderDetail) {
+    const rows = o.lines.filter((l) => !l.system);
+    const out: { id: string; title: string; total: number | null; lines: WorkOrderLine[] }[] = [];
+    for (const j of o.jobs ?? []) {
+      const lines = rows.filter((l) => l.jobId === j.id);
+      if (lines.length)
+        out.push({ id: j.id, title: j.title, total: o.jobTotals?.[j.id] ?? null, lines });
+    }
+    const known = new Set((o.jobs ?? []).map((j) => j.id));
+    const rest = rows.filter((l) => !l.jobId || !known.has(l.jobId));
+    if (rest.length) out.push({ id: 'rest', title: '', total: null, lines: rest });
+    return out;
   }
 
   day = (iso: string | null) => dateInput(iso);
@@ -240,7 +313,7 @@ export class WorkOrderQuick implements OnInit {
   patch(body: Partial<WorkOrderInput>) {
     const o = this.order();
     if (!o || this.busy()) return;
-    if (o.invoice && (body.lines || body.status)) {
+    if (o.locked) {
       this.snack.open('Ordern är fakturerad och låst.', undefined, { duration: 2500 });
       return;
     }
@@ -264,7 +337,7 @@ export class WorkOrderQuick implements OnInit {
     this.patch({ lines: o.lines.map((x) => asInput(x, x.id === l.id ? done : x.done)) });
   }
 
-  add(o: WorkOrderDetail, box: HTMLInputElement, type: string) {
+  add(o: WorkOrderDetail, box: HTMLInputElement) {
     const description = box.value.trim();
     if (!description) return;
     box.value = '';
@@ -272,7 +345,7 @@ export class WorkOrderQuick implements OnInit {
       lines: [
         ...o.lines.map((x) => asInput(x)),
         {
-          type: type as WorkOrderLineType,
+          type: 'other',
           description,
           quantity: 1,
           done: false,
@@ -281,8 +354,40 @@ export class WorkOrderQuick implements OnInit {
     });
   }
 
-  saveNotes(o: WorkOrderDetail, value: string) {
-    if ((o.notes ?? '') === value.trim()) return;
-    this.patch({ notes: value.trim() || null });
+  /** Öppnar kostnadsförslaget; en äldre order flyttar först sitt förslag till ett eget dokument. */
+  openQuote(o: WorkOrderDetail) {
+    if (o.quoteId) {
+      this.router.navigate(['/quotes', o.quoteId]);
+      return;
+    }
+    this.busy.set(true);
+    this.quotes.fromWorkOrder(o.id).subscribe({
+      next: (q) => {
+        this.busy.set(false);
+        this.router.navigate(['/quotes', q.id]);
+      },
+      error: () => this.busy.set(false),
+    });
+  }
+
+  remove(o: WorkOrderDetail) {
+    this.confirm
+      .ask({
+        title: `Ta bort ${o.code}?`,
+        message: 'Arbetsordern och alla dess rader tas bort. Det går inte att ångra.',
+        confirmText: 'Ta bort',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.busy.set(true);
+        this.api.remove(o.id).subscribe({
+          next: () => {
+            this.busy.set(false);
+            this.removed.emit();
+          },
+          error: () => this.busy.set(false),
+        });
+      });
   }
 }

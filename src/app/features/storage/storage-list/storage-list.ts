@@ -3,7 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
 import { StorageApi } from '../../../core/api/storage-api';
+import { StorageRecallDialog } from '../storage-recall-dialog/storage-recall-dialog';
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -104,6 +106,9 @@ type PaymentFilter = PaymentStatus | '';
         />
       </div>
       <span class="hidden flex-1 md:block"></span>
+      <button mat-stroked-button type="button" class="max-md:!hidden" (click)="openRecall()">
+        <mat-icon>sms</mat-icon> Kalla in
+      </button>
       <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
         ><mat-icon>add</mat-icon> Ny inlämning</a
       >
@@ -281,7 +286,12 @@ type PaymentFilter = PaymentStatus | '';
   `,
 })
 export class StorageList implements OnInit {
+  openRecall() {
+    this.dialog.open(StorageRecallDialog, { width: '720px', maxWidth: '95vw' });
+  }
+
   private readonly api = inject(StorageApi);
+  private readonly dialog = inject(MatDialog);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);

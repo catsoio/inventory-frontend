@@ -1,3 +1,4 @@
+import { costInclOre } from '../../../core/pricing';
 import {
   Component,
   DestroyRef,
@@ -91,7 +92,7 @@ const COLS: Col[] = [
   },
   {
     key: 'location',
-    label: 'Hyllplats',
+    label: 'Lager och plats',
     val: (a) => a.location ?? '',
     fmt: (a) => a.location || '–',
   },
@@ -111,14 +112,14 @@ const COLS: Col[] = [
   },
   {
     key: 'averageCost',
-    label: 'Snittkostnad exkl. moms',
+    label: 'Inköpspris inkl. moms',
     right: true,
     val: (a) => a.averageCost ?? 0,
-    fmt: (a) => kr.transform(a.averageCost ?? 0),
+    fmt: (a) => kr.transform(costInclOre(a.averageCost ?? 0)),
   },
   {
     key: 'sellPrice',
-    label: 'Pris exkl. moms',
+    label: 'Pris inkl. moms',
     right: true,
     val: (a) => a.sellPrice,
     fmt: (a) => kr.transform(a.sellPrice),

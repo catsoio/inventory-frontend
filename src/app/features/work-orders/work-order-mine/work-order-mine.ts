@@ -52,7 +52,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
               <div class="mt-2 text-lg font-semibold">{{ o.vehicle || '–' }}</div>
               <div class="text-sm text-gray-600">{{ o.code }} · hämtas {{ day(o.pickupAt) }}</div>
               @if (o.remarks) {
-                <div class="mt-2 rounded-lg bg-amber-50 p-2 text-sm whitespace-pre-line">
+                <div class="mt-2 rounded-lg bg-gray-50 p-2 text-sm whitespace-pre-line">
                   {{ o.remarks }}
                 </div>
               }

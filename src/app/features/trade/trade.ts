@@ -1,3 +1,4 @@
+import { Pricing } from '../../core/pricing';
 import { vatIn } from '../../shared/vat';
 import {
   Component,
@@ -72,7 +73,9 @@ interface Line {
                   </span>
                   <span class="flex items-center gap-3 text-sm">
                     <span class="text-gray-600">{{ a.quantity }} st</span>
-                    <span class="font-medium">{{ (sell ? a.sellPrice : a.averageCost) | kr }}</span>
+                    <span class="font-medium">{{
+                      (sell ? a.sellPrice : pricing.costIncl(a.averageCost ?? 0)) | kr
+                    }}</span>
                   </span>
                 </button>
               }
@@ -99,7 +102,7 @@ interface Line {
         <ng-template #priceField let-l="l" let-i="i">
           <mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>{{
-              sell ? 'Pris/st (kr, inkl. moms)' : 'Inköpspris/st (kr, exkl. moms)'
+              sell ? 'Pris/st (kr, inkl. moms)' : 'Inköpspris/st (kr, inkl. moms)'
             }}</mat-label>
             <input
               matInput
@@ -126,7 +129,7 @@ interface Line {
                 <th class="px-3 py-2 text-right">I lager</th>
                 <th class="w-28 px-3 py-2 text-right">Antal</th>
                 <th class="w-44 px-3 py-2 text-right">Pris/st (kr)</th>
-                <th class="px-3 py-2 text-right">{{ sell ? 'Summa inkl. moms' : 'Summa exkl. moms' }}</th>
+                <th class="px-3 py-2 text-right">Summa inkl. moms</th>
                 <th class="w-10 px-3 py-2"></th>
               </tr>
             </thead>
@@ -209,7 +212,7 @@ interface Line {
                 <div class="mt-3 text-xs text-red-600">{{ qtyHint(l) }}</div>
               }
               <div class="mt-2 flex justify-between border-t pt-2 text-sm">
-                <span class="text-gray-600">{{ sell ? 'Summa inkl. moms' : 'Summa exkl. moms' }}</span>
+                <span class="text-gray-600">Summa inkl. moms</span>
                 <b>{{ lineOre(l) | kr }}</b>
               </div>
             </div>
@@ -250,9 +253,14 @@ interface Line {
             <span>Antal</span><b>{{ units() }} st</b>
           </div>
           <div class="flex justify-between py-2 text-xl font-semibold">
-            <span>{{ sell ? 'Totalt inkl. moms' : 'Totalt exkl. moms' }}</span
-            ><span>{{ totalOre() | kr }}</span>
+            <span>Totalt inkl. moms</span><span>{{ totalOre() | kr }}</span>
           </div>
+          @if (!sell) {
+            <div class="flex justify-between pb-2 text-sm text-gray-600">
+              <span>Varav ingående moms {{ pricing.value().purchaseVatRate }} %</span
+              ><span>{{ totalOre() - pricing.costNet(totalOre()) | kr }}</span>
+            </div>
+          }
           @if (sell) {
             <div class="flex justify-between text-sm text-gray-600">
               <span>Varav moms 25 %</span><span>{{ vatOre() | kr }}</span>
@@ -280,6 +288,7 @@ interface Line {
 })
 export class Trade {
   private readonly api = inject(InventoryApi);
+  readonly pricing = inject(Pricing);
   private readonly snack = inject(MatSnackBar);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
 
@@ -354,7 +363,8 @@ export class Trade {
     this.lines.update((ls) => {
       const i = ls.findIndex((l) => l.a.id === a.id);
       if (i >= 0) return ls.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
-      const price = this.sell ? a.sellPrice / 100 : (a.averageCost ?? 0) / 100;
+      // Inköpspriset skrivs inkl. moms; det lagrade snittpriset är utan.
+      const price = this.sell ? a.sellPrice / 100 : this.pricing.costIncl(a.averageCost ?? 0) / 100;
       return [...ls, { a, qty: 1, price }];
     });
     this.search.setValue('', { emitEvent: false });
@@ -388,7 +398,7 @@ export class Trade {
       const price = Math.round(l.price * 100);
       return this.sell
         ? { articleId: l.a.id, quantity: l.qty, unitPrice: price }
-        : { articleId: l.a.id, quantity: l.qty, unitCost: price };
+        : { articleId: l.a.id, quantity: l.qty, unitCost: this.pricing.costNet(price) };
     });
     try {
       const link =

@@ -3,6 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  PricingSettings,
+  StorageDefaults,
   Article,
   ArticleInput,
   ArticleQuery,
@@ -42,6 +44,7 @@ export interface CompanySettings {
   defaultSupplier: string | null;
   defaultSeason: Season | null;
   defaultStorageFee: number | null;
+  defaultHourlyRate: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -61,6 +64,25 @@ export class InventoryApi {
 
   saveCompanySettings(body: Partial<CompanySettings>): Observable<CompanySettings> {
     return this.http.put<CompanySettings>(`${this.base}/settings`, body);
+  }
+
+  /** Vad en ny däckhotellsinlämning börjar med. */
+  storageDefaults(): Observable<StorageDefaults> {
+    return this.http.get<StorageDefaults>(`${this.base}/settings/storage`);
+  }
+
+  saveStorageDefaults(body: Partial<StorageDefaults>): Observable<StorageDefaults> {
+    return this.http.put<StorageDefaults>(`${this.base}/settings/storage`, body);
+  }
+
+  /** Hur företaget prissätter och skriver ut (Prissättning). */
+  pricingSettings(): Observable<PricingSettings> {
+    return this.http.get<PricingSettings>(`${this.base}/settings/pricing`);
+  }
+
+  /** Ägaren ändrar prissättningen; fält som utelämnas behåller sitt värde. */
+  savePricingSettings(body: Partial<PricingSettings>): Observable<PricingSettings> {
+    return this.http.put<PricingSettings>(`${this.base}/settings/pricing`, body);
   }
 
   saveSeller(body: Partial<SellerDetails>): Observable<SellerDetails> {

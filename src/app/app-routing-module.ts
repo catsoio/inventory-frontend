@@ -72,10 +72,20 @@ const routes: Routes = [
           import('./features/resources/resources-module').then((m) => m.ResourcesModule),
       },
       {
+        path: '',
+        loadChildren: () =>
+          import('./features/catalog/catalog-module').then((m) => m.CatalogModule),
+      },
+      {
         path: 'service-types',
         title: 'Åtgärder',
         loadChildren: () =>
           import('./features/service-types/service-types-module').then((m) => m.ServiceTypesModule),
+      },
+      {
+        path: 'quotes',
+        title: 'Kostnadsförslag',
+        loadChildren: () => import('./features/quotes/quotes-module').then((m) => m.QuotesModule),
       },
       {
         path: 'workorders',

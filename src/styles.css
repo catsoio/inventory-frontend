@@ -109,6 +109,21 @@ main {
   --mat-form-field-outlined-focus-outline-width: 2px;
 }
 
+/* Små fält som ligger direkt i en rad (antal, pris, rabatt): samma ram som alla andra fält. */
+.field {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-ui);
+  outline: none;
+}
+.field:hover {
+  border-color: #9ca3af;
+}
+.field:focus {
+  border-color: var(--mat-sys-primary);
+  box-shadow: 0 0 0 1px var(--mat-sys-primary);
+}
+
 /* Rubrik över en grupp fält i en dialog eller ett kort. */
 .sec {
   margin: 0 0 8px;

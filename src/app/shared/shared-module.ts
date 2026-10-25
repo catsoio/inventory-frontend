@@ -15,6 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
@@ -67,6 +68,7 @@ const MATERIAL = [
   MatInputModule,
   MatMenuModule,
   MatProgressBarModule,
+  MatRadioModule,
   MatSelectModule,
   MatSlideToggleModule,
   MatSnackBarModule,

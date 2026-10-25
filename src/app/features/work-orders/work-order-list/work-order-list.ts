@@ -54,6 +54,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
       (search)="query.set($event); load()"
       [highlight]="isSelected"
       (rowClick)="open($event)"
+      (rowDblClick)="router.navigate(['/workorders', $event.id])"
     >
       <mat-button-toggle-group
         class="mb-3 self-start"
@@ -72,8 +73,22 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
       <ng-template #cell let-o="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill [tone]="tones[o.status]">{{ text }}</app-pill>
+          @if (o.locked) {
+            <app-pill tone="gray" class="ml-1">
+              <mat-icon class="!h-3.5 !w-3.5 align-middle !text-sm">lock</mat-icon> Fakturerad
+            </app-pill>
+          }
           @if (o.hasMissing && o.status !== 'done' && o.status !== 'cancelled') {
             <app-pill tone="amber" class="ml-1">Del saknas</app-pill>
+          }
+          @if (o.status !== 'done' && o.status !== 'cancelled') {
+            @if (o.quoteStatus === 'given') {
+              <app-pill tone="amber" class="ml-1">Väntar på svar</app-pill>
+            } @else if (o.quoteStatus === 'approved') {
+              <app-pill tone="green" class="ml-1">Godkänt</app-pill>
+            } @else if (o.quoteStatus === 'declined') {
+              <app-pill tone="red" class="ml-1">Nekat</app-pill>
+            }
           }
         } @else if (col.key === 'regNo') {
           <app-reg-plate [value]="text" size="sm" />
@@ -83,10 +98,14 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
       </ng-template>
       <aside
         detail
-        class="hidden min-h-0 w-[38%] max-w-[32rem] min-w-[24rem] shrink-0 overflow-y-auto lg:block"
+        class="hidden min-h-0 w-[38%] max-w-[32rem] min-w-[24rem] shrink-0 overflow-y-auto lg:mt-11 lg:block"
       >
         @if (selected(); as id) {
-          <app-work-order-quick [orderId]="id" (changed)="load()" />
+          <app-work-order-quick
+            [orderId]="id"
+            (changed)="load()"
+            (removed)="selected.set(null); load()"
+          />
         } @else {
           <div
             class="flex flex-col items-center gap-2 rounded-xl bg-white p-10 text-center text-sm text-gray-500 shadow-sm ring-1 ring-black/5"
@@ -102,7 +121,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
 })
 export class WorkOrderList {
   private readonly api = inject(WorkOrderApi);
-  private readonly router = inject(Router);
+  readonly router = inject(Router);
   private readonly auth = inject(Auth);
 
   constructor() {

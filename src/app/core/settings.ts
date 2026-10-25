@@ -13,6 +13,8 @@ export interface AppSettings {
   markupPercent: number;
   /** Standardavgift för däckhotell per inlämning, kr. */
   defaultStorageFee: number;
+  /** Timpris för arbete, kr inkl. moms. */
+  defaultHourlyRate: number;
 }
 
 export const SETTINGS_DEFAULTS: AppSettings = {
@@ -24,6 +26,7 @@ export const SETTINGS_DEFAULTS: AppSettings = {
   defaultReorderLevel: 4,
   markupPercent: 35,
   defaultStorageFee: 0,
+  defaultHourlyRate: 0,
 };
 
 const KEY = 'garagestock.settings';
@@ -48,6 +51,7 @@ export class Settings {
       if (c.defaultReorderLevel !== null) next.defaultReorderLevel = c.defaultReorderLevel;
       if (c.defaultMarkupPercent !== null) next.markupPercent = c.defaultMarkupPercent;
       if (c.defaultStorageFee !== null) next.defaultStorageFee = c.defaultStorageFee;
+      if (c.defaultHourlyRate !== null) next.defaultHourlyRate = c.defaultHourlyRate;
       this.value.set(next);
     });
   }
@@ -63,6 +67,7 @@ export class Settings {
           defaultReorderLevel: next.defaultReorderLevel,
           defaultMarkupPercent: next.markupPercent,
           defaultStorageFee: next.defaultStorageFee,
+          defaultHourlyRate: next.defaultHourlyRate,
         })
         .subscribe();
     }

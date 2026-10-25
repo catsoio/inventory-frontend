@@ -13,7 +13,11 @@ import { Component, Input } from '@angular/core';
     <header
       class="sticky top-0 z-10 before:pointer-events-none before:absolute before:inset-x-0 before:-top-6 before:h-6 before:bg-gray-50 before:content-[''] -mx-3 -mt-3 mb-4 border-b border-gray-200 bg-gray-50 px-3 py-2 md:-mx-5 md:-mt-5 md:px-5 xl:-mx-6 xl:-mt-6 xl:px-6"
     >
-      <div class="mx-auto flex max-w-4xl items-center gap-2">
+      <div
+        class="mx-auto flex items-center gap-2"
+        [class.max-w-4xl]="!wide"
+        [class.max-w-[1400px]]="wide"
+      >
         <a
           mat-icon-button
           class="shrink-0"
@@ -43,7 +47,11 @@ import { Component, Input } from '@angular/core';
         </div>
       </div>
     </header>
-    <div class="mx-auto flex max-w-4xl flex-col gap-4 pt-6">
+    <div
+      class="mx-auto flex flex-col gap-4 pt-6"
+      [class.max-w-4xl]="!wide"
+      [class.max-w-[1400px]]="wide"
+    >
       <ng-content />
     </div>
   `,
@@ -57,4 +65,6 @@ export class CardPage {
   @Input() newTitle = 'Nytt kort';
   @Input() code: string | null = null;
   @Input() archived = false;
+  /** Bred sida för kort med mycket innehåll (arbetsorder, säljkort): sektionerna kan ligga bredvid varandra. */
+  @Input() wide = false;
 }

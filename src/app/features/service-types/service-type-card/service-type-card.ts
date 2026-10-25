@@ -1,15 +1,18 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
-import { FormBuilder, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { WorkshopApi } from '../../../core/api/workshop-api';
-import { ServiceType } from '../../../core/models';
+import { ServiceTemplateLine, ServiceType } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Auth } from '../../../core/auth/auth';
 
-/** Kortet för en åtgärd: namn, standardtid och prisspann som bokningen fylls i med. */
+/**
+ * Kortet för en åtgärd: namn, standardtid och prisspann som bokningen fylls i med, och en
+ * mall (operationskod och färdiga rader) som läggs på ett jobb på arbetsordern med ett klick.
+ */
 @Component({
   selector: 'app-service-type-card',
   standalone: false,
@@ -26,7 +29,15 @@ import { Auth } from '../../../core/auth/auth';
         @if (card(); as c) {
           @if (c.active) {
             @if (admin) {
-              <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+              <button
+                mat-icon-button
+                class="!text-red-700"
+                aria-label="Ta bort"
+                matTooltip="Ta bort"
+                (click)="remove()"
+              >
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             }
           } @else {
             @if (admin) {
@@ -43,32 +54,96 @@ import { Auth } from '../../../core/auth/auth';
 
       <form
         [formGroup]="form"
-        class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-3"
+        class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-[1fr_11rem_11rem]"
       >
-        <mat-form-field class="sm:col-span-3">
+        <mat-form-field>
           <mat-label>Åtgärd</mat-label>
           <input matInput formControlName="name" autocomplete="off" />
           <mat-error>Ange namn</mat-error>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Standardtid (minuter)</mat-label>
+          <mat-label>Tid (minuter)</mat-label>
           <input matInput type="number" min="5" step="5" formControlName="minutes" />
           <mat-error>Minst 5 minuter</mat-error>
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Pris från (kr, inkl. moms)</mat-label>
+          <mat-label>Pris (kr, inkl. moms)</mat-label>
           <input matInput type="number" min="0" formControlName="priceFrom" />
           <mat-hint>{{ form.controls.priceFrom.value | vatPart }}</mat-hint>
         </mat-form-field>
-        <mat-form-field>
-          <mat-label>Pris till (kr, inkl. moms)</mat-label>
-          <input matInput type="number" min="0" formControlName="priceTo" />
-          <mat-hint>{{ form.controls.priceTo.value | vatPart }}</mat-hint>
-          @if (form.errors?.['price']) {
-            <mat-error>Lägre än "från"</mat-error>
-          }
-        </mat-form-field>
       </form>
+
+      <section class="mt-4 rounded-xl bg-white p-5 shadow-sm" [formGroup]="form">
+        <div class="mb-1 flex flex-wrap items-center gap-2">
+          <h2 class="flex-1 text-base font-semibold">Mall för arbetsorder</h2>
+          @if (admin) {
+            <button mat-stroked-button type="button" (click)="addRow('labour')">
+              <mat-icon>build</mat-icon> Arbete
+            </button>
+            <button mat-stroked-button type="button" (click)="addRow('part')">
+              <mat-icon>inventory_2</mat-icon> Del
+            </button>
+            <button mat-stroked-button type="button" (click)="addRow('fee')">
+              <mat-icon>add</mat-icon> Avgift
+            </button>
+          }
+        </div>
+        <p class="mb-3 text-sm text-gray-600">
+          Raderna läggs på jobbet när man väljer åtgärden ("Från åtgärd"). Utan rader blir det en
+          arbetsrad med åtgärdens namn och pris. Priser inkl. moms; tiden är bara intern.
+        </p>
+        <div formArrayName="lines" class="flex flex-col gap-2">
+          @for (row of lines.controls; track row; let i = $index) {
+            <div [formGroupName]="i" class="flex flex-wrap items-end gap-2">
+              <span class="w-16 pb-3 text-xs text-gray-500">{{ typeLabel(row.value.type) }}</span>
+              <input
+                formControlName="description"
+                placeholder="Text"
+                class="h-10 min-w-48 flex-1 px-2 field"
+              />
+              <label class="flex flex-col gap-0.5 text-xs text-gray-500"
+                >Antal
+                <input
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  formControlName="quantity"
+                  class="h-10 w-16 px-2 text-right field"
+              /></label>
+              <label class="flex flex-col gap-0.5 text-xs text-gray-500"
+                >Pris
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  formControlName="unitPrice"
+                  class="h-10 w-24 px-2 text-right field"
+              /></label>
+              <label class="flex flex-col gap-0.5 text-xs text-gray-500"
+                >Min
+                <input
+                  type="number"
+                  min="0"
+                  step="5"
+                  formControlName="minutes"
+                  class="h-10 w-16 px-2 text-right field"
+              /></label>
+              @if (admin) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="removeRow(i)"
+                  aria-label="Ta bort raden"
+                >
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              }
+            </div>
+          } @empty {
+            <p class="text-sm text-gray-500">Ingen mall.</p>
+          }
+        </div>
+      </section>
     </app-card-page>
   `,
 })
@@ -85,9 +160,18 @@ export class ServiceTypeCard implements OnInit {
   readonly busy = signal(false);
   readonly card = signal<ServiceType | null>(null);
 
-  readonly form = inject(FormBuilder).nonNullable.group(
+  private readonly fb = inject(FormBuilder);
+  readonly typeLabels: Record<ServiceTemplateLine['type'], string> = {
+    labour: 'Arbete',
+    part: 'Del',
+    fee: 'Avgift',
+  };
+  readonly lines = this.fb.array<FormGroup>([]);
+  readonly form = this.fb.nonNullable.group(
     {
       name: ['', Validators.required],
+      opCode: [''],
+      lines: this.lines,
       minutes: [60, [Validators.required, Validators.min(5)]],
       priceFrom: [null as number | null, Validators.min(0)],
       priceTo: [null as number | null, Validators.min(0)],
@@ -100,6 +184,32 @@ export class ServiceTypeCard implements OnInit {
     },
   );
 
+  private newRow(t: Partial<ServiceTemplateLine> & { type: ServiceTemplateLine['type'] }) {
+    return this.fb.nonNullable.group({
+      type: [t.type],
+      code: [t.code ?? ''],
+      description: [t.description ?? '', Validators.required],
+      articleId: [t.articleId ?? (null as string | null)],
+      quantity: [t.quantity ?? 1, [Validators.required, Validators.min(0.01)]],
+      unitPrice: [t.unitPrice == null ? null : t.unitPrice / 100, Validators.min(0)],
+      minutes: [t.minutes ?? (null as number | null), Validators.min(0)],
+    });
+  }
+
+  typeLabel(t: unknown) {
+    return this.typeLabels[t as ServiceTemplateLine['type']] ?? '';
+  }
+
+  addRow(type: ServiceTemplateLine['type']) {
+    this.lines.push(this.newRow({ type }));
+    this.form.markAsDirty();
+  }
+
+  removeRow(i: number) {
+    this.lines.removeAt(i);
+    this.form.markAsDirty();
+  }
+
   ngOnInit() {
     if (!this.admin) this.form.disable();
     if (this.id) this.load();
@@ -110,7 +220,11 @@ export class ServiceTypeCard implements OnInit {
       const t = all.find((x) => x.id === this.id);
       if (!t) return void this.router.navigate(['/service-types']);
       this.card.set(t);
+      this.lines.clear();
+      for (const l of t.lines ?? []) this.lines.push(this.newRow(l));
+      if (!this.admin) this.form.disable();
       this.form.reset({
+        opCode: t.opCode ?? '',
         name: t.name,
         minutes: t.durationMinutes,
         priceFrom: t.priceFrom == null ? null : t.priceFrom / 100,
@@ -131,9 +245,20 @@ export class ServiceTypeCard implements OnInit {
     const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
     const body = {
       name: v.name,
+      opCode: v.opCode || null,
+      lines: (v.lines as Record<string, unknown>[]).map((l) => ({
+        type: l['type'] as ServiceTemplateLine['type'],
+        code: (l['code'] as string) || null,
+        description: l['description'] as string,
+        articleId: (l['articleId'] as string | null) ?? null,
+        quantity: Number(l['quantity']) || 1,
+        unitPrice: ore(l['unitPrice'] === '' ? null : (l['unitPrice'] as number | null)),
+        minutes:
+          l['minutes'] == null || l['minutes'] === '' ? null : Math.round(Number(l['minutes'])),
+      })),
       durationMinutes: v.minutes,
       priceFrom: ore(v.priceFrom),
-      priceTo: ore(v.priceTo),
+      priceTo: ore(v.priceFrom),
     };
     this.busy.set(true);
     const req = this.id

@@ -8,8 +8,21 @@ import { Auth } from '../../core/auth/auth';
 import { I18n } from '../../core/i18n/i18n';
 import { Confirm } from '../../shared/confirm';
 import { Billing } from '../../core/billing/billing';
-import { GARAGE_ROLE_LABELS, GarageMember, SEASON_LABELS } from '../../core/models';
+import { CatalogApi } from '../../core/api/catalog-api';
+import {
+  ACCESSORY_LABELS,
+  DEPOSIT_CONDITION_LABELS,
+  GARAGE_ROLE_LABELS,
+  GarageMember,
+  MONTH_LABELS,
+  SEASON_LABELS,
+  STORAGE_CONTENTS_LABELS,
+  StorageDefaults,
+  Warehouse,
+} from '../../core/models';
 import { AppSettings, Settings } from '../../core/settings';
+import { PRICING_PROFILES, Pricing, quoteTermsText } from '../../core/pricing';
+import { PricingSettings } from '../../core/models';
 import pkg from '../../../../package.json';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
 
@@ -157,6 +170,160 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
             }
           </form>
 
+          @if (tab() === 'pricing' && auth.isAdmin()) {
+            <h3 class="sec">Prissättning och dokument</h3>
+            <p class="mb-3 max-w-2xl text-sm text-gray-600">
+              Välj det som liknar ert arbetssätt, justera sedan enskilda val. Ändrar du något
+              efteråt blir det "Anpassat".
+            </p>
+            <mat-button-toggle-group
+              [formControl]="pricingForm.controls.profile"
+              (change)="applyProfile($event.value)"
+              hideSingleSelectionIndicator
+              class="mb-6"
+              aria-label="Arbetssätt"
+            >
+              <mat-button-toggle value="service">
+                <mat-icon>tire_repair</mat-icon> Däck och service
+              </mat-button-toggle>
+              <mat-button-toggle value="workshop">
+                <mat-icon>car_repair</mat-icon> Bilverkstad
+              </mat-button-toggle>
+            </mat-button-toggle-group>
+            <form id="pricing-form" [formGroup]="pricingForm" (ngSubmit)="savePricing()">
+              <h3 class="sec">Arbetsorder</h3>
+              <mat-button-toggle-group
+                formControlName="priceEntry"
+                hideSingleSelectionIndicator
+                aria-label="Så prissätts en order"
+              >
+                <mat-button-toggle value="order">Ett pris per order</mat-button-toggle>
+                <mat-button-toggle value="lines">Jobb med priser</mat-button-toggle>
+              </mat-button-toggle-group>
+              <p class="mt-2 mb-4 max-w-xl text-sm text-gray-600">
+                @if (pricingForm.controls.priceEntry.value === 'order') {
+                  Ordern har ett pris. Raderna är en checklista för mekanikern, utan pris.
+                } @else {
+                  Varje jobb har eget pris, med delar under sig. Summan räknas på ordern.
+                }
+              </p>
+              <div class="mb-4 flex flex-col gap-1">
+                <mat-checkbox formControlName="showVin">Chassinummer på utskrifterna</mat-checkbox>
+                <mat-checkbox formControlName="showMileage"
+                  >Mätarställning på utskrifterna</mat-checkbox
+                >
+                <mat-checkbox formControlName="requireMileage">
+                  Mätarställning krävs innan ordern blir klar
+                </mat-checkbox>
+              </div>
+
+              <h3 class="sec">Avrundning</h3>
+              <mat-checkbox formControlName="roundToKrona" class="mb-4 block">
+                Öresutjämning: avrunda att betala till hela kronor
+              </mat-checkbox>
+
+              <h3 class="sec">Förbrukningsmaterial</h3>
+              <div class="mb-4 grid gap-x-4 sm:grid-cols-3">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Procent av arbetet</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    formControlName="consumablesPercent"
+                  />
+                  <mat-hint>Tomt = av</mat-hint>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Högst (kr)</mat-label>
+                  <input matInput type="number" min="0" formControlName="consumablesMax" />
+                  <mat-hint>Tomt = inget tak</mat-hint>
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Text på raden</mat-label>
+                  <input matInput formControlName="consumablesText" />
+                </mat-form-field>
+              </div>
+
+              <h3 class="sec">Kostnadsförslag</h3>
+              <div class="mb-2 grid gap-x-4 sm:grid-cols-3">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Giltigt (dagar)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="1"
+                    max="365"
+                    formControlName="quoteValidDays"
+                  />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Får avvika (%)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    max="100"
+                    formControlName="quoteTolerancePercent"
+                  />
+                  <mat-hint>Konsumenttjänstlagen: högst 15 % om inget annat avtalats</mat-hint>
+                </mat-form-field>
+              </div>
+              <mat-form-field class="mb-4 w-full" subscriptSizing="dynamic">
+                <mat-label>Villkor under förslaget</mat-label>
+                <textarea
+                  matInput
+                  rows="2"
+                  formControlName="quoteTerms"
+                  [placeholder]="defaultTerms()"
+                ></textarea>
+                <mat-hint>Tomt = standardtexten</mat-hint>
+              </mat-form-field>
+
+              <h3 class="sec">Lager</h3>
+              <div class="mb-1 text-sm text-gray-600">Delar tas ur lagret</div>
+              <mat-button-toggle-group
+                formControlName="stockOut"
+                hideSingleSelectionIndicator
+                class="mb-4"
+                aria-label="När delar tas ur lagret"
+              >
+                <mat-button-toggle value="work_order_done">När ordern är klar</mat-button-toggle>
+                <mat-button-toggle value="sales_card_posted"
+                  >När säljkortet bokförs</mat-button-toggle
+                >
+              </mat-button-toggle-group>
+
+              <h3 class="sec">Inköp</h3>
+              <div class="mb-4 grid gap-x-4 sm:grid-cols-2">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Moms på inköp</mat-label>
+                  <mat-select formControlName="purchaseVatRate">
+                    @for (r of [25, 12, 6, 0]; track r) {
+                      <mat-option [value]="r">{{ r }} %</mat-option>
+                    }
+                  </mat-select>
+                  <mat-hint
+                    >Inköpspriser skrivs inkl. moms; lager och marginal räknas utan</mat-hint
+                  >
+                </mat-form-field>
+              </div>
+
+              <h3 class="sec">Efterkalkyl (bara internt)</h3>
+              <div class="grid gap-x-4 sm:grid-cols-2">
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label>Intern kostnad per timme (kr)</mat-label>
+                  <input matInput type="number" min="0" formControlName="internalHourlyCost" />
+                  <mat-hint
+                    >Används för att se vad jobbet tjänade. Syns aldrig för kunden.</mat-hint
+                  >
+                </mat-form-field>
+              </div>
+            </form>
+          }
+
           @if (tab() === 'account') {
             <h3 class="sec">Mitt lösenord</h3>
             <form
@@ -197,6 +364,100 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
                 }
               </mat-form-field>
               <p class="text-xs text-gray-500">Du loggas ut på andra enheter.</p>
+            </form>
+          }
+
+          @if (tab() === 'storage' && auth.isAdmin()) {
+            <h3 class="sec">Förval för ny inlämning</h3>
+            <p class="mb-4 max-w-2xl text-sm text-gray-600">
+              Det här fylls i när ni tar emot ett set, så att den som står i kassan bara ändrar det
+              som avviker. Standardavgift och säsong ställer ni in under Lager och däckhotell.
+            </p>
+            <form
+              id="storage-form"
+              [formGroup]="storageForm"
+              (ngSubmit)="saveStorage()"
+              class="grid max-w-3xl gap-x-4 gap-y-3 sm:grid-cols-2"
+            >
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Brukar lämnas in</mat-label>
+                <mat-select formControlName="contents">
+                  @for (c of storageContents; track c[0]) {
+                    <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Antal hjul i ett set</mat-label>
+                <input matInput type="number" min="1" max="12" formControlName="quantity" />
+                <mat-error>1–12</mat-error>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Skick vid inlämning</mat-label>
+                <mat-select formControlName="condition">
+                  @for (c of storageConditions; track c[0]) {
+                    <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <div class="field flex h-11 items-center px-3">
+                <mat-slide-toggle formControlName="studded"
+                  >Vinterdäcken är dubbade</mat-slide-toggle
+                >
+              </div>
+              <mat-form-field subscriptSizing="dynamic" class="sm:col-span-2">
+                <mat-label>Följer oftast med</mat-label>
+                <mat-select formControlName="accessories" multiple>
+                  @for (a of storageAccessories; track a[0]) {
+                    <mat-option [value]="a[0]">{{ a[1] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Lager</mat-label>
+                <mat-select formControlName="warehouseId">
+                  <mat-option [value]="null">Ingen vald</mat-option>
+                  @for (w of storageWarehouses(); track w.id) {
+                    <mat-option [value]="w.id">{{ w.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Plats</mat-label>
+                <mat-select formControlName="locationId">
+                  <mat-option [value]="null">Ingen vald</mat-option>
+                  @for (l of storagePlaces(); track l.id) {
+                    <mat-option [value]="l.id">{{ l.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Vinterhjul hämtas i</mat-label>
+                <mat-select formControlName="winterPickupMonth">
+                  @for (m of months; track $index) {
+                    <mat-option [value]="$index + 1">{{ m }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Sommarhjul hämtas i</mat-label>
+                <mat-select formControlName="summerPickupMonth">
+                  @for (m of months; track $index) {
+                    <mat-option [value]="$index + 1">{{ m }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Månader mellan avgifter</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  max="60"
+                  formControlName="paymentCycleMonths"
+                />
+                <mat-error>1–60</mat-error>
+              </mat-form-field>
             </form>
           }
 
@@ -256,7 +517,11 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
               </mat-form-field>
               <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
                 <mat-label>Bankkonto</mat-label>
-                <input matInput formControlName="bankAccount" placeholder="Bank, clearing, kontonr" />
+                <input
+                  matInput
+                  formControlName="bankAccount"
+                  placeholder="Bank, clearing, kontonr"
+                />
               </mat-form-field>
               <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
                 <mat-label>Betala med Swish (nummer)</mat-label>
@@ -423,6 +688,30 @@ import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dial
         >
           Byt lösenord
         </button>
+      } @else if (tab() === 'pricing') {
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Stäng</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          form="pricing-form"
+          [disabled]="pricingForm.invalid || pricingBusy()"
+        >
+          Spara prissättning
+        </button>
+      } @else if (tab() === 'storage') {
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Stäng</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          form="storage-form"
+          [disabled]="storageForm.invalid || storageBusy()"
+        >
+          Spara förval
+        </button>
       } @else if (tab() === 'invoice') {
         <span class="flex-1"></span>
         <button mat-button type="button" mat-dialog-close>Stäng</button>
@@ -493,7 +782,9 @@ export class SettingsPage {
     validators: [Validators.required, Validators.minLength(2)],
   });
   readonly companyBusy = signal(false);
-  readonly tab = signal<'view' | 'stock' | 'account' | 'invoice' | 'staff' | 'companies'>('view');
+  readonly tab = signal<
+    'view' | 'stock' | 'account' | 'pricing' | 'storage' | 'invoice' | 'staff' | 'companies'
+  >('view');
   readonly tabs = computed(() => {
     const t = [
       { id: 'view' as const, label: 'Visning', icon: 'tune' },
@@ -503,6 +794,8 @@ export class SettingsPage {
     if (!this.auth.isAdmin()) return t;
     const owner = [
       ...t,
+      { id: 'pricing' as const, label: 'Prissättning', icon: 'sell' },
+      { id: 'storage' as const, label: 'Däckhotell', icon: 'warehouse' },
       { id: 'invoice' as const, label: 'Fakturauppgifter', icon: 'receipt_long' },
       { id: 'staff' as const, label: 'Personal', icon: 'group' },
     ];
@@ -558,6 +851,55 @@ export class SettingsPage {
     footer: [''],
   });
 
+  private readonly pricing = inject(Pricing);
+  readonly storageContents = Object.entries(STORAGE_CONTENTS_LABELS);
+  readonly storageConditions = Object.entries(DEPOSIT_CONDITION_LABELS);
+  readonly storageAccessories = Object.entries(ACCESSORY_LABELS);
+  readonly months = MONTH_LABELS;
+  private readonly catalog = inject(CatalogApi);
+  readonly storageBusy = signal(false);
+  readonly storageWarehouses = signal<Warehouse[]>([]);
+  readonly storageWarehouseId = signal<string | null>(null);
+  readonly storagePlaces = computed(
+    () => this.storageWarehouses().find((w) => w.id === this.storageWarehouseId())?.locations ?? [],
+  );
+  readonly storageForm = inject(FormBuilder).group({
+    contents: ['complete_wheels' as string],
+    quantity: [4, [Validators.required, Validators.min(1), Validators.max(12)]],
+    studded: [false],
+    condition: ['good' as string],
+    accessories: [[] as string[]],
+    warehouseId: [null as string | null],
+    locationId: [null as string | null],
+    winterPickupMonth: [10],
+    summerPickupMonth: [4],
+    paymentCycleMonths: [12, [Validators.required, Validators.min(1), Validators.max(60)]],
+  });
+  readonly pricingBusy = signal(false);
+  readonly pricingForm = inject(FormBuilder).group({
+    profile: ['service' as PricingSettings['profile']],
+    priceEntry: ['order' as PricingSettings['priceEntry']],
+    privatePricesIncludeVat: [true],
+    companyPricesIncludeVat: [true],
+    roundToKrona: [false],
+    consumablesPercent: [null as number | null, [Validators.min(0), Validators.max(100)]],
+    consumablesMax: [null as number | null, Validators.min(0)],
+    consumablesText: ['Förbrukningsmaterial'],
+    quoteValidDays: [30, [Validators.required, Validators.min(1), Validators.max(365)]],
+    quoteTolerancePercent: [15, [Validators.required, Validators.min(0), Validators.max(100)]],
+    quoteTerms: [''],
+    defaultJobLimit: [null as number | null, Validators.min(0)],
+    showVin: [true],
+    showMileage: [true],
+    requireMileage: [false],
+    internalHourlyCost: [null as number | null, Validators.min(0)],
+    stockOut: ['work_order_done' as PricingSettings['stockOut']],
+    purchaseVatRate: [25],
+  });
+  readonly defaultTerms = computed(() =>
+    quoteTermsText({ ...this.pricing.value(), quoteTerms: null }),
+  );
+
   readonly form = inject(FormBuilder).nonNullable.group({
     defaultView: this.settings.value().defaultView,
     pageSize: this.settings.value().pageSize,
@@ -573,17 +915,46 @@ export class SettingsPage {
       this.settings.value().defaultStorageFee,
       [Validators.required, Validators.min(0)],
     ],
+    defaultHourlyRate: [
+      this.settings.value().defaultHourlyRate,
+      [Validators.required, Validators.min(0)],
+    ],
   });
 
   constructor() {
+    this.pricingForm.valueChanges.subscribe(() => this.syncProfile());
     if (!this.auth.isAdmin()) {
       // Företagets standardvärden gäller alla; bara ägaren ändrar dem.
-      for (const k of ['defaultSeason', 'defaultSupplier', 'defaultReorderLevel', 'markupPercent', 'defaultStorageFee'] as const) {
+      for (const k of [
+        'defaultSeason',
+        'defaultSupplier',
+        'defaultReorderLevel',
+        'markupPercent',
+        'defaultStorageFee',
+        'defaultHourlyRate',
+      ] as const) {
         this.form.controls[k].disable();
       }
     }
     if (this.auth.isAdmin()) {
       this.loadMembers();
+      this.api.pricingSettings().subscribe((p) => this.fillPricing(p));
+      this.catalog
+        .warehouses()
+        .subscribe((all) =>
+          this.storageWarehouses.set(all.filter((w) => w.active && w.kind === 'customer')),
+        );
+      this.api.storageDefaults().subscribe((d) => {
+        this.storageForm.reset(d as never);
+        this.storageWarehouseId.set(d.warehouseId);
+      });
+      this.storageForm.controls.warehouseId.valueChanges.subscribe((w) => {
+        this.storageWarehouseId.set(w);
+        const places = this.storageWarehouses().find((x) => x.id === w)?.locations ?? [];
+        if (!places.some((p) => p.id === this.storageForm.controls.locationId.value)) {
+          this.storageForm.controls.locationId.setValue(null);
+        }
+      });
       this.api.seller().subscribe((s) =>
         this.sellerForm.patchValue({
           ...s,
@@ -600,6 +971,101 @@ export class SettingsPage {
         }),
       );
     }
+  }
+
+  /** Pengar i kronor i formuläret, öre i backend. */
+  private fillPricing(p: PricingSettings) {
+    const kr = (o: number | null) => (o == null ? null : o / 100);
+    this.pricingForm.reset({
+      ...p,
+      consumablesMax: kr(p.consumablesMax),
+      defaultJobLimit: kr(p.defaultJobLimit),
+      internalHourlyCost: kr(p.internalHourlyCost),
+      quoteTerms: p.quoteTerms ?? '',
+    });
+  }
+
+  /** Fyller i profilens arbetssätt; inget sparas förrän man trycker Spara. */
+  applyProfile(p: 'service' | 'workshop') {
+    this.pricingForm.patchValue(PRICING_PROFILES[p]);
+    this.pricingForm.markAsDirty();
+  }
+
+  /** Stämmer valen inte längre med profilen är arbetssättet "Anpassat". */
+  private syncProfile() {
+    const cur = this.pricingForm.controls.profile.value;
+    if (cur !== 'service' && cur !== 'workshop') return;
+    // Momsvalen finns inte längre och räknas inte.
+    const {
+      profile: _p,
+      privatePricesIncludeVat: _a,
+      companyPricesIncludeVat: _b,
+      ...want
+    } = PRICING_PROFILES[cur] as Record<string, unknown>;
+    const have = this.pricingForm.getRawValue() as Record<string, unknown>;
+    if (Object.entries(want).some(([k, v]) => have[k] !== v)) {
+      this.pricingForm.controls.profile.setValue('custom', { emitEvent: false });
+    }
+  }
+
+  savePricing() {
+    const v = this.pricingForm.getRawValue();
+    const ore = (kr: number | null | undefined) =>
+      kr == null || (kr as unknown) === '' ? null : Math.round(Number(kr) * 100);
+    const num = (n: number | null | undefined) =>
+      n == null || (n as unknown) === '' ? null : Number(n);
+    this.pricingBusy.set(true);
+    this.pricing
+      .save({
+        // Ändrar ägaren något efter en profil är det ett eget arbetssätt.
+        profile: v.profile ?? 'custom',
+        priceEntry: v.priceEntry ?? 'order',
+        // Priser anges alltid inkl. moms; valen finns inte längre.
+        privatePricesIncludeVat: true,
+        companyPricesIncludeVat: true,
+        roundToKrona: !!v.roundToKrona,
+        consumablesPercent: num(v.consumablesPercent),
+        consumablesMax: ore(v.consumablesMax),
+        consumablesText: v.consumablesText || 'Förbrukningsmaterial',
+        quoteValidDays: Number(v.quoteValidDays),
+        quoteTolerancePercent: Number(v.quoteTolerancePercent),
+        quoteTerms: v.quoteTerms?.trim() || null,
+        defaultJobLimit: ore(v.defaultJobLimit),
+        showVin: !!v.showVin,
+        showMileage: !!v.showMileage,
+        requireMileage: !!v.requireMileage,
+        internalHourlyCost: ore(v.internalHourlyCost),
+        stockOut: v.stockOut ?? 'work_order_done',
+        purchaseVatRate: Number(v.purchaseVatRate ?? 25),
+      })
+      .subscribe({
+        next: (p) => {
+          this.pricingBusy.set(false);
+          this.fillPricing(p);
+          this.snack.open('Prissättningen sparades', undefined, { duration: 2500 });
+        },
+        error: () => this.pricingBusy.set(false),
+      });
+  }
+
+  saveStorage() {
+    this.storageBusy.set(true);
+    const v = this.storageForm.getRawValue();
+    this.api
+      .saveStorageDefaults({
+        ...v,
+        quantity: Number(v.quantity),
+        paymentCycleMonths: Number(v.paymentCycleMonths),
+        locationId: v.warehouseId ? v.locationId : null,
+      } as Partial<StorageDefaults>)
+      .subscribe({
+        next: (d) => {
+          this.storageBusy.set(false);
+          this.storageForm.reset(d as never);
+          this.snack.open('Förvalen sparades', undefined, { duration: 2500 });
+        },
+        error: () => this.storageBusy.set(false),
+      });
   }
 
   saveSeller() {

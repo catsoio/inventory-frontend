@@ -27,7 +27,15 @@ import { Auth } from '../../../core/auth/auth';
         @if (card(); as c) {
           @if (c.active) {
             @if (admin) {
-              <button mat-button class="!text-red-700" (click)="remove()">Ta bort</button>
+              <button
+                mat-icon-button
+                class="!text-red-700"
+                aria-label="Ta bort"
+                matTooltip="Ta bort"
+                (click)="remove()"
+              >
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             }
           } @else {
             @if (admin) {

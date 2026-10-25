@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
 import { NavigationEnd, Router } from '@angular/router';
@@ -11,6 +11,7 @@ import { GARAGE_ROLE_LABELS, Report, StorageSummary, Summary } from '../../model
 import { Auth } from '../../auth/auth';
 import { PageTitle } from '../../page-title';
 import { Settings } from '../../settings';
+import { Pricing } from '../../pricing';
 import { SettingsPage } from '../../../features/settings/settings';
 import { environment } from '../../../../environments/environment';
 
@@ -56,6 +57,12 @@ const NAV: NavSection[] = [
     items: [
       { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month' },
       {
+        path: '/quotes',
+        label: 'Kostnadsförslag',
+        icon: 'request_quote',
+        hidden: !environment.workOrders,
+      },
+      {
         path: '/workorders',
         label: 'Arbetsorder',
         icon: 'handyman',
@@ -94,6 +101,8 @@ const NAV: NavSection[] = [
     items: [
       { path: '/resources', label: 'Mekaniker och platser', icon: 'engineering' },
       { path: '/service-types', label: 'Åtgärder', icon: 'build' },
+      { path: '/article-types', label: 'Artikeltyper', icon: 'category' },
+      { path: '/warehouses', label: 'Lager', icon: 'warehouse' },
     ],
   },
   {
@@ -348,7 +357,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
             >
             <div class="min-w-0 flex-1 leading-tight">
               <div class="truncate text-sm font-semibold">
-                {{ (auth.companyName() || 'Däcklager') }}
+                {{ auth.companyName() || 'Däcklager' }}
               </div>
               <div class="truncate text-xs text-white/80">
                 {{ who() }} ·
@@ -420,13 +429,13 @@ const today = () => new Date().toLocaleDateString('sv-SE');
               aria-label="Byt garage"
             >
               <span class="truncate text-sm font-semibold">{{
-                (auth.companyName() || 'Däcklager')
+                auth.companyName() || 'Däcklager'
               }}</span>
               <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] opacity-80">unfold_more</mat-icon>
             </button>
           } @else {
             <a routerLink="/dashboard" class="min-w-0 flex-1 truncate text-sm font-semibold">{{
-              (auth.companyName() || 'Däcklager')
+              auth.companyName() || 'Däcklager'
             }}</a>
           }
         }
@@ -664,6 +673,12 @@ export class Shell {
       }
     });
     inject(Settings).loadCompany();
+    // Prissättningen gäller bolaget man är i (ägare och personal; mekaniker har ingen åtkomst).
+    const pricing = inject(Pricing);
+    effect(() => {
+      const id = this.auth.garage()?.id;
+      if (id && !this.auth.isMechanic()) untracked(() => pricing.load());
+    });
     // Uppdateras vid start och efter varje sidbyte (t.ex. efter en försäljning).
     this.router.events
       .pipe(

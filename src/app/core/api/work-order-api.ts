@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  AnswerMethod,
   Page,
   PaymentMethod,
   WorkOrder,
@@ -76,6 +77,36 @@ export class WorkOrderApi {
     },
   ): Observable<WorkOrderDetail> {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/progress`, body);
+  }
+
+  /** Lämnar ett kostnadsförslag: beloppen frysas med giltighet och tillåten avvikelse. */
+  giveQuote(id: string): Observable<WorkOrderDetail> {
+    return this.http.post<WorkOrderDetail>(`${this.base}/${id}/quote`, {});
+  }
+
+  /** Kundens ja eller nej till hela kostnadsförslaget (null tar bort svaret). */
+  setQuoteApproval(
+    id: string,
+    body: {
+      status: 'approved' | 'declined' | null;
+      method?: AnswerMethod;
+      note?: string;
+    },
+  ): Observable<WorkOrderDetail> {
+    return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/quote/approval`, body);
+  }
+
+  /** Kundens ja eller nej till ett jobb (null tar bort svaret). */
+  setApproval(
+    id: string,
+    jobId: string,
+    body: {
+      status: 'approved' | 'declined' | null;
+      method?: AnswerMethod;
+      note?: string;
+    },
+  ): Observable<WorkOrderDetail> {
+    return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/jobs/${jobId}/approval`, body);
   }
 
   /** Lägger till en gammal faktura/kvitto: skapar en klar order och bokför den direkt. */

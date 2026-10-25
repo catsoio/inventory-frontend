@@ -86,6 +86,7 @@ export interface DtCol<T = any> {
               [class]="clickable ? 'cursor-pointer hover:bg-brand-soft' : 'hover:bg-gray-50'"
               [class.selected-row]="!!highlight && highlight(r)"
               (click)="clickable && rowClick.emit(r)"
+              (dblclick)="clickable && rowDblClick.emit(r)"
             >
               @for (c of colsSig(); track c.key; let first = $first) {
                 <td
@@ -198,6 +199,8 @@ export class DataTable {
   // Standard: fyller tillgänglig höjd. Skicka t.ex. 'max-h-96' för en fast maxhöjd.
   @Input() scrollClass = 'flex-1';
   @Output() rowClick = new EventEmitter<any>();
+  /** Dubbelklick på en rad (bara tabellen på bred skärm). */
+  @Output() rowDblClick = new EventEmitter<any>();
   @ContentChild('cell') cell?: TemplateRef<unknown>;
   /** Valfritt eget kort för mobilen: `row` i mallens kontext. Annars byggs ett av kolumnerna. */
   @Input() card?: TemplateRef<unknown>;

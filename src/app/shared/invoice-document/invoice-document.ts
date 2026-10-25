@@ -80,6 +80,9 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
           <table class="mt-10 w-full border-collapse">
             <thead>
               <tr class="border-b-2 border-[#4b5563] text-left text-xs tracking-wide uppercase">
+                @if (hasCodes(inv)) {
+                  <th class="w-28 py-1">Kod</th>
+                }
                 <th class="py-1">Beskrivning</th>
                 <th class="w-14 py-1 text-right">Antal</th>
                 <th class="w-28 py-1 text-right whitespace-nowrap">À-pris</th>
@@ -89,27 +92,51 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
               </tr>
             </thead>
             <tbody>
-              @for (r of inv.rows; track $index) {
-                <tr class="border-b border-gray-300 align-top">
-                  <td class="py-2">{{ r.description }}</td>
-                  <td class="py-2 text-right tabular-nums">{{ r.quantity }}</td>
-                  <td class="py-2 text-right tabular-nums">{{ r.unitPrice | kr }}</td>
-                  <td class="py-2 text-right tabular-nums">
-                    {{ r.discountPercent ? r.discountPercent + ' %' : '' }}
-                  </td>
-                  <td class="py-2 text-right tabular-nums">{{ r.vatRate }} %</td>
-                  <td class="py-2 text-right tabular-nums">{{ r.total | kr }}</td>
-                </tr>
+              @for (g of groups(inv); track $index) {
+                @if (g.section; as sec) {
+                  <tr>
+                    <td class="pt-3 pb-1 font-bold" [attr.colspan]="cols(inv)">{{ sec.title }}</td>
+                  </tr>
+                }
+                @for (r of g.rows; track $index) {
+                  <tr class="border-b border-gray-300 align-top">
+                    @if (hasCodes(inv)) {
+                      <td class="py-2 tabular-nums">{{ r.code }}</td>
+                    }
+                    <td class="py-2">{{ r.description }}</td>
+                    <td class="py-2 text-right tabular-nums">{{ r.quantity }}</td>
+                    @if (r.hidePrice) {
+                      <td colspan="4"></td>
+                    } @else {
+                      <td class="py-2 text-right tabular-nums">{{ r.unitPrice | kr }}</td>
+                      <td class="py-2 text-right tabular-nums">
+                        {{ r.discountPercent ? r.discountPercent + ' %' : '' }}
+                      </td>
+                      <td class="py-2 text-right tabular-nums">{{ r.vatRate }} %</td>
+                      <td class="py-2 text-right tabular-nums">{{ r.total | kr }}</td>
+                    }
+                  </tr>
+                }
+                @if (g.section; as sec) {
+                  <tr class="border-b border-gray-300">
+                    <td class="py-1 text-right text-gray-600" [attr.colspan]="cols(inv) - 1">
+                      {{ sec.fixed ? 'Fast pris' : 'Summa' }}
+                    </td>
+                    <td class="py-1 text-right font-bold tabular-nums">{{ sec.total | kr }}</td>
+                  </tr>
+                }
               }
               @if (cardDiscount(inv) > 0) {
                 <tr class="border-b border-gray-300">
-                  <td class="py-2 font-bold" colspan="5">Rabatt</td>
+                  <td class="py-2 font-bold" [attr.colspan]="cols(inv) - 1">Rabatt</td>
                   <td class="py-2 text-right tabular-nums">−{{ cardDiscount(inv) | kr }}</td>
                 </tr>
               }
             </tbody>
           </table>
-          <p class="mt-1 text-xs text-gray-600">Priser och belopp är angivna inklusive moms.</p>
+          <p class="mt-1 text-xs text-gray-600">
+            Priser och belopp är angivna {{ excl(inv) ? 'exklusive' : 'inklusive' }} moms.
+          </p>
           @if (inv.performed) {
             <p class="mt-3 whitespace-pre-line">{{ inv.performed }}</p>
           }
@@ -137,13 +164,18 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
 
         <section class="mt-4 ml-auto w-full max-w-sm">
           <div class="flex justify-between py-0.5">
-            <span>Summa exkl. moms</span
-            ><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
+            <span>Summa exkl. moms</span><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
           </div>
           @for (b of inv.totals.byRate; track b.rate) {
             <div class="flex justify-between py-0.5 text-[#4b5563]">
               <span>Moms {{ b.rate }} % på {{ b.base | kr }}</span>
               <span class="tabular-nums">{{ b.vat | kr }}</span>
+            </div>
+          }
+          @if (inv.totals.rounding) {
+            <div class="flex justify-between py-0.5 text-[#4b5563]">
+              <span>Öresutjämning</span>
+              <span class="tabular-nums">{{ inv.totals.rounding | kr }}</span>
             </div>
           }
           <div
@@ -158,9 +190,7 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
           @if (inv.paidAt) {
             <p>
               Betald {{ day(inv.paidAt)
-              }}{{
-                inv.paymentMethod ? ' med ' + payLabels[inv.paymentMethod].toLowerCase() : ''
-              }}.
+              }}{{ inv.paymentMethod ? ' med ' + payLabels[inv.paymentMethod].toLowerCase() : '' }}.
             </p>
           } @else if (
             inv.seller.bankgiro ||
@@ -170,9 +200,7 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
           ) {
             <p>
               Betalning till
-              <b>{{
-                payTo(inv.seller)
-              }}</b
+              <b>{{ payTo(inv.seller) }}</b
               >. {{ inv.code ? 'Ange ' + inv.code + ' som referens.' : '' }}
             </p>
           }
@@ -245,9 +273,44 @@ export class InvoiceDocument {
     return iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
   }
 
-  /** Rabatten på hela kortet: radernas summa minus det som ska betalas. */
+  excl(inv: WorkOrderInvoice) {
+    return inv.totals.pricesIncludeVat === false;
+  }
+
+  /** Koder fylls på i bakgrunden men visas aldrig på dokumentet. */
+  hasCodes(_inv: WorkOrderInvoice) {
+    return false;
+  }
+
+  cols(inv: WorkOrderInvoice) {
+    return this.hasCodes(inv) ? 7 : 6;
+  }
+
+  /** Raderna under sina jobb (i jobbens ordning), sedan raderna utan jobb. */
+  groups(inv: WorkOrderInvoice) {
+    const rows = inv.rows ?? [];
+    const sections = inv.sections ?? [];
+    const ids = new Set(sections.map((x) => x.id));
+    return [
+      ...sections.map((section) => ({
+        section,
+        rows: rows.filter((r) => r.sectionId === section.id),
+      })),
+      { section: null, rows: rows.filter((r) => !r.sectionId || !ids.has(r.sectionId)) },
+    ].filter((g) => g.rows.length);
+  }
+
+  /**
+   * Rabatten på hela kortet: vad raderna och jobben summerar till minus det som ska betalas
+   * (i dokumentets prisläge, före öresutjämning). Jobb med fast pris räknas med sitt pris.
+   */
   cardDiscount(inv: WorkOrderInvoice): number {
-    const sum = (inv.rows ?? []).reduce((s, r) => s + r.total, 0);
-    return Math.max(0, sum - inv.totals.total);
+    const fixed = new Map((inv.sections ?? []).filter((x) => x.fixed).map((x) => [x.id, x.total]));
+    const loose = (inv.rows ?? [])
+      .filter((r) => !(r.sectionId && fixed.has(r.sectionId)))
+      .reduce((s, r) => s + r.total, 0);
+    const sum = loose + [...fixed.values()].reduce((a, b) => a + b, 0);
+    const paid = this.excl(inv) ? inv.totals.net : inv.totals.total - (inv.totals.rounding ?? 0);
+    return Math.max(0, sum - paid);
   }
 }

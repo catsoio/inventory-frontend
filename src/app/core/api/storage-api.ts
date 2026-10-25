@@ -5,6 +5,8 @@ import { environment } from '../../../environments/environment';
 import {
   Page,
   PaymentMethod,
+  RecallPreview,
+  RecallResult,
   StorageDeposit,
   StorageDepositInput,
   StorageQuery,
@@ -51,6 +53,14 @@ export class StorageApi {
 
   pickUp(id: string, body: { pickedUpAt?: string; paymentMethod?: PaymentMethod }) {
     return this.http.post<StorageDeposit>(`${this.base}/${id}/pickup`, body);
+  }
+
+  recallPreview(): Observable<RecallPreview> {
+    return this.http.get<RecallPreview>(`${this.base}/recall`);
+  }
+
+  recallSend(depositIds: string[], message: string): Observable<RecallResult> {
+    return this.http.post<RecallResult>(`${this.base}/recall/send`, { depositIds, message });
   }
 
   reopen(id: string): Observable<StorageDeposit> {

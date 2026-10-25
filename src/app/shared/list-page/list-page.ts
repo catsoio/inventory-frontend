@@ -71,6 +71,7 @@ import type { DtCol } from '../data-table/data-table';
         [card]="cardTpl"
         [emptyText]="loading ? 'Laddar…' : emptyText"
         (rowClick)="rowClick.emit($event)"
+        (rowDblClick)="rowDblClick.emit($event)"
       >
         <ng-template #cell let-row="row" let-col="col" let-text="text">
           @if (cellTpl) {
@@ -107,6 +108,7 @@ export class ListPage implements OnInit {
   @Output() search = new EventEmitter<string>();
   @Output() archivedChange = new EventEmitter<boolean>();
   @Output() rowClick = new EventEmitter<any>();
+  @Output() rowDblClick = new EventEmitter<any>();
   /** Valfri mall för egna celler: `<ng-template #cell let-row="row" let-col="col" let-text="text">`. */
   @ContentChild('cell') cellTpl?: TemplateRef<unknown>;
   /** Valfritt eget kort för mobilen: `<ng-template #card let-row="row">`. */

@@ -1,3 +1,4 @@
+import { Pricing } from '../../../core/pricing';
 import { Component, Inject, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ensureValid } from '../../../shared/form-guard';
@@ -64,7 +65,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
         }
         @if (data.action === 'receive') {
           <mat-form-field
-            ><mat-label>Inköpspris per styck (kr, exkl. moms)</mat-label>
+            ><mat-label>Inköpspris per styck (kr, inkl. moms)</mat-label>
             <input
               matInput
               type="number"
@@ -123,6 +124,7 @@ export class StockActionDialog {
   private readonly snack = inject(MatSnackBar);
   private readonly api = inject(InventoryApi);
   private readonly dialog = inject(MatDialog);
+  private readonly pricing = inject(Pricing);
   private readonly ref = inject<MatDialogRef<StockActionDialog, Article>>(MatDialogRef);
 
   readonly busy = signal(false);
@@ -149,7 +151,11 @@ export class StockActionDialog {
         [...int, Validators.min(1), ...(outgoing ? [Validators.max(art.quantity)] : [])],
       ],
       countedQuantity: [String(art.quantity), int],
-      unitCost: [kr(art.averageCost ?? 0), [Validators.required, Validators.min(0)]],
+      // Inköpspriset skrivs inkl. moms; snittpriset lagras utan.
+      unitCost: [
+        kr(inject(Pricing).costIncl(art.averageCost ?? 0)),
+        [Validators.required, Validators.min(0)],
+      ],
       unitPrice: [kr(art.sellPrice), [Validators.min(0)]],
       supplier: [art.supplier ?? ''],
       reference: [''],
@@ -174,7 +180,7 @@ export class StockActionDialog {
     const bodies: Record<StockAction, object> = {
       receive: {
         quantity: q,
-        unitCost: ore(v.unitCost),
+        unitCost: this.pricing.costNet(ore(v.unitCost)),
         supplier: v.supplier || undefined,
         ...common,
       },

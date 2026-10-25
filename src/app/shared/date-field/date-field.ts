@@ -15,7 +15,7 @@ const toYmd = (d: Date) =>
   selector: 'app-date-field',
   standalone: false,
   template: `
-    <mat-form-field class="w-full">
+    <mat-form-field class="w-full" [subscriptSizing]="subscript">
       <mat-label>{{ label }}</mat-label>
       @if (icon) {
         <mat-icon matPrefix class="mr-2 text-gray-400">{{ icon }}</mat-icon>
@@ -47,6 +47,8 @@ export class DateField implements ControlValueAccessor {
   @Input() label = '';
   @Input() icon = '';
   @Input() hint = '';
+  /** `dynamic` ger ingen tom rad under fältet när det inte finns något fel att visa. */
+  @Input() subscript: 'fixed' | 'dynamic' = 'fixed';
   @Input() error = '';
   @Input() set min(v: string | null | undefined) {
     this.minDate = toDate(v);
