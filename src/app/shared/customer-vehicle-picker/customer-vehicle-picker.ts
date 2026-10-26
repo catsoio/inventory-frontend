@@ -30,8 +30,12 @@ export interface PickerValue {
    * Något är skrivet men inte valt ur listan: kunden och/eller bilen skapas när formuläret sparas
    * (se `LinkResolver`). `customerId`/`vehicleId` är då tomma.
    */
-  pending?: { customerId?: string; customerName?: string; regNo?: string };
+  pending?: { customerId?: string; customerName?: string; customerPhone?: string; regNo?: string };
 }
+
+/** Skrivet som ett telefonnummer (siffror, mellanslag, bindestreck, +, parenteser) och inte ett namn. */
+export const isPhoneText = (s: string) =>
+  /^\+?[\d\s\-()]{5,}$/.test(s.trim()) && s.replace(/\D/g, '').length >= 5;
 
 /** Giltigt när något valts ur listan (ett objekt) eller skrivits (då skapas det vid spar). */
 const filled = (min: number) => (c: AbstractControl) => {
@@ -59,7 +63,7 @@ const filled = (min: number) => (c: AbstractControl) => {
           [matAutocomplete]="customerAuto"
           (input)="edited.set(true)"
           autocomplete="off"
-          placeholder="Sök eller skriv ny kund"
+          placeholder="Namn eller telefonnummer"
         />
         <mat-autocomplete
           #customerAuto="matAutocomplete"
@@ -114,9 +118,9 @@ const filled = (min: number) => (c: AbstractControl) => {
         <mat-icon class="!h-4 !w-4 shrink-0 !text-base text-brand">add_circle</mat-icon>
         <span>
           @if (newCustomer() && newVehicle()) {
-            Ny kund och ny bil skapas när du sparar.
+            Ny kund{{ phoneOnly() ? ' med bara telefonnummer' : '' }} och ny bil skapas när du sparar.
           } @else if (newCustomer()) {
-            Ny kund skapas när du sparar.
+            Ny kund{{ phoneOnly() ? ' med bara telefonnummer' : '' }} skapas när du sparar.
           } @else {
             Ny bil skapas åt {{ customerRef()?.name }} när du sparar.
           }
@@ -176,6 +180,8 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
   readonly newCustomer = computed(
     () => !this.customerRef() && this.customerText().trim().length > 0 && !this.isLegacyText(),
   );
+  /** Det som skrivits är ett telefonnummer: kunden skapas med numret, namnet fyller man i senare. */
+  readonly phoneOnly = computed(() => this.newCustomer() && isPhoneText(this.customerText()));
   readonly newVehicle = computed(
     () => !this.selectedVehicle() && this.carQuery().trim().length >= 2 && !this.isLegacyText(),
   );
@@ -303,6 +309,7 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     const v = this.vehicle.value;
     const customerName = typeof c === 'string' ? c.trim() : '';
     const regNo = typeof v === 'string' ? v.trim().toUpperCase() : '';
+    const customerPhone = !customer && isPhoneText(customerName) ? customerName : undefined;
     if (regNo.length >= 2 && (customer || customerName)) {
       return this.onChange({
         customerId: '',
@@ -310,6 +317,7 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
         pending: {
           customerId: customer?.id,
           customerName: customer ? customer.name : customerName,
+          customerPhone,
           regNo,
         },
       });
@@ -319,7 +327,11 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
       return this.onChange({ customerId: customer.id, vehicleId: '', customer });
     }
     if (this.isOptional && customerName) {
-      return this.onChange({ customerId: '', vehicleId: '', pending: { customerName } });
+      return this.onChange({
+        customerId: '',
+        vehicleId: '',
+        pending: { customerName, customerPhone },
+      });
     }
     this.onChange(null);
   }

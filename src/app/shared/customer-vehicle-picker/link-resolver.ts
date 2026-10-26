@@ -23,12 +23,17 @@ export class LinkResolver {
   resolve(link: PickerValue): Observable<ResolvedLink> {
     const p = link.pending;
     if (!p) return of({ customerId: link.customerId, vehicleId: link.vehicleId });
+    // Numret är namnet tills man fyller i det riktiga (namn krävs i registret).
+    const newCustomer = () =>
+      this.api.createCustomer({
+        type: 'private',
+        name: p.customerName ?? '',
+        ...(p.customerPhone ? { phone: p.customerPhone } : {}),
+      });
     // Bara en ny kund, ingen bil.
     const regNo = p.regNo;
     if (!regNo) {
-      return this.api
-        .createCustomer({ type: 'private', name: p.customerName ?? '' })
-        .pipe(map((c) => ({ customerId: c.id, vehicleId: '' })));
+      return newCustomer().pipe(map((c) => ({ customerId: c.id, vehicleId: '' })));
     }
     return this.api.vehicles({ q: regNo, includeArchived: true, limit: 5 }).pipe(
       map((page) => page.items.find((v) => v.regNo === regNo) ?? null),
@@ -36,9 +41,7 @@ export class LinkResolver {
         if (existing) return of({ customerId: existing.customerId, vehicleId: existing.id });
         const customerId$ = p.customerId
           ? of(p.customerId)
-          : this.api
-              .createCustomer({ type: 'private', name: p.customerName ?? '' })
-              .pipe(map((c) => c.id));
+          : newCustomer().pipe(map((c) => c.id));
         return customerId$.pipe(
           switchMap((customerId) =>
             this.api.lookupVehicle(regNo).pipe(
