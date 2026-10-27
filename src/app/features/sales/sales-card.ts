@@ -3,7 +3,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
-import { debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
+import { addDays, format } from 'date-fns';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  firstValueFrom,
+  of,
+  switchMap,
+} from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { StorageApi } from '../../core/api/storage-api';
@@ -11,8 +19,12 @@ import { WorkshopApi } from '../../core/api/workshop-api';
 import {
   Article,
   Customer,
-  PAYMENT_METHOD_LABELS,
+  DocumentChoice,
+  InvoiceKind,
+  paidWith,
   PaymentMethod,
+  paymentLabel,
+  paymentOptions,
   SalesCardDetail,
   SalesCardInput,
   SalesLineType,
@@ -23,6 +35,8 @@ import {
 import { Pricing } from '../../core/pricing';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
+import { invoiceGap } from '../../shared/invoice-gap';
+import { dueNote } from '../../shared/invoice-status';
 import { type PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
 import {
@@ -59,6 +73,10 @@ interface Row {
 let seq = 0;
 const key = () => `r${++seq}`;
 const ore = (kr: number) => Math.round((kr || 0) * 100);
+/** Dagen som ÅÅÅÅ-MM-DD i datorns tid. */
+const ymd = (d: Date) => format(d, 'yyyy-MM-dd');
+/** Mitt på dagen: en dag som skickas till servern ska inte hamna på fel datum i en annan tidszon. */
+const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
 
 /**
  * Säljkortet: en affär med kund, rader, rabatt, bokföring (kvitto eller faktura) och betalning,
@@ -73,7 +91,7 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
       [wide]="true"
       listLink="/sales"
       listLabel="Försäljning"
-      newTitle="Nytt säljkort"
+      newTitle="Ny försäljning"
       [title]="title()"
       [code]="card()?.code ?? null"
     >
@@ -472,28 +490,85 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
       @if (card(); as c) {
         @if (c.status === 'draft') {
           <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-2 text-base font-semibold">Bokför</h2>
+            <h2 class="mb-1 text-base font-semibold">Bokför</h2>
             <p class="mb-3 text-sm text-gray-600">
-              Privatkund får kvitto och företag får faktura. Vid bokföring minskar lagret för
-              artiklarna på raderna och dokumentet får sitt nummer. Därefter går kortet inte att
-              ändra. Tills dess kan du förhandsgranska utkastet.
+              Vad ska kunden få? Vid bokföring minskar lagret för artiklarna på raderna och
+              dokumentet får sitt nummer. Därefter går kortet inte att ändra, och kvitto kan inte
+              göras om till faktura. Tills dess kan du förhandsgranska utkastet.
             </p>
-            @if (dirty()) {
-              <p class="mb-3 text-sm text-gray-500">Spara ändringarna först.</p>
+            <mat-radio-group
+              class="mb-4 grid gap-3 sm:grid-cols-2"
+              aria-label="Vad kunden får"
+              [value]="kind()"
+              (change)="docKind.set($event.value)"
+            >
+              <label class="choice" [class.is-on]="kind() === 'invoice'">
+                <mat-radio-button value="invoice" class="font-medium">Faktura</mat-radio-button>
+                <span class="choice-text"
+                  >Kunden betalar senare, inom betalningsvillkoren. Passar företag och större
+                  jobb.</span
+                >
+              </label>
+              <label class="choice" [class.is-on]="kind() === 'receipt'">
+                <mat-radio-button value="receipt" class="font-medium">Kvitto</mat-radio-button>
+                <span class="choice-text">Kunden betalar nu. Kvittot är betalt direkt.</span>
+              </label>
+            </mat-radio-group>
+            @if (kind() === 'invoice') {
+              <div class="flex flex-wrap items-start gap-3">
+                <mat-form-field class="w-56" subscriptSizing="dynamic">
+                  <mat-label>Betalningsvillkor (dagar)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    max="365"
+                    [value]="terms()"
+                    (input)="termsDays.set($any($event.target).valueAsNumber)"
+                  />
+                  <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
+                </mat-form-field>
+              </div>
+              @if (invoiceBlocker(); as why) {
+                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{{ why }}</p>
+              }
+            } @else {
+              <mat-form-field class="w-56" subscriptSizing="dynamic">
+                <mat-label>Betalsätt</mat-label>
+                <mat-select
+                  [value]="receiptMethod()"
+                  (selectionChange)="receiptMethod.set($event.value)"
+                >
+                  @for (m of receiptMethods; track m[0]) {
+                    <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
+                kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
+                prisbasbelopp inkl. moms (236 800 kr för 2026). Det här systemet är inget
+                kassaregister. Kontrollera med Skatteverket eller er revisor.
+              </p>
             }
-            <div class="flex flex-wrap gap-2">
+            @if (dirty()) {
+              <p class="mt-3 text-sm text-gray-500">Spara ändringarna först.</p>
+            }
+            <div class="mt-4 flex flex-wrap gap-2">
               <button
                 mat-flat-button
                 color="primary"
                 type="button"
-                [disabled]="dirty() || busy() || !rows().length"
+                [disabled]="dirty() || busy() || !rows().length || !!invoiceBlocker()"
                 (click)="post()"
               >
-                <mat-icon>receipt_long</mat-icon> Bokför
+                <mat-icon>receipt_long</mat-icon>
+                {{ kind() === 'invoice' ? 'Bokför som faktura' : 'Bokför som kvitto' }}
               </button>
               <a
                 mat-stroked-button
                 [routerLink]="['/sales', c.id, 'invoice']"
+                [queryParams]="choiceParams()"
                 [class.pointer-events-none]="dirty() || !rows().length"
               >
                 <mat-icon>visibility</mat-icon> Förhandsgranska utkast
@@ -502,13 +577,25 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
           </section>
         } @else if (c.invoice; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-2 text-base font-semibold">Betalning</h2>
+            <h2 class="mb-2 text-base font-semibold">
+              {{ inv.kind === 'invoice' ? 'Betalning av fakturan' : 'Betalning' }}
+            </h2>
+            @if (inv.kind === 'invoice' && inv.dueAt) {
+              <p class="mb-3 text-sm text-gray-600">
+                Förfaller <b>{{ inv.dueAt | date: 'yyyy-MM-dd' }}</b>
+                @if (late(inv)) {
+                  <span class="font-medium text-red-700"> · {{ late(inv) }}</span>
+                } @else if (!inv.paidAt) {
+                  <span> · {{ dueNote(inv) }}</span>
+                }
+              </p>
+            }
             <div class="flex flex-wrap items-center gap-3">
               @if (inv.paidAt) {
                 <app-pill tone="green"
                   >Betald {{ inv.paidAt | date: 'yyyy-MM-dd' }}
                   @if (inv.paymentMethod) {
-                    · {{ payLabels[inv.paymentMethod] }}
+                    · {{ payLabel(inv.kind, inv.paymentMethod) }}
                   }
                 </app-pill>
                 <button mat-button type="button" (click)="setPaid(false)">Ångra betalning</button>
@@ -516,17 +603,24 @@ const ore = (kr: number) => Math.round((kr || 0) * 100);
                 <mat-form-field subscriptSizing="dynamic" class="w-48">
                   <mat-label>Betalsätt</mat-label>
                   <mat-select [value]="payMethod()" (selectionChange)="payMethod.set($event.value)">
-                    @for (m of payMethods; track m[0]) {
+                    @for (m of payOptions(); track m[0]) {
                       <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
                     }
                   </mat-select>
                 </mat-form-field>
+                <app-date-field
+                  class="w-48"
+                  label="Betaldatum"
+                  subscript="dynamic"
+                  [max]="today"
+                  [formControl]="paidOn"
+                />
                 <button mat-flat-button color="primary" type="button" (click)="setPaid(true)">
                   Markera betald
                 </button>
               }
             </div>
-            @if (inv.kind === 'receipt' && payMethod() !== 'invoice' && !inv.paidAt) {
+            @if (inv.kind === 'receipt' && !inv.paidAt) {
               <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                 <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
                 kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
@@ -588,8 +682,9 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   private readonly destroyRef = inject(DestroyRef);
   private readonly id = this.route.snapshot.paramMap.get('id');
 
-  readonly payLabels = PAYMENT_METHOD_LABELS;
-  readonly payMethods = Object.entries(PAYMENT_METHOD_LABELS) as [PaymentMethod, string][];
+  readonly payLabel = paymentLabel;
+  readonly dueNote = dueNote;
+  readonly receiptMethods = paymentOptions('receipt');
   readonly vatOptions = VAT_OPTIONS;
   readonly vatLabel = vatLabel;
   /** Kortets prisläge: inkl. moms (standard) eller exkl. moms. */
@@ -612,7 +707,46 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly warranty = signal('');
   readonly dirty = signal(false);
   readonly busy = signal(false);
+  /** Hur kunden betalar. Gäller ett bokfört dokument: en faktura betalas oftast in på banken. */
   readonly payMethod = signal<PaymentMethod>('card');
+  /** Dagen betalningen kom in (standard i dag); en faktura betalas ofta dagar efter att den bokfördes. */
+  readonly today = ymd(new Date());
+  readonly paidOn = new FormControl(ymd(new Date()), { nonNullable: true });
+  readonly payOptions = computed(() => paymentOptions(this.card()?.kind ?? 'receipt'));
+
+  /**
+   * Vad kunden får när kortet bokförs: faktura (betalar senare) eller kvitto (betalar nu). Valt för
+   * hand, annars följer det kunden: ett företag får faktura, alla andra kvitto. "Ny faktura" på
+   * Fakturor börjar med faktura (`?kind=invoice`).
+   */
+  readonly docKind = signal<InvoiceKind | null>(null);
+  readonly kind = computed<InvoiceKind>(
+    () =>
+      this.card()?.kind ??
+      this.docKind() ??
+      (this.customer()?.type === 'company' ? 'invoice' : 'receipt'),
+  );
+  /** Betalningsvillkoren som verkstaden har ställt in (Företaget), tills man skriver egna dagar. */
+  private readonly defaultTerms = signal(30);
+  readonly termsDays = signal<number | null>(null);
+  readonly terms = computed(() => {
+    const t = this.termsDays();
+    return t != null && Number.isFinite(t) && t >= 0
+      ? Math.min(Math.round(t), 365)
+      : this.defaultTerms();
+  });
+  readonly dueDate = computed(() => ymd(addDays(new Date(), this.terms())));
+  readonly receiptMethod = signal<PaymentMethod>('card');
+
+  /** Det som hindrar en faktura just nu, med vad man ska göra åt det. En faktura ska nå någon. */
+  readonly invoiceBlocker = computed(() => {
+    if (this.kind() !== 'invoice') return null;
+    const l = this.link();
+    if (!l?.customerId && !l?.pending?.customerId && !l?.pending?.customerName) {
+      return 'En faktura behöver en kund. Välj kund högst upp, eller bokför som kvitto.';
+    }
+    return invoiceGap(this.customer());
+  });
 
   readonly search = new FormControl('', { nonNullable: true });
   readonly results = signal<Article[]>([]);
@@ -701,6 +835,13 @@ export class SalesCardPage implements OnInit, HasUnsaved {
 
   ngOnInit() {
     this.workshop.serviceTypes().subscribe((l) => this.serviceTypes.set(l));
+    this.inventory
+      .seller()
+      .pipe(catchError(() => of(null)))
+      .subscribe((s) => s && this.defaultTerms.set(s.paymentTermsDays));
+    // "Ny faktura" (och sidan efter första sparningen) bär valet i adressen.
+    const kind = this.route.snapshot.queryParamMap.get('kind');
+    if (kind === 'invoice' || kind === 'receipt') this.docKind.set(kind);
     if (this.id && this.id !== 'new') {
       this.load(this.id);
       return;
@@ -822,7 +963,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.note.set(c.note ?? '');
     this.performed.set(c.performed ?? '');
     this.warranty.set(c.invoice?.warranty ?? '');
-    this.payMethod.set(c.invoice?.paymentMethod ?? 'card');
+    this.payMethod.set(c.invoice?.paymentMethod ?? (c.kind === 'invoice' ? 'invoice' : 'card'));
     this.dirty.set(false);
   }
 
@@ -984,7 +1125,12 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         : await firstValueFrom(this.api.create(body));
       this.apply(saved);
       this.snack.open(`${saved.code} sparades`, undefined, { duration: 2500 });
-      if (!c) await this.router.navigate(['/sales', saved.id], { replaceUrl: true });
+      if (!c) {
+        await this.router.navigate(['/sales', saved.id], {
+          replaceUrl: true,
+          queryParams: this.docKind() ? { kind: this.docKind() } : {},
+        });
+      }
       return true;
     } catch {
       return false;
@@ -993,20 +1139,35 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     }
   }
 
+  /** Valet som skickas med när kortet bokförs eller förhandsgranskas. */
+  private choice(): DocumentChoice {
+    return this.kind() === 'invoice'
+      ? { kind: 'invoice', paymentTermsDays: this.terms() }
+      : { kind: 'receipt', paymentMethod: this.receiptMethod() };
+  }
+
+  /** Samma val som adressparametrar, för förhandsgranskningen. */
+  choiceParams() {
+    return { ...this.choice() };
+  }
+
   post() {
     const c = this.card();
     if (!c) return;
+    const invoice = this.kind() === 'invoice';
+    const gets = invoice
+      ? `en faktura som förfaller ${this.dueDate()} (${this.terms()} dagar)`
+      : `ett kvitto, betalt ${paidWith('receipt', this.receiptMethod())}`;
     this.confirm
       .ask({
-        title: `Bokför ${c.code}?`,
-        message:
-          'Lagret minskas för artiklarna på raderna och kvittot eller fakturan får sitt nummer. Därefter går kortet inte att ändra.',
+        title: `Bokför ${c.code} som ${invoice ? 'faktura' : 'kvitto'}?`,
+        message: `Kunden får ${gets}. Lagret minskas för artiklarna på raderna och dokumentet får sitt nummer. Därefter går varken kortet eller dokumentet att ändra.`,
         confirmText: 'Bokför',
       })
       .subscribe((ok) => {
         if (!ok) return;
         this.busy.set(true);
-        this.api.post(c.id).subscribe({
+        this.api.post(c.id, this.choice()).subscribe({
           next: (posted) => {
             this.apply(posted);
             this.busy.set(false);
@@ -1017,12 +1178,23 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       });
   }
 
+  /** "5 dagar sen" när en obetald faktura har passerat förfallodatumet. */
+  late(inv: { kind: InvoiceKind; dueAt: string | null; paidAt: string | null }) {
+    const n = dueNote(inv);
+    return n.endsWith('sen') ? n : '';
+  }
+
   setPaid(paid: boolean) {
     const c = this.card();
     if (!c) return;
     const run = () =>
       this.api
-        .setPaid(c.id, paid, paid ? this.payMethod() : undefined)
+        .setPaid(
+          c.id,
+          paid,
+          paid ? this.payMethod() : undefined,
+          paid ? noonOf(this.paidOn.value) : undefined,
+        )
         .subscribe((r) => this.apply(r));
     if (paid) {
       run();

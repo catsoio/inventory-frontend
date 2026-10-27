@@ -17,8 +17,8 @@ interface Entry {
   template: `
     <div class="mx-auto max-w-5xl">
       <p class="mb-4 max-w-2xl text-sm text-gray-600">
-        Sådant som ställs in en gång och sällan ändras: vad ni utför och tar betalt för, vem som
-        utför det, vilka lager och hyllor som finns och vilka ni köper av.
+        Sådant som ställs in en gång och sällan ändras: artikeltyper, lager och hyllor, leverantörer
+        och aktivitetsloggen. Mekaniker, platser och åtgärder ligger under Verkstad i menyn.
       </p>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         @for (e of entries; track e.path) {
@@ -50,18 +50,6 @@ export class RegisterHub {
 
   readonly entries: Entry[] = (
     [
-      {
-        path: '/service-types',
-        title: 'Åtgärder',
-        text: 'Prislistan: vad ett däckbyte, en service eller en reparation kostar och hur lång tid det tar.',
-        icon: 'build',
-      },
-      {
-        path: '/resources',
-        title: 'Mekaniker och platser',
-        text: 'Vem som utför jobben, och vilka lyft och platser som kan bokas.',
-        icon: 'engineering',
-      },
       {
         path: '/article-types',
         title: 'Artikeltyper',

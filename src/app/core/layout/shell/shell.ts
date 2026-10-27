@@ -1,3 +1,4 @@
+import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { Component, HostListener, effect, inject, untracked } from '@angular/core';
 import { InventoryApi } from '../../api/inventory-api';
@@ -5,6 +6,7 @@ import { Auth } from '../../auth/auth';
 import { GARAGE_ROLE_LABELS } from '../../models';
 import { PageTitle } from '../../page-title';
 import { Pricing } from '../../pricing';
+import { QUICK_ACTIONS } from '../../search/quick-actions';
 import { GlobalSearch } from '../../search/global-search';
 import { Settings } from '../../settings';
 import { Nav } from '../nav';
@@ -71,6 +73,21 @@ import { Nav } from '../nav';
         <app-billing-banner />
 
         @if (!auth.isMechanic()) {
+          <!-- Genvägar för att skapa något (dator): samma som under sökrutan. -->
+          <div class="hidden items-center gap-1 lg:flex">
+            @for (a of quick; track a.label) {
+              <button
+                type="button"
+                class="flex h-10 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-white/90 transition-colors bg-white/10 hover:bg-white/20 xl:px-3"
+                [matTooltip]="a.label"
+                [attr.aria-label]="a.label"
+                (click)="run(a)"
+              >
+                <mat-icon class="!h-5 !w-5 shrink-0 !text-xl !leading-5">{{ a.icon }}</mat-icon>
+                <span class="leading-5 max-2xl:hidden">{{ a.label }}</span>
+              </button>
+            }
+          </div>
           <!-- Dator: ett fält att klicka i; mobil: bara en ikon. -->
           <button
             type="button"
@@ -134,7 +151,18 @@ export class Shell {
   readonly auth = inject(Auth);
   readonly nav = inject(Nav);
   readonly search = inject(GlobalSearch);
+  readonly quick = QUICK_ACTIONS;
+  run(a: (typeof QUICK_ACTIONS)[number]) {
+    if (a.go) void this.router.navigate(a.go);
+    else {
+      // Dialogen laddas först när den behövs, så att den inte väger i första paketet.
+      void import('../../../shared/booking-dialog/open-booking').then((m) =>
+        m.openBooking(this.dialog, null).subscribe(),
+      );
+    }
+  }
   private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
 
   openSettings(): void {
     void import('../../../features/settings/settings').then((m) => m.openSettings(this.dialog));

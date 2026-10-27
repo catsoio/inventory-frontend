@@ -12,7 +12,7 @@ import { SalesList } from './sales-list';
     SharedModule,
     RouterModule.forChild([
       { path: '', component: SalesList },
-      { path: 'new', title: 'Nytt säljkort', component: SalesCardPage, canDeactivate: [unsavedGuard] },
+      { path: 'new', title: 'Ny försäljning', component: SalesCardPage, canDeactivate: [unsavedGuard] },
       { path: ':id/invoice', title: 'Faktura', component: SalesInvoicePage },
       { path: ':id', title: 'Säljkort', component: SalesCardPage, canDeactivate: [unsavedGuard] },
     ]),

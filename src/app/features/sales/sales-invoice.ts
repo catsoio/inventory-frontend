@@ -1,7 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { SalesCardApi } from '../../core/api/sales-card-api';
-import { SalesCardDetail, WorkOrderInvoice } from '../../core/models';
+import { PageTitle } from '../../core/page-title';
+import {
+  DocumentChoice,
+  PaymentMethod,
+  SalesCardDetail,
+  WorkOrderInvoice,
+} from '../../core/models';
 
 /** Fakturan eller kvittot för ett säljkort som A4: det bokförda dokumentet, annars ett utkast. */
 @Component({
@@ -25,7 +31,9 @@ import { SalesCardDetail, WorkOrderInvoice } from '../../core/models';
 })
 export class SalesInvoicePage implements OnInit {
   private readonly api = inject(SalesCardApi);
-  readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
+  private readonly route = inject(ActivatedRoute);
+  private readonly pageTitle = inject(PageTitle);
+  readonly id = this.route.snapshot.paramMap.get('id')!;
   readonly card = signal<SalesCardDetail | null>(null);
   readonly document = signal<WorkOrderInvoice | null>(null);
   readonly error = signal<string | null>(null);
@@ -33,12 +41,32 @@ export class SalesInvoicePage implements OnInit {
   ngOnInit() {
     this.api.get(this.id).subscribe((c) => {
       this.card.set(c);
-      if (c.invoice) return this.document.set(c.invoice);
-      this.api.preview(this.id).subscribe({
-        next: (d) => this.document.set(d),
+      if (c.invoice) return this.show(c.invoice);
+      this.api.preview(this.id, this.choice()).subscribe({
+        next: (d) => this.show(d),
         error: (e) => this.error.set(e?.error?.message ?? 'Kunde inte skapa utkastet.'),
       });
     });
+  }
+
+  private show(d: WorkOrderInvoice) {
+    this.document.set(d);
+    this.pageTitle.page.set(
+      `${d.kind === 'invoice' ? 'Faktura' : 'Kvitto'} ${d.code ?? '(utkast)'}`,
+    );
+  }
+
+  /** Det man valt på kortet (faktura eller kvitto, villkor, betalsätt) står i adressen. */
+  private choice(): DocumentChoice {
+    const q = this.route.snapshot.queryParamMap;
+    const kind = q.get('kind');
+    const days = q.get('paymentTermsDays');
+    const method = q.get('paymentMethod');
+    return {
+      ...(kind === 'invoice' || kind === 'receipt' ? { kind } : {}),
+      ...(days !== null && days !== '' && !isNaN(+days) ? { paymentTermsDays: +days } : {}),
+      ...(method ? { paymentMethod: method as PaymentMethod } : {}),
+    };
   }
 
   meta(): [string, string][] {

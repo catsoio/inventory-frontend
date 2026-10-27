@@ -607,7 +607,6 @@ export const EN: Record<string, string> = {
   'Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar senast".':
     'Leave empty if the job is done in the time above. Otherwise it becomes the work order\'s "Due".',
   'Kund (tomt = kontantförsäljning)': 'Customer (empty = cash sale)',
-  'Nytt säljkort': 'New sales card',
   Säljkort: 'Sales card',
   'Äldre försäljningar': 'Older sales',
   Utkast: 'Draft',
@@ -746,7 +745,6 @@ export const EN: Record<string, string> = {
   // Ny meny, sökning, Hem och översikter
   Verkstad: 'Workshop',
   'Däck och lager': 'Tyres and stock',
-  Pengar: 'Money',
   Ekonomi: 'Finance',
   Mer: 'More',
   Sök: 'Search',
@@ -834,4 +832,41 @@ export const EN: Record<string, string> = {
   'Vad som lämnas in': 'What is handed in',
   'Var det förvaras': 'Where it is stored',
   'När det hämtas': 'When it is collected',
+  // Fakturor, kvitton och menyn Ekonomi
+  'Försäljning och ekonomi': 'Sales and finance',
+  Förfallet: 'Overdue',
+  Förfallen: 'Overdue',
+  Förfallna: 'Overdue',
+  'Betalt senaste 30 dagarna': 'Paid in the last 30 days',
+  'Alla typer': 'All types',
+  Kvitton: 'Receipts',
+  Kvitto: 'Receipt',
+  Förfaller: 'Due',
+  Belopp: 'Amount',
+  Nr: 'No.',
+  'Ny faktura': 'New invoice',
+  'Lägg till gammal faktura': 'Add an old invoice',
+  'Inget att visa. Fakturor och kvitton skapas när ett säljkort bokförs.':
+    'Nothing to show. Invoices and receipts are created when a sales card is posted.',
+  'Vad ska kunden få? Vid bokföring minskar lagret för artiklarna på raderna och dokumentet får sitt nummer. Därefter går kortet inte att ändra, och kvitto kan inte göras om till faktura. Tills dess kan du förhandsgranska utkastet.':
+    'What should the customer get? Posting reduces the stock for the articles on the rows, and the document gets its number. After that the card cannot be changed, and a receipt cannot be turned into an invoice. Until then you can preview the draft.',
+  'Kunden betalar senare, inom betalningsvillkoren. Passar företag och större jobb.':
+    'The customer pays later, within the payment terms. Suits companies and bigger jobs.',
+  'Kunden betalar nu. Kvittot är betalt direkt.':
+    'The customer pays now. The receipt is paid at once.',
+  Betaldatum: 'Payment date',
+  'Betalning av fakturan': 'Payment of the invoice',
+  'Bokför som faktura': 'Post as invoice',
+  'Bokför som kvitto': 'Post as receipt',
+  'Vad var det?': 'What was it?',
+  'Kunden fick betala i efterhand, med förfallodatum.':
+    'The customer paid afterwards, with a due date.',
+  'Kunden betalade på stället.': 'The customer paid on the spot.',
+  Fakturadatum: 'Invoice date',
+  'Förfallodatum räknas från fakturadatumet': 'The due date is counted from the invoice date',
+  '0 till 365 dagar': '0 to 365 days',
+  'Redan betald': 'Already paid',
+  'Ett kvitto är betalt, så säg hur.': 'A receipt is paid, so say how.',
+  'Räknas som betald samma dag som dokumentet.': 'Counts as paid on the same day as the document.',
+  'Garanti (valfritt)': 'Warranty (optional)',
 };

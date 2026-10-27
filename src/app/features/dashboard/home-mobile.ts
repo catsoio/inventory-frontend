@@ -233,7 +233,7 @@ export class HomeMobile {
   }[] = [
     { label: 'Ny inlämning', icon: 'add_box', link: '/storage/new' },
     { label: 'Ny bokning', icon: 'event', link: null },
-    { label: 'Nytt säljkort', icon: 'point_of_sale', link: '/sales/new' },
+    { label: 'Ny försäljning', icon: 'point_of_sale', link: '/sales/new' },
     { label: 'Sök däck i lager', icon: 'tire_repair', link: '/inventory', params: { focus: 1 } },
   ];
 

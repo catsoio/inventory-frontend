@@ -16,6 +16,7 @@ import { VehicleAutofill } from '../../../shared/vehicle-autofill';
 import { Auth } from '../../../core/auth/auth';
 import { ensureValid } from '../../../shared/form-guard';
 import { PENDING_CUSTOMER } from '../../../shared/customer-select/customer-select';
+import { carColorHex } from '../../../shared/car-color';
 
 /** Bilens kort: ägare, uppgifter och bestående anmärkningar, med bilens bokningar under. */
 @Component({
@@ -99,6 +100,16 @@ import { PENDING_CUSTOMER } from '../../../shared/customer-select/customer-selec
           <input matInput type="number" inputmode="numeric" formControlName="year" />
           <mat-error>Ogiltigt år</mat-error>
         </mat-form-field>
+        @if (card()?.color; as col) {
+          <div class="mb-4 flex items-center gap-2 text-sm sm:col-span-2">
+            <span class="text-gray-500">Färg</span>
+            <span
+              class="inline-block h-4 w-4 rounded-full ring-1 ring-black/20"
+              [style.background]="hex(col)"
+            ></span>
+            <span>{{ col }}</span>
+          </div>
+        }
         <mat-form-field class="sm:col-span-6">
           <mat-label>Chassinummer (VIN)</mat-label>
           <input matInput formControlName="vin" />
@@ -149,7 +160,7 @@ import { PENDING_CUSTOMER } from '../../../shared/customer-select/customer-selec
                 routerLink="/sales/new"
                 [queryParams]="{ customerId: c.customerId, vehicleId: c.id }"
               >
-                <mat-icon>add</mat-icon> Nytt säljkort
+                <mat-icon>add</mat-icon> Ny försäljning
               </a>
             }
           </div>
@@ -203,6 +214,7 @@ export class VehicleCard implements OnInit {
   /** Regnumret finns redan på en annan bil. */
   readonly taken = signal(false);
   /** Bilinfo hämtas just nu. */
+  readonly hex = carColorHex;
   readonly looking = signal(false);
   /** Fälten är ifyllda från fordonsregistret och låsta. */
   readonly locked = signal(false);

@@ -1,14 +1,18 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormControl } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { format } from 'date-fns';
 import { WorkOrderApi } from '../../core/api/work-order-api';
-import { PAYMENT_METHOD_LABELS, PaymentMethod, WorkOrderDetail } from '../../core/models';
+import { PaymentMethod, WorkOrderDetail, paymentLabel, paymentOptions } from '../../core/models';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { STATUS_TEXT, STATUS_TONE, dueNote, invoiceStatus } from '../../shared/invoice-status';
 
 /**
- * Fakturakortet (eller kvittot): status, parter, belopp och betalning på ett ställe, med
- * genvägar till utskriften och arbetsordern bakom. Dokumentet är bokfört och låst; det enda
- * som ändras här är betalningen. Id:t är arbetsordern som bär dokumentet.
+ * Fakturakortet (eller kvittot) för ett äldre dokument på en arbetsorder: status, parter, belopp
+ * och betalning på ett ställe, med genvägar till utskriften och arbetsordern bakom. Dokumentet är
+ * bokfört och låst; det enda som ändras här är betalningen. Id:t är arbetsordern som bär
+ * dokumentet. Nyare dokument ligger på säljkortet.
  */
 @Component({
   selector: 'app-invoice-card',
@@ -29,9 +33,7 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
                 <h2 class="flex-1 text-base font-semibold">
                   {{ inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }} {{ inv.code }}
                 </h2>
-                <app-pill [tone]="inv.paidAt ? 'green' : 'amber'">
-                  {{ inv.paidAt ? 'Betald' : 'Obetald' }}
-                </app-pill>
+                <app-pill [tone]="statusTone(inv)">{{ statusText(inv) }}</app-pill>
               </div>
               <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr_auto_1fr]">
                 <dt class="text-gray-500">Kund</dt>
@@ -50,8 +52,17 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
                   <a class="text-brand" [routerLink]="['/vehicles', o.vehicleId]">{{ o.regNo }}</a>
                   {{ o.vehicle }}
                 </dd>
-                <dt class="text-gray-500">Förfaller</dt>
-                <dd>{{ inv.dueAt ? (inv.dueAt | date: 'yyyy-MM-dd') : '–' }}</dd>
+                @if (inv.kind === 'invoice') {
+                  <dt class="text-gray-500">Förfaller</dt>
+                  <dd>
+                    {{ inv.dueAt ? (inv.dueAt | date: 'yyyy-MM-dd') : '–' }}
+                    @if (note(inv); as n) {
+                      <span [class]="status(inv) === 'overdue' ? 'font-medium text-red-700' : 'text-gray-500'">
+                        · {{ n }}</span
+                      >
+                    }
+                  </dd>
+                }
                 <dt class="text-gray-500">Arbetsorder</dt>
                 <dd>
                   <a class="text-brand" [routerLink]="['/workorders', o.id]">{{ o.code }}</a>
@@ -89,7 +100,7 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
                   <span>
                     Betald {{ inv.paidAt | date: 'yyyy-MM-dd' }}
                     @if (inv.paymentMethod) {
-                      med {{ payLabels[inv.paymentMethod].toLowerCase() }}
+                      · {{ payText(inv.kind, inv.paymentMethod) }}
                     }
                   </span>
                   <button mat-button type="button" (click)="setPaid(false)">Ångra betalning</button>
@@ -97,11 +108,18 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
                   <mat-form-field subscriptSizing="dynamic" class="w-48">
                     <mat-label>Betalsätt</mat-label>
                     <mat-select [value]="method()" (selectionChange)="method.set($event.value)">
-                      @for (m of methods; track m[0]) {
+                      @for (m of methods(); track m[0]) {
                         <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
+                  <app-date-field
+                    class="w-48"
+                    label="Betaldatum"
+                    subscript="dynamic"
+                    [max]="today"
+                    [formControl]="paidOn"
+                  />
                   <button mat-flat-button color="primary" type="button" (click)="setPaid(true)">
                     Markera betald
                   </button>
@@ -120,10 +138,16 @@ export class InvoiceCard implements OnInit {
   private readonly api = inject(WorkOrderApi);
   private readonly dialog = inject(MatDialog);
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
-  readonly payLabels = PAYMENT_METHOD_LABELS;
-  readonly methods = Object.entries(PAYMENT_METHOD_LABELS) as [PaymentMethod, string][];
+  readonly payText = paymentLabel;
   readonly method = signal<PaymentMethod>('card');
   readonly order = signal<WorkOrderDetail | null>(null);
+  readonly methods = computed(() => paymentOptions(this.order()?.invoice?.kind ?? 'receipt'));
+  readonly today = format(new Date(), 'yyyy-MM-dd');
+  readonly paidOn = new FormControl(this.today, { nonNullable: true });
+  readonly status = invoiceStatus;
+  readonly note = dueNote;
+  readonly statusText = (i: Parameters<typeof invoiceStatus>[0]) => STATUS_TEXT[invoiceStatus(i)];
+  readonly statusTone = (i: Parameters<typeof invoiceStatus>[0]) => STATUS_TONE[invoiceStatus(i)];
 
   ngOnInit() {
     this.load();
@@ -132,14 +156,19 @@ export class InvoiceCard implements OnInit {
   private load() {
     this.api.get(this.id).subscribe((o) => {
       this.order.set(o);
-      this.method.set(o.invoice?.paymentMethod ?? 'card');
+      this.method.set(o.invoice?.paymentMethod ?? (o.invoice?.kind === 'invoice' ? 'invoice' : 'card'));
     });
   }
 
   setPaid(paid: boolean) {
     const run = () =>
       this.api
-        .setPaid(this.id, paid, paid ? this.method() : undefined)
+        .setPaid(
+          this.id,
+          paid,
+          paid ? this.method() : undefined,
+          paid ? new Date(`${this.paidOn.value}T12:00:00`).toISOString() : undefined,
+        )
         .subscribe(() => this.load());
     if (paid) {
       run();

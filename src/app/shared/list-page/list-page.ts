@@ -48,17 +48,26 @@ import type { DtCol } from '../data-table/data-table';
       }
       <span class="flex-1 max-md:hidden"></span>
       @if (newLink) {
-        <a mat-flat-button color="primary" [routerLink]="newLink" class="max-md:!hidden">
-          <mat-icon>add</mat-icon> {{ newLabel }}
-        </a>
         <a
-          mat-fab
+          mat-flat-button
           color="primary"
           [routerLink]="newLink"
-          [attr.aria-label]="newLabel"
-          class="!fixed right-4 bottom-20 z-10 md:!hidden"
-          ><mat-icon>add</mat-icon></a
+          [queryParams]="newQuery"
+          class="max-md:!hidden"
         >
+          <mat-icon>add</mat-icon> {{ newLabel }}
+        </a>
+        @if (newFab) {
+          <a
+            mat-fab
+            color="primary"
+            [routerLink]="newLink"
+            [queryParams]="newQuery"
+            [attr.aria-label]="newLabel"
+            class="!fixed right-4 bottom-20 z-10 md:!hidden"
+            ><mat-icon>add</mat-icon></a
+          >
+        }
       }
     </div>
     <ng-content />
@@ -100,7 +109,11 @@ export class ListPage implements OnInit {
   @Input() rows: unknown[] | null = [];
   @Input() loading = false;
   @Input() newLink: string | null = null;
+  /** Adressparametrar till "Ny"-knappen, t.ex. `{ kind: 'invoice' }` för en ny faktura. */
+  @Input() newQuery: Record<string, string> | null = null;
   @Input() newLabel = 'Ny';
+  /** Rund flytande knapp på mobil. Av för listor där det som skapas inte görs i farten. */
+  @Input() newFab = true;
   @Input() emptyText = 'Inget hittades.';
   /** Klasser per rad, t.ex. för att markera den valda raden. */
   @Input() accent?: (row: any) => string | null;

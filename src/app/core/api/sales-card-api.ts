@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  DocumentChoice,
   Page,
   PaymentMethod,
   SalesCardDetail,
@@ -57,17 +58,33 @@ export class SalesCardApi {
     return this.http.delete(`${this.base}/${id}`);
   }
 
-  /** Bokför: lagret minskas och faktura eller kvitto utfärdas. Därefter är kortet låst. */
-  post(id: string, supplyDate?: string): Observable<SalesCardDetail> {
-    return this.http.post<SalesCardDetail>(`${this.base}/${id}/post`, { supplyDate });
+  /**
+   * Bokför: lagret minskas och faktura eller kvitto utfärdas. Därefter är kortet låst. En faktura
+   * lämnas obetald; ett kvitto betalas direkt och måste säga hur. Utan val följer dokumentet kunden
+   * (företag = faktura, annars kvitto).
+   */
+  post(id: string, choice: DocumentChoice = {}): Observable<SalesCardDetail> {
+    return this.http.post<SalesCardDetail>(`${this.base}/${id}/post`, choice);
   }
 
-  /** Utkastet till dokumentet som det blir om kortet bokförs nu. Inget sparas. */
-  preview(id: string): Observable<WorkOrderInvoice> {
-    return this.http.get<WorkOrderInvoice>(`${this.base}/${id}/preview`);
+  /** Utkastet till dokumentet som det blir om kortet bokförs nu med de här valen. Inget sparas. */
+  preview(id: string, choice: DocumentChoice = {}): Observable<WorkOrderInvoice> {
+    return this.http.get<WorkOrderInvoice>(`${this.base}/${id}/preview`, {
+      params: toParams(choice),
+    });
   }
 
-  setPaid(id: string, paid: boolean, method?: PaymentMethod): Observable<SalesCardDetail> {
-    return this.http.patch<SalesCardDetail>(`${this.base}/${id}/payment`, { paid, method });
+  /** Markera betald (hur, och vilken dag; annars i dag) eller ångra. */
+  setPaid(
+    id: string,
+    paid: boolean,
+    method?: PaymentMethod,
+    paidAt?: string,
+  ): Observable<SalesCardDetail> {
+    return this.http.patch<SalesCardDetail>(`${this.base}/${id}/payment`, {
+      paid,
+      method,
+      paidAt,
+    });
   }
 }

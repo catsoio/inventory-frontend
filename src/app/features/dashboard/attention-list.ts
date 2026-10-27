@@ -11,7 +11,8 @@ import type { Attention } from './home-data';
   host: { class: 'block' },
   template: `
     @if (items().length) {
-      <ul class="-my-1 divide-y divide-gray-100">
+      <!-- Högst fyra rader syns; resten rullar i listan så att inte hela sidan blir lång. -->
+      <ul class="-my-1 max-h-[216px] divide-y divide-gray-100 overflow-y-auto overscroll-contain">
         @for (a of items(); track a.key) {
           <li>
             <a

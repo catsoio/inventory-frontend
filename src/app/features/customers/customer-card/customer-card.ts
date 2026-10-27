@@ -196,7 +196,7 @@ import { Auth } from '../../../core/auth/auth';
             <h2 class="flex-1 text-lg font-semibold">Säljkort</h2>
             @if (c.active) {
               <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ customerId: c.id }">
-                <mat-icon>add</mat-icon> Nytt säljkort
+                <mat-icon>add</mat-icon> Ny försäljning
               </a>
             }
           </div>

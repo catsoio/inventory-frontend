@@ -451,18 +451,46 @@ interface JobValue {
             }
           } @else {
             <div class="flex flex-col">
-              @for (r of rowsOfAll(); track r.row) {
+              @for (r of taskRows(); track r.row) {
                 <ng-container
-                  *ngTemplateOutlet="rowTpl; context: { $implicit: r.row, i: r.i, fixed: false }"
+                  *ngTemplateOutlet="
+                    rowTpl;
+                    context: { $implicit: r.row, i: r.i, fixed: false, part: false }
+                  "
                 />
               } @empty {
                 <p class="text-sm text-gray-500">
-                  Inga rader än. Lägg till vad som ska göras med knappen ovan.
+                  Inget än. Lägg till vad som ska göras med knappen ovan.
                 </p>
               }
             </div>
           }
         </section>
+
+        @if (!linesMode()) {
+          <section class="rounded-xl bg-white p-5 shadow-sm xl:col-span-2">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <h2 class="flex-1 text-base font-semibold">Artiklar</h2>
+              <button mat-stroked-button type="button" [disabled]="locked()" (click)="addPartRow()">
+                <mat-icon>inventory_2</mat-icon> Lägg till artikel
+              </button>
+            </div>
+            <div class="flex flex-col">
+              @for (r of partRows(); track r.row) {
+                <ng-container
+                  *ngTemplateOutlet="
+                    rowTpl;
+                    context: { $implicit: r.row, i: r.i, fixed: false, part: true }
+                  "
+                />
+              } @empty {
+                <p class="text-sm text-gray-500">
+                  Inga artiklar. Sök i lagret för däck, delar och material som ska användas.
+                </p>
+              }
+            </div>
+          </section>
+        }
 
         @if (linesMode()) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -567,7 +595,7 @@ interface JobValue {
       </form>
 
       <!-- En rad: i jobbläget med kod, pris och rabatt; annars som checklista. -->
-      <ng-template #rowTpl let-row let-i="i" let-fixed="fixed">
+      <ng-template #rowTpl let-row let-i="i" let-fixed="fixed" let-part="part">
         <div
           [formGroup]="row"
           class="mt-2 flex flex-col gap-2 rounded-xl border border-transparent p-3"
@@ -577,53 +605,60 @@ interface JobValue {
           [class.bg-green-50]="row.value.done && !row.value.toOrder"
         >
           <div class="flex flex-wrap items-end gap-2">
-            <div class="relative min-w-48 flex-1">
-              <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400"
-                >search</mat-icon
-              >
+            @if (part === false) {
               <input
                 formControlName="description"
-                [matAutocomplete]="auto"
-                (input)="edited(row)"
-                (focus)="typed(row)"
                 autocomplete="off"
-                [placeholder]="
-                  linesMode()
-                    ? 'Sök del i lagret…'
-                    : 'Sök artikel i lagret, eller skriv vad som ska göras…'
-                "
-                class="h-10 w-full pr-3 pl-10 field"
+                placeholder="Vad ska göras, t.ex. Byt bromsbelägg fram"
+                class="h-10 min-w-48 flex-1 px-3 field"
               />
-              <mat-autocomplete
-                #auto="matAutocomplete"
-                (optionSelected)="picked(row, $event.option.value)"
-              >
-                @for (o of suggestions(row); track o.key) {
-                  <mat-option [value]="o.key">
-                    {{ o.label }}
-                    <span class="ml-2 text-xs text-gray-500">{{ o.hint }}</span>
-                  </mat-option>
-                }
-                @if (row.value.description && !row.value.articleId) {
-                  <mat-option
-                    [value]="'n:' + row.value.description"
-                    class="!font-medium !text-brand"
-                  >
-                    + Ny artikel "{{ row.value.description }}"
-                  </mat-option>
-                }
-              </mat-autocomplete>
-            </div>
-            <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
-              Antal
-              <input
-                type="number"
-                min="0"
-                step="0.25"
-                formControlName="quantity"
-                class="h-10 w-16 px-2 text-center text-gray-900 field"
-              />
-            </label>
+            } @else {
+              <div class="relative min-w-48 flex-1">
+                <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400"
+                  >search</mat-icon
+                >
+                <input
+                  formControlName="description"
+                  [matAutocomplete]="auto"
+                  (input)="edited(row)"
+                  (focus)="typed(row)"
+                  autocomplete="off"
+                  [placeholder]="linesMode() ? 'Sök del i lagret…' : 'Sök artikel i lagret…'"
+                  class="h-10 w-full pr-3 pl-10 field"
+                />
+                <mat-autocomplete
+                  #auto="matAutocomplete"
+                  (optionSelected)="picked(row, $event.option.value)"
+                >
+                  @for (o of suggestions(row); track o.key) {
+                    <mat-option [value]="o.key">
+                      {{ o.label }}
+                      <span class="ml-2 text-xs text-gray-500">{{ o.hint }}</span>
+                    </mat-option>
+                  }
+                  @if (row.value.description && !row.value.articleId) {
+                    <mat-option
+                      [value]="'n:' + row.value.description"
+                      class="!font-medium !text-brand"
+                    >
+                      + Ny artikel "{{ row.value.description }}"
+                    </mat-option>
+                  }
+                </mat-autocomplete>
+              </div>
+            }
+            @if (part !== false) {
+              <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+                Antal
+                <input
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  formControlName="quantity"
+                  class="h-10 w-16 px-2 text-center text-gray-900 field"
+                />
+              </label>
+            }
             @if (linesMode()) {
               <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
                 À-pris
@@ -672,7 +707,7 @@ interface JobValue {
               <mat-icon>delete_outline</mat-icon>
             </button>
           </div>
-          @if (!linesMode()) {
+          @if (!linesMode() && part === false) {
             <input
               formControlName="instruction"
               autocomplete="off"
@@ -681,7 +716,7 @@ interface JobValue {
             />
           }
           <div class="flex flex-wrap items-center gap-2 text-sm">
-            @if (!linesMode()) {
+            @if (!linesMode() && part === false) {
               <mat-checkbox
                 [checked]="row.value.done"
                 [disabled]="locked()"
@@ -690,13 +725,15 @@ interface JobValue {
                 Klar
               </mat-checkbox>
             }
-            <mat-checkbox
-              [checked]="row.value.toOrder"
-              [disabled]="locked()"
-              (change)="flip(row, 'toOrder')"
-            >
-              Del saknas, ska beställas
-            </mat-checkbox>
+            @if (part !== false) {
+              <mat-checkbox
+                [checked]="row.value.toOrder"
+                [disabled]="locked()"
+                (change)="flip(row, 'toOrder')"
+              >
+                Del saknas, ska beställas
+              </mat-checkbox>
+            }
             @if (linesMode()) {
               <mat-checkbox
                 [checked]="row.value.noCharge"
@@ -1004,6 +1041,20 @@ export class WorkOrderCard implements OnInit {
     );
   }
 
+  /** Vad som ska göras (utan lagerartikel). Bara i läget med ett pris per order. */
+  taskRows() {
+    return this.rowsOfAll().filter(({ row }) => !row.value.articleId && row.value.type !== 'part');
+  }
+
+  /** Artiklarna som ska användas: rader kopplade till lagret, eller nya som ska få en artikel. */
+  partRows() {
+    return this.rowsOfAll().filter(({ row }) => !!row.value.articleId || row.value.type === 'part');
+  }
+
+  addPartRow() {
+    this.addPart(null);
+  }
+
   /** Alla rader utom systemets (förbrukningsmaterialet visas räknat, inte som rad). */
   rowsOfAll() {
     this.version();
@@ -1129,7 +1180,7 @@ export class WorkOrderCard implements OnInit {
     this.settle();
   }
 
-  addPart(jobId: string) {
+  addPart(jobId: string | null) {
     this.lines.push(
       this.newLine({ type: 'part', jobId, discountPercent: this.customer()?.partsDiscount ?? 0 }),
     );

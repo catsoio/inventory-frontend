@@ -107,7 +107,7 @@ const routes: Routes = [
       },
       {
         path: 'bookkeeping',
-        title: 'Bokföring',
+        title: 'Moms och bokföring',
         canActivate: [adminGuard],
         loadChildren: () =>
           import('./features/bookkeeping/bookkeeping-module').then((m) => m.BookkeepingModule),

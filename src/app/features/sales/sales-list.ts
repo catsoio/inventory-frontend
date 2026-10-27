@@ -5,13 +5,25 @@ import { SalesCardApi } from '../../core/api/sales-card-api';
 import { SalesCardItem } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
+import { STATUS_TEXT, STATUS_TONE, invoiceStatus } from '../../shared/invoice-status';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
 
-const statusOf = (c: SalesCardItem) =>
-  c.status === 'draft' ? 'Utkast' : c.paidAt ? 'Betald' : 'Obetald';
+/** Ett utkast, eller hur det bokförda dokumentet ligger till: betalt, förfallet eller obetalt. */
+const stateOf = (c: SalesCardItem) =>
+  c.status === 'draft'
+    ? null
+    : invoiceStatus({ kind: c.kind ?? 'receipt', dueAt: c.dueAt, paidAt: c.paidAt });
+const statusOf = (c: SalesCardItem) => {
+  const s = stateOf(c);
+  return s ? STATUS_TEXT[s] : 'Utkast';
+};
+const toneOf = (c: SalesCardItem) => {
+  const s = stateOf(c);
+  return s ? STATUS_TONE[s] : 'gray';
+};
 
 const COLS: DtCol<SalesCardItem>[] = [
   { key: 'code', label: 'Nr', value: (c) => c.number },
@@ -49,7 +61,7 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
       [rows]="items()"
       [loading]="loading()"
       newLink="/sales/new"
-      newLabel="Nytt säljkort"
+      newLabel="Ny försäljning"
       emptyText="Inga säljkort än. Skapa ett med knappen, eller från en arbetsorder eller ett däckhotell."
       searchPlaceholder="Sök nummer, kund eller regnr…"
       (search)="q.set($event); load()"
@@ -88,19 +100,13 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
           </div>
           <div class="shrink-0 text-right">
             <div class="font-semibold tabular-nums">{{ kr(c.total) }}</div>
-            <app-pill
-              class="mt-1 inline-block"
-              [tone]="c.status === 'draft' ? 'gray' : c.paidAt ? 'green' : 'amber'"
-              >{{ statusOf(c) }}</app-pill
-            >
+            <app-pill class="mt-1 inline-block" [tone]="toneOf(c)">{{ statusOf(c) }}</app-pill>
           </div>
         </div>
       </ng-template>
       <ng-template #cell let-c="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
-          <app-pill [tone]="c.status === 'draft' ? 'gray' : c.paidAt ? 'green' : 'amber'">{{
-            text
-          }}</app-pill>
+          <app-pill [tone]="toneOf(c)">{{ text }}</app-pill>
         } @else if (col.key === 'code') {
           {{ c.code }}
         } @else {
@@ -115,6 +121,7 @@ export class SalesList {
   readonly router = inject(Router);
   readonly cols = COLS;
   readonly statusOf = statusOf;
+  readonly toneOf = toneOf;
   readonly kr = (ore: number) => kr.transform(ore);
   readonly dateOf = (c: SalesCardItem) => day(c.invoicedAt ?? c.createdAt);
   readonly items = signal<SalesCardItem[]>([]);

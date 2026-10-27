@@ -23,6 +23,16 @@ export interface NavItem {
   only?: 'desktop' | 'mobile';
   /** Markeras också när någon av de här adresserna är öppen (avsnittets flikar och undersidor). */
   match?: string[];
+  /**
+   * Nyckeln till siffran i menyn (`Nav.badges`); standard är adressen. Sätts för en sida som delar
+   * adress med sin grupp (Översikt under Ekonomi) men inte ska visa gruppens siffra.
+   */
+  badge?: string;
+  /**
+   * Undermeny på dator: posten fälls ut i sidomenyn och varje barn är en egen adress. Posten själv
+   * är bara en rubrik som öppnar och stänger; mobilen har ingen sidomeny och använder inte barnen.
+   */
+  children?: NavItem[];
 }
 
 export interface NavSection {
@@ -48,7 +58,7 @@ export interface Badge {
 export const NAV: NavSection[] = [
   { title: '', items: [{ path: '/dashboard', label: 'Hem', icon: 'home', exact: true }] },
   {
-    title: 'Verkstad',
+    title: 'Arbete',
     items: [
       { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month' },
       {
@@ -77,6 +87,19 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    // Det verkstaden ställer in: vem som jobbar, vilka platser som finns och vad man utför.
+    title: 'Verkstad',
+    items: [
+      {
+        path: '/resources',
+        label: 'Mekaniker och platser',
+        icon: 'engineering',
+        only: 'desktop',
+      },
+      { path: '/service-types', label: 'Åtgärder', icon: 'build', only: 'desktop' },
+    ],
+  },
+  {
     title: 'Kunder',
     items: [
       { path: '/customers', label: 'Kunder', icon: 'groups' },
@@ -84,7 +107,7 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    title: 'Pengar',
+    title: 'Försäljning och ekonomi',
     items: [
       {
         path: '/sales',
@@ -92,13 +115,19 @@ export const NAV: NavSection[] = [
         icon: 'point_of_sale',
         match: ['/sales', '/sales-legacy'],
       },
-      // Fakturor och Moms och bokföring är flikar här, inte egna menyval.
+      // Fakturor och de andra ekonomisidorna är undermenyn här. Mobilen har ingen sidomeny och
+      // visar dem som flikar (`FinanceTabs`).
       {
         path: '/finance',
         label: 'Ekonomi',
         icon: 'account_balance_wallet',
         adminOnly: true,
         match: ['/finance', '/bookkeeping'],
+        children: [
+          { path: '/finance', label: 'Översikt', icon: 'monitoring', exact: true, badge: 'none' },
+          { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
+          { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
+        ],
       },
     ],
   },
@@ -111,15 +140,7 @@ export const FOOTER_NAV: NavItem[] = [
     label: 'Register',
     icon: 'dataset',
     only: 'desktop',
-    match: [
-      '/register',
-      '/service-types',
-      '/resources',
-      '/article-types',
-      '/warehouses',
-      '/suppliers',
-      '/activity',
-    ],
+    match: ['/register', '/article-types', '/warehouses', '/suppliers', '/activity'],
   },
 ];
 
@@ -176,6 +197,12 @@ export class Nav {
   /** Hopfälld sidomeny (bara ikoner); valet sparas per webbläsare. */
   readonly collapsed = signal(this.stored('garagestock.sidebar') === 'collapsed');
 
+  /**
+   * Utfällda undermenyer, per post. Det man själv öppnat eller stängt gäller; annars är en grupp
+   * öppen när någon av dess sidor är det. Valet sparas per webbläsare.
+   */
+  private readonly groups = signal<Record<string, boolean>>(this.storedGroups());
+
   private readonly stock = signal<Summary | null>(null);
   private readonly hotel = signal<StorageSummary | null>(null);
   private readonly soldToday = signal<Report | null>(null);
@@ -227,7 +254,8 @@ export class Nav {
     }
     const unpaid = this.unpaidInvoices();
     if (unpaid > 0) {
-      out['/finance'] = {
+      // På Fakturor, och på Ekonomi (gruppens rad när den är hopfälld, och mobilens "Mer").
+      out['/finance/invoices'] = out['/finance'] = {
         text: String(unpaid),
         tone: 'bg-red-100 text-red-800',
         dot: 'bg-red-500',
@@ -266,12 +294,18 @@ export class Nav {
     );
   }
 
-  /** Sidomenyn (dator): filtrerad efter roll och påslagna funktioner. */
+  /** Sidomenyn (dator): filtrerad efter roll och påslagna funktioner, barnen med. */
   readonly sections = computed<NavSection[]>(() => {
     if (this.auth.isMechanic()) return MECHANIC_NAV;
-    return NAV.map((s) => ({ ...s, items: s.items.filter((i) => this.visible(i, false)) })).filter(
-      (s) => s.items.length,
-    );
+    const shown = (i: NavItem): NavItem =>
+      i.children ? { ...i, children: i.children.filter((c) => this.visible(c, false)) } : i;
+    return NAV.map((s) => ({
+      ...s,
+      items: s.items
+        .filter((i) => this.visible(i, false))
+        .map(shown)
+        .filter((i) => !i.children || i.children.length),
+    })).filter((s) => s.items.length);
   });
 
   readonly footer = computed<NavItem[]>(() =>
@@ -290,9 +324,17 @@ export class Nav {
 
   constructor() {
     const done$ = this.router.events.pipe(filter((e) => e instanceof NavigationEnd));
-    done$
-      .pipe(takeUntilDestroyed(inject(DestroyRef)))
-      .subscribe((e) => this.url.set(e.urlAfterRedirects.split(/[?#]/)[0]));
+    done$.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((e) => {
+      this.url.set(e.urlAfterRedirects.split(/[?#]/)[0]);
+      // Kommer man in i en grupp (t.ex. via en länk på Hem) fälls den ut, även om man stängt den förut.
+      for (const s of NAV) {
+        for (const i of s.items) {
+          if (i.children && this.matches(i) && this.groups()[i.path] === false) {
+            this.setGroup(i.path, true);
+          }
+        }
+      }
+    });
     // Siffrorna uppdateras när garaget byts och efter varje sidbyte (t.ex. efter en försäljning),
     // ett anrop per omgång även om flera händer samtidigt.
     merge(toObservable(computed(() => this.auth.garage()?.id)), done$)
@@ -314,6 +356,33 @@ export class Nav {
       return localStorage.getItem(key);
     } catch {
       return null;
+    }
+  }
+
+  /** Är undermenyn utfälld? */
+  isOpen(item: NavItem): boolean {
+    return this.groups()[item.path] ?? this.matches(item);
+  }
+
+  toggleGroup(item: NavItem) {
+    this.setGroup(item.path, !this.isOpen(item));
+  }
+
+  private setGroup(path: string, open: boolean) {
+    this.groups.update((g) => ({ ...g, [path]: open }));
+    try {
+      localStorage.setItem('garagestock.navGroups', JSON.stringify(this.groups()));
+    } catch {
+      /* sparas bara som bekvämlighet */
+    }
+  }
+
+  private storedGroups(): Record<string, boolean> {
+    try {
+      const raw = JSON.parse(this.stored('garagestock.navGroups') ?? '{}');
+      return raw && typeof raw === 'object' ? raw : {};
+    } catch {
+      return {};
     }
   }
 

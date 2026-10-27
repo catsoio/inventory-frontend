@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { Vehicle } from '../../../core/models';
+import { carColorHex } from '../../../shared/car-color';
 import { DtCol } from '../../../shared/data-table/data-table';
 
 const COLS: DtCol<Vehicle>[] = [
@@ -13,6 +14,7 @@ const COLS: DtCol<Vehicle>[] = [
     value: (v) => [v.make, v.model, v.year].filter(Boolean).join(' '),
     fmt: (v) => [v.make, v.model, v.year].filter(Boolean).join(' ') || '–',
   },
+  { key: 'color', label: 'Färg', value: (v) => v.color ?? '', fmt: (v) => v.color || '–' },
   { key: 'owner', label: 'Ägare', value: (v) => v.customer?.name ?? '' },
   { key: 'notes', label: 'Anmärkning', value: (v) => v.notes ?? '', fmt: (v) => v.notes || '–' },
   { key: 'status', label: 'Status', value: (v) => (v.active ? 'Aktiv' : 'Arkiverad') },
@@ -60,6 +62,12 @@ const COLS: DtCol<Vehicle>[] = [
       <ng-template #cell let-v="row" let-col="col" let-text="text">
         @if (col.key === 'regNo') {
           <app-reg-plate [value]="text" size="sm" />
+        } @else if (col.key === 'color' && v.color) {
+          <span
+            class="mr-1.5 inline-block h-3.5 w-3.5 rounded-full align-middle ring-1 ring-black/20"
+            [style.background]="hex(v.color)"
+          ></span
+          >{{ text }}
         } @else if (col.key === 'status') {
           <app-pill [tone]="v.active ? 'green' : 'gray'">{{ text }}</app-pill>
         } @else {
@@ -74,6 +82,7 @@ export class VehicleList {
   private readonly router = inject(Router);
 
   readonly cols = COLS;
+  readonly hex = carColorHex;
   readonly car = (v: Vehicle) => [v.make, v.model, v.year].filter(Boolean).join(' ') || '–';
   readonly items = signal<Vehicle[]>([]);
   readonly loading = signal(true);

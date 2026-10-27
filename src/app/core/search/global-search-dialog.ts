@@ -14,6 +14,7 @@ import {
   switchMap,
   tap,
 } from 'rxjs';
+import { QUICK_ACTIONS } from './quick-actions';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { SharedModule } from '../../shared/shared-module';
 import { InventoryApi } from '../api/inventory-api';
@@ -223,12 +224,7 @@ export class GlobalSearchDialog {
   readonly recent = signal<string[]>(this.loadRecent());
   private readonly flat = computed(() => this.groups().flatMap((g) => g.hits));
 
-  readonly actions = [
-    { label: 'Ny inlämning', icon: 'warehouse', go: ['/storage', 'new'] },
-    { label: 'Ny bokning', icon: 'event', go: null },
-    { label: 'Nytt säljkort', icon: 'point_of_sale', go: ['/sales', 'new'] },
-    { label: 'Ny kund', icon: 'person_add', go: ['/customers', 'new'] },
-  ];
+  readonly actions = QUICK_ACTIONS;
 
   constructor() {
     this.q.valueChanges

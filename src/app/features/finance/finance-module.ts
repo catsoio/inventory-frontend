@@ -16,7 +16,7 @@ import { InvoiceList } from './invoice-list';
       { path: 'invoices', title: 'Fakturor', component: InvoiceList },
       {
         path: 'invoices/new',
-        title: 'Lägg till faktura',
+        title: 'Lägg till gammal faktura',
         component: InvoiceNew,
         canDeactivate: [unsavedGuard],
       },

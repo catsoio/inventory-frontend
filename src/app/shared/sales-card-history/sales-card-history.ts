@@ -1,6 +1,7 @@
 import { Component, Input, OnChanges, inject, signal } from '@angular/core';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { SalesCardItem } from '../../core/models';
+import { STATUS_TEXT, STATUS_TONE, invoiceStatus } from '../invoice-status';
 
 /** Senaste säljkorten för en kund eller en bil; klick öppnar kortet. */
 @Component({
@@ -18,9 +19,7 @@ import { SalesCardItem } from '../../core/models';
           <app-reg-plate [value]="c.regNo" size="sm" />
         }
         <span class="flex-1 truncate text-gray-500">{{ c.invoiceCode ?? '' }}</span>
-        <app-pill [tone]="c.status === 'draft' ? 'gray' : c.paidAt ? 'green' : 'amber'">
-          {{ c.status === 'draft' ? 'Utkast' : c.paidAt ? 'Betald' : 'Obetald' }}
-        </app-pill>
+        <app-pill [tone]="tone(c)">{{ text(c) }}</app-pill>
         <span class="font-medium tabular-nums">{{ c.total | kr }}</span>
       </a>
     } @empty {
@@ -35,6 +34,21 @@ export class SalesCardHistory implements OnChanges {
   @Input() vehicleId?: string;
   @Input() empty = 'Inga säljkort än.';
   readonly cards = signal<SalesCardItem[]>([]);
+
+  /** Utkast, eller hur dokumentet ligger till: betald, förfallen eller obetald. */
+  private state(c: SalesCardItem) {
+    return c.status === 'draft'
+      ? null
+      : invoiceStatus({ kind: c.kind ?? 'receipt', dueAt: c.dueAt, paidAt: c.paidAt });
+  }
+  text(c: SalesCardItem) {
+    const s = this.state(c);
+    return s ? STATUS_TEXT[s] : 'Utkast';
+  }
+  tone(c: SalesCardItem) {
+    const s = this.state(c);
+    return s ? STATUS_TONE[s] : 'gray';
+  }
 
   ngOnChanges() {
     if (!this.customerId && !this.vehicleId) return;

@@ -48,11 +48,12 @@ const ACTION_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-activity',
   standalone: false,
+  host: { class: 'flex h-full flex-col' },
   template: `
-    <h1 class="mb-1 text-2xl font-semibold">Aktivitetslogg</h1>
-    <p class="mb-4 text-sm text-gray-500">Vem som lagt till, ändrat och tagit bort vad.</p>
+    <h1 class="mb-1 shrink-0 text-2xl font-semibold">Aktivitetslogg</h1>
+    <p class="mb-4 shrink-0 text-sm text-gray-500">Vem som lagt till, ändrat och tagit bort vad.</p>
 
-    <mat-form-field class="mb-2 w-60">
+    <mat-form-field class="mb-2 w-60 shrink-0">
       <mat-label>Visa</mat-label>
       <mat-select [value]="entity()" (selectionChange)="filter($event.value)">
         <mat-option [value]="''">Allt</mat-option>
@@ -62,9 +63,10 @@ const ACTION_LABELS: Record<string, string> = {
       </mat-select>
     </mat-form-field>
 
-    <div class="overflow-x-auto rounded-xl bg-white shadow-sm">
+    <!-- Tabellen rullar för sig med rubrikraden kvar; sidan i sig rullar inte. -->
+    <div class="min-h-0 flex-1 overflow-auto rounded-xl bg-white shadow-sm">
       <table class="w-full text-left text-sm">
-        <thead class="border-b border-gray-200 text-xs text-gray-500">
+        <thead class="sticky top-0 border-b border-gray-200 bg-white text-xs text-gray-500">
           <tr>
             <th class="px-4 py-2 font-medium">Tid</th>
             <th class="px-4 py-2 font-medium">Vem</th>
@@ -98,7 +100,12 @@ const ACTION_LABELS: Record<string, string> = {
       </table>
     </div>
     @if (more()) {
-      <button mat-stroked-button class="mt-3" (click)="load(false)" [disabled]="loading()">
+      <button
+        mat-stroked-button
+        class="mt-3 shrink-0 self-start"
+        (click)="load(false)"
+        [disabled]="loading()"
+      >
         Visa fler
       </button>
     }

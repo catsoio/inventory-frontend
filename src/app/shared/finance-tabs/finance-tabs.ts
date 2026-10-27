@@ -3,14 +3,15 @@ import { Auth } from '../../core/auth/auth';
 import type { SectionTab } from '../section-tabs/section-tabs';
 
 /**
- * Flikraden för Ekonomi. Sidomenyn har bara "Ekonomi"; Fakturor och Moms och bokföring ligger
- * här som flikar, inte som egna menyval.
+ * Flikraden för Ekonomi, bara på mobil. På dator är Översikt, Fakturor och Moms och bokföring
+ * undermenyn till Ekonomi i sidomenyn, och en flikrad vore en dubblett. Mobilen har ingen sidomeny
+ * och öppnar Ekonomi från "Mer".
  */
 @Component({
   selector: 'app-finance-tabs',
   standalone: false,
   host: { class: 'block' },
-  template: `<app-section-tabs [tabs]="tabs" label="Ekonomi" />`,
+  template: `<app-section-tabs [tabs]="tabs" label="Ekonomi" [mobileOnly]="true" />`,
 })
 export class FinanceTabs {
   private readonly auth = inject(Auth);

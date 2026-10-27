@@ -1,13 +1,19 @@
 import { appLocale } from '../../core/i18n/locale';
 import { Component, Input } from '@angular/core';
-import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../core/models';
+import { differenceInCalendarDays } from 'date-fns';
+import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
 
 /**
- * Fakturan (till företag) eller kvittot (till privatpersoner) som A4. Allt på sidan är det
- * som frystes när dokumentet utfärdades (säljare, köpare, rader, summor), så det ser
- * likadant ut vid varje utskrift. Innehållet följer kraven på en faktura i mervärdesskattelagen:
- * löpnummer, datum, säljarens momsreg.nr, namn och adress på båda parter, vad som sålts,
- * pris, rabatt, momssats och momsbelopp. Samma dokument används för arbetsorder och säljkort.
+ * Fakturan eller kvittot som A4. Allt på sidan är det som frystes när dokumentet utfärdades
+ * (säljare, köpare, rader, summor), så det ser likadant ut vid varje utskrift. Innehållet följer
+ * kraven på en faktura i mervärdesskattelagen: löpnummer, datum, säljarens momsreg.nr, namn och
+ * adress på båda parter, vad som sålts, pris, rabatt, momssats och momsbelopp. Samma dokument
+ * används för arbetsorder och säljkort.
+ *
+ * En faktura ber kunden betala: förfallodatum, betalningsvillkor, betalningsuppgifter och referens.
+ * Den står aldrig som betald, vad som än hänt med betalningen sedan den skickades (betalningen
+ * hålls i systemet, inte på dokumentet). Ett kvitto är beviset på en betalning: det säger hur och
+ * när det betalades, och har varken förfallodatum eller betalningsuppgifter.
  */
 @Component({
   selector: 'app-invoice-document',
@@ -31,11 +37,6 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
               </div>
             } @else {
               <div class="text-xl font-bold tabular-nums">{{ inv.code }}</div>
-            }
-            @if (inv.paidAt) {
-              <div class="mt-1 inline-block border-2 border-[#4b5563] px-2 font-bold uppercase">
-                Betald
-              </div>
             }
           </div>
         </header>
@@ -65,9 +66,11 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
               <dt class="text-gray-600">Utfört</dt>
               <dd class="tabular-nums">{{ day(inv.supplyDate) }}</dd>
             }
-            @if (inv.dueAt) {
+            @if (inv.kind === 'invoice' && inv.dueAt) {
               <dt class="text-gray-600">Förfallodatum</dt>
               <dd class="font-bold tabular-nums">{{ day(inv.dueAt) }}</dd>
+              <dt class="text-gray-600">Betalningsvillkor</dt>
+              <dd>{{ termsDays(inv) }} dagar netto</dd>
             }
             @for (m of meta; track m[0]) {
               <dt class="text-gray-600">{{ m[0] }}</dt>
@@ -181,27 +184,31 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
           <div
             class="mt-1 flex justify-between gap-6 border-t-2 border-[#4b5563] pt-1 text-lg font-bold"
           >
-            <span>{{ inv.draft ? 'Att betala (utkast)' : 'Att betala' }} inkl. moms</span>
+            <span>{{ totalLabel(inv) }} inkl. moms</span>
             <span class="tabular-nums">{{ inv.totals.total | kr }}</span>
           </div>
         </section>
 
         <section class="mt-10 text-xs">
-          @if (inv.paidAt) {
-            <p>
-              Betald {{ day(inv.paidAt)
-              }}{{ inv.paymentMethod ? ' med ' + payLabels[inv.paymentMethod].toLowerCase() : '' }}.
+          @if (inv.kind === 'invoice') {
+            @if (payTo(inv.seller)) {
+              <p>
+                Betalning till
+                <b>{{ payTo(inv.seller) }}</b
+                >. Ange <b>{{ inv.code ?? 'fakturanumret' }}</b> som referens.
+                @if (inv.dueAt) {
+                  Förfallodatum <b>{{ day(inv.dueAt) }}</b
+                  >.
+                }
+              </p>
+            }
+            <p class="mt-1 text-gray-600">
+              Vid betalning efter förfallodatum debiteras dröjsmålsränta enligt räntelagen.
             </p>
-          } @else if (
-            inv.seller.bankgiro ||
-            inv.seller.bankAccount ||
-            inv.seller.swish ||
-            inv.seller.paymentDetails
-          ) {
+          } @else if (inv.paidAt) {
             <p>
-              Betalning till
-              <b>{{ payTo(inv.seller) }}</b
-              >. {{ inv.code ? 'Ange ' + inv.code + ' som referens.' : '' }}
+              Betalt {{ day(inv.paidAt)
+              }}{{ inv.paymentMethod ? ' ' + paidText(inv.kind, inv.paymentMethod) : '' }}.
             </p>
           }
           @if (inv.seller.footer) {
@@ -233,17 +240,20 @@ import { InvoiceSeller, PAYMENT_METHOD_LABELS, WorkOrderInvoice } from '../../co
             }
           </div>
           <div>
-            @if (inv.seller.bankgiro) {
-              <div>Bankgiro {{ inv.seller.bankgiro }}</div>
-            }
-            @if (inv.seller.bankAccount) {
-              <div>Bankkonto {{ inv.seller.bankAccount }}</div>
-            }
-            @if (inv.seller.swish) {
-              <div>Betala med Swish {{ inv.seller.swish }}</div>
-            }
-            @if (inv.seller.paymentDetails) {
-              <div>{{ inv.seller.paymentDetails }}</div>
+            <!-- Betalningsuppgifter hör till en faktura; ett kvitto är redan betalt. -->
+            @if (inv.kind === 'invoice') {
+              @if (inv.seller.bankgiro) {
+                <div>Bankgiro {{ inv.seller.bankgiro }}</div>
+              }
+              @if (inv.seller.bankAccount) {
+                <div>Bankkonto {{ inv.seller.bankAccount }}</div>
+              }
+              @if (inv.seller.swish) {
+                <div>Betala med Swish {{ inv.seller.swish }}</div>
+              }
+              @if (inv.seller.paymentDetails) {
+                <div>{{ inv.seller.paymentDetails }}</div>
+              }
             }
           </div>
         </footer>
@@ -255,7 +265,18 @@ export class InvoiceDocument {
   @Input() doc: WorkOrderInvoice | null = null;
   /** Referensrader högst upp till höger, t.ex. ["Arbetsorder", "AO-00002"]. */
   @Input() meta: [string, string][] = [];
-  readonly payLabels = PAYMENT_METHOD_LABELS;
+  readonly paidText = paidWith;
+
+  /** Dagar från fakturadatum till förfallodatum: betalningsvillkoret. */
+  termsDays(inv: WorkOrderInvoice) {
+    return inv.dueAt ? differenceInCalendarDays(new Date(inv.dueAt), new Date(inv.issuedAt)) : 0;
+  }
+
+  /** Summaraden: en faktura ber om pengar, ett kvitto visar vad som betalats. */
+  totalLabel(inv: WorkOrderInvoice) {
+    const label = inv.kind === 'invoice' ? 'Att betala' : 'Totalt';
+    return inv.draft ? `${label} (utkast)` : label;
+  }
 
   /** Betalningssätten i en rad: "Bankgiro 123-4567, Swish 123 456 78 90". */
   payTo(s: InvoiceSeller): string {

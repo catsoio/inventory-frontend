@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
+import { PageTitle } from '../../../core/page-title';
 import { WorkOrderDetail, WorkOrderInvoice } from '../../../core/models';
 
 /**
@@ -40,6 +41,7 @@ import { WorkOrderDetail, WorkOrderInvoice } from '../../../core/models';
 })
 export class WorkOrderInvoicePage implements OnInit {
   private readonly api = inject(WorkOrderApi);
+  private readonly pageTitle = inject(PageTitle);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
   readonly order = signal<WorkOrderDetail | null>(null);
   /** Det bokförda dokumentet, annars utkastet från förhandsvisningen. */
@@ -49,12 +51,19 @@ export class WorkOrderInvoicePage implements OnInit {
   ngOnInit() {
     this.api.get(this.id).subscribe((o) => {
       this.order.set(o);
-      if (o.invoice) return this.document.set(o.invoice);
+      if (o.invoice) return this.show(o.invoice);
       this.api.invoicePreview(this.id).subscribe({
-        next: (d) => this.document.set(d),
+        next: (d) => this.show(d),
         error: (e) => this.error.set(e?.error?.message ?? 'Kunde inte skapa utkastet.'),
       });
     });
+  }
+
+  private show(d: WorkOrderInvoice) {
+    this.document.set(d);
+    this.pageTitle.page.set(
+      `${d.kind === 'invoice' ? 'Faktura' : 'Kvitto'} ${d.code ?? '(utkast)'}`,
+    );
   }
 
   meta(o: WorkOrderDetail): [string, string][] {

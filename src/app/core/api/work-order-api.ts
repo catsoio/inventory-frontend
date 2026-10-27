@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AnswerMethod,
+  InvoiceKind,
   Page,
   PaymentMethod,
   WorkOrder,
@@ -109,7 +110,10 @@ export class WorkOrderApi {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/jobs/${jobId}/approval`, body);
   }
 
-  /** Lägger till en gammal faktura/kvitto: skapar en klar order och bokför den direkt. */
+  /**
+   * Lägger till en gammal faktura/kvitto: skapar en klar order och bokför den direkt. Ett kvitto
+   * är alltid betalt och måste säga hur (`method`); en faktura kan vara betald eller obetald.
+   */
   importInvoice(body: {
     customerId: string;
     vehicleId: string;
@@ -117,6 +121,9 @@ export class WorkOrderApi {
     performed: string;
     price: number;
     warranty?: string;
+    kind?: InvoiceKind;
+    /** Dagar till förfallodatum (faktura). Standard: betalningsvillkoren i Företaget. */
+    paymentTermsDays?: number;
     paid?: boolean;
     method?: string;
   }): Observable<WorkOrderDetail> {
@@ -133,9 +140,18 @@ export class WorkOrderApi {
     return this.http.post<WorkOrderDetail>(`${this.base}/${id}/invoice`, { supplyDate });
   }
 
-  /** Markera fakturan betald (och hur) eller ångra. */
-  setPaid(id: string, paid: boolean, method?: PaymentMethod): Observable<WorkOrderDetail> {
-    return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/payment`, { paid, method });
+  /** Markera fakturan betald (hur, och vilken dag; annars i dag) eller ångra. */
+  setPaid(
+    id: string,
+    paid: boolean,
+    method?: PaymentMethod,
+    paidAt?: string,
+  ): Observable<WorkOrderDetail> {
+    return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/payment`, {
+      paid,
+      method,
+      paidAt,
+    });
   }
 
   remove(id: string): Observable<unknown> {

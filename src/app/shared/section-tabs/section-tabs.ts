@@ -19,7 +19,9 @@ const IGNORE = { queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ign
 @Component({
   selector: 'app-section-tabs',
   standalone: false,
-  host: { '[class]': "desktopOnly() ? 'block max-md:hidden' : 'block'" },
+  host: {
+    '[class]': "desktopOnly() ? 'block max-md:hidden' : mobileOnly() ? 'block md:hidden' : 'block'",
+  },
   styles: `
     .tab.is-active {
       border-color: var(--mat-sys-primary);
@@ -57,4 +59,6 @@ export class SectionTabs {
   readonly label = input('Avsnitt');
   /** Bara på dator: vyer som är för uppföljning, inte för snabba slag i mobilen. */
   readonly desktopOnly = input(false);
+  /** Bara på mobil: på dator ligger sidorna som undermeny i sidomenyn, så flikarna vore en dubblett. */
+  readonly mobileOnly = input(false);
 }

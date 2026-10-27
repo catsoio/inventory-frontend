@@ -359,6 +359,17 @@ export interface GarageInvite {
 export type StorageStatus = 'stored' | 'picked_up';
 export type PaymentStatus = 'unpaid' | 'paid';
 export type PaymentMethod = 'cash' | 'card' | 'swish' | 'invoice';
+/** Faktura = kunden betalar senare (förfallodatum, betalningsuppgifter). Kvitto = betalt på stället. */
+export type InvoiceKind = 'invoice' | 'receipt';
+
+/** Vad verkstaden väljer när ett säljkort bokförs (eller förhandsgranskas). Utan val följer det kunden. */
+export interface DocumentChoice {
+  kind?: InvoiceKind;
+  /** Dagar till förfallodatum på en faktura. Standard: betalningsvillkoren under Företaget. */
+  paymentTermsDays?: number;
+  /** Hur ett kvitto betalades; ett kvitto är betalt direkt. En faktura betalas senare. */
+  paymentMethod?: PaymentMethod;
+}
 export type StorageContents = 'tyres' | 'rims' | 'complete_wheels';
 export type StorageAccessory = 'hubcaps' | 'locking_nuts' | 'wheel_bolts' | 'tpms';
 
@@ -378,6 +389,46 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   swish: 'Swish',
   invoice: 'Faktura',
 };
+
+/**
+ * Betalsätten för ett dokument. Ett kvitto är betalt på stället (kort, kontant, Swish). En faktura
+ * betalas oftast in på banken, vilket här heter "Faktura" som betalsätt: betalt mot fakturan.
+ */
+export function paymentOptions(kind: InvoiceKind): [PaymentMethod, string][] {
+  return kind === 'receipt'
+    ? [
+        ['card', PAYMENT_METHOD_LABELS.card],
+        ['cash', PAYMENT_METHOD_LABELS.cash],
+        ['swish', PAYMENT_METHOD_LABELS.swish],
+      ]
+    : [
+        ['invoice', paymentLabel('invoice', 'invoice')],
+        ['swish', PAYMENT_METHOD_LABELS.swish],
+        ['card', PAYMENT_METHOD_LABELS.card],
+        ['cash', PAYMENT_METHOD_LABELS.cash],
+      ];
+}
+
+/** Hur en betalning läses i en mening: "Betalt med kort", "Betalt kontant", "Betalt via bank". */
+export function paidWith(kind: InvoiceKind | null | undefined, method: PaymentMethod): string {
+  switch (method) {
+    case 'cash':
+      return 'kontant';
+    case 'card':
+      return 'med kort';
+    case 'swish':
+      return 'med Swish';
+    default:
+      return kind === 'invoice' ? 'via bank' : 'mot faktura';
+  }
+}
+
+/** Betalsättets namn på ett dokument: på en faktura är "Faktura" en inbetalning till banken. */
+export function paymentLabel(kind: InvoiceKind | null | undefined, method: PaymentMethod): string {
+  return kind === 'invoice' && method === 'invoice'
+    ? 'Bank / bankgiro'
+    : PAYMENT_METHOD_LABELS[method];
+}
 
 export const STORAGE_CONTENTS_LABELS: Record<StorageContents, string> = {
   tyres: 'Däck',
@@ -807,6 +858,8 @@ export interface Vehicle {
   model: string | null;
   year: number | null;
   vin: string | null;
+  /** Färgen enligt fordonsregistret, t.ex. "Svart". */
+  color?: string | null;
   /** Däckdimension, t.ex. "205/55 R16". */
   tyreSize?: string | null;
   rimSize?: string | null;
@@ -1010,16 +1063,17 @@ export interface InvoiceBuyer {
   city: string | null;
 }
 
-/** Fakturan (företag) eller kvittot (privat) som låser ordern. */
+/** Fakturan eller kvittot som låser ordern eller säljkortet. */
 export interface WorkOrderInvoice {
   /** FAK-00042. Null på ett utkast som inte är bokfört. */
   code: string | null;
   number?: number;
   /** Sant för förhandsvisningen: inget nummer, inget sparat, ordern går att ändra. */
   draft?: boolean;
-  kind: 'invoice' | 'receipt';
+  kind: InvoiceKind;
   issuedAt: string;
   supplyDate: string;
+  /** Förfallodatum. Bara en faktura har ett. */
   dueAt: string | null;
   seller: InvoiceSeller;
   buyer: InvoiceBuyer;
@@ -1227,7 +1281,13 @@ export interface WorkOrder {
   /** FAK-00042 när ordern är fakturerad (då är den låst). */
   invoiceCode?: string | null;
   invoicedAt?: string | null;
+  /** Vad dokumentet är och vad det begär, för fakturalistan. */
+  invoiceKind?: InvoiceKind | null;
+  invoiceDueAt?: string | null;
+  /** Att betala enligt dokumentet, öre inkl. moms. */
+  invoiceTotal?: number | null;
   paidAt?: string | null;
+  paymentMethod?: PaymentMethod | null;
 }
 
 export interface WorkOrderDetail extends WorkOrder {
@@ -1379,15 +1439,18 @@ export interface SalesCardItem {
   /** FAK-00042 när kortet är bokfört. */
   invoiceCode: string | null;
   invoicedAt: string | null;
+  /** Förfallodatum, när kortet blev en faktura. */
+  dueAt: string | null;
   paidAt: string | null;
-  kind: 'invoice' | 'receipt' | null;
+  paymentMethod: PaymentMethod | null;
+  kind: InvoiceKind | null;
   note: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SalesCardLinks {
-  customer: { id: string; code: string; name: string } | null;
+  customer: { id: string; code: string; name: string; type: CustomerType } | null;
   vehicle: { id: string; regNo: string; label: string | null } | null;
   workOrder: { id: string; code: string } | null;
   deposits: { id: string; code: string; regNo: string }[];

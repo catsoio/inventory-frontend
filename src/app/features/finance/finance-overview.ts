@@ -13,7 +13,7 @@ import { bars, columns, fmtKr, kronor, line, tickKr } from '../../shared/chart/c
 import { ACCENT, OTHER } from '../../shared/chart/chart-theme';
 import type { PanelTable } from '../../shared/panel/panel';
 import { delta } from '../../shared/stat/stat';
-import { InvoiceItem, loadInvoices } from './invoices';
+import { InvoiceItem, invoiceFigures, loadInvoices } from './invoices';
 
 const MONTHS = 12;
 
@@ -40,9 +40,10 @@ const sameMonth = (iso: string | null | undefined, d: Date) => {
       <app-stat
         label="Obetalt"
         [value]="loaded() ? kr(unpaidSum()) : '–'"
-        [hint]="loaded() ? unpaidCount() + ' fakturor, inkl. moms' : ''"
-        [status]="unpaidCount() ? 'warn' : 'none'"
+        [hint]="unpaidHint()"
+        [status]="overdueCount() ? 'bad' : unpaidCount() ? 'warn' : 'none'"
         link="/finance/invoices"
+        [params]="{ status: 'unpaid' }"
       />
       <app-stat
         label="Fakturerat i månaden"
@@ -159,9 +160,19 @@ export class FinanceOverview {
 
   // --- att hantera ---
 
-  private readonly unpaid = computed(() => this.invoices().filter((o) => !o.paidAt));
-  readonly unpaidSum = computed(() => this.unpaid().reduce((s, o) => s + o.total, 0));
-  readonly unpaidCount = computed(() => this.unpaid().length);
+  private readonly figures = computed(() => invoiceFigures(this.invoices()));
+  readonly unpaidSum = computed(() => this.figures().unpaid.sum);
+  readonly unpaidCount = computed(() => this.figures().unpaid.count);
+  readonly overdueCount = computed(() => this.figures().overdue.count);
+  /** "5 fakturor, varav 2 förfallna": det som är sent är det som ägaren behöver agera på. */
+  readonly unpaidHint = computed(() => {
+    if (!this.loaded()) return '';
+    const n = this.unpaidCount();
+    const late = this.overdueCount();
+    return `${n} ${n === 1 ? 'faktura' : 'fakturor'}${
+      late ? `, varav ${late} ${late === 1 ? 'förfallen' : 'förfallna'}` : ''
+    }`;
+  });
 
   private gross(month: Date): number {
     return this.invoices()
