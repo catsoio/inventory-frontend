@@ -101,7 +101,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
     >
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
-          @if (c.status === 'draft' && !c.reservedDocumentCode) {
+          @if (c.status === 'draft') {
             <button
               mat-icon-button
               class="!text-red-700"
@@ -142,7 +142,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
           {{ card()!.reservedKind === 'invoice' ? 'en faktura' : 'ett kvitto' }},
           {{ card()!.reservedDocumentCode }}. Rätta det som är fel och bokför igen som
           {{ card()!.reservedKind === 'invoice' ? 'faktura' : 'kvitto' }}: samma nummer används på
-          nytt. Kortet går inte att ta bort, eftersom numret redan är utfärdat.
+          nytt. Tar du bort kortet används inte numret igen.
         </p>
       }
 
@@ -1346,7 +1346,9 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.confirm
       .ask({
         title: `Ta bort ${c.code}?`,
-        message: 'Utkastet raderas. Inget har bokförts.',
+        message: c.reservedDocumentCode
+          ? `Utkastet raderas. ${c.reservedDocumentCode} har redan använts och används inte igen.`
+          : 'Utkastet raderas. Inget har bokförts.',
         confirmText: 'Ta bort',
         danger: true,
       })
