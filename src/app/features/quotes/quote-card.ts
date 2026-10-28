@@ -186,7 +186,9 @@ const TONES: Record<QuoteShownStatus, 'gray' | 'amber' | 'green' | 'red'> = {
           </mat-form-field>
         </section>
 
-        <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
+        <section
+          class="grid content-start gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6"
+        >
           <h2 class="mb-2 flex items-center gap-2 text-base font-semibold sm:col-span-6">
             Offert
             @if (card(); as c) {
