@@ -6,14 +6,16 @@ import { FinanceOverview } from './finance-overview';
 import { InvoiceNew } from './invoice-new';
 import { InvoiceCard } from './invoice-card';
 import { InvoiceList } from './invoice-list';
+import { ReceiptList } from './receipt-list';
 
 @NgModule({
-  declarations: [FinanceOverview, InvoiceList, InvoiceCard, InvoiceNew],
+  declarations: [FinanceOverview, InvoiceList, ReceiptList, InvoiceCard, InvoiceNew],
   imports: [
     SharedModule,
     RouterModule.forChild([
       { path: '', component: FinanceOverview },
       { path: 'invoices', title: 'Fakturor', component: InvoiceList },
+      { path: 'receipts', title: 'Kvitton', component: ReceiptList },
       {
         path: 'invoices/new',
         title: 'Lägg till gammal faktura',

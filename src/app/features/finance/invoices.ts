@@ -35,6 +35,12 @@ export interface InvoiceFigures {
   paidRecently: { count: number; sum: number };
 }
 
+/** Fakturorna (kundreskontran): det som betalas senare. Ett kvitto är betalt på stället och hör inte dit. */
+export const onlyInvoices = (items: InvoiceItem[]) => items.filter((o) => o.kind === 'invoice');
+
+/** Kvittona: försäljning som betalades på stället. */
+export const onlyReceipts = (items: InvoiceItem[]) => items.filter((o) => o.kind === 'receipt');
+
 export function invoiceFigures(
   items: InvoiceItem[],
   today = new Date(),
@@ -45,7 +51,7 @@ export function invoiceFigures(
     overdue: { count: 0, sum: 0, oldestDays: 0 },
     paidRecently: { count: 0, sum: 0 },
   };
-  for (const o of items) {
+  for (const o of onlyInvoices(items)) {
     const status = invoiceStatus(o, today);
     if (status === 'paid') {
       if (o.paidAt && differenceInCalendarDays(today, new Date(o.paidAt)) < days) {
@@ -109,7 +115,7 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
         id: c.id,
         source: 'card',
         kind: c.kind ?? (c.dueAt ? 'invoice' : 'receipt'),
-        code: c.invoiceCode ?? c.code,
+        code: c.documentCode ?? c.code,
         invoicedAt: c.invoicedAt,
         dueAt: c.dueAt ?? null,
         paidAt: c.paidAt,

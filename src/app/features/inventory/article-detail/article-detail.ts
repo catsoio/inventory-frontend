@@ -50,7 +50,10 @@ type Field = [label: string, value: string | number];
           <button mat-flat-button (click)="act('receive')">
             <mat-icon>add_box</mat-icon> Inköp
           </button>
-          <button mat-flat-button (click)="act('sell')"><mat-icon>sell</mat-icon> Sälj</button>
+          <!-- All försäljning går via ett säljkort (kund, pris, kvitto eller faktura). -->
+          <a mat-flat-button routerLink="/sales/new" [queryParams]="{ articleId: a.id }"
+            ><mat-icon>sell</mat-icon> Sälj</a
+          >
           <button mat-stroked-button (click)="act('return')">
             <mat-icon>undo</mat-icon> Retur
           </button>

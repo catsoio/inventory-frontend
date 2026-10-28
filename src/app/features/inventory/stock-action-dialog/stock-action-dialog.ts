@@ -15,7 +15,6 @@ export interface StockActionData {
 
 const TITLES: Record<StockAction, string> = {
   receive: 'Inköp',
-  sell: 'Sälj',
   return: 'Retur',
   'write-off': 'Kassera',
   adjust: 'Räkna om',
@@ -81,21 +80,6 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
             ><mat-label>Leverantör</mat-label><input matInput formControlName="supplier"
           /></mat-form-field>
         }
-        @if (data.action === 'sell') {
-          <mat-form-field
-            ><mat-label>Pris per styck (kr, inkl. moms)</mat-label>
-            <input
-              matInput
-              type="number"
-              inputmode="decimal"
-              step="0.01"
-              min="0"
-              formControlName="unitPrice"
-              (focus)="$any($event.target).select()"
-            />
-            <mat-hint>{{ form.controls.unitPrice.value | vatPart }}</mat-hint></mat-form-field
-          >
-        }
         <mat-form-field
           ><mat-label>Referens (t.ex. ordernr)</mat-label
           ><input matInput formControlName="reference"
@@ -131,8 +115,7 @@ export class StockActionDialog {
 
   total(): number | null {
     const v = this.form.getRawValue();
-    const unit =
-      this.data.action === 'sell' ? v.unitPrice : this.data.action === 'receive' ? v.unitCost : '';
+    const unit = this.data.action === 'receive' ? v.unitCost : '';
     const q = Number(v.quantity);
     return unit === '' || !q ? null : Math.round(q * Number(unit) * 100);
   }
@@ -143,7 +126,7 @@ export class StockActionDialog {
     this.title = TITLES[data.action];
     const fb = inject(FormBuilder).nonNullable;
     const art = data.article;
-    const outgoing = data.action === 'sell' || data.action === 'write-off';
+    const outgoing = data.action === 'write-off';
     const kr = (ore: number) => (ore > 0 ? String(ore / 100) : '');
     this.form = fb.group({
       quantity: [
@@ -156,7 +139,6 @@ export class StockActionDialog {
         kr(inject(Pricing).costIncl(art.averageCost ?? 0)),
         [Validators.required, Validators.min(0)],
       ],
-      unitPrice: [kr(art.sellPrice), [Validators.min(0)]],
       supplier: [art.supplier ?? ''],
       reference: [''],
       note: [''],
@@ -166,7 +148,6 @@ export class StockActionDialog {
     if (a === 'adjust') c.quantity.disable();
     else c.countedQuantity.disable();
     if (a !== 'receive') c.unitCost.disable();
-    if (a !== 'sell') c.unitPrice.disable();
     if (a !== 'receive') c.supplier.disable();
   }
 
@@ -182,11 +163,6 @@ export class StockActionDialog {
         quantity: q,
         unitCost: this.pricing.costNet(ore(v.unitCost)),
         supplier: v.supplier || undefined,
-        ...common,
-      },
-      sell: {
-        quantity: q,
-        unitPrice: v.unitPrice === '' ? undefined : ore(v.unitPrice),
         ...common,
       },
       return: { quantity: q, ...common },

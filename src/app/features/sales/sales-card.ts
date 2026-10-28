@@ -1,6 +1,7 @@
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { addDays, format } from 'date-fns';
@@ -14,6 +15,7 @@ import {
 } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
+import { Auth } from '../../core/auth/auth';
 import { StorageApi } from '../../core/api/storage-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import {
@@ -29,13 +31,15 @@ import {
   SalesCardInput,
   SalesLineType,
   SalesSection,
+  SellerDetails,
   ServiceType,
   StorageDeposit,
 } from '../../core/models';
 import { Pricing } from '../../core/pricing';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
-import { invoiceGap } from '../../shared/invoice-gap';
+import { Gap, invoiceGap, sellerGap } from '../../shared/invoice-gap';
+import { openSettings } from '../settings/settings';
 import { dueNote } from '../../shared/invoice-status';
 import { type PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
@@ -97,7 +101,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
     >
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
-          @if (c.status === 'draft') {
+          @if (c.status === 'draft' && !c.reservedDocumentCode) {
             <button
               mat-icon-button
               class="!text-red-700"
@@ -109,6 +113,17 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             </button>
           }
           @if (c.status === 'posted') {
+            @if (isOwner) {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() || !!reopenBlocked(c)"
+                [matTooltip]="reopenBlocked(c) || 'Tar tillbaka kortet till ett utkast'"
+                (click)="reopen()"
+              >
+                <mat-icon>undo</mat-icon> Återöppna
+              </button>
+            }
             <a mat-stroked-button [routerLink]="['/sales', c.id, 'invoice']">
               <mat-icon>print</mat-icon> Visa / skriv ut
             </a>
@@ -121,9 +136,22 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         }
       </div>
 
+      @if (card()?.status === 'draft' && card()?.reservedDocumentCode) {
+        <p class="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          <b>Återöppnat.</b> Kortet var
+          {{ card()!.reservedKind === 'invoice' ? 'en faktura' : 'ett kvitto' }},
+          {{ card()!.reservedDocumentCode }}. Rätta det som är fel och bokför igen som
+          {{ card()!.reservedKind === 'invoice' ? 'faktura' : 'kvitto' }}: samma nummer används på
+          nytt. Kortet går inte att ta bort, eftersom numret redan är utfärdat.
+        </p>
+      }
+
       @if (card()?.status === 'posted') {
         <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
-          <b>Bokfört som {{ card()!.invoiceCode }}.</b>
+          <b
+            >Bokfört som {{ card()!.kind === 'invoice' ? 'faktura' : 'kvitto' }}
+            {{ card()!.documentCode }}.</b
+          >
           Kortet är låst: rader, priser och rabatt kan inte ändras (ett utfärdat dokument får inte
           ändras i efterhand). Betalningen går att ändra.
         </p>
@@ -493,25 +521,30 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             <h2 class="mb-1 text-base font-semibold">Bokför</h2>
             <p class="mb-3 text-sm text-gray-600">
               Vad ska kunden få? Vid bokföring minskar lagret för artiklarna på raderna och
-              dokumentet får sitt nummer. Därefter går kortet inte att ändra, och kvitto kan inte
-              göras om till faktura. Tills dess kan du förhandsgranska utkastet.
+              dokumentet får sitt nummer i sin egen serie. Därefter går kortet inte att ändra, och
+              ett kvitto kan inte göras om till en faktura. Tills dess kan du förhandsgranska
+              utkastet.
             </p>
             <mat-radio-group
               class="mb-4 grid gap-3 sm:grid-cols-2"
               aria-label="Vad kunden får"
               [value]="kind()"
+              [disabled]="!!c.reservedKind"
               (change)="docKind.set($event.value)"
             >
               <label class="choice" [class.is-on]="kind() === 'invoice'">
                 <mat-radio-button value="invoice" class="font-medium">Faktura</mat-radio-button>
                 <span class="choice-text"
-                  >Kunden betalar senare, inom betalningsvillkoren. Passar företag och större
-                  jobb.</span
+                  >Kunden betalar senare, inom betalningsvillkoren. Får ett fakturanummer (FAK-) och
+                  hamnar under Fakturor. Passar företag och större jobb.</span
                 >
               </label>
               <label class="choice" [class.is-on]="kind() === 'receipt'">
                 <mat-radio-button value="receipt" class="font-medium">Kvitto</mat-radio-button>
-                <span class="choice-text">Kunden betalar nu. Kvittot är betalt direkt.</span>
+                <span class="choice-text"
+                  >Kunden betalar nu. Får ett kvittonummer (KV-) och hamnar under Kvitton, inte
+                  bland fakturorna.</span
+                >
               </label>
             </mat-radio-group>
             @if (kind() === 'invoice') {
@@ -529,9 +562,6 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
                 </mat-form-field>
               </div>
-              @if (invoiceBlocker(); as why) {
-                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{{ why }}</p>
-              }
             } @else {
               <mat-form-field class="w-56" subscriptSizing="dynamic">
                 <mat-label>Betalsätt</mat-label>
@@ -551,6 +581,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 kassaregister. Kontrollera med Skatteverket eller er revisor.
               </p>
             }
+            @if (blocker(); as b) {
+              <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
+            }
             @if (dirty()) {
               <p class="mt-3 text-sm text-gray-500">Spara ändringarna först.</p>
             }
@@ -559,7 +592,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 mat-flat-button
                 color="primary"
                 type="button"
-                [disabled]="dirty() || busy() || !rows().length || !!invoiceBlocker()"
+                [disabled]="dirty() || busy() || !rows().length || !!blocker()"
                 (click)="post()"
               >
                 <mat-icon>receipt_long</mat-icon>
@@ -575,58 +608,68 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               </a>
             </div>
           </section>
-        } @else if (c.invoice; as inv) {
+        } @else if (c.document; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold">
               {{ inv.kind === 'invoice' ? 'Betalning av fakturan' : 'Betalning' }}
             </h2>
-            @if (inv.kind === 'invoice' && inv.dueAt) {
-              <p class="mb-3 text-sm text-gray-600">
-                Förfaller <b>{{ inv.dueAt | date: 'yyyy-MM-dd' }}</b>
-                @if (late(inv)) {
-                  <span class="font-medium text-red-700"> · {{ late(inv) }}</span>
-                } @else if (!inv.paidAt) {
-                  <span> · {{ dueNote(inv) }}</span>
-                }
-              </p>
-            }
-            <div class="flex flex-wrap items-center gap-3">
-              @if (inv.paidAt) {
+            @if (inv.kind === 'receipt') {
+              <!-- Ett kvitto är betalt när det utfärdas: det finns ingenting att registrera efteråt. -->
+              <div class="flex flex-wrap items-center gap-3">
                 <app-pill tone="green"
-                  >Betald {{ inv.paidAt | date: 'yyyy-MM-dd' }}
+                  >Betalt {{ inv.paidAt | date: 'yyyy-MM-dd' }}
                   @if (inv.paymentMethod) {
                     · {{ payLabel(inv.kind, inv.paymentMethod) }}
                   }
                 </app-pill>
-                <button mat-button type="button" (click)="setPaid(false)">Ångra betalning</button>
-              } @else {
-                <mat-form-field subscriptSizing="dynamic" class="w-48">
-                  <mat-label>Betalsätt</mat-label>
-                  <mat-select [value]="payMethod()" (selectionChange)="payMethod.set($event.value)">
-                    @for (m of payOptions(); track m[0]) {
-                      <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <app-date-field
-                  class="w-48"
-                  label="Betaldatum"
-                  subscript="dynamic"
-                  [max]="today"
-                  [formControl]="paidOn"
-                />
-                <button mat-flat-button color="primary" type="button" (click)="setPaid(true)">
-                  Markera betald
-                </button>
+                <span class="text-sm text-gray-600"
+                  >Ett kvitto är betalt när det utfärdas. Blev det fel: återöppna kortet.</span
+                >
+              </div>
+            } @else {
+              @if (inv.dueAt) {
+                <p class="mb-3 text-sm text-gray-600">
+                  Förfaller <b>{{ inv.dueAt | date: 'yyyy-MM-dd' }}</b>
+                  @if (late(inv)) {
+                    <span class="font-medium text-red-700"> · {{ late(inv) }}</span>
+                  } @else if (!inv.paidAt) {
+                    <span> · {{ dueNote(inv) }}</span>
+                  }
+                </p>
               }
-            </div>
-            @if (inv.kind === 'receipt' && !inv.paidAt) {
-              <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
-                kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
-                prisbasbelopp inkl. moms (236 800 kr för 2026). Det här systemet är inget
-                kassaregister. Kontrollera med Skatteverket eller er revisor.
-              </p>
+              <div class="flex flex-wrap items-center gap-3">
+                @if (inv.paidAt) {
+                  <app-pill tone="green"
+                    >Betald {{ inv.paidAt | date: 'yyyy-MM-dd' }}
+                    @if (inv.paymentMethod) {
+                      · {{ payLabel(inv.kind, inv.paymentMethod) }}
+                    }
+                  </app-pill>
+                  <button mat-button type="button" (click)="setPaid(false)">Ångra betalning</button>
+                } @else {
+                  <mat-form-field subscriptSizing="dynamic" class="w-48">
+                    <mat-label>Betalsätt</mat-label>
+                    <mat-select
+                      [value]="payMethod()"
+                      (selectionChange)="payMethod.set($event.value)"
+                    >
+                      @for (m of payOptions(); track m[0]) {
+                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <app-date-field
+                    class="w-48"
+                    label="Betaldatum"
+                    subscript="dynamic"
+                    [max]="today"
+                    [formControl]="paidOn"
+                  />
+                  <button mat-flat-button color="primary" type="button" (click)="setPaid(true)">
+                    Markera betald
+                  </button>
+                }
+              </div>
             }
           </section>
         }
@@ -677,6 +720,10 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   private readonly links = inject(LinkResolver);
   private readonly snack = inject(MatSnackBar);
   private readonly confirm = inject(Confirm);
+  private readonly dialog = inject(MatDialog);
+  private readonly auth = inject(Auth);
+  /** Bara ägaren återöppnar ett bokfört kort. */
+  readonly isOwner = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
@@ -723,6 +770,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly kind = computed<InvoiceKind>(
     () =>
       this.card()?.kind ??
+      // Ett återöppnat kort är samma dokument igen: numret hör till dess serie.
+      this.card()?.reservedKind ??
       this.docKind() ??
       (this.customer()?.type === 'company' ? 'invoice' : 'receipt'),
   );
@@ -738,15 +787,51 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly dueDate = computed(() => ymd(addDays(new Date(), this.terms())));
   readonly receiptMethod = signal<PaymentMethod>('card');
 
-  /** Det som hindrar en faktura just nu, med vad man ska göra åt det. En faktura ska nå någon. */
-  readonly invoiceBlocker = computed(() => {
+  /** Verkstadens egna uppgifter (Inställningar → Företaget): varje faktura och kvitto bär dem. */
+  private readonly seller = signal<SellerDetails | null>(null);
+  /** Valet som löser en faktura som inte går att skriva: ett kvitto kräver varken kund eller adress. */
+  private readonly receiptFix = {
+    label: 'Bokför som kvitto',
+    icon: 'receipt',
+    click: () => this.docKind.set('receipt'),
+  };
+
+  /**
+   * Det som hindrar bokföring just nu, med en knapp dit det rättas. Först verkstadens egna uppgifter
+   * (gäller faktura och kvitto), sedan en faktura som behöver en kund med adress.
+   */
+  readonly blocker = computed<Gap | null>(() => {
+    const own = sellerGap(this.seller(), this.isOwner, () => this.openCompanySettings());
+    if (own) return own;
     if (this.kind() !== 'invoice') return null;
     const l = this.link();
     if (!l?.customerId && !l?.pending?.customerId && !l?.pending?.customerName) {
-      return 'En faktura behöver en kund. Välj kund högst upp, eller bokför som kvitto.';
+      return {
+        text: 'En faktura behöver en kund. Välj kund högst upp, eller bokför som kvitto.',
+        fixes: [this.receiptFix],
+      };
     }
-    return invoiceGap(this.customer());
+    const gap = invoiceGap(this.customer());
+    return gap && { ...gap, fixes: [...gap.fixes, this.receiptFix] };
   });
+
+  /** Öppnar Inställningar → Företaget och läser om uppgifterna när man stänger. */
+  private openCompanySettings() {
+    void openSettings(this.dialog, 'foretag').then((ref) =>
+      ref.afterClosed().subscribe(() => this.loadSeller()),
+    );
+  }
+
+  private loadSeller() {
+    this.inventory
+      .seller()
+      .pipe(catchError(() => of(null)))
+      .subscribe((s) => {
+        if (!s) return;
+        this.seller.set(s);
+        this.defaultTerms.set(s.paymentTermsDays);
+      });
+  }
 
   readonly search = new FormControl('', { nonNullable: true });
   readonly results = signal<Article[]>([]);
@@ -806,8 +891,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly amounts = computed(() => rowAmounts(this.priced(), this.discount(), this.groups()));
   /** Summan medan man skriver; efter bokföring gäller det som frystes. */
   readonly totals = computed(() =>
-    this.readOnly() && this.card()?.invoice
-      ? this.card()!.invoice!.totals
+    this.readOnly() && this.card()?.document
+      ? this.card()!.document!.totals
       : totalsOf(this.priced(), this.discount(), {
           pricesIncludeVat: this.incl(),
           roundToKrona: this.card()?.roundToKrona ?? this.pricing.value().roundToKrona,
@@ -835,10 +920,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
 
   ngOnInit() {
     this.workshop.serviceTypes().subscribe((l) => this.serviceTypes.set(l));
-    this.inventory
-      .seller()
-      .pipe(catchError(() => of(null)))
-      .subscribe((s) => s && this.defaultTerms.set(s.paymentTermsDays));
+    this.loadSeller();
     // "Ny faktura" (och sidan efter första sparningen) bär valet i adressen.
     const kind = this.route.snapshot.queryParamMap.get('kind');
     if (kind === 'invoice' || kind === 'receipt') this.docKind.set(kind);
@@ -852,6 +934,11 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     const vehicleId = q.get('vehicleId');
     if (customerId || vehicleId) {
       this.linkCtl.setValue({ customerId: customerId ?? '', vehicleId: vehicleId ?? '' });
+    }
+    // "Sälj" på en artikel öppnar ett nytt kort med artikeln på första raden.
+    const articleId = q.get('articleId');
+    if (articleId) {
+      this.inventory.article(articleId).subscribe((a) => this.addArticle(a));
     }
     const depositId = q.get('depositId');
     if (depositId) {
@@ -962,8 +1049,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.discReason.set(c.discount?.reason ?? '');
     this.note.set(c.note ?? '');
     this.performed.set(c.performed ?? '');
-    this.warranty.set(c.invoice?.warranty ?? '');
-    this.payMethod.set(c.invoice?.paymentMethod ?? (c.kind === 'invoice' ? 'invoice' : 'card'));
+    this.warranty.set(c.document?.warranty ?? '');
+    this.payMethod.set(c.document?.paymentMethod ?? (c.kind === 'invoice' ? 'invoice' : 'card'));
     this.dirty.set(false);
   }
 
@@ -1156,8 +1243,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     if (!c) return;
     const invoice = this.kind() === 'invoice';
     const gets = invoice
-      ? `en faktura som förfaller ${this.dueDate()} (${this.terms()} dagar)`
-      : `ett kvitto, betalt ${paidWith('receipt', this.receiptMethod())}`;
+      ? `en faktura som förfaller ${this.dueDate()} (${this.terms()} dagar), i fakturaserien (FAK-)`
+      : `ett kvitto, betalt ${paidWith('receipt', this.receiptMethod())}, i kvittoserien (KV-)`;
     this.confirm
       .ask({
         title: `Bokför ${c.code} som ${invoice ? 'faktura' : 'kvitto'}?`,
@@ -1171,7 +1258,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
           next: (posted) => {
             this.apply(posted);
             this.busy.set(false);
-            this.snack.open(`${posted.invoiceCode} är bokfört`, 'OK', { duration: 4000 });
+            this.snack.open(`${posted.documentCode} är bokfört`, 'OK', { duration: 4000 });
           },
           error: () => this.busy.set(false),
         });
@@ -1182,6 +1269,49 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   late(inv: { kind: InvoiceKind; dueAt: string | null; paidAt: string | null }) {
     const n = dueNote(inv);
     return n.endsWith('sen') ? n : '';
+  }
+
+  /** Skälet till att kortet inte kan återöppnas just nu, annars tomt. */
+  reopenBlocked(c: SalesCardDetail) {
+    return c.document?.paidAt && c.document.kind === 'invoice'
+      ? 'Fakturan är betald. Markera den obetald först.'
+      : '';
+  }
+
+  /**
+   * Återöppnar ett bokfört kort så att ett fel kan rättas. Ett kvitto var betalt på stället och går
+   * tillbaka med affären; en betald faktura får ägaren först markera obetald, med flit.
+   */
+  reopen() {
+    const c = this.card();
+    if (!c?.document) return;
+    const receipt = c.document.kind === 'receipt';
+    this.confirm
+      .ask({
+        title: `Återöppna ${c.documentCode}?`,
+        message:
+          `Kortet blir ett utkast igen${receipt ? ' och betalningen på kvittot tas bort' : ''}. ` +
+          `Delar som lämnade lagret läggs tillbaka, och numret ${c.documentCode} sparas så att det ` +
+          `används igen när du bokför som ${receipt ? 'kvitto' : 'faktura'}. Har dokumentet redan ` +
+          'gått till kunden ska det i stället krediteras (kreditfaktura finns inte än).',
+        confirmText: 'Återöppna',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.busy.set(true);
+        this.api.reopen(c.id).subscribe({
+          next: (r) => {
+            this.busy.set(false);
+            this.apply(r);
+            this.snack.open('Kortet är återöppnat', 'OK', { duration: 4000 });
+          },
+          error: () => {
+            this.busy.set(false);
+            this.load(c.id);
+          },
+        });
+      });
   }
 
   setPaid(paid: boolean) {

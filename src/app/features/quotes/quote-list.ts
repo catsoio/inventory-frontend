@@ -1,10 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { QuoteApi } from '../../core/api/quote-api';
 import { appLocale } from '../../core/i18n/locale';
 import { QUOTE_STATUS_LABELS, Quote, QuoteShownStatus } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
-import { ORDER_TABS } from '../../shared/section-tabs/tabs';
 import { KrPipe } from '../../shared/kr-pipe';
 
 const kr = new KrPipe();
@@ -48,13 +47,12 @@ const TONES: Record<string, 'gray' | 'amber' | 'green' | 'red'> = {
 
 type Filter = '' | 'draft' | 'given' | 'approved' | 'declined';
 
-/** Alla kostnadsförslag: utkast, lämnade och besvarade. */
+/** Alla offerter: utkast, lämnade och besvarade. */
 @Component({
   selector: 'app-quote-list',
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs [tabs]="tabs" label="Arbetsorder" />
     <app-list-page
       class="min-h-0 flex-1"
       title=""
@@ -62,8 +60,8 @@ type Filter = '' | 'draft' | 'given' | 'approved' | 'declined';
       [rows]="items()"
       [loading]="loading()"
       newLink="/quotes/new"
-      newLabel="Nytt förslag"
-      emptyText="Inga kostnadsförslag än. Skapa ett med knappen."
+      newLabel="Ny offert"
+      emptyText="Inga offerter än. Skapa en med knappen."
       searchPlaceholder="Sök nummer, kund eller regnr…"
       (search)="q.set($event); load()"
       (rowClick)="router.navigate(['/quotes', $event.id])"
@@ -86,6 +84,11 @@ type Filter = '' | 'draft' | 'given' | 'approved' | 'declined';
       <ng-template #cell let-r="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill [tone]="tones[r.shownStatus]">{{ text }}</app-pill>
+          @if (r.shownStatus === 'given' && r.sends.length) {
+            <span class="ml-2 text-xs text-gray-500">{{ r.viewedAt ? 'Öppnat' : 'Skickat' }}</span>
+          } @else if (r.approval?.method === 'link') {
+            <span class="ml-2 text-xs text-gray-500">via länk</span>
+          }
         } @else if (col.key === 'code') {
           {{ r.code }}
         } @else {
@@ -99,12 +102,16 @@ export class QuoteList {
   private readonly api = inject(QuoteApi);
   readonly router = inject(Router);
   readonly cols = COLS;
-  readonly tabs = ORDER_TABS;
   readonly tones = TONES;
   readonly items = signal<Quote[]>([]);
   readonly loading = signal(true);
   readonly q = signal('');
-  readonly filter = signal<Filter>('');
+  /** Länkar från Hem öppnar listan förfiltrerad (`?status=approved`). */
+  readonly filter = signal<Filter>(
+    (['draft', 'given', 'approved', 'declined'] as const).find(
+      (s) => s === inject(ActivatedRoute).snapshot.queryParamMap.get('status'),
+    ) ?? '',
+  );
   readonly sum = computed(() => kr.transform(this.items().reduce((s, c) => s + c.total, 0)));
 
   constructor() {

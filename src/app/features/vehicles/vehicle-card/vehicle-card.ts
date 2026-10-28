@@ -165,11 +165,25 @@ import { carColorHex } from '../../../shared/car-color';
             }
           </div>
           <app-sales-card-history [vehicleId]="c.id" empty="Inget sålt till den här bilen än." />
-          @if (olderSales(c.sales).length) {
-            <h3 class="mt-4 mb-1 text-sm font-semibold text-gray-600">Äldre lagerförsäljningar</h3>
-            <app-trade-history [rows]="olderSales(c.sales)" kind="sales" />
-          }
         </section>
+
+        @if (workOrdersOn) {
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <div class="mb-2 flex items-center">
+              <h2 class="flex-1 text-lg font-semibold">Offerter</h2>
+              @if (c.active) {
+                <a
+                  mat-stroked-button
+                  routerLink="/quotes/new"
+                  [queryParams]="{ customerId: c.customerId, vehicleId: c.id }"
+                >
+                  <mat-icon>add</mat-icon> Ny offert
+                </a>
+              }
+            </div>
+            <app-quote-history [vehicleId]="c.id" empty="Inga offerter för den här bilen än." />
+          </section>
+        }
 
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-lg font-semibold">Bokningar</h2>
@@ -363,7 +377,4 @@ export class VehicleCard implements OnInit {
   }
 
   /** Lagerförsäljningar från före säljkorten; de som säljkort och arbetsorder bokat visas på sina kort. */
-  olderSales<T extends { reference: string | null }>(rows: T[]): T[] {
-    return rows.filter((r) => !/^(SK|AO)-/.test(r.reference ?? ''));
-  }
 }

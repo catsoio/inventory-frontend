@@ -35,7 +35,9 @@ import { STATUS_TEXT, STATUS_TONE, dueNote, invoiceStatus } from '../../shared/i
                 </h2>
                 <app-pill [tone]="statusTone(inv)">{{ statusText(inv) }}</app-pill>
               </div>
-              <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr_auto_1fr]">
+              <dl
+                class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr_auto_1fr]"
+              >
                 <dt class="text-gray-500">Kund</dt>
                 <dd>
                   <a class="text-brand" [routerLink]="['/customers', o.customerId]">{{
@@ -57,7 +59,11 @@ import { STATUS_TEXT, STATUS_TONE, dueNote, invoiceStatus } from '../../shared/i
                   <dd>
                     {{ inv.dueAt ? (inv.dueAt | date: 'yyyy-MM-dd') : '–' }}
                     @if (note(inv); as n) {
-                      <span [class]="status(inv) === 'overdue' ? 'font-medium text-red-700' : 'text-gray-500'">
+                      <span
+                        [class]="
+                          status(inv) === 'overdue' ? 'font-medium text-red-700' : 'text-gray-500'
+                        "
+                      >
                         · {{ n }}</span
                       >
                     }
@@ -128,7 +134,9 @@ import { STATUS_TEXT, STATUS_TONE, dueNote, invoiceStatus } from '../../shared/i
             </section>
           </div>
         } @else {
-          <p class="text-gray-600">Ordern har ingen faktura. <a [routerLink]="['/workorders', o.id]">Öppna ordern</a></p>
+          <p class="text-gray-600">
+            Ordern har ingen faktura. <a [routerLink]="['/workorders', o.id]">Öppna ordern</a>
+          </p>
         }
       }
     </app-card-page>
@@ -156,7 +164,9 @@ export class InvoiceCard implements OnInit {
   private load() {
     this.api.get(this.id).subscribe((o) => {
       this.order.set(o);
-      this.method.set(o.invoice?.paymentMethod ?? (o.invoice?.kind === 'invoice' ? 'invoice' : 'card'));
+      this.method.set(
+        o.invoice?.paymentMethod ?? (o.invoice?.kind === 'invoice' ? 'invoice' : 'card'),
+      );
     });
   }
 

@@ -18,6 +18,7 @@ import { QUICK_ACTIONS } from './quick-actions';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { SharedModule } from '../../shared/shared-module';
 import { InventoryApi } from '../api/inventory-api';
+import { QuoteApi } from '../api/quote-api';
 import { SalesCardApi } from '../api/sales-card-api';
 import { StorageApi } from '../api/storage-api';
 import { WorkOrderApi } from '../api/work-order-api';
@@ -33,6 +34,7 @@ import {
   groupOrder,
   normalize,
   orderHit,
+  quoteHit,
   saleHit,
   storageHit,
   supplierHit,
@@ -202,6 +204,7 @@ export class GlobalSearchDialog {
   private readonly workshop = inject(WorkshopApi);
   private readonly orders = inject(WorkOrderApi);
   private readonly cards = inject(SalesCardApi);
+  private readonly quotes = inject(QuoteApi);
   private readonly inventory = inject(InventoryApi);
 
   readonly icons = KIND_ICONS;
@@ -258,6 +261,7 @@ export class GlobalSearchDialog {
       vehicle: quiet(this.workshop.vehicles({ q, limit }), vehicleHit),
       customer: quiet(this.workshop.customers({ q, limit }), customerHit),
       order: environment.workOrders ? quiet(this.orders.list({ q, limit }), orderHit) : of([]),
+      quote: environment.workOrders ? quiet(this.quotes.list({ q, limit }), quoteHit) : of([]),
       sale: quiet(this.cards.list({ q, limit }), saleHit),
       article: quiet(this.inventory.articles({ q, limit }), articleHit),
       supplier: quiet(this.workshop.suppliers({ q, limit }), supplierHit),

@@ -39,6 +39,8 @@ import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
 import { VatPartPipe } from './vat-part-pipe';
 import { InvoiceDocument } from './invoice-document/invoice-document';
+import { Callout } from './callout/callout';
+import { QuoteHistory } from './quote-history/quote-history';
 import { SalesCardHistory } from './sales-card-history/sales-card-history';
 import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
@@ -97,6 +99,8 @@ const MATERIAL = [
     KrPipe,
     VatPartPipe,
     InvoiceDocument,
+    Callout,
+    QuoteHistory,
     SalesCardHistory,
     StockBadge,
     MovementList,
@@ -136,6 +140,8 @@ const MATERIAL = [
     KrPipe,
     VatPartPipe,
     InvoiceDocument,
+    Callout,
+    QuoteHistory,
     SalesCardHistory,
     StockBadge,
     MovementList,

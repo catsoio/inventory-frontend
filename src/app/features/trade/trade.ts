@@ -1,5 +1,4 @@
 import { Pricing } from '../../core/pricing';
-import { vatIn } from '../../shared/vat';
 import {
   Component,
   DestroyRef,
@@ -16,8 +15,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { Article, itemKind } from '../../core/models';
-import { type PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
-import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
+import { normalizeUrl } from '../../shared/web-link';
 
 interface Line {
   a: Article;
@@ -34,7 +32,7 @@ interface Line {
       <a mat-icon-button routerLink=".." aria-label="Till listan"
         ><mat-icon>arrow_back</mat-icon></a
       >
-      <h1 class="text-2xl font-semibold">{{ sell ? 'Ny försäljning' : 'Nytt inköp' }}</h1>
+      <h1 class="text-2xl font-semibold">Nytt inköp</h1>
     </div>
 
     <div class="grid min-h-0 flex-1 gap-6 xl:grid-cols-3">
@@ -48,11 +46,7 @@ interface Line {
             type="search"
             [formControl]="search"
             (keydown.enter)="addFirst()"
-            [placeholder]="
-              sell
-                ? 'Sök artikel att sälja: storlek, märke, artikelnummer…'
-                : 'Sök artikel att köpa in: storlek, märke, artikelnummer…'
-            "
+            placeholder="Sök artikel att köpa in: storlek, märke, artikelnummer…"
             class="focus:ring-brand h-12 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-11 outline-none focus:ring-2"
           />
           @if (results().length) {
@@ -73,9 +67,7 @@ interface Line {
                   </span>
                   <span class="flex items-center gap-3 text-sm">
                     <span class="text-gray-600">{{ a.quantity }} st</span>
-                    <span class="font-medium">{{
-                      (sell ? a.sellPrice : pricing.costIncl(a.averageCost ?? 0)) | kr
-                    }}</span>
+                    <span class="font-medium">{{ pricing.costIncl(a.averageCost ?? 0) | kr }}</span>
                   </span>
                 </button>
               }
@@ -101,9 +93,7 @@ interface Line {
         </ng-template>
         <ng-template #priceField let-l="l" let-i="i">
           <mat-form-field class="w-full" subscriptSizing="dynamic">
-            <mat-label>{{
-              sell ? 'Pris/st (kr, inkl. moms)' : 'Inköpspris/st (kr, inkl. moms)'
-            }}</mat-label>
+            <mat-label>Inköpspris/st (kr, inkl. moms)</mat-label>
             <input
               matInput
               type="number"
@@ -168,7 +158,7 @@ interface Line {
                 @if (!qtyOk(l)) {
                   <tr>
                     <td colspan="6" class="px-3 pb-2 text-xs text-red-600">
-                      {{ qtyHint(l) }}
+                      {{ qtyHint() }}
                     </td>
                   </tr>
                 }
@@ -209,7 +199,7 @@ interface Line {
                 />
               </div>
               @if (!qtyOk(l)) {
-                <div class="mt-3 text-xs text-red-600">{{ qtyHint(l) }}</div>
+                <div class="mt-3 text-xs text-red-600">{{ qtyHint() }}</div>
               }
               <div class="mt-2 flex justify-between border-t pt-2 text-sm">
                 <span class="text-gray-600">Summa inkl. moms</span>
@@ -226,7 +216,7 @@ interface Line {
 
       <aside class="xl:overflow-y-auto">
         <mat-card class="flex flex-col gap-1 p-4">
-          <div class="mb-2 text-lg font-semibold">{{ sell ? 'Försäljning' : 'Inköp' }}</div>
+          <div class="mb-2 text-lg font-semibold">Inköp</div>
           <mat-form-field>
             <mat-label>Referens</mat-label>
             <input
@@ -235,15 +225,19 @@ interface Line {
               (input)="reference.set($any($event.target).value)"
             />
           </mat-form-field>
-          @if (sell) {
-            <app-customer-vehicle-picker
-              [formControl]="linkCtl"
-              [optional]="true"
-              customerLabel="Kund (tomt = kontantförsäljning)"
+          <mat-form-field>
+            <mat-label>Länk (var du köpte det)</mat-label>
+            <input
+              matInput
+              type="url"
+              inputmode="url"
+              placeholder="https://…"
+              [value]="url()"
+              (input)="url.set($any($event.target).value)"
             />
-          } @else {
-            <app-supplier-select label="Leverantör" [formControl]="supplierCtl" />
-          }
+            <mat-hint>Klistra in länken till ordern eller produkten</mat-hint>
+          </mat-form-field>
+          <app-supplier-select label="Leverantör" [formControl]="supplierCtl" />
           <mat-form-field>
             <mat-label>Anteckning</mat-label>
             <input matInput [value]="note()" (input)="note.set($any($event.target).value)" />
@@ -255,20 +249,10 @@ interface Line {
           <div class="flex justify-between py-2 text-xl font-semibold">
             <span>Totalt inkl. moms</span><span>{{ totalOre() | kr }}</span>
           </div>
-          @if (!sell) {
-            <div class="flex justify-between pb-2 text-sm text-gray-600">
-              <span>Varav ingående moms {{ pricing.value().purchaseVatRate }} %</span
-              ><span>{{ totalOre() - pricing.costNet(totalOre()) | kr }}</span>
-            </div>
-          }
-          @if (sell) {
-            <div class="flex justify-between text-sm text-gray-600">
-              <span>Varav moms 25 %</span><span>{{ vatOre() | kr }}</span>
-            </div>
-            <div class="flex justify-between pb-2 font-semibold">
-              <span>Att betala inkl. moms</span><span>{{ totalOre() | kr }}</span>
-            </div>
-          }
+          <div class="flex justify-between pb-2 text-sm text-gray-600">
+            <span>Varav ingående moms {{ pricing.value().purchaseVatRate }} %</span
+            ><span>{{ totalOre() - pricing.costNet(totalOre()) | kr }}</span>
+          </div>
           <button
             mat-flat-button
             color="primary"
@@ -276,7 +260,7 @@ interface Line {
             [disabled]="!valid() || busy()"
             (click)="submit()"
           >
-            {{ sell ? 'Slutför försäljning' : 'Slutför inköp' }}
+            Slutför inköp
           </button>
           <button mat-button [disabled]="!lines().length || busy()" (click)="lines.set([])">
             Töm raderna
@@ -292,67 +276,47 @@ export class Trade {
   private readonly snack = inject(MatSnackBar);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
 
-  private readonly links = inject(LinkResolver);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  readonly mode: 'sell' | 'receive' = this.route.snapshot.data['mode'];
-  readonly sell = this.mode === 'sell';
   readonly kind = (a: Article) => itemKind(a.category);
 
   readonly search = new FormControl('', { nonNullable: true });
   readonly results = signal<Article[]>([]);
   readonly lines = signal<Line[]>([]);
   readonly reference = signal('');
-  /** Kund och bil (båda valfria); nyskrivna skapas när försäljningen sparas. */
-  readonly linkCtl = new FormControl<PickerValue | null>(null);
+  /** Länken man köpte från (bara inköp). */
+  readonly url = signal('');
   readonly supplierCtl = new FormControl<string | null>(null);
   readonly note = signal('');
   readonly busy = signal(false);
 
   readonly units = computed(() => this.lines().reduce((n, l) => n + (l.qty || 0), 0));
   readonly totalOre = computed(() => this.lines().reduce((n, l) => n + this.lineOre(l), 0));
-  /** Momsen som ingår i försäljningen (25 %), avrundad en gång på summan. */
-  readonly vatOre = computed(() => vatIn(this.totalOre()));
   readonly valid = computed(
     () => this.lines().length > 0 && this.lines().every((l) => this.qtyOk(l) && l.price >= 0),
   );
 
   constructor() {
-    // Länkar från kund-, bil- och leverantörskort fyller i vem det gäller.
-    const q = this.route.snapshot.queryParamMap;
-    if (this.sell) {
-      const customerId = q.get('customerId');
-      const vehicleId = q.get('vehicleId');
-      if (customerId || vehicleId) {
-        this.linkCtl.setValue({ customerId: customerId ?? '', vehicleId: vehicleId ?? '' });
-      }
-    } else {
-      const supplierId = q.get('supplierId');
-      if (supplierId) this.supplierCtl.setValue(supplierId);
-    }
+    // Länkar från leverantörskortet fyller i vem det gäller.
+    const supplierId = this.route.snapshot.queryParamMap.get('supplierId');
+    if (supplierId) this.supplierCtl.setValue(supplierId);
 
     this.search.valueChanges
       .pipe(
         debounceTime(250),
         distinctUntilChanged(),
-        switchMap((q) =>
-          q.trim()
-            ? this.api.articles({ q: q.trim(), limit: 8, inStock: this.sell ? true : undefined })
-            : of(null),
-        ),
+        switchMap((q) => (q.trim() ? this.api.articles({ q: q.trim(), limit: 8 }) : of(null))),
         takeUntilDestroyed(),
       )
       .subscribe((p) => this.results.set(p?.items ?? []));
   }
 
   qtyOk(l: Line) {
-    return Number.isInteger(l.qty) && l.qty >= 1 && (!this.sell || l.qty <= l.a.quantity);
+    return Number.isInteger(l.qty) && l.qty >= 1;
   }
 
-  qtyHint(l: Line) {
-    return this.sell && l.qty > l.a.quantity
-      ? `Bara ${l.a.quantity} st i lager.`
-      : 'Ange ett helt antal, minst 1.';
+  qtyHint() {
+    return 'Ange ett helt antal, minst 1.';
   }
 
   lineOre(l: Line) {
@@ -364,7 +328,7 @@ export class Trade {
       const i = ls.findIndex((l) => l.a.id === a.id);
       if (i >= 0) return ls.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
       // Inköpspriset skrivs inkl. moms; det lagrade snittpriset är utan.
-      const price = this.sell ? a.sellPrice / 100 : this.pricing.costIncl(a.averageCost ?? 0) / 100;
+      const price = this.pricing.costIncl(a.averageCost ?? 0) / 100;
       return [...ls, { a, qty: 1, price }];
     });
     this.search.setValue('', { emitEvent: false });
@@ -394,31 +358,22 @@ export class Trade {
     this.busy.set(true);
     const reference = this.reference().trim() || undefined;
     const note = this.note().trim() || undefined;
-    const lines = this.lines().map((l) => {
-      const price = Math.round(l.price * 100);
-      return this.sell
-        ? { articleId: l.a.id, quantity: l.qty, unitPrice: price }
-        : { articleId: l.a.id, quantity: l.qty, unitCost: this.pricing.costNet(price) };
-    });
+    const lines = this.lines().map((l) => ({
+      articleId: l.a.id,
+      quantity: l.qty,
+      unitCost: this.pricing.costNet(Math.round(l.price * 100)),
+    }));
     try {
-      const link =
-        this.sell && this.linkCtl.value
-          ? await firstValueFrom(this.links.resolve(this.linkCtl.value))
-          : null;
       const doc = await firstValueFrom(
-        this.api.createTrade(this.sell ? 'sales' : 'purchases', {
+        this.api.createTrade('purchases', {
           lines,
           reference,
           note,
-          ...(this.sell
-            ? {
-                customerId: link?.customerId || undefined,
-                vehicleId: link?.vehicleId || undefined,
-              }
-            : { supplierId: this.supplierCtl.value || undefined }),
+          url: normalizeUrl(this.url()) ?? undefined,
+          supplierId: this.supplierCtl.value || undefined,
         }),
       );
-      this.snack.open(`${this.sell ? 'Försäljning' : 'Inköp'} ${doc.code} är registrerad`, 'OK', {
+      this.snack.open(`Inköp ${doc.code} är registrerat`, 'OK', {
         duration: 4000,
       });
       await this.router.navigate(['..'], { relativeTo: this.route });

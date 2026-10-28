@@ -18,7 +18,7 @@ import { STATUS_TEXT, STATUS_TONE, invoiceStatus } from '../invoice-status';
         @if (c.regNo) {
           <app-reg-plate [value]="c.regNo" size="sm" />
         }
-        <span class="flex-1 truncate text-gray-500">{{ c.invoiceCode ?? '' }}</span>
+        <span class="flex-1 truncate text-gray-500">{{ c.documentCode ?? '' }}</span>
         <app-pill [tone]="tone(c)">{{ text(c) }}</app-pill>
         <span class="font-medium tabular-nums">{{ c.total | kr }}</span>
       </a>

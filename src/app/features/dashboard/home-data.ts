@@ -13,6 +13,7 @@ import { pickupForecast } from '../../core/insights/hotel';
 import { Insights } from '../../core/insights/insights';
 import { WeeklySeries, weeklySeries } from '../../core/insights/sales';
 import { Settings } from '../../core/settings';
+import { Todo } from '../../core/todo';
 import {
   Booking,
   BookingStatus,
@@ -23,7 +24,6 @@ import {
   Summary,
   WorkOrder,
 } from '../../core/models';
-import { kronor } from '../../shared/chart/chart-kit';
 import { environment } from '../../../environments/environment';
 
 /** En rad under "Att göra": något som väntar på någon. */
@@ -54,6 +54,7 @@ export class HomeData {
   private readonly orderApi = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly insights = inject(Insights);
+  private readonly todo = inject(Todo);
   private readonly snack = inject(MatSnackBar);
 
   /** Försäljning och pengar är bara för ägaren. */
@@ -82,7 +83,11 @@ export class HomeData {
   readonly cur = signal<Report | null>(null);
   readonly prev = signal<Report | null>(null);
 
-  private desktopLoaded = false;
+  /** Sant när det som väntar hämtats, så att "Allt under kontroll" inte blinkar fram för tidigt. */
+  readonly attentionReady = this.todo.ready;
+
+  /** Datorvyn har hämtat sitt (arbetsorder m.m.); mobilen gör aldrig det. */
+  private readonly desktop = signal(false);
 
   constructor() {
     const tick = setInterval(() => this.now.set(Date.now()), 60_000);
@@ -136,81 +141,23 @@ export class HomeData {
 
   // --- det som väntar ---
 
+  /**
+   * "Att göra": samma lista som siffrorna i menyn (`core/todo.ts`), så att de aldrig säger olika.
+   * Hem lägger till det som inte är något att göra men bra att veta (hämtas den här veckan).
+   */
   readonly attention = computed<Attention[]>(() => {
-    const out: Attention[] = [];
-    const h = this.hotel();
-    const s = this.summary();
-    if (h && h.overdue > 0) {
-      out.push({
-        key: 'overdue',
-        icon: 'event_busy',
-        tone: 'bad',
-        text: `${h.overdue} däckset har passerat hämtdatum`,
-        link: '/storage',
-        params: { status: 'stored', overdue: true },
-      });
-    }
-    if (h && h.unpaid > 0) {
-      out.push({
-        key: 'hotel-unpaid',
-        icon: 'payments',
-        tone: 'warn',
-        text: `${h.unpaid} obetalda hotellavgifter · ${kronor(h.unpaidAmount)}`,
-        link: '/storage',
-        params: { status: 'stored', paymentStatus: 'unpaid' },
-      });
-    }
-    if (s && s.outOfStock > 0) {
-      out.push({
-        key: 'out',
-        icon: 'block',
-        tone: 'bad',
-        text: `${s.outOfStock} ${s.outOfStock === 1 ? 'artikel är' : 'artiklar är'} slut`,
-        link: '/inventory',
-        params: { inStock: false },
-      });
-    }
-    if (s && s.lowStock > 0) {
-      out.push({
-        key: 'low',
-        icon: 'inventory',
-        tone: 'warn',
-        text: `${s.lowStock} ${s.lowStock === 1 ? 'artikel' : 'artiklar'} att beställa`,
-        link: '/inventory',
-        params: { lowStock: true },
-      });
-    }
-    const u = this.unpaid();
-    if (this.admin && u && u.count > 0) {
-      out.push({
-        key: 'unpaid',
-        icon: 'receipt_long',
-        tone: 'warn',
-        text: `${u.count} obetalda fakturor · ${kronor(u.amount)}${u.more ? '+' : ''}`,
-        link: '/sales',
-        params: { show: 'unpaid' },
-      });
-    }
-    if (this.drafts() > 0) {
-      out.push({
-        key: 'drafts',
-        icon: 'edit_note',
-        tone: 'info',
-        text: `${this.drafts()} säljkort väntar på att bokföras`,
-        link: '/sales',
-        params: { show: 'draft' },
-      });
-    }
-    if (this.missingParts() > 0) {
-      out.push({
-        key: 'parts',
-        icon: 'handyman',
-        tone: 'warn',
-        text: `${this.missingParts()} ${this.missingParts() === 1 ? 'arbetsorder väntar' : 'arbetsorder väntar'} på del`,
-        link: '/workorders',
-        params: { status: 'action' },
-      });
-    }
+    const tone = { urgent: 'bad', wait: 'warn', info: 'info' } as const;
+    const out: Attention[] = this.todo
+      .items()
+      .filter((t) => !t.desktopOnly || this.desktop())
+      .map((t) => ({
+        key: t.key,
+        icon: t.icon,
+        tone: tone[t.urgency],
+        text: t.text,
+        link: t.link,
+        params: t.params,
+      }));
     const wp = this.pickupsThisWeek();
     if (wp > 0) {
       out.push({
@@ -223,13 +170,6 @@ export class HomeData {
     }
     return out;
   });
-
-  /** Order som väntar på en del (bara datorvyn). */
-  readonly missingParts = computed(
-    () =>
-      this.orders().filter((o) => o.hasMissing && o.status !== 'done' && o.status !== 'cancelled')
-        .length,
-  );
 
   // --- hämtning ---
 
@@ -278,8 +218,8 @@ export class HomeData {
 
   /** Arbetsorder och pengar: bara datorvyn behöver dem. */
   loadDesktop() {
-    if (this.desktopLoaded) return;
-    this.desktopLoaded = true;
+    if (this.desktop()) return;
+    this.desktop.set(true);
     if (this.workOrdersOn) {
       this.orderApi
         .list({ limit: 100 })

@@ -16,7 +16,7 @@ import type { DtCol } from '../data-table/data-table';
 
 /**
  * Listsidan för en tabell (som en lista i Business Central): rubrik, sökruta, "Ny"-knapp mot
- * tabellens kort och själva tabellen. Sidan som använder den hämtar data och lyssnar på `search`.
+ * tabellens kort (och eventuella sekundärknappar bredvid, `[actions]`) och själva tabellen. Sidan som använder den hämtar data och lyssnar på `search`.
  */
 @Component({
   selector: 'app-list-page',
@@ -47,6 +47,8 @@ import type { DtCol } from '../data-table/data-table';
         </label>
       }
       <span class="flex-1 max-md:hidden"></span>
+      <!-- Sekundära knappar (t.ex. "Lägg till gammal faktura") ligger bredvid "Ny", inte under. -->
+      <ng-content select="[actions]" />
       @if (newLink) {
         <a
           mat-flat-button

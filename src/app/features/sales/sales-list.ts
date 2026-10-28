@@ -43,7 +43,7 @@ const COLS: DtCol<SalesCardItem>[] = [
     value: (c) => c.total,
     fmt: (c) => kr.transform(c.total),
   },
-  { key: 'invoice', label: 'Dokument', value: (c) => c.invoiceCode ?? '' },
+  { key: 'invoice', label: 'Dokument', value: (c) => c.documentCode ?? '' },
   { key: 'status', label: 'Status', value: statusOf },
 ];
 
@@ -80,10 +80,6 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
           <mat-button-toggle value="paid">Betalda</mat-button-toggle>
         </mat-button-toggle-group>
         <span class="text-sm text-gray-600">{{ items().length }} st · {{ sum() }}</span>
-        <span class="flex-1"></span>
-        <a mat-button routerLink="/sales-legacy">
-          <mat-icon>history</mat-icon> Äldre försäljningar
-        </a>
       </div>
       <!-- Mobil: ett kompakt kort i stället för alla kolumner under varandra. -->
       <ng-template #card let-c="row">

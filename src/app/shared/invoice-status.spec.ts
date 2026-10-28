@@ -81,8 +81,9 @@ describe('invoiceFigures', () => {
     );
     expect(f.unpaid).toEqual({ count: 3, sum: 390_000 });
     expect(f.overdue).toEqual({ count: 2, sum: 290_000, oldestDays: 17 });
-    // Betalt senaste 30 dagarna: fakturan 15 okt och kvittot i dag, inte den från 1 aug.
-    expect(f.paidRecently).toEqual({ count: 2, sum: 100_000 });
+    // Betalt senaste 30 dagarna: fakturan 15 okt, inte den från 1 aug. Kvittot hör inte dit: det är
+    // betalt på stället och aldrig en fordran (det har en egen lista och en egen nummerserie).
+    expect(f.paidRecently).toEqual({ count: 1, sum: 70_000 });
   });
 
   it('is empty when there is nothing', () => {

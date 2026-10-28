@@ -36,7 +36,7 @@ import { SettingsStore } from '../settings-store';
           </label>
           <label class="choice" [class.is-on]="s.pricingForm.controls.profile.value === 'workshop'">
             <mat-radio-button value="workshop" class="font-medium">Bilverkstad</mat-radio-button>
-            <span class="choice-text">Jobb med egna priser, kostnadsförslag och förbrukningsmaterial.</span>
+            <span class="choice-text">Jobb med egna priser, offerter och förbrukningsmaterial.</span>
           </label>
         </mat-radio-group>
         <p class="mt-2 text-xs text-gray-500">
@@ -161,7 +161,7 @@ export class SettingsPricing {
   readonly sub = signal('order');
   readonly subtabs = [
     ['order', 'Arbetsorder'],
-    ['quote', 'Kostnadsförslag'],
+    ['quote', 'Offert'],
     ['material', 'Material och kalkyl'],
     ['stock', 'Lager och inköp'],
   ] as const;

@@ -10,6 +10,12 @@ const routes: Routes = [
     loadChildren: () => import('./features/auth/auth-module').then((m) => m.AuthModule),
   },
   {
+    // Kundens sida för ett kostnadsförslag: utan inloggning, nyckeln i länken är nyckeln.
+    path: 'q/:token',
+    loadChildren: () =>
+      import('./features/public-quote/public-quote-module').then((m) => m.PublicQuoteModule),
+  },
+  {
     path: 'onboarding',
     title: 'Kom igång',
     canActivate: [authGuard],
@@ -84,7 +90,7 @@ const routes: Routes = [
       },
       {
         path: 'quotes',
-        title: 'Kostnadsförslag',
+        title: 'Offert',
         loadChildren: () => import('./features/quotes/quotes-module').then((m) => m.QuotesModule),
       },
       {
@@ -132,15 +138,8 @@ const routes: Routes = [
         loadChildren: () => import('./features/sales/sales-module').then((m) => m.SalesModule),
       },
       {
-        path: 'sales-legacy',
-        title: 'Äldre försäljningar',
-        data: { mode: 'sell' },
-        loadChildren: () => import('./features/trade/trade-module').then((m) => m.TradeModule),
-      },
-      {
         path: 'purchases',
         title: 'Inköp',
-        data: { mode: 'receive' },
         loadChildren: () => import('./features/trade/trade-module').then((m) => m.TradeModule),
       },
       { path: 'settings', redirectTo: '' },

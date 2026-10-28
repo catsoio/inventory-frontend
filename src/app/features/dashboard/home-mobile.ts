@@ -156,7 +156,7 @@ const MAX_COMING = 6;
     </section>
 
     <app-panel title="Att göra" icon="task_alt">
-      <app-attention-list [items]="data.attention()" [ready]="!!data.hotel() && !!data.summary()" />
+      <app-attention-list [items]="data.attention()" [ready]="data.attentionReady()" />
     </app-panel>
 
     @if (data.admin) {

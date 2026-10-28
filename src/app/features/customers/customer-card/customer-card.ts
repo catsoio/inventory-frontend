@@ -204,11 +204,24 @@ import { Auth } from '../../../core/auth/auth';
             [customerId]="c.id"
             empty="Inga säljkort till den här kunden än."
           />
-          @if (olderSales(c.sales).length) {
-            <h3 class="mt-4 mb-1 text-sm font-semibold text-gray-600">Äldre lagerförsäljningar</h3>
-            <app-trade-history [rows]="olderSales(c.sales)" kind="sales" />
-          }
         </section>
+
+        @if (workOrdersOn) {
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <div class="mb-2 flex items-center">
+              <h2 class="flex-1 text-lg font-semibold">Offerter</h2>
+              @if (c.active) {
+                <a mat-stroked-button routerLink="/quotes/new" [queryParams]="{ customerId: c.id }">
+                  <mat-icon>add</mat-icon> Ny offert
+                </a>
+              }
+            </div>
+            <app-quote-history
+              [customerId]="c.id"
+              empty="Inga offerter till den här kunden än."
+            />
+          </section>
+        }
 
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-lg font-semibold">Senaste bokningar</h2>
@@ -278,6 +291,9 @@ export class CustomerCard implements OnInit {
     return [v.make, v.model, v.year].filter(Boolean).join(' ');
   }
 
+  /** Fältet som en länk från en varning vill att man fyller i (`?focus=address`). */
+  private readonly focusField = inject(ActivatedRoute).snapshot.queryParamMap.get('focus');
+
   private load() {
     this.api.customer(this.id!).subscribe((c) => {
       this.card.set(c);
@@ -295,6 +311,14 @@ export class CustomerCard implements OnInit {
         labourDiscount: c.labourDiscount ?? null,
         partsDiscount: c.partsDiscount ?? null,
       });
+      if (this.focusField && /^\w+$/.test(this.focusField)) {
+        // Fälten ritas först efter att kortet laddats; markören hamnar på det som saknas.
+        setTimeout(() => {
+          const el = document.querySelector<HTMLElement>(`[formControlName="${this.focusField}"]`);
+          el?.scrollIntoView({ block: 'center' });
+          el?.focus();
+        }, 50);
+      }
     });
   }
 
@@ -367,7 +391,4 @@ export class CustomerCard implements OnInit {
   }
 
   /** Lagerförsäljningar från före säljkorten; de som säljkort och arbetsorder bokat visas på sina kort. */
-  olderSales<T extends { reference: string | null }>(rows: T[]): T[] {
-    return rows.filter((r) => !/^(SK|AO)-/.test(r.reference ?? ''));
-  }
 }

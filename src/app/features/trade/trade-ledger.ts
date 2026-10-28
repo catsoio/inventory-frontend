@@ -1,12 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { TradeKind, TradeRow } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
-import { netOf, vatIn } from '../../shared/vat';
 import { TradeDocumentDialog } from '../../shared/trade-document-dialog/trade-document-dialog';
+import { hostOf, safeUrl } from '../../shared/web-link';
 
 const kr = new KrPipe();
 const day = (iso: string) => new Date(iso).toLocaleDateString('sv-SE');
@@ -20,16 +19,14 @@ const time = (iso: string) =>
   host: { class: 'block h-full' },
   template: `
     <app-list-page
-      [title]="sell ? 'Försäljningar' : 'Inköp'"
+      title="Inköp"
       [columns]="cols()"
       [rows]="shown()"
       [loading]="loading()"
       newLink="new"
-      [newLabel]="sell ? 'Ny försäljning' : 'Nytt inköp'"
-      [emptyText]="sell ? 'Inga försäljningar ännu.' : 'Inga inköp ännu.'"
-      [searchPlaceholder]="
-        sell ? 'Sök nummer, kund, regnr eller referens…' : 'Sök nummer, leverantör eller referens…'
-      "
+      newLabel="Nytt inköp"
+      emptyText="Inga inköp ännu."
+      searchPlaceholder="Sök nummer, leverantör eller referens…"
       (search)="query.set($event)"
       (rowClick)="open($event)"
     >
@@ -37,16 +34,11 @@ const time = (iso: string) =>
       <ng-template #card let-r="row">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            @if (sell && r.vehicle) {
-              <app-reg-plate [value]="r.vehicle.regNo" size="sm" />
-            }
-            <div class="truncate text-base font-semibold" [class.mt-1]="sell && r.vehicle">
-              {{ party(r) }}
-            </div>
+            <div class="truncate text-base font-semibold">{{ party(r) }}</div>
           </div>
           <div class="shrink-0 text-right">
             <div class="text-base font-semibold tabular-nums">{{ shownTotal(r) }}</div>
-            <div class="text-[11px] text-gray-500">{{ sell ? 'inkl. moms' : 'exkl. moms' }}</div>
+            <div class="text-[11px] text-gray-500">exkl. moms</div>
           </div>
         </div>
         <div class="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
@@ -59,6 +51,30 @@ const time = (iso: string) =>
         @if (r.reference || r.note) {
           <div class="mt-1 truncate text-xs text-gray-500">{{ r.reference || r.note }}</div>
         }
+        @if (link(r); as u) {
+          <a
+            [href]="u"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-brand mt-1 inline-flex items-center gap-1 text-xs"
+            (click)="$event.stopPropagation()"
+            ><mat-icon class="!h-4 !w-4 !text-base">open_in_new</mat-icon>{{ host(r.url) }}</a
+          >
+        }
+      </ng-template>
+      <ng-template #cell let-r="row" let-col="col" let-text="text">
+        @if (col.key === 'url' && link(r); as u) {
+          <a
+            [href]="u"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-brand inline-flex items-center gap-1 hover:underline"
+            (click)="$event.stopPropagation()"
+            >{{ text }}<mat-icon class="!h-4 !w-4 !text-base">open_in_new</mat-icon></a
+          >
+        } @else {
+          {{ text }}
+        }
       </ng-template>
     </app-list-page>
   `,
@@ -67,8 +83,9 @@ export class TradeLedger {
   private readonly api = inject(InventoryApi);
   private readonly dialog = inject(MatDialog);
 
-  readonly sell = inject(ActivatedRoute).snapshot.data['mode'] === 'sell';
-  private readonly kind: TradeKind = this.sell ? 'sales' : 'purchases';
+  readonly host = hostOf;
+  readonly link = (r: TradeRow) => safeUrl(r.url);
+  private readonly kind: TradeKind = 'purchases';
 
   readonly cols = signal<DtCol<TradeRow>[]>([
     { key: 'code', label: 'Nr', value: (r) => r.number, fmt: (r) => r.code },
@@ -78,32 +95,18 @@ export class TradeLedger {
       value: (r) => r.createdAt,
       fmt: (r) => `${day(r.createdAt)} ${time(r.createdAt)}`,
     },
-    ...(this.sell
-      ? [
-          {
-            key: 'customer',
-            label: 'Kund',
-            value: (r: TradeRow) => r.customer?.name ?? '',
-            fmt: (r: TradeRow) => r.customer?.name || 'Kontant',
-          },
-          {
-            key: 'vehicle',
-            label: 'Bil',
-            value: (r: TradeRow) => r.vehicle?.regNo ?? '',
-            fmt: (r: TradeRow) =>
-              r.vehicle
-                ? [r.vehicle.regNo, r.vehicle.make, r.vehicle.model].filter(Boolean).join(' ')
-                : '–',
-          },
-        ]
-      : [
-          {
-            key: 'supplier',
-            label: 'Leverantör',
-            value: (r: TradeRow) => r.supplier?.name ?? r.supplierName ?? '',
-            fmt: (r: TradeRow) => r.supplier?.name || r.supplierName || '–',
-          },
-        ]),
+    {
+      key: 'supplier',
+      label: 'Leverantör',
+      value: (r) => r.supplier?.name ?? r.supplierName ?? '',
+      fmt: (r) => r.supplier?.name || r.supplierName || '–',
+    },
+    {
+      key: 'url',
+      label: 'Köpt via',
+      value: (r) => hostOf(r.url),
+      fmt: (r) => hostOf(r.url) || '–',
+    },
     {
       key: 'reference',
       label: 'Referens',
@@ -114,39 +117,19 @@ export class TradeLedger {
     { key: 'units', label: 'Antal', right: true, value: (r) => r.units },
     {
       key: 'total',
-      label: this.sell ? 'Summa inkl. moms' : 'Summa exkl. moms',
+      label: 'Summa exkl. moms',
       right: true,
       value: (r) => r.total,
       fmt: (r) => kr.transform(r.total),
     },
-    ...(this.sell
-      ? [
-          {
-            key: 'vat',
-            label: 'Varav moms 25 %',
-            right: true,
-            value: (r: TradeRow) => vatIn(r.total),
-            fmt: (r: TradeRow) => kr.transform(vatIn(r.total)),
-          },
-          {
-            key: 'gross',
-            label: 'Exkl. moms',
-            right: true,
-            value: (r: TradeRow) => netOf(r.total),
-            fmt: (r: TradeRow) => kr.transform(netOf(r.total)),
-          },
-        ]
-      : []),
     { key: 'note', label: 'Anteckning', value: (r) => r.note ?? '', fmt: (r) => r.note || '–' },
   ]);
 
-  /** Kortets rubrik: kunden (eller Kontant) på försäljning, leverantören på inköp. */
+  /** Kortets rubrik: leverantören. */
   party(r: TradeRow) {
-    return this.sell
-      ? r.customer?.name || 'Kontant'
-      : r.supplier?.name || r.supplierName || 'Okänd leverantör';
+    return r.supplier?.name || r.supplierName || 'Okänd leverantör';
   }
-  /** Försäljning visas inkl. moms (det kunden betalar), inköp exkl. moms. */
+  /** Inköp visas exkl. moms. */
   shownTotal(r: TradeRow) {
     return kr.transform(r.total);
   }
@@ -165,9 +148,6 @@ export class TradeLedger {
         r.code,
         String(r.number),
         r.reference,
-        r.customer?.name,
-        r.customer?.code,
-        r.vehicle?.regNo,
         r.supplier?.name,
         r.supplier?.code,
         r.supplierName,

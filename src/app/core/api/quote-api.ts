@@ -9,6 +9,9 @@ import {
   QuoteDetail,
   QuoteInput,
   QuoteDocStatus,
+  QuotePublic,
+  QuoteSendBody,
+  QuoteSendResponse,
   WorkOrderDetail,
 } from '../models';
 
@@ -58,6 +61,31 @@ export class QuoteApi {
   /** Lämnar förslaget till kunden: beloppet och giltigheten frysas. */
   give(id: string): Observable<QuoteDetail> {
     return this.http.post<QuoteDetail>(`${this.base}/${id}/give`, {});
+  }
+
+  /** Skickar länken till kunden som SMS och/eller e-post (lämnar förslaget först om det är ett utkast). */
+  send(id: string, body: QuoteSendBody): Observable<QuoteSendResponse> {
+    return this.http.post<QuoteSendResponse>(`${this.base}/${id}/send`, body);
+  }
+
+  /** Stänger kundens länk. */
+  revokeLink(id: string): Observable<QuoteDetail> {
+    return this.http.delete<QuoteDetail>(`${this.base}/${id}/link`);
+  }
+
+  /** Kundens egen sida: ingen inloggning, nyckeln i länken är nyckeln. */
+  publicView(token: string): Observable<QuotePublic> {
+    return this.http.get<QuotePublic>(`${environment.apiUrl}/inventory/public/quotes/${token}`);
+  }
+
+  publicAnswer(
+    token: string,
+    body: { status: 'approved' | 'declined'; name?: string; note?: string },
+  ): Observable<QuotePublic> {
+    return this.http.post<QuotePublic>(
+      `${environment.apiUrl}/inventory/public/quotes/${token}/answer`,
+      body,
+    );
   }
 
   /** Kundens ja eller nej (null tar bort svaret). */

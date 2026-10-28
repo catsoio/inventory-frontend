@@ -8,7 +8,7 @@ import { Nav } from '../nav';
   host: {
     class:
       'hidden shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 md:flex',
-    '[style.width.px]': 'nav.collapsed() ? 72 : 256',
+    '[style.width.px]': 'nav.collapsed() ? 72 : 288',
   },
   styles: `
     .nav-link {

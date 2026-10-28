@@ -134,8 +134,8 @@ export class SettingsPage {
 }
 
 /** Öppnar inställningarna som popup. Koden laddas först nu, så den ligger utanför första paketet. */
-export function openSettings(dialog: MatDialog, tab?: string): void {
-  void import('./settings-module').then((m) =>
+export function openSettings(dialog: MatDialog, tab?: string): Promise<MatDialogRef<unknown>> {
+  return import('./settings-module').then((m) =>
     dialog.open(m.SettingsPage, {
       data: { tab },
       width: '980px',

@@ -3,6 +3,8 @@ import {
   Customer,
   PAYMENT_STATUS_LABELS,
   STORAGE_CONTENTS_LABELS,
+  Quote,
+  QUOTE_STATUS_LABELS,
   SalesCardItem,
   StorageDeposit,
   Supplier,
@@ -13,7 +15,7 @@ import {
 import { KrPipe } from '../../shared/kr-pipe';
 
 export type HitKind =
-  'storage' | 'vehicle' | 'customer' | 'order' | 'sale' | 'article' | 'supplier';
+  'storage' | 'vehicle' | 'customer' | 'order' | 'quote' | 'sale' | 'article' | 'supplier';
 
 /** En träff i sökningen: en rad med rubrik, förklaring och vart den leder. */
 export interface Hit {
@@ -37,6 +39,7 @@ export const KIND_LABELS: Record<HitKind, string> = {
   vehicle: 'Bilar',
   customer: 'Kunder',
   order: 'Arbetsorder',
+  quote: 'Offerter',
   sale: 'Säljkort',
   article: 'Artiklar',
   supplier: 'Leverantörer',
@@ -47,6 +50,7 @@ export const KIND_ICONS: Record<HitKind, string> = {
   vehicle: 'directions_car',
   customer: 'person',
   order: 'handyman',
+  quote: 'request_quote',
   sale: 'receipt_long',
   article: 'inventory_2',
   supplier: 'local_shipping',
@@ -110,11 +114,31 @@ export const orderHit = (o: WorkOrder): Hit => ({
   link: ['/workorders', o.id],
 });
 
+export const quoteHit = (q: Quote): Hit => ({
+  kind: 'quote',
+  id: q.id,
+  title: q.regNo,
+  plate: q.regNo,
+  sub: join(q.code, q.customerName, q.vehicle),
+  side:
+    QUOTE_STATUS_LABELS[q.shownStatus] +
+    (q.shownStatus === 'draft' ? '' : ' · ' + kr.transform(q.total)),
+  tone:
+    q.shownStatus === 'approved'
+      ? 'green'
+      : q.shownStatus === 'given'
+        ? 'amber'
+        : q.shownStatus === 'declined'
+          ? 'red'
+          : 'gray',
+  link: ['/quotes', q.id],
+});
+
 export const saleHit = (c: SalesCardItem): Hit => ({
   kind: 'sale',
   id: c.id,
   title: c.customerName ?? 'Kontantkund',
-  sub: join(c.code, c.regNo, c.invoiceCode),
+  sub: join(c.code, c.regNo, c.documentCode),
   side:
     c.status === 'draft' ? 'Utkast' : (c.paidAt ? 'Betald ' : 'Obetald ') + kr.transform(c.total),
   tone: c.status === 'draft' ? 'gray' : c.paidAt ? 'green' : 'amber',
@@ -146,16 +170,18 @@ export const supplierHit = (s: Supplier): Hit => ({
 export function groupOrder(q: string): HitKind[] {
   const t = q.trim();
   if (/^[a-zåäö]{3}\s?\d{2}[\dA-Za-z]$/i.test(t) || /^dh-?\d/i.test(t))
-    return ['storage', 'vehicle', 'order', 'sale', 'customer', 'article', 'supplier'];
+    return ['storage', 'vehicle', 'order', 'quote', 'sale', 'customer', 'article', 'supplier'];
   if (/\d{3}\s*\/\s*\d{2}/.test(t) || /\br\s?\d{2}\b/i.test(t) || /^art-?\d/i.test(t))
-    return ['article', 'storage', 'vehicle', 'customer', 'order', 'sale', 'supplier'];
+    return ['article', 'storage', 'vehicle', 'customer', 'order', 'quote', 'sale', 'supplier'];
+  if (/^kf-?\d/i.test(t))
+    return ['quote', 'customer', 'vehicle', 'order', 'sale', 'storage', 'article', 'supplier'];
   if (/^ao-?\d/i.test(t))
-    return ['order', 'vehicle', 'customer', 'sale', 'storage', 'article', 'supplier'];
+    return ['order', 'quote', 'vehicle', 'customer', 'sale', 'storage', 'article', 'supplier'];
   if (/^(sk|fak)-?\d/i.test(t))
-    return ['sale', 'customer', 'vehicle', 'order', 'storage', 'article', 'supplier'];
+    return ['sale', 'customer', 'vehicle', 'order', 'quote', 'storage', 'article', 'supplier'];
   if (/^[\d\s+()-]{5,}$/.test(t))
-    return ['customer', 'vehicle', 'storage', 'order', 'sale', 'article', 'supplier'];
-  return ['customer', 'vehicle', 'storage', 'order', 'sale', 'article', 'supplier'];
+    return ['customer', 'vehicle', 'storage', 'order', 'quote', 'sale', 'article', 'supplier'];
+  return ['customer', 'vehicle', 'storage', 'order', 'quote', 'sale', 'article', 'supplier'];
 }
 
 /** "ABC 123" och "abc123" är samma regnr: skicka utan blanksteg när det ser ut som ett. */

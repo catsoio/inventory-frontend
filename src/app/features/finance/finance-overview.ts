@@ -13,7 +13,7 @@ import { bars, columns, fmtKr, kronor, line, tickKr } from '../../shared/chart/c
 import { ACCENT, OTHER } from '../../shared/chart/chart-theme';
 import type { PanelTable } from '../../shared/panel/panel';
 import { delta } from '../../shared/stat/stat';
-import { InvoiceItem, invoiceFigures, loadInvoices } from './invoices';
+import { InvoiceItem, invoiceFigures, loadInvoices, onlyInvoices } from './invoices';
 
 const MONTHS = 12;
 
@@ -335,7 +335,7 @@ export class FinanceOverview {
     loadInvoices(this.orders, this.cards)
       .pipe(catchError(() => of([] as InvoiceItem[])))
       .subscribe((l) => {
-        this.invoices.set(l);
+        this.invoices.set(onlyInvoices(l));
         this.loaded.set(true);
       });
     const start = new Date(this.now.getFullYear(), this.now.getMonth(), 1);

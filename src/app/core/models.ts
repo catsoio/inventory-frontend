@@ -177,6 +177,9 @@ export interface Summary {
   retailValue: number;
   lowStock: number;
   outOfStock: number;
+  /** Det som ska beställas, utan överlapp: slut (med påminnelsenivå) och under nivån men kvar. */
+  reorderSoldOut: number;
+  reorderLow: number;
 }
 
 export interface FacetItem {
@@ -228,6 +231,8 @@ export interface TradeRow {
   code: string;
   createdAt: string;
   reference: string | null;
+  /** Länk till var det köptes (inköp). */
+  url?: string | null;
   /** Fri text på inköp som gjordes innan leverantörsregistret fanns. */
   supplierName: string | null;
   note: string | null;
@@ -254,6 +259,7 @@ export interface TradeDocument {
   code: string;
   createdAt: string;
   reference: string | null;
+  url?: string | null;
   supplierName: string | null;
   note: string | null;
   units: number;
@@ -264,7 +270,7 @@ export interface TradeDocument {
   lines: TradeLine[];
 }
 
-export type TradeKind = 'sales' | 'purchases';
+export type TradeKind = 'purchases';
 
 export interface MovementQuery {
   type?: MovementType;
@@ -306,7 +312,7 @@ export interface StockHistoryPoint {
   stockValue: number;
 }
 
-export type StockAction = 'receive' | 'sell' | 'return' | 'write-off' | 'adjust';
+export type StockAction = 'receive' | 'return' | 'write-off' | 'adjust';
 
 export type GarageRole = 'owner' | 'staff' | 'mechanic';
 
@@ -895,14 +901,11 @@ export interface VehicleLookup {
 
 /** Bilens kort: bilen med dess senaste bokningar. */
 export interface VehicleDetail extends Vehicle {
-  sales: TradeRow[];
   bookings: Booking[];
   workOrders: WorkOrder[];
 }
 
 export interface CustomerDetail extends Customer {
-  sales: TradeRow[];
-  saleCount: number;
   vehicles: Vehicle[];
   bookings: Booking[];
   workOrders: WorkOrder[];
@@ -1134,6 +1137,7 @@ export interface VatReport {
   from: string;
   to: string;
   invoices: VatSource;
+  receipts: VatSource;
   stockSales: VatSource;
   hotel: VatSource;
   total: { net: number; vat: number; gross: number; byRate: VatBucket[] };
@@ -1436,8 +1440,11 @@ export interface SalesCardItem {
   lineCount: number;
   /** Att betala, öre inkl. moms. */
   total: number;
-  /** FAK-00042 när kortet är bokfört. */
+  /** Numret på det kortet bokfördes som: FAK-00042 för en faktura, KV-00042 för ett kvitto. */
+  documentCode: string | null;
+  /** Bara en faktura har ett fakturanummer (FAK-); ett kvitto har ett kvittonummer (KV-). */
   invoiceCode: string | null;
+  receiptCode: string | null;
   invoicedAt: string | null;
   /** Förfallodatum, när kortet blev en faktura. */
   dueAt: string | null;
@@ -1466,7 +1473,14 @@ export interface SalesCardDetail extends SalesCardItem {
   totals: OrderTotals;
   performed: string | null;
   warranty: string | null;
+  /** Det kortet bokfördes som, en faktura eller ett kvitto (null medan det är ett utkast). */
+  document: WorkOrderInvoice | null;
   invoice: WorkOrderInvoice | null;
+  receipt: WorkOrderInvoice | null;
+  /** På ett återöppnat utkast: numret (och typen) det tar tillbaka när det bokförs igen. */
+  reservedDocumentCode?: string | null;
+  reservedKind?: InvoiceKind | null;
+  reopenings?: { at: string; by: string; kind: InvoiceKind; number: number }[];
   links: SalesCardLinks;
 }
 
@@ -1595,6 +1609,13 @@ export interface QuoteLine {
   system: boolean;
 }
 
+/** En gång förslaget skickades till kunden. */
+export interface QuoteSend {
+  channel: 'sms' | 'email';
+  to: string;
+  at: string;
+}
+
 export interface Quote {
   id: string;
   number: number;
@@ -1619,6 +1640,11 @@ export interface Quote {
   tolerancePercent: number;
   givenTotal: number | null;
   approval: JobApproval | null;
+  /** Kunden har en länk som fungerar. */
+  shared: boolean;
+  sends: QuoteSend[];
+  /** När kunden först öppnade länken. */
+  viewedAt: string | null;
   workOrderId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1627,6 +1653,8 @@ export interface Quote {
 }
 
 export interface QuoteDetail extends Quote {
+  /** Adressen kunden öppnar (null tills förslaget lämnats). */
+  shareUrl: string | null;
   jobs: QuoteJob[];
   lines: QuoteLine[];
   totals: OrderTotals;
@@ -1689,3 +1717,63 @@ export const MONTH_LABELS = [
   'November',
   'December',
 ];
+
+export interface QuoteSendBody {
+  channels: ('sms' | 'email')[];
+  phone?: string;
+  email?: string;
+  smsText?: string;
+  emailNote?: string;
+}
+
+export interface QuoteSendResponse {
+  quote: QuoteDetail;
+  results: { channel: 'sms' | 'email'; to: string; ok: boolean }[];
+}
+
+/** En rad på kundens sida: priser är null när jobbet har fast pris. */
+export interface QuotePublicRow {
+  id: string;
+  type: WorkOrderLineType;
+  description: string;
+  quantity: number;
+  unitPrice: number | null;
+  discountPercent: number;
+  amount: number | null;
+}
+
+/** Förslaget som kunden ser det på `/q/<nyckel>`. */
+export interface QuotePublic {
+  code: string;
+  /** open = väntar på kunden. */
+  state: 'open' | 'approved' | 'declined' | 'expired';
+  seller: {
+    name: string;
+    orgNo: string;
+    address: string;
+    postalCode: string;
+    city: string;
+    phone: string | null;
+    email: string | null;
+  };
+  customerName: string;
+  regNo: string;
+  vehicle: string | null;
+  remarks: string | null;
+  mileage: number | null;
+  givenAt: string | null;
+  validUntil: string | null;
+  tolerancePercent: number;
+  pricesIncludeVat: boolean;
+  terms: string;
+  jobs: {
+    id: string;
+    title: string;
+    fixedPrice: boolean;
+    total: number;
+    rows: QuotePublicRow[];
+  }[];
+  otherRows: QuotePublicRow[];
+  totals: OrderTotals;
+  answer: { status: 'approved' | 'declined'; at: string } | null;
+}

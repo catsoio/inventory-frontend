@@ -59,8 +59,8 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
             <button
               mat-icon-button
               type="button"
-              matTooltip="Öppna kostnadsförslag"
-              aria-label="Öppna kostnadsförslag"
+              matTooltip="Öppna offert"
+              aria-label="Öppna offert"
               [disabled]="busy() || o.locked"
               (click)="openQuote(o)"
             >
@@ -114,10 +114,15 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
             }
           </mat-button-toggle-group>
           @if (o.stockMissing) {
-            <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            <app-callout
+              class="mt-3"
+              [fixes]="[
+                { label: 'Öppna ordern', icon: 'open_in_new', link: ['/workorders', o.id] },
+              ]"
+            >
               {{ o.stockMissing }} {{ o.stockMissing === 1 ? 'del' : 'delar' }} kunde inte tas ur
               lagret. Justera lagret och öppna ordern för att spara om.
-            </p>
+            </app-callout>
           }
         </div>
 

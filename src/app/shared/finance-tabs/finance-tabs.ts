@@ -20,6 +20,7 @@ export class FinanceTabs {
   readonly tabs: SectionTab[] = [
     { path: '/finance', label: 'Översikt', exact: true },
     { path: '/finance/invoices', label: 'Fakturor' },
+    { path: '/finance/receipts', label: 'Kvitton' },
     { path: '/bookkeeping', label: 'Moms och bokföring' },
   ].filter(() => this.admin);
 }

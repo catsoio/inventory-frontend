@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, switchMap } from 'rxjs';
@@ -22,6 +23,7 @@ import {
   WorkOrderLineType,
 } from '../../core/models';
 import { Pricing } from '../../core/pricing';
+import { QuoteSendDialog, type QuoteSendData } from './quote-send-dialog';
 import { Confirm } from '../../shared/confirm';
 import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
 import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
@@ -74,8 +76,8 @@ const TONES: Record<QuoteShownStatus, 'gray' | 'amber' | 'green' | 'red'> = {
     <app-card-page
       [wide]="true"
       listLink="/quotes"
-      listLabel="Kostnadsförslag"
-      newTitle="Nytt kostnadsförslag"
+      listLabel="Offert"
+      newTitle="Ny offert"
       [title]="card() ? card()!.regNo + ' · ' + card()!.customerName : ''"
       [code]="card()?.code ?? null"
     >
@@ -116,14 +118,41 @@ const TONES: Record<QuoteShownStatus, 'gray' | 'amber' | 'green' | 'red'> = {
             </button>
           } @else if (c.status !== 'declined') {
             <button
-              mat-stroked-button
+              mat-flat-button
+              color="primary"
               [disabled]="form.dirty || busy()"
               [matTooltip]="form.dirty ? 'Spara först' : ''"
-              (click)="give()"
+              (click)="openSend()"
             >
-              <mat-icon>outgoing_mail</mat-icon>
-              {{ c.status === 'given' ? 'Lämna på nytt' : 'Markera som lämnat' }}
+              <mat-icon>send</mat-icon>
+              {{ c.sends.length ? 'Skicka igen' : 'Skicka till kund' }}
             </button>
+          }
+          @if (!c.workOrderId && c.status !== 'approved') {
+            <button
+              mat-icon-button
+              type="button"
+              [matMenuTriggerFor]="more"
+              [disabled]="busy()"
+              aria-label="Fler val"
+              matTooltip="Fler val"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #more="matMenu">
+              <button mat-menu-item type="button" [disabled]="form.dirty" (click)="copyLink()">
+                <mat-icon>link</mat-icon> Kopiera länk
+              </button>
+              <button mat-menu-item type="button" [disabled]="form.dirty" (click)="give()">
+                <mat-icon>outgoing_mail</mat-icon>
+                {{ c.givenAt ? 'Lämna på nytt (utan att skicka)' : 'Markera som lämnat' }}
+              </button>
+              @if (c.shared) {
+                <button mat-menu-item type="button" (click)="closeLink()">
+                  <mat-icon>link_off</mat-icon> Stäng kundens länk
+                </button>
+              }
+            </mat-menu>
           }
         }
         @if (!locked()) {
@@ -159,7 +188,7 @@ const TONES: Record<QuoteShownStatus, 'gray' | 'amber' | 'green' | 'red'> = {
 
         <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
           <h2 class="mb-2 flex items-center gap-2 text-base font-semibold sm:col-span-6">
-            Förslag
+            Offert
             @if (card(); as c) {
               <app-pill [tone]="tones[c.shownStatus]">{{ statusLabels[c.shownStatus] }}</app-pill>
             }
@@ -170,16 +199,44 @@ const TONES: Record<QuoteShownStatus, 'gray' | 'amber' | 'green' | 'red'> = {
                 Lämnat {{ day(c.givenAt) }}, giltigt till {{ day(c.validUntil) }}. Slutpriset får
                 avvika högst {{ c.tolerancePercent }} % från {{ c.givenTotal ?? c.total | kr }}.
               } @else {
-                Inte lämnat än. Skriv ut förslaget eller berätta priset i telefon, och markera det
-                som lämnat.
+                Inte lämnat än. Skicka det till kunden med SMS eller e-post, eller skriv ut det och
+                markera det som lämnat.
               }
             </div>
+            @if (c.sends.length || c.viewedAt) {
+              <ul class="mb-3 space-y-1 text-sm sm:col-span-6">
+                @for (x of c.sends; track x.at + x.to) {
+                  <li class="flex items-center gap-2">
+                    <mat-icon class="!h-5 !w-5 !text-[18px] text-gray-500">{{
+                      x.channel === 'sms' ? 'sms' : 'mail'
+                    }}</mat-icon>
+                    Skickat {{ x.channel === 'sms' ? 'som SMS' : 'som e-post' }} till {{ x.to }},
+                    {{ when(x.at) }}
+                  </li>
+                }
+                @if (c.viewedAt) {
+                  <li class="flex items-center gap-2 text-emerald-800">
+                    <mat-icon class="!h-5 !w-5 !text-[18px]">visibility</mat-icon>
+                    Kunden öppnade länken {{ when(c.viewedAt) }}
+                  </li>
+                } @else if (c.shared && c.sends.length) {
+                  <li class="flex items-center gap-2 text-gray-500">
+                    <mat-icon class="!h-5 !w-5 !text-[18px]">visibility_off</mat-icon>
+                    Kunden har inte öppnat länken än
+                  </li>
+                }
+              </ul>
+            }
             @if (c.givenAt && !c.workOrderId) {
               <div class="mb-3 flex flex-wrap items-center gap-2 sm:col-span-6">
                 @if (c.approval; as a) {
                   <span class="text-sm">
                     <b>{{ a.status === 'approved' ? 'Kunden sa ja' : 'Kunden sa nej' }}</b>
-                    {{ day(a.at) }}{{ a.method ? ' (' + methodLabels[a.method] + ')' : '' }}
+                    {{ a.method === 'link' ? 'via länken' : '' }} {{ when(a.at) }}
+                    {{ a.method && a.method !== 'link' ? '(' + methodLabels[a.method] + ')' : '' }}
+                    @if (a.note) {
+                      <span class="block text-gray-600">{{ a.note }}</span>
+                    }
                   </span>
                   <button mat-button type="button" [disabled]="busy()" (click)="answer(null)">
                     Ångra svaret
@@ -457,10 +514,12 @@ export class QuoteCard implements OnInit {
   private readonly inventory = inject(InventoryApi);
   private readonly confirm = inject(Confirm);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly cdr = inject(ChangeDetectorRef);
-  private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  private readonly route = inject(ActivatedRoute);
+  private readonly id = this.route.snapshot.paramMap.get('id');
 
   readonly tones = TONES;
   readonly statusLabels = QUOTE_STATUS_LABELS;
@@ -555,8 +614,21 @@ export class QuoteCard implements OnInit {
 
   ngOnInit() {
     this.workshop.serviceTypes().subscribe((l) => this.serviceTypes.set(l));
-    if (this.id) this.load();
-    else this.form.patchValue({ ourReference: this.auth.user()?.name ?? '' }, { emitEvent: false });
+    if (this.id) {
+      this.load();
+      return;
+    }
+    this.form.patchValue({ ourReference: this.auth.user()?.name ?? '' }, { emitEvent: false });
+    // Länkar från kund- och bilkorten fyller i vem det gäller.
+    const q = this.route.snapshot.queryParamMap;
+    const customerId = q.get('customerId');
+    const vehicleId = q.get('vehicleId');
+    if (customerId || vehicleId) {
+      this.form.controls.link.setValue({
+        customerId: customerId ?? '',
+        vehicleId: vehicleId ?? '',
+      });
+    }
   }
 
   day(iso: string | null | undefined) {
@@ -885,6 +957,80 @@ export class QuoteCard implements OnInit {
       });
   }
 
+  openSend() {
+    const c = this.card();
+    if (!c) return;
+    const data: QuoteSendData = {
+      id: c.id,
+      code: c.code,
+      customerName: c.customerName,
+      regNo: c.regNo,
+      phone: this.customer()?.phone ?? c.phone,
+      email: this.customer()?.email ?? null,
+      total: this.live().totals.total,
+      resend: c.sends.length > 0,
+    };
+    this.dialog
+      .open(QuoteSendDialog, { data, width: '560px', maxWidth: '100vw' })
+      .afterClosed()
+      .subscribe((sent: QuoteDetail | null | undefined) => {
+        if (!sent) return;
+        this.snack.open('Förslaget är skickat', undefined, { duration: 3000 });
+        this.load();
+      });
+  }
+
+  /** Länken kunden öppnar. Finns ingen än lämnas förslaget först. */
+  copyLink() {
+    const c = this.card();
+    if (!c) return;
+    const copy = (url: string) =>
+      navigator.clipboard
+        .writeText(url)
+        .then(() => this.snack.open('Länken är kopierad', undefined, { duration: 2000 }))
+        .catch(() => this.snack.open(url, 'OK'));
+    if (c.shareUrl) {
+      void copy(c.shareUrl);
+      return;
+    }
+    this.busy.set(true);
+    this.api.give(c.id).subscribe({
+      next: (q) => {
+        this.busy.set(false);
+        this.load();
+        if (q.shareUrl) void copy(q.shareUrl);
+      },
+      error: () => this.busy.set(false),
+    });
+  }
+
+  closeLink() {
+    const c = this.card();
+    if (!c) return;
+    this.confirm
+      .ask({
+        title: 'Stänga kundens länk?',
+        message: 'Länken som skickats slutar fungera. Du kan skicka förslaget på nytt.',
+        confirmText: 'Stäng länken',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (ok) this.run(this.api.revokeLink(c.id), 'Länken är stängd');
+      });
+  }
+
+  /** "28 okt 14:02" */
+  when(iso: string | null | undefined) {
+    return iso
+      ? new Date(iso).toLocaleString(appLocale(), {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '';
+  }
+
   answer(status: 'approved' | 'declined' | null, method?: AnswerMethod) {
     const c = this.card();
     if (!c) return;
@@ -926,7 +1072,7 @@ export class QuoteCard implements OnInit {
     this.confirm
       .ask({
         title: `Ta bort ${c.code}?`,
-        message: 'Kostnadsförslaget tas bort. Det går inte att ångra.',
+        message: 'Offerten tas bort. Det går inte att ångra.',
         confirmText: 'Ta bort',
         danger: true,
       })

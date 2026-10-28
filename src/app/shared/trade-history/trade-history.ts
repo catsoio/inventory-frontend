@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { TradeKind, TradeRow } from '../../core/models';
 import { TradeDocumentDialog } from '../trade-document-dialog/trade-document-dialog';
 
-/** Senaste försäljningar eller inköp för en kund, bil eller leverantör; klick öppnar dokumentet. */
+/** Senaste inköp från en leverantör; klick öppnar dokumentet. */
 @Component({
   selector: 'app-trade-history',
   standalone: false,
@@ -16,9 +16,6 @@ import { TradeDocumentDialog } from '../trade-document-dialog/trade-document-dia
       >
         <span class="text-xs text-gray-500">{{ r.code }}</span>
         <span class="tabular-nums">{{ r.createdAt | date: 'yyyy-MM-dd' }}</span>
-        @if (r.vehicle) {
-          <app-reg-plate [value]="r.vehicle.regNo" size="sm" />
-        }
         <span class="flex-1 truncate text-gray-500">{{ r.reference || r.note || '' }}</span>
         <span class="tabular-nums">{{ r.units }} st</span>
         <span class="font-medium tabular-nums">{{ r.total | kr }}</span>
@@ -32,7 +29,7 @@ export class TradeHistory {
   private readonly dialog = inject(MatDialog);
 
   @Input({ required: true }) rows: TradeRow[] = [];
-  @Input({ required: true }) kind: TradeKind = 'sales';
+  @Input({ required: true }) kind: TradeKind = 'purchases';
   @Input() empty = 'Inget än.';
 
   open(r: TradeRow) {

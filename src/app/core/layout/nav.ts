@@ -1,13 +1,9 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
-import { catchError, debounceTime, filter, merge, of } from 'rxjs';
-import { InventoryApi } from '../api/inventory-api';
-import { SalesCardApi } from '../api/sales-card-api';
-import { StorageApi } from '../api/storage-api';
-import { WorkOrderApi } from '../api/work-order-api';
+import { debounceTime, filter, merge } from 'rxjs';
 import { Auth } from '../auth/auth';
-import { Report, StorageSummary, Summary } from '../models';
+import { Todo, todoBadges } from '../todo';
 import { environment } from '../../../environments/environment';
 
 export interface NavItem {
@@ -40,16 +36,6 @@ export interface NavSection {
   items: NavItem[];
 }
 
-/** Siffra bredvid ett menyval så att man ser läget utan att öppna sidan. */
-export interface Badge {
-  text: string;
-  /** Pillens färger. */
-  tone: string;
-  /** Prick på ikonen när menyn är hopfälld eller på mobilens flikar. */
-  dot: string;
-  hint: string;
-}
-
 /**
  * Sidomenyn på dator. Ordningen är hur ofta det används, inte hur data är modellerad: det man gör
  * flera gånger om dagen ligger överst, ett val per avsnitt (resten är flikar i avsnittet) och
@@ -62,13 +48,11 @@ export const NAV: NavSection[] = [
     items: [
       { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month' },
       {
-        // Kostnadsförslag är en flik här (förslaget blir en arbetsorder).
         path: '/workorders',
         label: 'Arbetsorder',
         icon: 'handyman',
         only: 'desktop',
         hidden: !environment.workOrders,
-        match: ['/workorders', '/quotes'],
       },
     ],
   },
@@ -109,11 +93,19 @@ export const NAV: NavSection[] = [
   {
     title: 'Försäljning och ekonomi',
     items: [
+      // Offerten är säljdokumentet som kommer före affären (som Sales Quote i ett affärssystem),
+      // därför står den över Försäljning.
+      {
+        path: '/quotes',
+        label: 'Offert',
+        icon: 'request_quote',
+        only: 'desktop',
+        hidden: !environment.workOrders,
+      },
       {
         path: '/sales',
         label: 'Försäljning',
         icon: 'point_of_sale',
-        match: ['/sales', '/sales-legacy'],
       },
       // Fakturor och de andra ekonomisidorna är undermenyn här. Mobilen har ingen sidomeny och
       // visar dem som flikar (`FinanceTabs`).
@@ -126,6 +118,7 @@ export const NAV: NavSection[] = [
         children: [
           { path: '/finance', label: 'Översikt', icon: 'monitoring', exact: true, badge: 'none' },
           { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
+          { path: '/finance/receipts', label: 'Kvitton', icon: 'receipt' },
           { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
         ],
       },
@@ -165,7 +158,6 @@ export const MOBILE_MORE: NavItem[] = [
     path: '/sales',
     label: 'Försäljning',
     icon: 'point_of_sale',
-    match: ['/sales', '/sales-legacy'],
   },
   { path: '/customers', label: 'Kunder', icon: 'groups' },
   { path: '/vehicles', label: 'Bilar', icon: 'directions_car' },
@@ -179,16 +171,11 @@ export const MOBILE_MORE: NavItem[] = [
   },
 ];
 
-const today = () => new Date().toLocaleDateString('sv-SE');
-
 /** Menyn och siffrorna i den, för sidomenyn på dator och mobilens flikar. */
 @Injectable({ providedIn: 'root' })
 export class Nav {
   private readonly auth = inject(Auth);
-  private readonly api = inject(InventoryApi);
-  private readonly storage = inject(StorageApi);
-  private readonly orders = inject(WorkOrderApi);
-  private readonly cards = inject(SalesCardApi);
+  private readonly todo = inject(Todo);
   private readonly router = inject(Router);
 
   /** Nuvarande adress (utan query). */
@@ -203,84 +190,11 @@ export class Nav {
    */
   private readonly groups = signal<Record<string, boolean>>(this.storedGroups());
 
-  private readonly stock = signal<Summary | null>(null);
-  private readonly hotel = signal<StorageSummary | null>(null);
-  private readonly soldToday = signal<Report | null>(null);
-  private readonly openOrders = signal(0);
-  private readonly missingOrders = signal(0);
-  private readonly draftCards = signal(0);
-  private readonly unpaidInvoices = signal(0);
-
-  readonly badges = computed<Record<string, Badge>>(() => {
-    const out: Record<string, Badge> = {};
-    const s = this.stock();
-    if (s && s.lowStock > 0) {
-      out['/inventory'] = {
-        text: String(s.lowStock),
-        tone: 'bg-amber-100 text-amber-800',
-        dot: 'bg-amber-500',
-        hint: `${s.lowStock} artiklar behöver beställas`,
-      };
-    }
-    const h = this.hotel();
-    if (h && h.stored > 0) {
-      out['/storage'] = {
-        text: String(h.stored),
-        tone: h.overdue > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600',
-        dot: h.overdue > 0 ? 'bg-red-500' : 'bg-gray-400',
-        hint:
-          `${h.stored} set inlagrade` +
-          (h.overdue > 0 ? `, ${h.overdue} har passerat hämtdatum` : '') +
-          (h.unpaid > 0 ? `, ${h.unpaid} obetalda` : ''),
-      };
-    }
-    const missing = this.missingOrders();
-    const fresh = this.openOrders();
-    if (missing > 0 || fresh > 0) {
-      out['/workorders'] =
-        missing > 0
-          ? {
-              text: String(missing),
-              tone: 'bg-amber-100 text-amber-800',
-              dot: 'bg-amber-500',
-              hint: `${missing} order har en del som saknas` + (fresh ? `, ${fresh} nya` : ''),
-            }
-          : {
-              text: String(fresh),
-              tone: 'bg-blue-100 text-blue-800',
-              dot: 'bg-blue-500',
-              hint: `${fresh} nya order`,
-            };
-    }
-    const unpaid = this.unpaidInvoices();
-    if (unpaid > 0) {
-      // På Fakturor, och på Ekonomi (gruppens rad när den är hopfälld, och mobilens "Mer").
-      out['/finance/invoices'] = out['/finance'] = {
-        text: String(unpaid),
-        tone: 'bg-red-100 text-red-800',
-        dot: 'bg-red-500',
-        hint: `${unpaid} obetalda fakturor`,
-      };
-    }
-    const drafts = this.draftCards();
-    const r = this.soldToday();
-    if (drafts > 0) {
-      out['/sales'] = {
-        text: `${drafts} utkast`,
-        tone: 'bg-amber-100 text-amber-800',
-        dot: 'bg-amber-500',
-        hint: `${drafts} säljkort väntar på att bokföras`,
-      };
-    } else if (r && r.soldUnits > 0) {
-      out['/sales'] = {
-        text: `${r.soldUnits} idag`,
-        tone: 'bg-green-100 text-green-800',
-        dot: 'bg-green-500',
-        hint: `${r.soldUnits} sålda enheter idag`,
-      };
-    }
-    return out;
-  });
+  /**
+   * Siffrorna i menyn: det som väntar på någon, ett antal med ett ord ("1 utkast"), röd när något är
+   * sent eller slut och gul när det väntar på dig. Samma lista som Hem visar (`core/todo.ts`).
+   */
+  readonly badges = computed(() => todoBadges(this.todo.items()));
 
   private get admin(): boolean {
     return this.auth.isAdmin() || this.auth.isSuperAdmin();
@@ -395,39 +309,6 @@ export class Nav {
   }
 
   private refresh() {
-    // Mekanikern har inga lager- eller hotellsiffror att visa (och skulle få 403).
-    if (this.auth.isMechanic() || !this.auth.garage()) return;
-    this.api
-      .summary()
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.stock.set(x));
-    this.storage
-      .summary()
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.hotel.set(x));
-    if (environment.workOrders) {
-      this.orders
-        .list({ needsAction: true, limit: 1 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => this.missingOrders.set(x?.pagination.total ?? 0));
-      this.orders
-        .list({ status: 'open', limit: 1 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => this.openOrders.set(x?.pagination.total ?? 0));
-    }
-    this.cards
-      .list({ status: 'draft', limit: 1 })
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.draftCards.set(x?.pagination.total ?? 0));
-    // Försäljningssiffror är bara för ägare; personal får annars 403 på varje sida.
-    if (!this.admin) return;
-    this.api
-      .report(today(), today())
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.soldToday.set(x));
-    this.cards
-      .list({ status: 'posted', paid: false, limit: 1 })
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.unpaidInvoices.set(x?.pagination.total ?? 0));
+    this.todo.refresh();
   }
 }

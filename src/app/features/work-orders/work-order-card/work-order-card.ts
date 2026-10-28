@@ -33,6 +33,7 @@ import type { PickerValue } from '../../../shared/customer-vehicle-picker/custom
 import { dateInput, dateIso } from '../../storage/storage-format';
 import { Auth } from '../../../core/auth/auth';
 import { Pricing } from '../../../core/pricing';
+import type { CalloutFix } from '../../../shared/callout/callout-fix';
 import {
   STANDARD_VAT,
   inMode,
@@ -174,23 +175,16 @@ interface JobValue {
       }
 
       @if (card()?.hasMissing && card()!.status !== 'done') {
-        <p
-          class="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900"
-        >
-          <span><b>Del saknas.</b> Någon rad måste beställas innan jobbet kan bli klart.</span>
-          @if (card()!.status !== 'waiting_parts' && !locked()) {
-            <button mat-stroked-button type="button" (click)="waitForParts()">
-              Sätt Väntar på del
-            </button>
-          }
-        </p>
+        <app-callout class="mb-4" [fixes]="missingFixes()">
+          <b>Del saknas.</b> Någon rad måste beställas innan jobbet kan bli klart.
+        </app-callout>
       }
 
       @if (card()?.overQuote) {
-        <p class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-900">
-          <b>Över kostnadsförslaget.</b> Priset är mer än {{ card()!.quote!.tolerancePercent }} %
+        <app-callout class="mb-4" tone="error" [fixes]="quoteFixes()">
+          <b>Över offerten.</b> Priset är mer än {{ card()!.quote!.tolerancePercent }} %
           över förslaget ({{ card()!.quote!.total | kr }}). Kunden måste godkänna det högre priset.
-        </p>
+        </app-callout>
       }
 
       <form [formGroup]="form" class="grid gap-4 xl:grid-cols-2">
@@ -288,10 +282,10 @@ interface JobValue {
           </div>
 
           @if (card()?.stockMissing; as n) {
-            <p class="mb-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            <app-callout class="mb-2" [fixes]="stockFixes">
               {{ n }} {{ n === 1 ? 'del' : 'delar' }} kunde inte tas ur lagret (saknas eller är
               arkiverad). Justera lagret och spara om ordern.
-            </p>
+            </app-callout>
           }
 
           @if (linesMode()) {
@@ -545,7 +539,7 @@ interface JobValue {
           @if (card(); as c) {
             @if (c.quote) {
               <section class="rounded-xl bg-white p-5 shadow-sm">
-                <h2 class="mb-2 text-base font-semibold">Kostnadsförslag</h2>
+                <h2 class="mb-2 text-base font-semibold">Offert</h2>
                 <p class="mb-3 text-sm">
                   Lämnat {{ c.quote.givenAt | date: 'yyyy-MM-dd' }}:
                   <b>{{ c.quote.total | kr }}</b> inkl. moms, giltigt till
@@ -566,7 +560,7 @@ interface JobValue {
                   <p class="mb-3"><app-pill tone="amber">Väntar på kundens svar</app-pill></p>
                 }
                 <button mat-stroked-button type="button" [disabled]="busy()" (click)="openQuote()">
-                  <mat-icon>request_quote</mat-icon> Öppna kostnadsförslag
+                  <mat-icon>request_quote</mat-icon> Öppna offert
                 </button>
               </section>
             }
@@ -800,6 +794,33 @@ export class WorkOrderCard implements OnInit {
   /** Valt för hand, så att kundbyte inte ändrar det. */
   private inclChosen = false;
   readonly locked = computed(() => !!this.card()?.locked);
+
+  /** Vad man kan göra åt en rad som saknas: beställa (Inköp) och sätta ordern på vänt. */
+  readonly missingFixes = computed<CalloutFix[]>(() => {
+    const c = this.card();
+    const fixes: CalloutFix[] = [
+      { label: 'Registrera inköp', icon: 'shopping_cart_checkout', link: ['/purchases', 'new'] },
+    ];
+    if (c && c.status !== 'waiting_parts' && !this.locked()) {
+      fixes.push({
+        label: 'Sätt Väntar på del',
+        icon: 'hourglass_top',
+        click: () => this.waitForParts(),
+      });
+    }
+    return fixes;
+  });
+  /** Över förslaget: öppna förslaget som kunden sa ja till. */
+  readonly quoteFixes = computed<CalloutFix[]>(() => {
+    const id = this.card()?.quoteId;
+    return id
+      ? [{ label: 'Öppna offerten', icon: 'request_quote', link: ['/quotes', id] }]
+      : [];
+  });
+  /** Delar som inte gick att ta ur lagret: justera artikeln i lagret. */
+  readonly stockFixes: CalloutFix[] = [
+    { label: 'Öppna artiklar', icon: 'inventory_2', link: ['/inventory'] },
+  ];
   /** Jobb med prissatta rader: inställningen, eller en order som redan har jobb eller priser. */
   readonly linesMode = computed(() => {
     const c = this.card();

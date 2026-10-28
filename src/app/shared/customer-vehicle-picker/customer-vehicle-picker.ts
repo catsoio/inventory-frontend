@@ -245,15 +245,20 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
       this.emit();
     });
 
+    // Första händelsen är bara startvärdet (tomt). Den kommer 150 ms efter öppnandet och får inte
+    // nollställa en kund och bil som formuläret hunnit fylla i under tiden (ett snabbt svar från
+    // servern gav tomt val, och ett formulär som såg ändrat ut).
+    let initial = true;
     this.vehicle.valueChanges
       .pipe(
         startWith(this.vehicle.value),
         debounceTime(150),
         switchMap((v) => {
+          const isStart = initial;
+          initial = false;
           this.carQuery.set(typeof v === 'string' ? v.trim() : '');
           if (typeof v !== 'string') return of(null);
-          // Startvärdet (tomt) får inte skriva över en kund och bil som formuläret just fyllt i.
-          if (this.selectedVehicle() || this.edited()) {
+          if (!isStart && (this.selectedVehicle() || this.edited())) {
             this.selectedVehicle.set(null);
             this.emit();
           }

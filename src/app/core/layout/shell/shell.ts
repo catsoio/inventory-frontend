@@ -6,7 +6,7 @@ import { Auth } from '../../auth/auth';
 import { GARAGE_ROLE_LABELS } from '../../models';
 import { PageTitle } from '../../page-title';
 import { Pricing } from '../../pricing';
-import { QUICK_ACTIONS } from '../../search/quick-actions';
+import { QUICK_GROUPS, type QuickAction } from '../../search/quick-actions';
 import { GlobalSearch } from '../../search/global-search';
 import { Settings } from '../../settings';
 import { Nav } from '../nav';
@@ -38,10 +38,10 @@ import { Nav } from '../nav';
       class="flex h-14 shrink-0 items-center text-white shadow-sm"
       [class]="auth.viewingOther() ? 'bg-amber-700' : 'bg-brand'"
     >
-      <!-- Loggan och garaget, lika brett som sidomenyn under. -->
+      <!-- Loggan och garaget, lika brett som sidomenyn under (288 px: ett långt bolagsnamn ska få plats). -->
       <div
         class="hidden h-full shrink-0 items-center gap-2 px-3 transition-[width] duration-200 md:flex"
-        [class]="nav.collapsed() ? 'w-[72px] justify-center' : 'w-64'"
+        [class]="nav.collapsed() ? 'w-[72px] justify-center' : 'w-72'"
       >
         <a routerLink="/dashboard" class="shrink-0 rounded-lg bg-white p-1" aria-label="Hem">
           <img src="catso-logo.png" alt="Catso" class="h-7 w-7 object-contain" />
@@ -73,19 +73,26 @@ import { Nav } from '../nav';
         <app-billing-banner />
 
         @if (!auth.isMechanic()) {
-          <!-- Genvägar för att skapa något (dator): samma som under sökrutan. -->
-          <div class="hidden items-center gap-1 lg:flex">
-            @for (a of quick; track a.label) {
-              <button
-                type="button"
-                class="flex h-10 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-white/90 transition-colors bg-white/10 hover:bg-white/20 xl:px-3"
-                [matTooltip]="a.label"
-                [attr.aria-label]="a.label"
-                (click)="run(a)"
-              >
-                <mat-icon class="!h-5 !w-5 shrink-0 !text-xl !leading-5">{{ a.icon }}</mat-icon>
-                <span class="leading-5 max-2xl:hidden">{{ a.label }}</span>
-              </button>
+          <!-- Genvägar för att skapa något (dator), i grupper som sidomenyns avsnitt: samma som under sökrutan. -->
+          <div class="hidden items-center gap-2 lg:flex xl:gap-3">
+            @for (g of quickGroups; track g.title) {
+              <div class="flex items-center gap-1" role="group" [attr.aria-label]="g.title">
+                @for (a of g.actions; track a.label) {
+                  <button
+                    type="button"
+                    class="flex h-10 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-white/90 transition-colors bg-white/10 hover:bg-white/20 xl:px-3"
+                    [matTooltip]="a.label"
+                    [attr.aria-label]="a.label"
+                    (click)="run(a)"
+                  >
+                    <mat-icon class="!h-5 !w-5 shrink-0 !text-xl !leading-5">{{ a.icon }}</mat-icon>
+                    <span class="leading-5 max-2xl:hidden">{{ a.label }}</span>
+                  </button>
+                }
+              </div>
+              @if (!$last) {
+                <span class="h-6 w-px bg-white/30" aria-hidden="true"></span>
+              }
             }
           </div>
           <!-- Dator: ett fält att klicka i; mobil: bara en ikon. -->
@@ -151,8 +158,8 @@ export class Shell {
   readonly auth = inject(Auth);
   readonly nav = inject(Nav);
   readonly search = inject(GlobalSearch);
-  readonly quick = QUICK_ACTIONS;
-  run(a: (typeof QUICK_ACTIONS)[number]) {
+  readonly quickGroups = QUICK_GROUPS;
+  run(a: QuickAction) {
     if (a.go) void this.router.navigate(a.go);
     else {
       // Dialogen laddas först när den behövs, så att den inte väger i första paketet.

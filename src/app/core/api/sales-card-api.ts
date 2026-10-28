@@ -67,6 +67,14 @@ export class SalesCardApi {
     return this.http.post<SalesCardDetail>(`${this.base}/${id}/post`, choice);
   }
 
+  /**
+   * Återöppnar ett bokfört, obetalt kort (ägaren): delarna läggs tillbaka i lagret, dokumentet
+   * dras tillbaka och fakturanumret sparas till nästa bokföring.
+   */
+  reopen(id: string): Observable<SalesCardDetail> {
+    return this.http.post<SalesCardDetail>(`${this.base}/${id}/reopen`, {});
+  }
+
   /** Utkastet till dokumentet som det blir om kortet bokförs nu med de här valen. Inget sparas. */
   preview(id: string, choice: DocumentChoice = {}): Observable<WorkOrderInvoice> {
     return this.http.get<WorkOrderInvoice>(`${this.base}/${id}/preview`, {

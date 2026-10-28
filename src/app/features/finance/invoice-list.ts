@@ -13,19 +13,17 @@ import {
   dueNote,
   invoiceStatus,
 } from '../../shared/invoice-status';
-import { InvoiceItem, invoiceFigures, loadInvoices } from './invoices';
+import { InvoiceItem, invoiceFigures, loadInvoices, onlyInvoices } from './invoices';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
 
-const KIND_TEXT = { invoice: 'Faktura', receipt: 'Kvitto' } as const;
 /** Det som kräver något av ägaren först: förfallet, sedan obetalt, sist betalt. */
 const STATUS_ORDER: Record<InvoiceStatus, number> = { overdue: 0, open: 1, paid: 2 };
 
 const COLS: DtCol<InvoiceItem>[] = [
   { key: 'code', label: 'Nr', value: (o) => o.code },
-  { key: 'kind', label: 'Typ', value: (o) => KIND_TEXT[o.kind] },
   { key: 'customer', label: 'Kund', value: (o) => o.customerName },
   { key: 'regNo', label: 'Regnr', value: (o) => o.regNo },
   {
@@ -38,7 +36,7 @@ const COLS: DtCol<InvoiceItem>[] = [
     key: 'due',
     label: 'Förfaller',
     value: (o) => o.dueAt ?? '',
-    fmt: (o) => (o.kind === 'invoice' ? day(o.dueAt) : '–'),
+    fmt: (o) => day(o.dueAt),
   },
   {
     key: 'gross',
@@ -56,12 +54,12 @@ const COLS: DtCol<InvoiceItem>[] = [
 ];
 
 type StatusFilter = 'all' | 'unpaid' | 'overdue' | 'paid';
-type KindFilter = 'all' | 'invoice' | 'receipt';
 
 /**
- * Fakturor och kvitton på ett ställe, som en kundreskontra: vad som är obetalt, vad som är sent
- * och vad som kommit in. En faktura har förfallodatum och kan vara förfallen; ett kvitto är betalt
- * redan när det skrivs. Klick öppnar säljkortet (eller den äldre fakturan) bakom.
+ * Fakturor som en kundreskontra: vad som är obetalt, vad som är sent och vad som kommit in. En
+ * faktura har förfallodatum och kan vara förfallen. Kvitton (betalt på stället) har en egen lista
+ * och en egen nummerserie: de är inga fordringar. Klick öppnar säljkortet (eller den äldre
+ * fakturan) bakom.
  */
 @Component({
   selector: 'app-invoice-list',
@@ -108,7 +106,7 @@ type KindFilter = 'all' | 'invoice' | 'receipt';
         [newQuery]="{ kind: 'invoice' }"
         newLabel="Ny faktura"
         [newFab]="false"
-        emptyText="Inget att visa. Fakturor och kvitton skapas när ett säljkort bokförs."
+        emptyText="Inga fakturor. De skapas när ett säljkort bokförs som faktura."
         searchPlaceholder="Sök nummer, kund eller regnr…"
         (search)="query.set($event)"
         (rowClick)="open($event)"
@@ -125,30 +123,18 @@ type KindFilter = 'all' | 'invoice' | 'receipt';
             <mat-button-toggle value="overdue">Förfallna</mat-button-toggle>
             <mat-button-toggle value="paid">Betalda</mat-button-toggle>
           </mat-button-toggle-group>
-          <mat-button-toggle-group
-            class="max-md:!hidden"
-            hideSingleSelectionIndicator
-            [value]="kind()"
-            (change)="kind.set($event.value)"
-            aria-label="Typ"
-          >
-            <mat-button-toggle value="all">Alla typer</mat-button-toggle>
-            <mat-button-toggle value="invoice">Fakturor</mat-button-toggle>
-            <mat-button-toggle value="receipt">Kvitton</mat-button-toggle>
-          </mat-button-toggle-group>
           <span class="text-sm text-gray-600">{{ summary() }}</span>
-          <span class="flex-1"></span>
-          <a mat-stroked-button routerLink="/finance/invoices/new" class="max-md:!hidden">
-            <mat-icon>history</mat-icon> Lägg till gammal faktura
-          </a>
         </div>
+        <a actions mat-stroked-button routerLink="/finance/invoices/new" class="max-md:!hidden">
+          <mat-icon>history</mat-icon> Lägg till gammal faktura
+        </a>
         <!-- Mobil: ett kompakt kort i stället för alla kolumner under varandra. -->
         <ng-template #card let-o="row">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-baseline gap-2">
                 <span class="font-semibold">{{ o.code }}</span>
-                <span class="text-xs text-gray-500">{{ kindText(o) }} · {{ dateOf(o) }}</span>
+                <span class="text-xs text-gray-500">{{ dateOf(o) }}</span>
               </div>
               <div class="truncate text-sm text-gray-700">{{ o.customerName }}</div>
               <div class="truncate text-xs text-gray-500">
@@ -174,9 +160,6 @@ type KindFilter = 'all' | 'invoice' | 'receipt';
             @case ('code') {
               <span class="font-medium">{{ o.code }}</span>
               <span class="block text-xs text-gray-500">{{ o.ref }}</span>
-            }
-            @case ('kind') {
-              <app-pill [tone]="o.kind === 'invoice' ? 'blue' : 'gray'">{{ text }}</app-pill>
             }
             @case ('due') {
               {{ text }}
@@ -211,7 +194,6 @@ export class InvoiceList {
   readonly money = (ore: number) => kr.transform(ore);
   readonly dayText = day;
   readonly dateOf = (o: InvoiceItem) => day(o.invoicedAt);
-  readonly kindText = (o: InvoiceItem) => KIND_TEXT[o.kind];
   readonly statusOf = (o: InvoiceItem) => invoiceStatus(o);
   readonly statusText = (o: InvoiceItem) => STATUS_TEXT[invoiceStatus(o)];
   readonly tone = (o: InvoiceItem) => STATUS_TONE[invoiceStatus(o)];
@@ -234,9 +216,8 @@ export class InvoiceList {
       inject(ActivatedRoute).snapshot.queryParamMap.get('status'),
     ),
   );
-  readonly kind = signal<KindFilter>('all');
 
-  /** Siffrorna gäller alla dokument, inte bara de som filtret visar. */
+  /** Siffrorna gäller alla fakturor, inte bara de som filtret visar. */
   readonly figures = computed(() => invoiceFigures(this.items()));
   readonly overdueHint = computed(() => {
     if (this.loading()) return '';
@@ -248,11 +229,9 @@ export class InvoiceList {
   readonly shown = computed(() => {
     const q = this.query().toLowerCase();
     const s = this.status();
-    const k = this.kind();
     return this.items().filter((o) => {
       const st = invoiceStatus(o);
       return (
-        (k === 'all' || o.kind === k) &&
         (s === 'all' ||
           (s === 'paid' && st === 'paid') ||
           (s === 'unpaid' && st !== 'paid') ||
@@ -274,7 +253,7 @@ export class InvoiceList {
   constructor() {
     loadInvoices(this.api, this.cardsApi).subscribe({
       next: (l) => {
-        this.items.set(l);
+        this.items.set(onlyInvoices(l));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

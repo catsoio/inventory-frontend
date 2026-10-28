@@ -143,10 +143,7 @@ const WORK_HOURS = 8;
       </app-panel>
 
       <app-panel title="Att göra" icon="task_alt">
-        <app-attention-list
-          [items]="data.attention()"
-          [ready]="!!data.hotel() && !!data.summary()"
-        />
+        <app-attention-list [items]="data.attention()" [ready]="data.attentionReady()" />
       </app-panel>
     </div>
 

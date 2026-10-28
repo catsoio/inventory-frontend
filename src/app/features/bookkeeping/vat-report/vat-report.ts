@@ -36,11 +36,21 @@ const ymd = (d: Date) =>
 
       @if (report(); as r) {
         @if (r.doneNotInvoiced > 0) {
-          <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          <app-callout
+            class="mt-3"
+            [fixes]="[
+              {
+                label: 'Visa klara arbetsorder',
+                icon: 'handyman',
+                link: ['/workorders'],
+                queryParams: { status: 'done' },
+              },
+            ]"
+          >
             {{ r.doneNotInvoiced }}
             {{ r.doneNotInvoiced === 1 ? 'klar arbetsorder är' : 'klara arbetsorder är' }} inte
             fakturerad än och ingår därför inte i rapporten.
-          </p>
+          </app-callout>
         }
         <table class="mt-4 w-full max-w-3xl text-sm">
           <thead>
@@ -96,7 +106,8 @@ export class VatReportPanel {
 
   rows(r: VatReport): [string, VatSource][] {
     return [
-      ['Fakturor och kvitton (arbetsorder)', r.invoices],
+      ['Fakturor', r.invoices],
+      ['Kvitton (betalt på stället)', r.receipts],
       ['Lagerförsäljning utanför arbetsorder', r.stockSales],
       ['Däckhotell (betalda avgifter)', r.hotel],
     ];

@@ -2,15 +2,17 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { InventoryApi } from '../../core/api/inventory-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
-import { InvoiceKind, PaymentMethod, paymentOptions } from '../../core/models';
+import { InvoiceKind, PaymentMethod, paymentOptions, SellerDetails } from '../../core/models';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { ensureValid } from '../../shared/form-guard';
-import { invoiceGap } from '../../shared/invoice-gap';
+import { Gap, invoiceGap, sellerGap } from '../../shared/invoice-gap';
+import { openSettings } from '../settings/settings';
 import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
 import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
 
@@ -52,8 +54,8 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-base font-semibold">Kund och bil</h2>
           <app-customer-vehicle-picker formControlName="link" />
-          @if (gap(); as why) {
-            <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{{ why }}</p>
+          @if (gap(); as g) {
+            <app-callout class="mt-3" [fixes]="g.fixes">{{ g.text }}</app-callout>
           }
         </section>
         <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -139,6 +141,7 @@ export class InvoiceNew implements HasUnsaved {
   private readonly inventory = inject(InventoryApi);
   private readonly links = inject(LinkResolver);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
   readonly busy = signal(false);
   readonly form = inject(FormBuilder).nonNullable.group({
@@ -170,28 +173,57 @@ export class InvoiceNew implements HasUnsaved {
     { initialValue: null },
   );
 
-  /** Det som hindrar en faktura just nu: en faktura behöver en kund med adress. */
-  readonly gap = computed(() => {
+  /** Verkstadens egna uppgifter: varje faktura och kvitto bär dem (Inställningar → Företaget). */
+  private readonly seller = signal<SellerDetails | null>(null);
+  private readonly receiptFix = {
+    label: 'Välj kvitto',
+    icon: 'receipt',
+    click: () => this.form.controls.kind.setValue('receipt'),
+  };
+
+  /** Det som hindrar sparandet just nu, med en knapp dit det rättas. */
+  readonly gap = computed<Gap | null>(() => {
+    // Sidan är bara för ägaren, som är den som kan fylla i verkstadens uppgifter.
+    const own = sellerGap(this.seller(), true, () => this.openCompanySettings());
+    if (own) return own;
     if (this.kind() !== 'invoice') return null;
     const l = this.link();
     if (l?.pending?.customerName && !l.customerId && !l.pending.customerId) {
-      return 'En ny kund har ingen adress än. Lägg först till kunden med adress under Kunder och välj den här, eller välj kvitto.';
+      return {
+        text: 'En ny kund har ingen adress än. Lägg först till kunden med adress under Kunder och välj den här, eller välj kvitto.',
+        fixes: [
+          { label: 'Lägg till kund', icon: 'person_add', link: ['/customers', 'new'] },
+          this.receiptFix,
+        ],
+      };
     }
-    return invoiceGap(this.customer());
+    const gap = invoiceGap(this.customer());
+    return gap && { ...gap, fixes: [...gap.fixes, this.receiptFix] };
   });
+
+  private openCompanySettings() {
+    void openSettings(this.dialog, 'foretag').then((ref) =>
+      ref.afterClosed().subscribe(() => this.loadSeller()),
+    );
+  }
+
+  private loadSeller() {
+    this.inventory
+      .seller()
+      .pipe(catchError(() => of(null)))
+      .subscribe((s) => {
+        if (!s) return;
+        this.seller.set(s);
+        this.form.controls.terms.setValue(s.paymentTermsDays);
+      });
+  }
 
   constructor() {
     // Rätt betalsätt för typen: en faktura betalas in på banken, ett kvitto på stället.
     this.form.controls.kind.valueChanges.pipe(takeUntilDestroyed()).subscribe((k) => {
       this.form.controls.method.setValue(k === 'receipt' ? 'card' : 'invoice');
     });
-    this.inventory
-      .seller()
-      .pipe(
-        catchError(() => of(null)),
-        takeUntilDestroyed(),
-      )
-      .subscribe((s) => s && this.form.controls.terms.setValue(s.paymentTermsDays));
+    this.loadSeller();
   }
 
   hasUnsaved() {

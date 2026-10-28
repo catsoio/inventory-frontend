@@ -12,8 +12,8 @@ export interface SectionTab {
 const IGNORE = { queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' } as const;
 
 /**
- * Flikraden överst i ett avsnitt: vyerna i samma avsnitt (Arbetsorder och Kostnadsförslag,
- * Översikt och Fakturor under Ekonomi). Sidomenyn har ett val per avsnitt; det som hör ihop ligger
+ * Flikraden överst i ett avsnitt: vyerna i samma avsnitt (Lager och Däckhotell,
+ * Översikt och Fakturor under Ekonomi på mobil). Sidomenyn har ett val per avsnitt; det som hör ihop ligger
  * här i stället för som ännu en menypost. På mobil rullar raden i sidled.
  */
 @Component({

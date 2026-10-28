@@ -41,7 +41,7 @@ export class SalesInvoicePage implements OnInit {
   ngOnInit() {
     this.api.get(this.id).subscribe((c) => {
       this.card.set(c);
-      if (c.invoice) return this.show(c.invoice);
+      if (c.document) return this.show(c.document);
       this.api.preview(this.id, this.choice()).subscribe({
         next: (d) => this.show(d),
         error: (e) => this.error.set(e?.error?.message ?? 'Kunde inte skapa utkastet.'),

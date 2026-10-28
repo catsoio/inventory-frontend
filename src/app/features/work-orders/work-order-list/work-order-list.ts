@@ -5,7 +5,6 @@ import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { Auth } from '../../../core/auth/auth';
 import { WORK_ORDER_STATUS_LABELS, WorkOrder, WorkOrderStatus } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
-import { ORDER_TABS } from '../../../shared/section-tabs/tabs';
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(appLocale()) : '–');
 
@@ -42,7 +41,6 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs [tabs]="tabs" label="Arbetsorder" />
     <app-list-page
       class="min-h-0 min-w-0 flex-1"
       title=""
@@ -132,7 +130,6 @@ export class WorkOrderList {
   }
 
   readonly cols = COLS;
-  readonly tabs = ORDER_TABS;
   readonly tones = TONES;
   readonly items = signal<WorkOrder[]>([]);
   readonly loading = signal(true);

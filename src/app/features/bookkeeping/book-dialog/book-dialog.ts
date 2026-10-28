@@ -4,7 +4,14 @@ import { FormBuilder } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { catchError, debounceTime, of, Subject, switchMap, tap } from 'rxjs';
 import { ClosingApi } from '../../../core/api/closing-api';
-import { Closing, ClosingPreview, ClosingStatusInfo, closingCode } from '../../../core/models';
+import {
+  Closing,
+  ClosingPreview,
+  ClosingStatusInfo,
+  ClosingWarning,
+  closingCode,
+} from '../../../core/models';
+import type { CalloutFix } from '../../../shared/callout/callout-fix';
 import {
   BLOCKED_TEXT,
   dateTimeText,
@@ -83,15 +90,9 @@ type Mode = 'now' | 'custom';
 
         @for (w of p.warnings; track w.code) {
           @if (!(p.blocked === 'NOTHING_TO_CLOSE' && w.code === 'EMPTY_PERIOD')) {
-            <div
-              class="flex gap-2 rounded-lg p-3 text-sm"
-              [class]="
-                w.severity === 'warning' ? 'bg-amber-50 text-amber-900' : 'bg-blue-50 text-blue-900'
-              "
-            >
-              <mat-icon>{{ w.severity === 'warning' ? 'warning' : 'info' }}</mat-icon>
-              <span>{{ text(w) }}</span>
-            </div>
+            <app-callout [tone]="w.severity === 'warning' ? 'warn' : 'info'" [fixes]="fixesFor(w)">
+              {{ text(w) }}
+            </app-callout>
           }
         }
 
@@ -163,6 +164,31 @@ export class BookDialog {
   code = closingCode;
   dateTime = dateTimeText;
   text = warningText;
+
+  /** Vart man går för att rätta det varningen gäller (dialogen stängs först). */
+  fixesFor(w: ClosingWarning): CalloutFix[] {
+    const close = () => this.ref.close();
+    switch (w.code) {
+      case 'UNPAID_FEES':
+        return [
+          {
+            label: 'Visa obetalda',
+            icon: 'warehouse',
+            link: ['/storage'],
+            queryParams: { status: 'stored', paymentStatus: 'unpaid' },
+            click: close,
+          },
+        ];
+      case 'NEGATIVE_STOCK':
+        return [
+          { label: 'Öppna artiklar', icon: 'inventory_2', link: ['/inventory'], click: close },
+        ];
+      case 'STOCK_NOT_IN_LEDGER':
+        return [{ label: 'Öppna lagerloggen', icon: 'history', link: ['/reports'], click: close }];
+      default:
+        return [];
+    }
+  }
   period = (p: ClosingPreview) => periodLabel(p.from, p.to);
   days = (p: ClosingPreview) => daysIn(p.from, p.to);
 

@@ -5,23 +5,24 @@ import { SharedModule } from '../../shared/shared-module';
 import { QuoteCard } from './quote-card';
 import { QuoteList } from './quote-list';
 import { QuotePrint } from './quote-print';
+import { QuoteSendDialog } from './quote-send-dialog';
 
 @NgModule({
-  declarations: [QuoteList, QuoteCard, QuotePrint],
+  declarations: [QuoteList, QuoteCard, QuotePrint, QuoteSendDialog],
   imports: [
     SharedModule,
     RouterModule.forChild([
       { path: '', component: QuoteList },
       {
         path: 'new',
-        title: 'Nytt kostnadsförslag',
+        title: 'Ny offert',
         component: QuoteCard,
         canDeactivate: [unsavedGuard],
       },
-      { path: ':id/print', title: 'Kostnadsförslag', component: QuotePrint },
+      { path: ':id/print', title: 'Offert', component: QuotePrint },
       {
         path: ':id',
-        title: 'Kostnadsförslag',
+        title: 'Offert',
         component: QuoteCard,
         canDeactivate: [unsavedGuard],
       },

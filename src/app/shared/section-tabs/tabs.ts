@@ -1,11 +1,5 @@
 import type { SectionTab } from './section-tabs';
 
-/** Arbetsorder och Kostnadsförslag är två vyer av samma avsnitt: förslaget blir en order. */
-export const ORDER_TABS: SectionTab[] = [
-  { path: '/workorders', label: 'Arbetsorder', exact: true },
-  { path: '/quotes', label: 'Kostnadsförslag' },
-];
-
 /** Lager: listan, en översikt med diagram och lagerloggen (som förut hette Logg och rapport). */
 export const STOCK_TABS: SectionTab[] = [
   { path: '/inventory', label: 'Artiklar', exact: true },
