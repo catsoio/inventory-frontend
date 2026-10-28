@@ -26,6 +26,14 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
   // Utan instruktionen skulle en sparning tömma den.
   instruction: l.instruction,
   done,
+  // Raderna ersätts vid sparning: allt som saknas här försvinner från ordern.
+  jobId: l.jobId,
+  code: l.code,
+  unitPrice: l.unitPrice,
+  discountPercent: l.discountPercent,
+  vatRate: l.vatRate,
+  noCharge: l.noCharge,
+  minutes: l.minutes,
 });
 
 /**
@@ -175,54 +183,96 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
           </div>
         </section>
 
-        @if (o.remarks) {
-          <section class="border-t border-gray-100 p-5">
-            <div class="sec">Kundanmärkning</div>
-            <div class="rounded-lg bg-gray-50 p-3 text-sm whitespace-pre-line text-gray-900">
-              {{ o.remarks }}
-            </div>
-          </section>
-        }
+        <section class="border-t border-gray-100 p-5">
+          <div class="sec">Kundanmärkning</div>
+          <textarea
+            rows="2"
+            class="w-full resize-y px-3 py-2 text-sm field"
+            placeholder="Vad kunden berättat, t.ex. ljud från framhjulet"
+            [value]="o.remarks ?? ''"
+            [disabled]="busy() || o.locked"
+            (blur)="saveRemarks(o, $any($event.target).value)"
+          ></textarea>
+        </section>
 
         <section class="border-t border-gray-100 p-5">
           <div class="sec">Vad ska göras</div>
           <div class="space-y-3">
-            @for (g of groups(o); track g.id) {
-              <div class="rounded-lg bg-gray-50 p-3">
+            @for (g of groups(o); track g.id; let n = $index) {
+              <div
+                class="overflow-hidden rounded-lg border border-l-4 transition-colors"
+                [class.border-gray-200]="!g.work?.done"
+                [class.border-l-teal-700]="!g.work?.done"
+                [class.bg-white]="!g.work?.done"
+                [class.border-green-300]="g.work?.done"
+                [class.border-l-green-600]="g.work?.done"
+                [class.bg-green-50]="g.work?.done"
+              >
                 @if (g.title) {
-                  <div class="mb-1 flex items-baseline gap-2">
-                    <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ g.title }}</span>
+                  <div class="flex items-center gap-3 px-3 py-2.5">
+                    @if (g.work; as w) {
+                      <input
+                        type="checkbox"
+                        class="h-5 w-5 shrink-0 accent-teal-700"
+                        [checked]="w.done"
+                        [disabled]="busy() || o.locked"
+                        (change)="toggle(o, w, $any($event.target).checked)"
+                        [attr.aria-label]="'Klar: ' + g.title"
+                      />
+                    }
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-semibold tracking-wide text-teal-800 uppercase">
+                        Jobb {{ n + 1 }}
+                      </div>
+                      <div
+                        class="truncate text-sm font-semibold"
+                        [class.line-through]="g.work?.done"
+                      >
+                        {{ g.title }}
+                      </div>
+                    </div>
                     @if (g.total !== null) {
-                      <span class="text-sm text-gray-600 tabular-nums">{{ g.total | kr }}</span>
+                      <span class="text-sm font-semibold tabular-nums">{{ g.total | kr }}</span>
                     }
                   </div>
                 }
-                <ul>
-                  @for (l of g.lines; track l.id) {
-                    <li class="flex items-start gap-3 py-1.5">
-                      <input
-                        type="checkbox"
-                        class="mt-0.5 h-5 w-5 shrink-0 accent-teal-700"
-                        [checked]="l.done"
-                        [disabled]="busy() || o.locked"
-                        (change)="toggle(o, l, $any($event.target).checked)"
-                        [attr.aria-label]="'Klar: ' + l.description"
-                      />
-                      <span class="min-w-0 flex-1 text-sm" [class.text-gray-400]="l.done">
-                        <span [class.line-through]="l.done">{{ l.description }}</span>
-                        @if (l.toOrder) {
-                          <app-pill tone="amber">Del saknas</app-pill>
-                        }
-                        @if (l.instruction) {
-                          <span class="block text-xs text-gray-500">{{ l.instruction }}</span>
-                        }
-                      </span>
-                      @if (l.quantity !== 1) {
-                        <span class="text-sm text-gray-500 tabular-nums">{{ l.quantity }} st</span>
+                @if (g.lines.length) {
+                  <div class="px-3 pb-3" [class.pt-3]="!g.title">
+                    @if (g.title) {
+                      <div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                        Delar
+                      </div>
+                    }
+                    <ul class="mt-1 ml-1 border-l-2 border-teal-700/30 pl-3">
+                      @for (l of g.lines; track l.id) {
+                        <li class="flex items-start gap-3 py-1.5">
+                          <input
+                            type="checkbox"
+                            class="mt-0.5 h-5 w-5 shrink-0 accent-teal-700"
+                            [checked]="l.done"
+                            [disabled]="busy() || o.locked"
+                            (change)="toggle(o, l, $any($event.target).checked)"
+                            [attr.aria-label]="'Klar: ' + l.description"
+                          />
+                          <span class="min-w-0 flex-1 text-sm" [class.text-gray-400]="l.done">
+                            <span [class.line-through]="l.done">{{ l.description }}</span>
+                            @if (l.toOrder) {
+                              <app-pill tone="amber">Del saknas</app-pill>
+                            }
+                            @if (l.instruction) {
+                              <span class="block text-xs text-gray-500">{{ l.instruction }}</span>
+                            }
+                          </span>
+                          @if (l.quantity !== 1) {
+                            <span class="text-sm text-gray-500 tabular-nums"
+                              >{{ l.quantity }} st</span
+                            >
+                          }
+                        </li>
                       }
-                    </li>
-                  }
-                </ul>
+                    </ul>
+                  </div>
+                }
               </div>
             } @empty {
               <p class="text-sm text-gray-500">Inga rader än.</p>
@@ -233,10 +283,10 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
             <input
               #text
               class="h-11 min-w-0 flex-1 px-3 text-sm field"
-              placeholder="Lägg till rad…"
+              placeholder="Nytt jobb, t.ex. Byta olja"
             />
             <button mat-stroked-button type="submit" class="!h-11" [disabled]="busy() || o.locked">
-              <mat-icon>add</mat-icon> Lägg till
+              <mat-icon>add</mat-icon> Lägg till jobb
             </button>
           </form>
         </section>
@@ -300,15 +350,24 @@ export class WorkOrderQuick implements OnInit {
   /** Raderna under sitt jobb (kundanmärkning) med delsumma; rader utan jobb samlas sist. Systemraden döljs. */
   groups(o: WorkOrderDetail) {
     const rows = o.lines.filter((l) => !l.system);
-    const out: { id: string; title: string; total: number | null; lines: WorkOrderLine[] }[] = [];
+    const out: {
+      id: string;
+      title: string;
+      total: number | null;
+      work: WorkOrderLine | null;
+      lines: WorkOrderLine[];
+    }[] = [];
     for (const j of o.jobs ?? []) {
-      const lines = rows.filter((l) => l.jobId === j.id);
-      if (lines.length)
-        out.push({ id: j.id, title: j.title, total: o.jobTotals?.[j.id] ?? null, lines });
+      const all = rows.filter((l) => l.jobId === j.id);
+      // Jobbets egen rad (arbetet) blir jobbets kryssruta; resten är delarna.
+      const work = all.find((l) => l.type === 'labour') ?? null;
+      const lines = all.filter((l) => l !== work);
+      if (all.length)
+        out.push({ id: j.id, title: j.title, total: o.jobTotals?.[j.id] ?? null, work, lines });
     }
     const known = new Set((o.jobs ?? []).map((j) => j.id));
     const rest = rows.filter((l) => !l.jobId || !known.has(l.jobId));
-    if (rest.length) out.push({ id: 'rest', title: '', total: null, lines: rest });
+    if (rest.length) out.push({ id: 'rest', title: '', total: null, work: null, lines: rest });
     return out;
   }
 
@@ -338,23 +397,70 @@ export class WorkOrderQuick implements OnInit {
     });
   }
 
-  toggle(o: WorkOrderDetail, l: WorkOrderLine, done: boolean) {
-    this.patch({ lines: o.lines.map((x) => asInput(x, x.id === l.id ? done : x.done)) });
+  saveRemarks(o: WorkOrderDetail, text: string) {
+    const remarks = text.trim();
+    if (remarks === (o.remarks ?? '')) return;
+    this.patch({ remarks: remarks || null });
   }
 
-  add(o: WorkOrderDetail, box: HTMLInputElement) {
-    const description = box.value.trim();
-    if (!description) return;
-    box.value = '';
-    this.patch({
-      lines: [
-        ...o.lines.map((x) => asInput(x)),
-        {
-          type: 'other',
-          description,
-          quantity: 1,
-          done: false,
+  private flushing = false;
+  private linesDirty = false;
+
+  /**
+   * Bockar av direkt i panelen och sparar efteråt. Klickar man igen medan en sparning pågår
+   * skickas senaste läget när den är klar (inget klick tappas, och svaret skriver inte över det).
+   */
+  toggle(o: WorkOrderDetail, l: WorkOrderLine, done: boolean) {
+    if (o.locked) return;
+    this.order.update((x) =>
+      x ? { ...x, lines: x.lines.map((r) => (r.id === l.id ? { ...r, done } : r)) } : x,
+    );
+    this.linesDirty = true;
+    if (!this.flushing) this.flush();
+  }
+
+  private flush() {
+    const o = this.order();
+    if (!o) return;
+    this.flushing = true;
+    this.linesDirty = false;
+    this.api
+      .update(o.id, { lines: o.lines.filter((x) => !x.system).map((x) => asInput(x)) })
+      .subscribe({
+        next: (r) => {
+          this.flushing = false;
+          if (this.linesDirty) return this.flush();
+          this.order.set(r);
+          this.changed.emit();
         },
+        error: () => {
+          this.flushing = false;
+          this.linesDirty = false;
+          this.api.get(o.id).subscribe((r) => this.order.set(r));
+        },
+      });
+  }
+
+  /** Nytt jobb: ett jobb med en arbetsrad, som i kortet. Priset sätts i ordern. */
+  add(o: WorkOrderDetail, box: HTMLInputElement) {
+    const title = box.value.trim();
+    if (!title) return;
+    box.value = '';
+    const id = crypto.randomUUID();
+    this.patch({
+      jobs: [
+        ...(o.jobs ?? []).map((j) => ({
+          id: j.id,
+          title: j.title,
+          instruction: j.instruction,
+          limit: j.limit,
+          fixedPrice: j.fixedPrice,
+        })),
+        { id, title },
+      ],
+      lines: [
+        ...o.lines.filter((x) => !x.system).map((x) => asInput(x)),
+        { type: 'labour', description: title, quantity: 1, done: false, jobId: id },
       ],
     });
   }

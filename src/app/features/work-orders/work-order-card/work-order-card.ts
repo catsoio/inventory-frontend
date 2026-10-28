@@ -28,7 +28,7 @@ import {
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Confirm } from '../../../shared/confirm';
 import { LinkResolver } from '../../../shared/customer-vehicle-picker/link-resolver';
-import { Subject, debounceTime, switchMap } from 'rxjs';
+import { Subject, debounceTime, filter, switchMap } from 'rxjs';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../../storage/storage-format';
 import { Auth } from '../../../core/auth/auth';
@@ -101,6 +101,24 @@ interface JobValue {
       [code]="card()?.code ?? null"
     >
       <div actions class="flex items-center gap-2">
+        @if (id && !locked()) {
+          <span class="text-sm text-gray-500" aria-live="polite">
+            @switch (saveState()) {
+              @case ('saving') {
+                Sparar…
+              }
+              @case ('saved') {
+                <mat-icon class="!h-4 !w-4 align-middle !text-base text-green-600">check</mat-icon>
+                Sparat {{ savedAt() }}
+              }
+              @default {
+                @if (form.dirty) {
+                  Osparade ändringar
+                }
+              }
+            }
+          </span>
+        }
         @if (card(); as c) {
           @if (admin && !c.locked) {
             <button
@@ -182,8 +200,8 @@ interface JobValue {
 
       @if (card()?.overQuote) {
         <app-callout class="mb-4" tone="error" [fixes]="quoteFixes()">
-          <b>Över offerten.</b> Priset är mer än {{ card()!.quote!.tolerancePercent }} %
-          över förslaget ({{ card()!.quote!.total | kr }}). Kunden måste godkänna det högre priset.
+          <b>Över offerten.</b> Priset är mer än {{ card()!.quote!.tolerancePercent }} % över
+          förslaget ({{ card()!.quote!.total | kr }}). Kunden måste godkänna det högre priset.
         </app-callout>
       }
 
@@ -192,7 +210,12 @@ interface JobValue {
           class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-white p-5 shadow-sm xl:col-span-2"
         >
           <h2 class="text-base font-semibold">Status</h2>
-          <mat-button-toggle-group formControlName="status" hideSingleSelectionIndicator>
+          <span class="text-xs text-gray-500">Internt. Sparas direkt när du byter.</span>
+          <mat-button-toggle-group
+            formControlName="status"
+            hideSingleSelectionIndicator
+            (change)="statusChanged()"
+          >
             @for (s of statuses; track s[0]) {
               <mat-button-toggle [value]="s[0]">{{ s[1] }}</mat-button-toggle>
             }
@@ -206,18 +229,22 @@ interface JobValue {
             <p class="mt-1 text-sm text-gray-600">{{ d }}</p>
           }
           <mat-form-field class="mt-3 block w-full">
-            <mat-label>Kundanmärkning</mat-label>
+            <mat-label>Kundanmärkning (vad kunden säger är fel)</mat-label>
             <textarea
               matInput
               rows="2"
               formControlName="remarks"
-              placeholder="t.ex. Oljebyte, sensor funkar inte"
+              placeholder="Kundens egna ord, t.ex. Oljebyte, sensor funkar inte"
             ></textarea>
+            <mat-hint>Skrivs ut på arbetsbladet till mekanikern.</mat-hint>
           </mat-form-field>
         </section>
 
         <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
-          <h2 class="mb-2 text-base font-semibold sm:col-span-6">Arbetsblad</h2>
+          <h2 class="text-base font-semibold sm:col-span-6">Arbetsblad (till mekanikern)</h2>
+          <p class="mb-2 text-xs text-gray-500 sm:col-span-6">
+            Internt. Skrivs ut utan priser. Er och vår referens syns bara på kostnadsförslaget.
+          </p>
           <app-date-field
             class="sm:col-span-3"
             label="Start"
@@ -269,7 +296,13 @@ interface JobValue {
 
         <section class="rounded-xl bg-white p-5 shadow-sm xl:col-span-2">
           <div class="mb-2 flex flex-wrap items-center gap-2">
-            <h2 class="flex-1 text-base font-semibold">Vad ska göras</h2>
+            <div class="flex-1">
+              <h2 class="text-base font-semibold">Vad ska göras</h2>
+              <p class="text-xs text-gray-500">
+                Jobb och instruktioner skrivs ut till mekanikern. Priser syns aldrig på
+                arbetsbladet.
+              </p>
+            </div>
             @if (linesMode()) {
               <button mat-stroked-button type="button" [disabled]="locked()" (click)="addJob()">
                 <mat-icon>add</mat-icon> Lägg till jobb
@@ -291,77 +324,33 @@ interface JobValue {
           @if (linesMode()) {
             @for (job of jobs.controls; track job; let j = $index) {
               @let w = work(job.value.id);
-              <div [formGroup]="job" class="mt-3 rounded-xl bg-gray-50 p-3">
-                <div class="flex flex-wrap items-end gap-2">
-                  <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
-                    <mat-label>Vad ska göras</mat-label>
-                    <input
-                      matInput
-                      formControlName="title"
-                      autocomplete="off"
-                      placeholder="Sök åtgärd eller skriv, t.ex. Byta olja"
-                      [matAutocomplete]="svcAuto"
-                    />
-                    <mat-autocomplete
-                      #svcAuto="matAutocomplete"
-                      (optionSelected)="addTemplate(job.value.id, $event.option.value)"
-                      [displayWith]="serviceName"
-                    >
-                      @for (s of serviceMatches(job.value.title); track s.id) {
-                        <mat-option [value]="s">
-                          {{ s.name }}
-                          @if (s.priceFrom !== null) {
-                            <span class="ml-2 text-xs text-gray-500">{{ s.priceFrom | kr }}</span>
-                          }
-                        </mat-option>
-                      }
-                    </mat-autocomplete>
-                  </mat-form-field>
+              <div
+                [formGroup]="job"
+                class="mt-4 overflow-hidden rounded-xl border border-l-4 transition-colors"
+                [class.border-gray-200]="!w?.value.done"
+                [class.border-l-teal-700]="!w?.value.done"
+                [class.bg-white]="!w?.value.done"
+                [class.border-green-300]="w?.value.done"
+                [class.border-l-green-600]="w?.value.done"
+                [class.bg-green-50]="w?.value.done"
+              >
+                <div
+                  class="flex items-center gap-2 px-4 py-2 transition-colors"
+                  [class.bg-gray-50]="!w?.value.done"
+                  [class.bg-green-100]="w?.value.done"
+                >
+                  <span class="text-xs font-semibold tracking-wide text-teal-800 uppercase">
+                    Jobb {{ j + 1 }}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm text-gray-700">
+                    @if (job.value.title) {
+                      <span class="font-medium text-gray-900">{{ job.value.title }}</span>
+                    }
+                    @if (partNames(job.value.id); as parts) {
+                      <span class="text-gray-500"> · Delar: {{ parts }}</span>
+                    }
+                  </span>
                   @if (w) {
-                    <div [formGroup]="w" class="contents">
-                      <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
-                        Pris
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          formControlName="unitPrice"
-                          (focus)="$any($event.target).select()"
-                          class="h-10 w-28 px-2 text-right text-gray-900 field"
-                        />
-                      </label>
-                      <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
-                        Rabatt %
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="1"
-                          formControlName="discountPercent"
-                          (focus)="$any($event.target).select()"
-                          class="h-10 w-16 px-2 text-right text-gray-900 field"
-                        />
-                      </label>
-                    </div>
-                  }
-                  <button
-                    mat-icon-button
-                    type="button"
-                    [disabled]="locked()"
-                    (click)="removeJob(j)"
-                    aria-label="Ta bort jobbet"
-                  >
-                    <mat-icon>delete_outline</mat-icon>
-                  </button>
-                </div>
-                <input
-                  formControlName="instruction"
-                  autocomplete="off"
-                  placeholder="Instruktion till mekanikern (valfritt)"
-                  class="mt-2 h-9 w-full px-3 text-sm field"
-                />
-                @if (w) {
-                  <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     <mat-checkbox
                       [checked]="w.value.done"
                       [disabled]="locked()"
@@ -369,52 +358,119 @@ interface JobValue {
                     >
                       Klar
                     </mat-checkbox>
-                    <mat-checkbox
-                      [checked]="w.value.toOrder"
-                      [disabled]="locked()"
-                      (change)="flip(w, 'toOrder')"
-                    >
-                      Del saknas, ska beställas
-                    </mat-checkbox>
-                    <mat-checkbox
-                      [checked]="w.value.noCharge"
-                      [disabled]="locked()"
-                      (change)="flip(w, 'noCharge')"
-                    >
-                      Debiteras ej (garanti)
-                    </mat-checkbox>
-                  </div>
-                }
-
-                @if (rowsOf(job.value.id).length) {
-                  <div class="mt-2 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                    Delar
-                  </div>
-                }
-                <div class="flex flex-col">
-                  @for (r of rowsOf(job.value.id); track r.row) {
-                    <ng-container
-                      *ngTemplateOutlet="
-                        rowTpl;
-                        context: { $implicit: r.row, i: r.i, fixed: false }
-                      "
-                    />
                   }
-                </div>
-
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                  <button
-                    mat-button
-                    type="button"
-                    [disabled]="locked()"
-                    (click)="addPart(job.value.id)"
-                  >
-                    <mat-icon>inventory_2</mat-icon> Lägg till del
-                  </button>
-                  <span class="flex-1"></span>
+                  <span class="text-sm text-gray-500">Summa jobbet</span>
                   <span class="text-sm font-semibold tabular-nums">
                     {{ live().jobTotals[job.value.id] ?? 0 | kr }}
                   </span>
+                </div>
+                <div class="p-4">
+                  <div class="flex flex-wrap items-end gap-2">
+                    <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
+                      <mat-label>Vad ska göras</mat-label>
+                      <input
+                        matInput
+                        formControlName="title"
+                        autocomplete="off"
+                        placeholder="Sök åtgärd eller skriv, t.ex. Byta olja"
+                        [matAutocomplete]="svcAuto"
+                      />
+                      <mat-autocomplete
+                        #svcAuto="matAutocomplete"
+                        (optionSelected)="addTemplate(job.value.id, $event.option.value)"
+                        [displayWith]="serviceName"
+                      >
+                        @for (s of serviceMatches(job.value.title); track s.id) {
+                          <mat-option [value]="s">
+                            {{ s.name }}
+                            @if (s.priceFrom !== null) {
+                              <span class="ml-2 text-xs text-gray-500">{{ s.priceFrom | kr }}</span>
+                            }
+                          </mat-option>
+                        }
+                      </mat-autocomplete>
+                    </mat-form-field>
+                    @if (w) {
+                      <div [formGroup]="w" class="contents">
+                        <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+                          Arbete (kr)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            formControlName="unitPrice"
+                            (focus)="$any($event.target).select()"
+                            class="h-10 w-28 px-2 text-right text-gray-900 field"
+                          />
+                        </label>
+                        <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+                          Rabatt %
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            formControlName="discountPercent"
+                            (focus)="$any($event.target).select()"
+                            class="h-10 w-16 px-2 text-right text-gray-900 field"
+                          />
+                        </label>
+                      </div>
+                    }
+                    <button
+                      mat-icon-button
+                      type="button"
+                      [disabled]="locked()"
+                      (click)="removeJob(j)"
+                      aria-label="Ta bort jobbet"
+                    >
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  </div>
+                  <input
+                    formControlName="instruction"
+                    autocomplete="off"
+                    placeholder="Instruktion till mekanikern (valfritt)"
+                    class="mt-2 h-9 w-full px-3 text-sm field"
+                  />
+                  @if (w) {
+                    <div class="mt-2 text-sm">
+                      <mat-checkbox
+                        [checked]="w.value.noCharge"
+                        [disabled]="locked()"
+                        (change)="flip(w, 'noCharge')"
+                      >
+                        Debiteras ej (garanti)
+                      </mat-checkbox>
+                    </div>
+                  }
+
+                  @if (rowsOf(job.value.id).length) {
+                    <div class="mt-4 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                      Delar till {{ job.value.title || 'jobbet' }}
+                    </div>
+                  }
+                  <div class="ml-1 flex flex-col border-l-2 border-teal-700/30 pl-3">
+                    @for (r of rowsOf(job.value.id); track r.row) {
+                      <ng-container
+                        *ngTemplateOutlet="
+                          rowTpl;
+                          context: { $implicit: r.row, i: r.i, fixed: false }
+                        "
+                      />
+                    }
+                  </div>
+
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      mat-button
+                      type="button"
+                      [disabled]="locked()"
+                      (click)="addPart(job.value.id)"
+                    >
+                      <mat-icon>inventory_2</mat-icon> Lägg till del
+                    </button>
+                  </div>
                 </div>
               </div>
             }
@@ -442,6 +498,17 @@ interface JobValue {
               <p class="text-sm text-gray-500">
                 Inga jobb än. Lägg till ett jobb, t.ex. Byta olja.
               </p>
+            }
+            @if (jobs.length) {
+              <button
+                mat-stroked-button
+                type="button"
+                class="!mt-3 !h-11 w-full !border-dashed"
+                [disabled]="locked()"
+                (click)="addJob()"
+              >
+                <mat-icon>add</mat-icon> Lägg till nytt jobb
+              </button>
             }
           } @else {
             <div class="flex flex-col">
@@ -590,13 +657,14 @@ interface JobValue {
 
       <!-- En rad: i jobbläget med kod, pris och rabatt; annars som checklista. -->
       <ng-template #rowTpl let-row let-i="i" let-fixed="fixed" let-part="part">
+        @let short = shortage(row);
         <div
           [formGroup]="row"
           class="mt-2 flex flex-col gap-2 rounded-xl border border-transparent p-3"
-          [class.bg-white]="!row.value.toOrder && !row.value.done"
-          [class.border-amber-300]="row.value.toOrder"
-          [class.bg-amber-50]="row.value.toOrder"
-          [class.bg-green-50]="row.value.done && !row.value.toOrder"
+          [class.bg-white]="short === null && !row.value.done"
+          [class.border-amber-300]="short !== null"
+          [class.bg-amber-50]="short !== null"
+          [class.bg-green-50]="row.value.done && short === null"
         >
           <div class="flex flex-wrap items-end gap-2">
             @if (part === false) {
@@ -719,15 +787,6 @@ interface JobValue {
                 Klar
               </mat-checkbox>
             }
-            @if (part !== false) {
-              <mat-checkbox
-                [checked]="row.value.toOrder"
-                [disabled]="locked()"
-                (change)="flip(row, 'toOrder')"
-              >
-                Del saknas, ska beställas
-              </mat-checkbox>
-            }
             @if (linesMode()) {
               <mat-checkbox
                 [checked]="row.value.noCharge"
@@ -737,7 +796,25 @@ interface JobValue {
                 Debiteras ej (garanti)
               </mat-checkbox>
             }
-            @if (row.value.articleId) {
+            @if (short !== null) {
+              <div class="flex w-full flex-wrap items-center gap-2 text-amber-900">
+                <mat-icon class="text-amber-600">warning</mat-icon>
+                <span class="flex-1">
+                  @if (short === 0) {
+                    Inget tillgängligt{{
+                      reservedOn(row) ? ' (' + reservedOn(row) + ' reserverad på andra order)' : ''
+                    }}. Måste beställas.
+                  } @else {
+                    Bara {{ short }} tillgänglig{{
+                      reservedOn(row) ? ' (' + reservedOn(row) + ' reserverad på andra order)' : ''
+                    }}, ordern behöver {{ needs(row.value.articleId) }}. Resten måste beställas.
+                  }
+                </span>
+                <button mat-stroked-button type="button" (click)="orderPart()">
+                  <mat-icon>shopping_cart_checkout</mat-icon> Beställ
+                </button>
+              </div>
+            } @else if (row.value.articleId) {
               <span class="text-xs text-gray-500">
                 {{ row.value.stockBooked ? 'Uttagen ur lagret' : stockHint() }}
               </span>
@@ -782,6 +859,11 @@ export class WorkOrderCard implements OnInit {
   /** Säljkortet som fakturerar ordern, om det finns. */
   readonly salesCard = signal<SalesCardItem | null>(null);
   readonly busy = signal(false);
+  /** Autosparning: status och när det senast sparades. */
+  readonly saveState = signal<'idle' | 'saving' | 'saved'>('idle');
+  readonly savedAt = signal('');
+  /** Räknar användarens ändringar, så att en sparning inte kvitterar det som skrevs under tiden. */
+  private edits = 0;
   readonly card = signal<WorkOrderDetail | null>(null);
   readonly resources = signal<Resource[]>([]);
   readonly serviceTypes = signal<ServiceType[]>([]);
@@ -813,23 +895,14 @@ export class WorkOrderCard implements OnInit {
   /** Över förslaget: öppna förslaget som kunden sa ja till. */
   readonly quoteFixes = computed<CalloutFix[]>(() => {
     const id = this.card()?.quoteId;
-    return id
-      ? [{ label: 'Öppna offerten', icon: 'request_quote', link: ['/quotes', id] }]
-      : [];
+    return id ? [{ label: 'Öppna offerten', icon: 'request_quote', link: ['/quotes', id] }] : [];
   });
   /** Delar som inte gick att ta ur lagret: justera artikeln i lagret. */
   readonly stockFixes: CalloutFix[] = [
     { label: 'Öppna artiklar', icon: 'inventory_2', link: ['/inventory'] },
   ];
-  /** Jobb med prissatta rader: inställningen, eller en order som redan har jobb eller priser. */
-  readonly linesMode = computed(() => {
-    const c = this.card();
-    return (
-      this.pricing.value().priceEntry === 'lines' ||
-      !!c?.jobs?.length ||
-      !!c?.lines.some((l) => l.unitPrice != null && !l.system)
-    );
-  });
+  /** Jobb med prissatta rader, alltid: en order skapad direkt ser ut som en från offert. */
+  readonly linesMode = computed(() => true);
   private readonly partResults = signal<Article[]>([]);
   private readonly partSearch = new Subject<string>();
   /** Räknas om när något i formuläret ändras, så att summan följer med. */
@@ -947,7 +1020,18 @@ export class WorkOrderCard implements OnInit {
   });
 
   constructor() {
-    this.form.valueChanges.subscribe(() => this.version.update((n) => n + 1));
+    this.form.valueChanges.subscribe(() => {
+      this.version.update((n) => n + 1);
+      if (this.form.dirty) this.edits++;
+    });
+    // En befintlig order sparas av sig själv när man slutat skriva en stund. En ny order sparas
+    // med knappen (den får sitt nummer då).
+    this.form.valueChanges
+      .pipe(
+        debounceTime(1500),
+        filter(() => !!this.id && this.form.dirty && !this.busy() && !this.locked()),
+      )
+      .subscribe(() => this.save({ silent: true }));
     this.form.controls.link.valueChanges.subscribe((v) => this.loadCustomer(v?.customerId));
     this.partSearch
       .pipe(
@@ -962,7 +1046,11 @@ export class WorkOrderCard implements OnInit {
     this.workshop.resources(true).subscribe((r) => this.resources.set(r.filter((x) => x.active)));
     this.workshop.serviceTypes().subscribe((l) => this.serviceTypes.set(l));
     if (this.id) this.load();
-    else this.form.patchValue({ ourReference: this.auth.user()?.name ?? '' }, { emitEvent: false });
+    else {
+      this.form.patchValue({ ourReference: this.auth.user()?.name ?? '' }, { emitEvent: false });
+      this.addJob();
+      this.form.markAsPristine();
+    }
   }
 
   private loadCustomer(customerId: string | undefined) {
@@ -1062,6 +1150,14 @@ export class WorkOrderCard implements OnInit {
     );
   }
 
+  /** Delarnas namn på ett jobb, för jobbets rubrikrad. */
+  partNames(jobId: string) {
+    return this.rowsOf(jobId)
+      .map(({ row }) => (row.value.description as string)?.trim())
+      .filter(Boolean)
+      .join(', ');
+  }
+
   /** Vad som ska göras (utan lagerartikel). Bara i läget med ett pris per order. */
   taskRows() {
     return this.rowsOfAll().filter(({ row }) => !row.value.articleId && row.value.type !== 'part');
@@ -1139,6 +1235,8 @@ export class WorkOrderCard implements OnInit {
 
   /** Kopplar raden till artikeln: kod, pris i orderns prisläge och kundens rabatt på delar. */
   private linkArticle(row: FormGroup, a: Article) {
+    this.stock.update((m) => ({ ...m, [a.id]: a.quantity }));
+    setTimeout(() => this.refreshReserved());
     const v = row.getRawValue() as LineValue;
     row.patchValue({
       description: a.label,
@@ -1294,6 +1392,54 @@ export class WorkOrderCard implements OnInit {
     this.settle();
   }
 
+  /** Lagersaldo per artikel, hämtat när en del kopplas eller ordern laddas. */
+  private readonly stock = signal<Record<string, number>>({});
+
+  /** Delar som andra öppna order redan lovat, per artikel. */
+  private readonly reservedElsewhere = signal<Record<string, number>>({});
+
+  /** Hämtar reservationerna för artiklarna på ordern (utan ordern själv). */
+  private refreshReserved() {
+    const ids = [
+      ...new Set(
+        this.lines.controls.map((l) => l.value.articleId as string | null).filter(Boolean),
+      ),
+    ] as string[];
+    if (!ids.length) return;
+    this.api.reserved(ids, this.id ?? undefined).subscribe((m) => this.reservedElsewhere.set(m));
+  }
+
+  /** Hur många av artikeln hela ordern behöver (flera rader med samma artikel summeras). */
+  needs(articleId: string) {
+    this.version();
+    return this.lines.controls
+      .map((l) => l.value as LineValue)
+      .filter((v) => v.articleId === articleId && !v.stockBooked)
+      .reduce((n, v) => n + (Number(v.quantity) || 0), 0);
+  }
+
+  /** Reserverat på andra order för artikeln raden pekar på. */
+  reservedOn(row: FormGroup) {
+    return this.reservedElsewhere()[row.value.articleId as string] ?? 0;
+  }
+
+  /** Tillgängligt för raden när den kommer till korta (annars null): lager minus andras reservationer. */
+  shortage(row: FormGroup): number | null {
+    return this.shortOf(row.value as LineValue);
+  }
+
+  private shortOf(v: Pick<LineValue, 'articleId' | 'quantity' | 'stockBooked'>): number | null {
+    if (!v.articleId || v.stockBooked) return null;
+    const have = this.stock()[v.articleId];
+    if (have === undefined) return null;
+    const available = have - (this.reservedElsewhere()[v.articleId] ?? 0);
+    return this.needs(v.articleId) > available ? Math.max(available, 0) : null;
+  }
+
+  orderPart() {
+    this.router.navigate(['/purchases', 'new']);
+  }
+
   /** Slår på/av en av radens markeringar (klar, saknas, debiteras ej). */
   flip(row: FormGroup, key: 'done' | 'toOrder' | 'noCharge') {
     row.patchValue({ [key]: !row.value[key] });
@@ -1370,6 +1516,13 @@ export class WorkOrderCard implements OnInit {
         this.jobs.push(this.newJob({ id: jid, title: first.value.description as string }));
       }
       for (const job of this.jobs.controls) this.ensureWork(job);
+      this.refreshReserved();
+      for (const id of new Set(this.lines.controls.map((l) => l.value.articleId as string))) {
+        if (id)
+          this.inventory
+            .article(id)
+            .subscribe((a) => this.stock.update((m) => ({ ...m, [id]: a.quantity })));
+      }
       // patchValue, inte reset: reset skulle nollställa jobbens och radernas fält (id, text).
       this.form.patchValue({
         link: { customerId: o.customerId, vehicleId: o.vehicleId },
@@ -1406,8 +1559,18 @@ export class WorkOrderCard implements OnInit {
     return this.form.dirty;
   }
 
-  save() {
-    if (!ensureValid(this.form, this.snack)) return;
+  /** Byte av status sparar direkt, med allt annat som ändrats. */
+  statusChanged() {
+    if (this.id && !this.locked()) this.save();
+  }
+
+  save(opts: { silent?: boolean } = {}) {
+    if (opts.silent) {
+      // Autosparning är tyst: ofullständigt formulär väntar tills det är klart.
+      const link = this.form.getRawValue().link;
+      if (this.form.invalid || !link?.customerId || !link?.vehicleId) return;
+    } else if (!ensureValid(this.form, this.snack)) return;
+    const editsAtStart = this.edits;
 
     const v = this.form.getRawValue();
     const num = (n: unknown) => (n == null || n === '' ? null : Math.round(Number(n)));
@@ -1441,7 +1604,8 @@ export class WorkOrderCard implements OnInit {
       lines: lines.map((l) => ({
         id: l.id ?? undefined,
         articleId: l.articleId,
-        toOrder: l.toOrder,
+        // "Del saknas" avgörs av lagersaldot, inte av en ruta.
+        toOrder: l.articleId ? this.shortOf(l) !== null : l.toOrder,
         // Typen följer artikeln: kopplad till lagret = del; en del utan artikel blir fri rad.
         type: (l.articleId ? 'part' : l.type === 'part' ? 'other' : l.type) as WorkOrderLineType,
         description: l.description,
@@ -1465,6 +1629,7 @@ export class WorkOrderCard implements OnInit {
       ).join(', ');
     }
     this.busy.set(true);
+    if (this.id) this.saveState.set('saving');
     this.links
       .resolve(v.link!)
       .pipe(
@@ -1476,12 +1641,27 @@ export class WorkOrderCard implements OnInit {
       .subscribe({
         next: (o) => {
           this.busy.set(false);
+          if (this.id) {
+            this.saveState.set('saved');
+            this.savedAt.set(
+              new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }),
+            );
+          }
+          if (opts.silent) {
+            // Formuläret byggs inte om under tiden man skriver; bara sammanfattningen läses in.
+            this.card.set(o);
+            if (this.edits === editsAtStart) this.form.markAsPristine();
+            return;
+          }
           this.snack.open('Sparat', undefined, { duration: 2000 });
           this.form.markAsPristine();
           if (this.id) this.load();
           else this.router.navigate(['/workorders', o.id]);
         },
-        error: () => this.busy.set(false),
+        error: () => {
+          this.busy.set(false);
+          this.saveState.set('idle');
+        },
       });
   }
 

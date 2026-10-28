@@ -51,6 +51,13 @@ export class WorkOrderApi {
     return this.http.get<Page<WorkOrder>>(this.base, { params: toParams(query) });
   }
 
+  /** Delar som lovats andra öppna order, per artikel. */
+  reserved(articleIds: string[], exceptId?: string): Observable<Record<string, number>> {
+    return this.http.get<Record<string, number>>(`${this.base}/reserved`, {
+      params: { articleIds: articleIds.join(','), ...(exceptId ? { exceptId } : {}) },
+    });
+  }
+
   get(id: string): Observable<WorkOrderDetail> {
     return this.http.get<WorkOrderDetail>(`${this.base}/${id}`);
   }
