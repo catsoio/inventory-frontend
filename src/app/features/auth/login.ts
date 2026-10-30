@@ -14,7 +14,7 @@ type Mode = 'login' | 'register' | 'verify';
       <div class="flex w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
         <aside class="auth-hero hidden flex-1 flex-col justify-between p-10 text-white md:flex">
           <div class="flex items-center gap-3 text-xl font-semibold">
-            <mat-icon>tire_repair</mat-icon> Catso | Däcklager
+            <img src="axle-logo-white.svg" alt="" class="h-7 w-auto" /> Axle
           </div>
           <div>
             <h2 class="mb-4 text-3xl leading-tight font-semibold">
@@ -37,8 +37,8 @@ type Mode = 'login' | 'register' | 'verify';
 
         <div class="w-full p-8 sm:p-12 md:w-[28rem] md:shrink-0">
           <div class="mb-6 flex items-center gap-2 text-brand md:hidden">
-            <mat-icon>tire_repair</mat-icon>
-            <span class="text-lg font-semibold">Däcklager</span>
+            <img src="axle-logo.svg" alt="" class="h-6 w-auto" />
+            <span class="text-lg font-semibold">Axle</span>
           </div>
           <h1 class="mb-1 text-2xl font-semibold">{{ title() }}</h1>
           <p class="mb-5 text-sm text-gray-600">

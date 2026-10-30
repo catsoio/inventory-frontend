@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { TradeDocument, TradeKind } from '../../core/models';
 import { hostOf, safeUrl } from '../web-link';
 
@@ -93,7 +93,7 @@ export class TradeDocumentDialog {
   readonly doc = signal<TradeDocument | null>(null);
 
   constructor() {
-    inject(InventoryApi)
+    inject(AxleApi)
       .trade(this.data.kind, this.data.number)
       .subscribe((d) => this.doc.set(d));
   }

@@ -130,7 +130,7 @@ import { Nav } from '../nav';
             >
             <div class="min-w-0 flex-1 leading-tight">
               <div class="truncate text-sm font-semibold">
-                {{ auth.companyName() || 'Däcklager' }}
+                {{ auth.companyName() || 'Axle' }}
               </div>
               <div class="truncate text-xs text-gray-500">{{ who() }} · {{ role() }}</div>
             </div>

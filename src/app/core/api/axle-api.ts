@@ -51,7 +51,7 @@ export interface CompanySettings {
 }
 
 @Injectable({ providedIn: 'root' })
-export class InventoryApi {
+export class AxleApi {
   private readonly http = inject(HttpClient);
   private readonly base = `${API_URL}/inventory`;
 

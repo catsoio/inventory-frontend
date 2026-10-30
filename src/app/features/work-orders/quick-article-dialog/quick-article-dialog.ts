@@ -1,7 +1,7 @@
 import { Component, Inject, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { Article } from '../../../core/models';
 import { ensureValid } from '../../../shared/form-guard';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -49,7 +49,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
   `,
 })
 export class QuickArticleDialog {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly snack = inject(MatSnackBar);
   private readonly ref = inject<MatDialogRef<QuickArticleDialog, Article>>(MatDialogRef);
   readonly busy = signal(false);

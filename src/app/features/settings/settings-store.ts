@@ -4,7 +4,7 @@ import { AbstractControl, FormBuilder, FormControl, FormGroup, Validators } from
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CatalogApi } from '../../core/api/catalog-api';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { Auth } from '../../core/auth/auth';
 import { Billing } from '../../core/billing/billing';
 import {
@@ -36,7 +36,7 @@ export class SettingsStore {
   readonly roleLabels = GARAGE_ROLE_LABELS;
   private readonly settings = inject(Settings);
   private readonly snack = inject(MatSnackBar);
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly dialog = inject(MatDialog);
   private readonly confirm = inject(Confirm);
   private readonly pricing = inject(Pricing);

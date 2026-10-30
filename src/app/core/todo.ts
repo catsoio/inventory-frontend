@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { kronor } from '../shared/chart/chart-kit';
 import { invoiceStatus } from '../shared/invoice-status';
-import { InventoryApi } from './api/inventory-api';
+import { AxleApi } from './api/axle-api';
 import { QuoteApi } from './api/quote-api';
 import { SalesCardApi } from './api/sales-card-api';
 import { StorageApi } from './api/storage-api';
@@ -237,7 +237,7 @@ export function todoBadges(items: TodoItem[]): Record<string, Badge> {
 @Injectable({ providedIn: 'root' })
 export class Todo {
   private readonly auth = inject(Auth);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly storage = inject(StorageApi);
   private readonly orders = inject(WorkOrderApi);
   private readonly cards = inject(SalesCardApi);

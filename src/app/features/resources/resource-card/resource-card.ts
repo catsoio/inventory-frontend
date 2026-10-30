@@ -4,7 +4,7 @@ import { FormBuilder, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { GarageMember, RESOURCE_KIND_LABELS, Resource, ResourceKind } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
@@ -110,7 +110,7 @@ export class ResourceCard implements OnInit {
     userId: [null as string | null],
   });
   readonly members = signal<GarageMember[]>([]);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
 
   ngOnInit() {
     if (!this.admin) this.form.disable();

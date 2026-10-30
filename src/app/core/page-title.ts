@@ -3,7 +3,7 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
 import { Auth } from './auth/auth';
 
-export const APP_NAME = 'Däcklager';
+export const APP_NAME = 'Axle';
 
 /**
  * Fliktitel och favicon. Titeln blir "Sida · Garage" (t.ex. "Artiklar · Däckcenter Stockholm AB"),

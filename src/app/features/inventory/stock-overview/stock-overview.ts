@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { Auth } from '../../../core/auth/auth';
 import { Insights } from '../../../core/insights/insights';
 import {
@@ -220,7 +220,7 @@ const day = (iso: string) =>
 })
 export class StockOverview {
   private readonly insights = inject(Insights);
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
   private readonly now = new Date();

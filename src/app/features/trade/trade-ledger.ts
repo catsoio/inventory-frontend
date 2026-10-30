@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { TradeKind, TradeRow } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
@@ -80,7 +80,7 @@ const time = (iso: string) =>
   `,
 })
 export class TradeLedger {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly dialog = inject(MatDialog);
 
   readonly host = hostOf;

@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { InventoryApi } from './api/inventory-api';
+import { AxleApi } from './api/axle-api';
 import { Auth } from './auth/auth';
 import { Season } from './models';
 
@@ -34,7 +34,7 @@ const KEY = 'garagestock.settings';
 /** Säsong, leverantör, lagernivå, påslag och däckhotellavgift gäller hela företaget (backend, ägaren ändrar); visning och sidstorlek är personliga (webbläsaren). */
 @Injectable({ providedIn: 'root' })
 export class Settings {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly auth = inject(Auth);
 
   readonly value = signal<AppSettings>({

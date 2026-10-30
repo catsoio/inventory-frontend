@@ -13,7 +13,7 @@ import {
   of,
   switchMap,
 } from 'rxjs';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { Auth } from '../../core/auth/auth';
 import { StorageApi } from '../../core/api/storage-api';
@@ -713,7 +713,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
 })
 export class SalesCardPage implements OnInit, HasUnsaved {
   private readonly api = inject(SalesCardApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly storage = inject(StorageApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly pricing = inject(Pricing);

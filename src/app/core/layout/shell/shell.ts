@@ -1,7 +1,7 @@
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { Component, HostListener, effect, inject, untracked } from '@angular/core';
-import { InventoryApi } from '../../api/inventory-api';
+import { AxleApi } from '../../api/axle-api';
 import { Auth } from '../../auth/auth';
 import { GARAGE_ROLE_LABELS } from '../../models';
 import { PageTitle } from '../../page-title';
@@ -35,8 +35,7 @@ import { Nav } from '../nav';
     <app-garage-menu #gm="garageMenu" />
 
     <header
-      class="flex h-14 shrink-0 items-center text-white shadow-sm"
-      [class]="auth.viewingOther() ? 'bg-amber-700' : 'bg-brand'"
+      class="flex h-14 shrink-0 items-center bg-brand text-white shadow-sm"
     >
       <!-- Loggan och garaget, lika brett som sidomenyn under (288 px: ett långt bolagsnamn ska få plats). -->
       <div
@@ -55,13 +54,13 @@ import { Nav } from '../nav';
               aria-label="Byt garage"
             >
               <span class="truncate text-sm font-semibold">{{
-                auth.companyName() || 'Däcklager'
+                auth.companyName() || 'Axle'
               }}</span>
               <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] opacity-80">unfold_more</mat-icon>
             </button>
           } @else {
             <a routerLink="/dashboard" class="min-w-0 flex-1 truncate text-sm font-semibold">{{
-              auth.companyName() || 'Däcklager'
+              auth.companyName() || 'Axle'
             }}</a>
           }
         }
@@ -176,7 +175,7 @@ export class Shell {
   }
   /** Sidans namn i topbaren. */
   readonly pageName = inject(PageTitle).page;
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
 
   constructor() {
     // Bolagsnamnet överst följer Fakturauppgifter för det bolag man är i.

@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { appLocale } from '../../../core/i18n/locale';
@@ -216,7 +216,7 @@ import { Pricing, quoteTermsText } from '../../../core/pricing';
 export class WorkOrderQuote implements OnInit {
   private readonly api = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   readonly pricing = inject(Pricing);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
 

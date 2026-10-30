@@ -2,7 +2,7 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, of } from 'rxjs';
 import { BookingApi } from '../../core/api/booking-api';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { StorageApi } from '../../core/api/storage-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
@@ -48,7 +48,7 @@ const LIVE: BookingStatus[] = ['booked', 'arrived', 'done'];
 export class HomeData {
   private readonly auth = inject(Auth);
   private readonly bookingApi = inject(BookingApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly storage = inject(StorageApi);
   private readonly cards = inject(SalesCardApi);
   private readonly orderApi = inject(WorkOrderApi);

@@ -5,7 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { QuoteApi } from '../../../core/api/quote-api';
 import { SalesCardApi } from '../../../core/api/sales-card-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
@@ -835,7 +835,7 @@ export class WorkOrderCard implements OnInit {
   private readonly quotes = inject(QuoteApi);
   private readonly links = inject(LinkResolver);
   private readonly workshop = inject(WorkshopApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly dialog = inject(MatDialog);
   private readonly confirm = inject(Confirm);
   private readonly snack = inject(MatSnackBar);

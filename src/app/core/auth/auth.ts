@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
-import { API_URL, InventoryApi } from '../api/inventory-api';
+import { API_URL, AxleApi } from '../api/axle-api';
 import { AuthTokens, AuthUser, Company, Garage, GarageListItem, Role } from '../models';
 
 const KEY = 'garagestock.auth';
@@ -33,7 +33,7 @@ export class Auth {
   private get router(): Router {
     return this.injector.get(Router);
   }
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly url = `${API_URL}/auth`;
   private refreshing$?: Observable<AuthTokens>;
 

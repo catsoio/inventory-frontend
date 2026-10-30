@@ -3,7 +3,7 @@ import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { GarageMember } from '../../../core/models';
 
 /** Utan förväxlingsbara tecken (0/O, 1/l/I). */
@@ -52,7 +52,7 @@ function generate(length = 12): string {
   `,
 })
 export class ResetPasswordDialog {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly snack = inject(MatSnackBar);
   private readonly ref = inject<MatDialogRef<ResetPasswordDialog, boolean>>(MatDialogRef);
 

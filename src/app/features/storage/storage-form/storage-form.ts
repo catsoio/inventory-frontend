@@ -10,7 +10,7 @@ import { AbstractControl, FormBuilder, ValidationErrors, Validators } from '@ang
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CatalogApi } from '../../../core/api/catalog-api';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { StorageApi } from '../../../core/api/storage-api';
 import {
   ACCESSORY_LABELS,
@@ -405,7 +405,7 @@ export class StorageForm {
 
   /** Säsongen och avgiften kommer från Inställningar. */
   private readonly settings = inject(Settings);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   /** Förval för en ny inlämning (Inställningar → Däckhotell). */
   private readonly defs = signal<StorageDefaults | null>(null);
   readonly seasons: [string, string][] = [

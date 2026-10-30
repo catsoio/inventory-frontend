@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { Auth } from '../../core/auth/auth';
 
 @Component({
@@ -15,7 +15,7 @@ import { Auth } from '../../core/auth/auth';
         >
           <mat-icon class="!h-8 !w-8 !text-[32px]">warehouse</mat-icon>
         </div>
-        <h1 class="text-2xl font-semibold">Välkommen till Däcklager</h1>
+        <h1 class="text-2xl font-semibold">Välkommen till Axle</h1>
         <p class="mt-1 text-gray-600">
           Inloggad som {{ auth.user()?.email ?? 'dig' }}. Välj hur du vill komma igång.
         </p>
@@ -123,7 +123,7 @@ import { Auth } from '../../core/auth/auth';
 })
 export class Onboarding {
   protected readonly auth = inject(Auth);
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly router = inject(Router);
 
   readonly mode = signal<'create' | 'join' | null>(null);

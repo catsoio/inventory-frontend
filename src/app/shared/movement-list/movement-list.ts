@@ -1,6 +1,6 @@
 import { appLocale } from '../../core/i18n/locale';
 import { Component, Input, OnChanges, inject, signal } from '@angular/core';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { MOVEMENT_LABELS, Movement, MovementType } from '../../core/models';
 import { DtCol } from '../data-table/data-table';
 import { KrPipe } from '../kr-pipe';
@@ -88,7 +88,7 @@ const when = (m: Movement) =>
   `,
 })
 export class MovementList implements OnChanges {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   @Input() articleId?: string;
   @Input() type?: MovementType;
   @Input() from?: string;

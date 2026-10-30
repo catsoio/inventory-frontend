@@ -7,7 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, forkJoin, switchMap } from 'rxjs';
 import { CatalogApi } from '../../../core/api/catalog-api';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import {
   Article,
   ArticleField,
@@ -351,7 +351,7 @@ const categoryOf = (t: ArticleType | undefined): Category =>
   `,
 })
 export class ArticleForm {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly catalog = inject(CatalogApi);
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);

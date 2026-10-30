@@ -13,7 +13,7 @@ import { FormControl } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, firstValueFrom, of, switchMap } from 'rxjs';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { Article, itemKind } from '../../core/models';
 import { normalizeUrl } from '../../shared/web-link';
 
@@ -271,7 +271,7 @@ interface Line {
   `,
 })
 export class Trade {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   readonly pricing = inject(Pricing);
   private readonly snack = inject(MatSnackBar);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');

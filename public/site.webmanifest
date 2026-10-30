@@ -1,6 +1,6 @@
 {
-  "name": "Däcklager",
-  "short_name": "Däcklager",
+  "name": "Axle",
+  "short_name": "Axle",
   "description": "Lager, försäljning och däckhotell för däckverkstäder.",
   "start_url": "/",
   "display": "standalone",

@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { InvoiceKind, PaymentMethod, paymentOptions, SellerDetails } from '../../core/models';
@@ -138,7 +138,7 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
 export class InvoiceNew implements HasUnsaved {
   private readonly api = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly links = inject(LinkResolver);
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);

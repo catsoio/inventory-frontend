@@ -14,7 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { Auth } from '../../../core/auth/auth';
 import {
   Article,
@@ -501,7 +501,7 @@ const COLS: Col[] = [
 })
 export class ArticleList implements OnInit {
   readonly tabs = STOCK_TABS;
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);

@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { ClosingApi } from '../../core/api/closing-api';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { addDays, ymd } from '../../core/insights/dates';
@@ -142,7 +142,7 @@ export class FinanceOverview {
   private readonly orders = inject(WorkOrderApi);
   private readonly cards = inject(SalesCardApi);
   private readonly closings = inject(ClosingApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly insights = inject(Insights);
   private readonly now = new Date();
 

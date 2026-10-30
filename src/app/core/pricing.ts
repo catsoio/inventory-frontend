@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { InventoryApi } from './api/inventory-api';
+import { AxleApi } from './api/axle-api';
 import { PricingSettings } from './models';
 
 /** Som backend `DEFAULT_PRICING`: däck och service, ett pris per order, inkl. moms. */
@@ -67,7 +67,7 @@ export const quoteTermsText = (s: PricingSettings) =>
 /** Företagets prissättning, laddas vid start (Shell) och gäller alla användare. */
 @Injectable({ providedIn: 'root' })
 export class Pricing {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   readonly value = signal<PricingSettings>({ ...PRICING_DEFAULTS });
 
   load(): void {

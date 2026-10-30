@@ -17,7 +17,7 @@ import {
 import { QUICK_ACTIONS } from './quick-actions';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { SharedModule } from '../../shared/shared-module';
-import { InventoryApi } from '../api/inventory-api';
+import { AxleApi } from '../api/axle-api';
 import { QuoteApi } from '../api/quote-api';
 import { SalesCardApi } from '../api/sales-card-api';
 import { StorageApi } from '../api/storage-api';
@@ -205,7 +205,7 @@ export class GlobalSearchDialog {
   private readonly orders = inject(WorkOrderApi);
   private readonly cards = inject(SalesCardApi);
   private readonly quotes = inject(QuoteApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
 
   readonly icons = KIND_ICONS;
   readonly placeholder =

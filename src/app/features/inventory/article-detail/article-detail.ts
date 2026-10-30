@@ -3,7 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { Auth } from '../../../core/auth/auth';
 import { PageTitle } from '../../../core/page-title';
 import {
@@ -158,7 +158,7 @@ type Field = [label: string, value: string | number];
   `,
 })
 export class ArticleDetail {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);

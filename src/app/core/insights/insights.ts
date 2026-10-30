@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, shareReplay, tap } from 'rxjs';
-import { InventoryApi } from '../api/inventory-api';
+import { AxleApi } from '../api/axle-api';
 import { StorageApi } from '../api/storage-api';
 import { Auth } from '../auth/auth';
 import { Article, GroupedReport, StockHistoryPoint, StorageDeposit } from '../models';
@@ -16,7 +16,7 @@ import { loadAll } from './load-all';
 export class Insights {
   private readonly auth = inject(Auth);
   private readonly storage = inject(StorageApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly memo = new Map<string, { at: number; value$: Observable<unknown> }>();
 
   /** Delar svaret mellan anropare i `ttl` ms. Ett fel sparas inte. */

@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, switchMap } from 'rxjs';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { QuoteApi } from '../../core/api/quote-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { Auth } from '../../core/auth/auth';
@@ -513,7 +513,7 @@ export class QuoteCard implements OnInit {
   private readonly api = inject(QuoteApi);
   private readonly links = inject(LinkResolver);
   private readonly workshop = inject(WorkshopApi);
-  private readonly inventory = inject(InventoryApi);
+  private readonly inventory = inject(AxleApi);
   private readonly confirm = inject(Confirm);
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);

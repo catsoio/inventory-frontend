@@ -4,7 +4,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { InventoryApi } from '../../../core/api/inventory-api';
+import { AxleApi } from '../../../core/api/axle-api';
 import { Article, StockAction } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 
@@ -106,7 +106,7 @@ const int = [Validators.required, Validators.pattern(/^\d+$/)];
 })
 export class StockActionDialog {
   private readonly snack = inject(MatSnackBar);
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly dialog = inject(MatDialog);
   private readonly pricing = inject(Pricing);
   private readonly ref = inject<MatDialogRef<StockActionDialog, Article>>(MatDialogRef);

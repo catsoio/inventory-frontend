@@ -1,6 +1,6 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { API_URL } from '../api/inventory-api';
+import { API_URL } from '../api/axle-api';
 import { Auth } from '../auth/auth';
 
 /** Superadmin som tittar i ett annat garage: backend agerar i det garaget. */

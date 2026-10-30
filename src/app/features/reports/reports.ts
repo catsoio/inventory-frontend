@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
 import { Auth } from '../../core/auth/auth';
-import { InventoryApi } from '../../core/api/inventory-api';
+import { AxleApi } from '../../core/api/axle-api';
 import { MOVEMENT_LABELS, MovementType, Report } from '../../core/models';
 import { STOCK_TABS } from '../../shared/section-tabs/tabs';
 
@@ -56,7 +56,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
   `,
 })
 export class Reports {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(AxleApi);
   private readonly auth = inject(Auth);
   readonly tabs = STOCK_TABS;
   readonly types = Object.entries(MOVEMENT_LABELS);

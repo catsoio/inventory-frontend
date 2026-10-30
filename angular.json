@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "inventory-frontend": {
+    "axle-frontend": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:class": {
@@ -92,10 +92,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "inventory-frontend:build:production"
+              "buildTarget": "axle-frontend:build:production"
             },
             "development": {
-              "buildTarget": "inventory-frontend:build:development"
+              "buildTarget": "axle-frontend:build:development"
             }
           },
           "defaultConfiguration": "development"
