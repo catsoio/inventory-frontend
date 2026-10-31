@@ -14,6 +14,7 @@ import {
   CustomerType,
 } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { mapsUrl } from '../../../shared/maps-link';
 import { Auth } from '../../../core/auth/auth';
 
 /** Kundens kort: fälten överst, kundens bilar och senaste bokningar under. */
@@ -98,6 +99,17 @@ import { Auth } from '../../../core/auth/auth';
           <mat-label>Ort</mat-label>
           <input matInput formControlName="city" autocomplete="off" />
         </mat-form-field>
+        @if (mapsLink(); as link) {
+          <a
+            mat-stroked-button
+            class="sm:col-span-2 sm:justify-self-start"
+            [href]="link"
+            target="_blank"
+            rel="noopener"
+          >
+            <mat-icon>map</mat-icon> Öppna i Google Maps
+          </a>
+        }
         <p class="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2">
           @if (form.controls.type.value === 'company') {
             <b>Företag:</b> får faktura med organisationsnummer och förfallodatum. Svenska företag
@@ -281,6 +293,10 @@ export class CustomerCard implements OnInit {
 
   ngOnInit() {
     if (this.id) this.load();
+  }
+
+  mapsLink() {
+    return mapsUrl(this.form.getRawValue());
   }
 
   activeCars() {

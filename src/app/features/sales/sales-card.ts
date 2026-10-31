@@ -15,6 +15,7 @@ import {
 } from 'rxjs';
 import { AxleApi } from '../../core/api/axle-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
+import { SalesSendDialog } from './sales-send-dialog';
 import { Auth } from '../../core/auth/auth';
 import { StorageApi } from '../../core/api/storage-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
@@ -127,6 +128,10 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             <a mat-stroked-button [routerLink]="['/sales', c.id, 'invoice']">
               <mat-icon>print</mat-icon> Visa / skriv ut
             </a>
+            <button mat-stroked-button type="button" [disabled]="busy()" (click)="sendDocument()">
+              <mat-icon>forward_to_inbox</mat-icon>
+              {{ c.sends?.length ? 'Skicka igen' : 'Skicka' }}
+            </button>
           }
         }
         @if (!readOnly()) {
@@ -154,6 +159,13 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
           >
           Kortet är låst: rader, priser och rabatt kan inte ändras (ett utfärdat dokument får inte
           ändras i efterhand). Betalningen går att ändra.
+          @if (card()!.sends?.length; as n) {
+            <br />
+            <b>Skickat till kunden</b> {{ lastSent(card()!) }}{{ n > 1 ? ' (' + n + ' gånger)' : '' }}.
+            @if (card()!.viewedAt) {
+              Kunden har öppnat länken.
+            }
+          }
         </p>
       }
 
@@ -1271,8 +1283,47 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     return n.endsWith('sen') ? n : '';
   }
 
+  lastSent(c: SalesCardDetail) {
+    const s = c.sends?.[c.sends.length - 1];
+    return s ? `till ${s.to} den ${s.at.slice(0, 10)}` : '';
+  }
+
+  /**
+   * Mejlar kvittot eller fakturan som en länk till samma dokument som "Visa / skriv ut". Saknar
+   * kunden e-post frågar dialogen efter adressen och sparar den på kunden.
+   */
+  sendDocument() {
+    const c = this.card();
+    if (!c?.document) return;
+    this.dialog
+      .open(SalesSendDialog, {
+        width: '520px',
+        data: {
+          id: c.id,
+          code: c.documentCode ?? c.code,
+          kind: c.document.kind,
+          customerName: c.document.buyer.name,
+          email: this.customer()?.email ?? null,
+          resend: !!c.sends?.length,
+          lastTo: c.sends?.[c.sends.length - 1]?.to ?? null,
+        },
+      })
+      .afterClosed()
+      .subscribe((r?: SalesCardDetail) => {
+        if (!r) return;
+        this.apply(r);
+        // Servern sparade adressen på kunden om den saknade en.
+        const to = r.sends?.[r.sends.length - 1]?.to;
+        this.customer.update((cu) => (cu && !cu.email && to ? { ...cu, email: to } : cu));
+        this.snack.open('Skickat till kunden', 'OK', { duration: 4000 });
+      });
+  }
+
   /** Skälet till att kortet inte kan återöppnas just nu, annars tomt. */
   reopenBlocked(c: SalesCardDetail) {
+    if (c.sends?.length) {
+      return 'Dokumentet har skickats till kunden och kan inte återöppnas.';
+    }
     return c.document?.paidAt && c.document.kind === 'invoice'
       ? 'Fakturan är betald. Markera den obetald först.'
       : '';

@@ -1,8 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { Settings } from '../../../core/settings';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { CUSTOMER_TYPE_LABELS, Customer } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
+import { mapsUrl } from '../../../shared/maps-link';
 
 const COLS: DtCol<Customer>[] = [
   { key: 'code', label: 'Nr', value: (c) => c.number, fmt: (c) => c.code },
@@ -42,7 +44,19 @@ const COLS: DtCol<Customer>[] = [
               {{ c.code }} · {{ typeLabel(c) }}{{ c.active ? '' : ' · Arkiverad' }}
             </div>
           </div>
-          @if (c.phone) {
+          @if (buttons().includes('map') && mapsUrl(c); as link) {
+            <a
+              [href]="link"
+              target="_blank"
+              rel="noopener"
+              class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"
+              [attr.aria-label]="'Visa ' + c.name + ' på karta'"
+              (click)="$event.stopPropagation()"
+            >
+              <mat-icon>map</mat-icon>
+            </a>
+          }
+          @if (buttons().includes('call') && c.phone) {
             <a
               [href]="'tel:' + c.phone"
               class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-soft text-brand"
@@ -67,8 +81,12 @@ const COLS: DtCol<Customer>[] = [
 export class CustomerList {
   private readonly api = inject(WorkshopApi);
   private readonly router = inject(Router);
+  private readonly settings = inject(Settings);
 
   readonly cols = COLS;
+  readonly mapsUrl = mapsUrl;
+  /** Snabbknapparna verkstaden valt i Inställningar → Kunder. */
+  readonly buttons = computed(() => this.settings.value().customerButtons);
   readonly typeLabel = (c: Customer) => CUSTOMER_TYPE_LABELS[c.type];
   readonly items = signal<Customer[]>([]);
   readonly loading = signal(true);

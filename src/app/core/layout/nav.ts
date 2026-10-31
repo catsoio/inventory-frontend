@@ -51,7 +51,6 @@ export const NAV: NavSection[] = [
         path: '/workorders',
         label: 'Arbetsorder',
         icon: 'handyman',
-        only: 'desktop',
         hidden: !environment.workOrders,
       },
     ],
@@ -99,7 +98,6 @@ export const NAV: NavSection[] = [
         path: '/quotes',
         label: 'Offert',
         icon: 'request_quote',
-        only: 'desktop',
         hidden: !environment.workOrders,
       },
       {
@@ -154,6 +152,19 @@ export const MOBILE_TABS: NavItem[] = [
 
 /** "Mer" på mobil: det som behövs ibland men inte i farten. */
 export const MOBILE_MORE: NavItem[] = [
+  // Verkstad som kör ute hos kunden skapar order och offerter i bilen (beslut 2026-10-31).
+  {
+    path: '/workorders',
+    label: 'Arbetsorder',
+    icon: 'handyman',
+    hidden: !environment.workOrders,
+  },
+  {
+    path: '/quotes',
+    label: 'Offert',
+    icon: 'request_quote',
+    hidden: !environment.workOrders,
+  },
   {
     path: '/sales',
     label: 'Försäljning',

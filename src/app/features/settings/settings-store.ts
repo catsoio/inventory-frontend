@@ -115,7 +115,14 @@ export class SettingsStore {
       this.settings.value().defaultHourlyRate,
       [Validators.required, Validators.min(0)],
     ],
+    customerButtons: [this.settings.value().customerButtons],
   });
+
+  /** Knappar som kan ligga på en kund i listan. Fler läggs till här när någon verkstad behöver dem. */
+  readonly customerButtonOptions: [string, string][] = [
+    ['call', 'Ring'],
+    ['map', 'Visa på karta'],
+  ];
 
   saveDefaults(): void {
     this.settings.save({

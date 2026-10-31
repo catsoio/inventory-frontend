@@ -6,6 +6,7 @@ import {
   DocumentChoice,
   Page,
   PaymentMethod,
+  PublicDocument,
   SalesCardDetail,
   SalesCardInput,
   SalesCardItem,
@@ -40,6 +41,18 @@ export class SalesCardApi {
     } = {},
   ): Observable<Page<SalesCardItem>> {
     return this.http.get<Page<SalesCardItem>>(this.base, { params: toParams(query) });
+  }
+
+  /** Mejlar det bokförda dokumentet som en länk. En adress som skrivs in sparas på kunden om den saknar. */
+  send(id: string, body: { email?: string; note?: string }): Observable<SalesCardDetail> {
+    return this.http.post<SalesCardDetail>(`${this.base}/${id}/send`, body);
+  }
+
+  /** Kundens sida: dokumentet bakom länken, utan inloggning. */
+  publicDocument(token: string): Observable<PublicDocument> {
+    return this.http.get<PublicDocument>(
+      `${environment.apiUrl}/inventory/public/documents/${token}`,
+    );
   }
 
   get(id: string): Observable<SalesCardDetail> {

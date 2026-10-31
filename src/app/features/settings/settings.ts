@@ -78,6 +78,9 @@ export interface SettingsTab {
         @case ('artiklar') {
           <app-settings-stock />
         }
+        @case ('kunder') {
+          <app-settings-customers />
+        }
         @case ('dackhotell') {
           <app-settings-hotel />
         }
@@ -105,6 +108,7 @@ export class SettingsPage {
     t.push(
       { key: 'prissattning', label: 'Prissättning' },
       { key: 'artiklar', label: 'Artiklar och lager' },
+      { key: 'kunder', label: 'Kunder' },
       { key: 'dackhotell', label: 'Däckhotell' },
     );
     return t;

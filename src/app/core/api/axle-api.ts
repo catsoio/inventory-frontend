@@ -48,6 +48,8 @@ export interface CompanySettings {
   defaultSeason: Season | null;
   defaultStorageFee: number | null;
   defaultHourlyRate: number | null;
+  /** Snabbknappar på en kund i listan (mobil): ring, karta. */
+  customerButtons: ('call' | 'map')[] | null;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -15,6 +15,8 @@ export interface AppSettings {
   defaultStorageFee: number;
   /** Timpris för arbete, kr inkl. moms. */
   defaultHourlyRate: number;
+  /** Knappar på en kund i kundlistan (mobil). Verkstäder behöver olika; fler kan läggas till. */
+  customerButtons: ('call' | 'map')[];
 }
 
 export const SETTINGS_DEFAULTS: AppSettings = {
@@ -27,6 +29,7 @@ export const SETTINGS_DEFAULTS: AppSettings = {
   markupPercent: 35,
   defaultStorageFee: 0,
   defaultHourlyRate: 0,
+  customerButtons: ['call'],
 };
 
 const KEY = 'garagestock.settings';
@@ -52,6 +55,7 @@ export class Settings {
       if (c.defaultMarkupPercent !== null) next.markupPercent = c.defaultMarkupPercent;
       if (c.defaultStorageFee !== null) next.defaultStorageFee = c.defaultStorageFee;
       if (c.defaultHourlyRate !== null) next.defaultHourlyRate = c.defaultHourlyRate;
+      if (c.customerButtons) next.customerButtons = c.customerButtons;
       this.value.set(next);
     });
   }
@@ -68,6 +72,7 @@ export class Settings {
           defaultMarkupPercent: next.markupPercent,
           defaultStorageFee: next.defaultStorageFee,
           defaultHourlyRate: next.defaultHourlyRate,
+          customerButtons: next.customerButtons,
         })
         .subscribe();
     }

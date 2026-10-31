@@ -16,6 +16,14 @@ const routes: Routes = [
       import('./features/public-quote/public-quote-module').then((m) => m.PublicQuoteModule),
   },
   {
+    // Kundens sida för en faktura eller ett kvitto: utan inloggning, nyckeln i länken är nyckeln.
+    path: 'i/:token',
+    loadChildren: () =>
+      import('./features/public-document/public-document-module').then(
+        (m) => m.PublicDocumentModule,
+      ),
+  },
+  {
     path: 'onboarding',
     title: 'Kom igång',
     canActivate: [authGuard],

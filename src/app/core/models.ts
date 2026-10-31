@@ -1481,6 +1481,10 @@ export interface SalesCardDetail extends SalesCardItem {
   reservedDocumentCode?: string | null;
   reservedKind?: InvoiceKind | null;
   reopenings?: { at: string; by: string; kind: InvoiceKind; number: number }[];
+  /** Gånger dokumentet mejlats till kunden; ett skickat dokument kan inte återöppnas. */
+  sends?: { channel: 'email'; to: string; at: string }[];
+  /** När kunden först öppnade länken. */
+  viewedAt?: string | null;
   links: SalesCardLinks;
 }
 
@@ -1776,4 +1780,11 @@ export interface QuotePublic {
   otherRows: QuotePublicRow[];
   totals: OrderTotals;
   answer: { status: 'approved' | 'declined'; at: string } | null;
+}
+
+/** Det kunden ser på sin länk `/i/<nyckel>`: dokumentet och bilen, inget internt. */
+export interface PublicDocument {
+  document: WorkOrderInvoice;
+  regNo: string | null;
+  vehicle: string | null;
 }

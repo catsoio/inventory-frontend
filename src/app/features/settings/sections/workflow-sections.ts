@@ -216,6 +216,37 @@ export class SettingsStock {
   readonly s = inject(SettingsStore);
 }
 
+/** Kunder: vilka snabbknappar en kund har i listan. */
+@Component({
+  selector: 'app-settings-customers',
+  standalone: false,
+  template: `
+    <app-settings-section
+      title="Kunder"
+      text="Knapparna som ligger på varje kund i kundlistan på mobilen. Välj det ni använder mest; resten tar bara plats. Gäller hela företaget."
+      [dirty]="s.defaultsForm.dirty"
+      [valid]="s.defaultsForm.valid"
+      (save)="s.saveDefaults()"
+      (discard)="s.discard(s.defaultsForm)"
+    >
+      <form [formGroup]="s.defaultsForm" (ngSubmit)="s.saveDefaults()" class="max-w-md">
+        <mat-form-field class="w-full" subscriptSizing="dynamic">
+          <mat-label>Knappar i kundlistan</mat-label>
+          <mat-select formControlName="customerButtons" multiple>
+            @for (b of s.customerButtonOptions; track b[0]) {
+              <mat-option [value]="b[0]">{{ b[1] }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Kartan öppnar kundens adress i Google Maps.</mat-hint>
+        </mat-form-field>
+      </form>
+    </app-settings-section>
+  `,
+})
+export class SettingsCustomers {
+  readonly s = inject(SettingsStore);
+}
+
 /** Däckhotell: avgift och vad en ny inlämning börjar med. */
 @Component({
   selector: 'app-settings-hotel',
