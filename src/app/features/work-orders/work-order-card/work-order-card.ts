@@ -243,7 +243,7 @@ interface JobValue {
         <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
           <h2 class="text-base font-semibold sm:col-span-6">Arbetsblad (till mekanikern)</h2>
           <p class="mb-2 text-xs text-gray-500 sm:col-span-6">
-            Internt. Skrivs ut utan priser. Er och vår referens syns bara på kostnadsförslaget.
+            Internt. Er och vår referens syns bara på kostnadsförslaget.
           </p>
           <app-date-field
             class="sm:col-span-3"

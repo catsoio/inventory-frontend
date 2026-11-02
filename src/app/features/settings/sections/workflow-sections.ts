@@ -127,7 +127,7 @@ import { SettingsStore } from '../settings-store';
             <mat-form-field class="w-full sm:w-1/2" subscriptSizing="dynamic">
               <mat-label>Intern kostnad per timme (kr)</mat-label>
               <input matInput type="number" min="0" formControlName="internalHourlyCost" />
-              <mat-hint>Visar vad jobbet tjänade. Syns aldrig för kunden.</mat-hint>
+              <mat-hint>Visar vad jobbet tjänade.</mat-hint>
             </mat-form-field>
           }
           @case ('stock') {

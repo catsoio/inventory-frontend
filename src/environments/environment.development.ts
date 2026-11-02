@@ -1,4 +1,5 @@
 export const environment = {
-  apiUrl: 'http://localhost:3000/api',
+  // Följer adressen sidan öppnades från, så samma bygge funkar på localhost och från mobilen på nätverket.
+  apiUrl: `http://${window.location.hostname}:3000/api`,
   workOrders: true,
 };
