@@ -84,6 +84,12 @@ export interface SettingsTab {
         @case ('dackhotell') {
           <app-settings-hotel />
         }
+        @case ('betalningar') {
+          <app-settings-payments />
+        }
+        @case ('kassaregister') {
+          <app-settings-register />
+        }
       }
       <div class="mt-6 text-xs text-gray-400 tabular-nums">Version {{ version }}</div>
     </div>
@@ -110,6 +116,8 @@ export class SettingsPage {
       { key: 'artiklar', label: 'Artiklar och lager' },
       { key: 'kunder', label: 'Kunder' },
       { key: 'dackhotell', label: 'Däckhotell' },
+      { key: 'betalningar', label: 'Betalningar' },
+      { key: 'kassaregister', label: 'Kassaregister' },
     );
     return t;
   });

@@ -214,6 +214,26 @@ import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
           @if (inv.seller.footer) {
             <p class="mt-1 text-gray-600">{{ inv.seller.footer }}</p>
           }
+          @if (inv.register; as r) {
+            <div class="mt-3 border-t border-gray-300 pt-2 text-[11px] leading-tight text-gray-600">
+              <div>
+                Elektroniskt kassakvitto · Kassa {{ r.label }} · Kvittonr {{ r.receiptNumber }} ·
+                Z-rapport {{ r.zNumber }} · {{ day(r.occurredAt) }}
+              </div>
+              <div>
+                Kassaregister {{ r.manufacturingNumber }} · Programversion {{ r.registerVersion }} ·
+                Kontrollsystem {{ r.controlSerial }}
+              </div>
+              <div class="font-mono break-all">
+                {{ r.codeType === 'kontrollkod' ? 'Kontrollkod' : 'Avstämningskod' }} {{ r.code }}
+              </div>
+              @if (!r.certified) {
+                <div class="mt-1 font-bold text-red-700 uppercase">
+                  Utvecklingsläge – inte ett giltigt kvitto
+                </div>
+              }
+            </div>
+          }
         </section>
 
         <footer

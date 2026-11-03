@@ -1090,6 +1090,27 @@ export interface WorkOrderInvoice {
   sections?: InvoiceDocSection[];
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+  /** Satt när kvittot är registrerat i kassaregistret: dess nummer, kontrollkod och kassa. */
+  register?: RegisteredReceiptRef;
+}
+
+/** Det ett registrerat kvitto bär med sig, så att det kan skrivas ut med kontrollkod och nummer. */
+export interface RegisteredReceiptRef {
+  unitId: string;
+  /** Kassabeteckning. */
+  label: string;
+  manufacturingNumber: string;
+  receiptNumber: number;
+  /** Z-rapporten kvittot räknas i. */
+  zNumber: number;
+  occurredAt: string;
+  code: string;
+  codeType: 'avstamningskod' | 'kontrollkod';
+  controlSerial: string;
+  registerVersion: string;
+  /** Falskt för utvecklingsläget: ett sådant kvitto är inte giltigt. */
+  certified: boolean;
+  provider: string;
 }
 
 /** En rubrik (jobb) på dokumentet med delsumma, öre i dokumentets prisläge. */
@@ -1481,6 +1502,10 @@ export interface SalesCardDetail extends SalesCardItem {
   reservedDocumentCode?: string | null;
   reservedKind?: InvoiceKind | null;
   reopenings?: { at: string; by: string; kind: InvoiceKind; number: number }[];
+  /** Satt när ett registrerat kvitto har tagits tillbaka med en retur. */
+  returned?: { at: string; by: string; receiptNumber: number; reason: string; total: number } | null;
+  /** Vid retur: hur återbetalningen av en kortbetalning gick. */
+  refunds?: { paymentId: string; status: 'done' | 'failed'; error?: string }[];
   /** Gånger dokumentet mejlats till kunden; ett skickat dokument kan inte återöppnas. */
   sends?: { channel: 'email'; to: string; at: string }[];
   /** När kunden först öppnade länken. */
@@ -1787,4 +1812,123 @@ export interface PublicDocument {
   document: WorkOrderInvoice;
   regNo: string | null;
   vehicle: string | null;
+  /** Kan kunden betala fakturan här, och hur. */
+  payment?: { available: boolean; paid: boolean; methods: ('card' | 'swish')[] };
+}
+
+// --- Kassaregister och betalningar ---
+
+/** Kassaregistrets läge för verkstaden. */
+export interface RegisterStatus {
+  configured: boolean;
+  version: string;
+  model: string;
+  program: string;
+  registerNumber: string | null;
+  unit: {
+    id: string;
+    label: string;
+    manufacturingNumber: string;
+    status: 'active' | 'suspended';
+    company: { name: string; orgNo: string; address: string };
+    control: { provider: string; serial: string; certified: boolean };
+  } | null;
+  counters: {
+    seq: number;
+    receipt: number;
+    copy: number;
+    z: number;
+    grandSales: number;
+    grandReturns: number;
+  } | null;
+  control: {
+    reachable: boolean;
+    certified: boolean;
+    provider: string;
+    detail: string | null;
+  } | null;
+}
+
+export interface RegisterReport {
+  kind: 'X' | 'Z';
+  number: number | null;
+  from: string | null;
+  to: string;
+  totalSales: number;
+  vat: { rate: number; vat: number }[];
+  goodsSold: number;
+  servicesSold: number;
+  receipts: number;
+  copies: number;
+  copiesAmount: number;
+  payments: { means: 'card' | 'swish' | 'cash'; amount: number }[];
+  returns: number;
+  returnsAmount: number;
+  discounts: number;
+  grandTotalSales: number;
+  grandTotalReturns: number;
+  grandTotalNet: number;
+}
+
+/** En rad i kassaregistrets journal. */
+export interface RegisterEntry {
+  seq: number;
+  kind: 'start' | 'sale' | 'return' | 'copy' | 'x_report' | 'z_report';
+  occurredAt: string;
+  operator: string | null;
+  code: string | null;
+  receiptNumber: number | null;
+  returnOf: number | null;
+  zNumber: number | null;
+  reason: string | null;
+  receipt: { total: number; totalVat: number; payments: { means: string; amount: number }[] } | null;
+  report: RegisterReport | null;
+  signature: { certified: boolean; controlSerial: string } | null;
+  registerVersion: string;
+  hash: string;
+}
+
+export type RegisterChain =
+  | { ok: true; entries: number }
+  | { ok: false; brokenAtSeq: number; reason: string };
+
+export interface PaymentAccount {
+  connected: boolean;
+  accountId: string | null;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  ready: boolean;
+  swish: boolean;
+  terminalLocationId: string | null;
+  readers: { id: string; label: string }[];
+  feePercent: number;
+}
+
+export interface PaymentReader {
+  id: string;
+  label: string;
+  deviceType: string | null;
+  status: 'online' | 'offline';
+  busy: boolean;
+}
+
+/** En betalning via Stripe för ett säljkort. */
+export interface PaymentRow {
+  id: string;
+  cardId: string;
+  purpose: 'invoice' | 'receipt';
+  channel: 'checkout' | 'reader';
+  amount: number;
+  applicationFee: number;
+  method: PaymentMethod | null;
+  status: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  failureReason: string | null;
+  /** Hur det gick att bokföra betalningen på kortet; `failed` = pengarna är inne men kvittot kunde inte utfärdas. */
+  receipt: 'not_needed' | 'pending' | 'done' | 'failed';
+  receiptError: string | null;
+  refundedAt: string | null;
+  refundError: string | null;
+  createdAt: string;
+  paidAt: string | null;
 }

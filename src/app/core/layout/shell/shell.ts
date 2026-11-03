@@ -170,8 +170,8 @@ export class Shell {
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
 
-  openSettings(): void {
-    void import('../../../features/settings/settings').then((m) => m.openSettings(this.dialog));
+  openSettings(tab?: string): void {
+    void import('../../../features/settings/settings').then((m) => m.openSettings(this.dialog, tab));
   }
   /** Sidans namn i topbaren. */
   readonly pageName = inject(PageTitle).page;
@@ -190,6 +190,11 @@ export class Shell {
       }
     });
     inject(Settings).loadCompany();
+    // Stripe skickar ägaren tillbaka hit efter registreringen (`/?payments=return`): visa Betalningar.
+    if (new URLSearchParams(window.location.search).has('payments')) {
+      history.replaceState(null, '', window.location.pathname + window.location.hash);
+      queueMicrotask(() => this.openSettings('betalningar'));
+    }
     // Prissättningen gäller bolaget man är i (ägare och personal; mekaniker har ingen åtkomst).
     const pricing = inject(Pricing);
     effect(() => {

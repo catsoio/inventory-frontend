@@ -3,6 +3,7 @@ import { SharedModule } from '../../shared/shared-module';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
 import { SettingsCompanies, SettingsCompany, SettingsStaff } from './sections/company-sections';
 import { SettingsPassword, SettingsView } from './sections/personal-sections';
+import { SettingsPayments, SettingsRegister } from './sections/payment-sections';
 import {
   SettingsCustomers,
   SettingsHotel,
@@ -28,6 +29,8 @@ export { SettingsPage };
     SettingsStock,
     SettingsCustomers,
     SettingsHotel,
+    SettingsPayments,
+    SettingsRegister,
     ResetPasswordDialog,
   ],
   imports: [SharedModule],

@@ -21,6 +21,7 @@ export class FinanceTabs {
     { path: '/finance', label: 'Översikt', exact: true },
     { path: '/finance/invoices', label: 'Fakturor' },
     { path: '/finance/receipts', label: 'Kvitton' },
+    { path: '/finance/register', label: 'Kassa' },
     { path: '/bookkeeping', label: 'Moms och bokföring' },
   ].filter(() => this.admin);
 }

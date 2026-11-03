@@ -1,3 +1,4 @@
+import { ReturnDialog } from './return-dialog';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
@@ -114,7 +115,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             </button>
           }
           @if (c.status === 'posted') {
-            @if (isOwner) {
+            @if (isOwner && !c.document?.register) {
               <button
                 mat-stroked-button
                 type="button"
@@ -123,6 +124,18 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 (click)="reopen()"
               >
                 <mat-icon>undo</mat-icon> Återöppna
+              </button>
+            }
+            @if (isOwner && c.document?.register && !c.returned) {
+              <button
+                mat-stroked-button
+                color="warn"
+                type="button"
+                [disabled]="busy()"
+                matTooltip="Registrerade kvitton kan inte återöppnas: de tas tillbaka med ett returkvitto"
+                (click)="giveBack()"
+              >
+                <mat-icon>undo</mat-icon> Retur
               </button>
             }
             <a mat-stroked-button [routerLink]="['/sales', c.id, 'invoice']">
@@ -619,6 +632,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 <mat-icon>visibility</mat-icon> Förhandsgranska utkast
               </a>
             </div>
+            @if (kind() === 'receipt') {
+              <app-reader-payment [cardId]="c.id" [disabled]="dirty()" (booked)="load(c.id)" />
+            }
           </section>
         } @else if (c.document; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -635,9 +651,26 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   }
                 </app-pill>
                 <span class="text-sm text-gray-600"
-                  >Ett kvitto är betalt när det utfärdas. Blev det fel: återöppna kortet.</span
+                  >Ett kvitto är betalt när det utfärdas.
+                  {{ inv.register ? 'Blev det fel: ta tillbaka kvittot med en retur.' : 'Blev det fel: återöppna kortet.' }}</span
                 >
               </div>
+              @if (inv.register; as r) {
+                <p class="mt-3 text-sm text-gray-600">
+                  Registrerat i kassaregistret: kvitto <b>{{ r.receiptNumber }}</b>, Z-rapport
+                  {{ r.zNumber }}.
+                  @if (!r.certified) {
+                    <span class="font-medium text-red-700">
+                      Utvecklingsläge – inte ett giltigt kvitto.</span
+                    >
+                  }
+                </p>
+              }
+              @if (c.returned; as ret) {
+                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                  Tillbakatagen med returkvitto {{ ret.receiptNumber }}: {{ ret.reason }}.
+                </p>
+              }
             } @else {
               @if (inv.dueAt) {
                 <p class="mb-3 text-sm text-gray-600">
@@ -682,6 +715,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   </button>
                 }
               </div>
+              @if (!inv.paidAt) {
+                <app-reader-payment [cardId]="c.id" (booked)="load(c.id)" />
+              }
             }
           </section>
         }
@@ -1021,7 +1057,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.dirty.set(true);
   }
 
-  private load(id: string) {
+  protected load(id: string) {
     this.api.get(id).subscribe((c) => this.apply(c));
   }
 
@@ -1356,6 +1392,40 @@ export class SalesCardPage implements OnInit, HasUnsaved {
             this.busy.set(false);
             this.apply(r);
             this.snack.open('Kortet är återöppnat', 'OK', { duration: 4000 });
+          },
+          error: () => {
+            this.busy.set(false);
+            this.load(c.id);
+          },
+        });
+      });
+  }
+
+  /** Tar ett registrerat kvitto tillbaka: ett returkvitto i kassaregistret, lagret tillbaka, kortbetalningen återbetald. */
+  giveBack() {
+    const c = this.card();
+    if (!c?.document) return;
+    this.dialog
+      .open(ReturnDialog, {
+        data: { code: c.documentCode, total: c.totals.total },
+        width: '440px',
+      })
+      .afterClosed()
+      .subscribe((reason?: string) => {
+        if (!reason) return;
+        this.busy.set(true);
+        this.api.returnReceipt(c.id, reason).subscribe({
+          next: (r) => {
+            this.busy.set(false);
+            this.apply(r);
+            const failed = r.refunds?.some((x) => x.status === 'failed');
+            this.snack.open(
+              failed
+                ? 'Returen är registrerad, men återbetalningen till kunden misslyckades: återbetala den för hand.'
+                : 'Returen är registrerad',
+              'OK',
+              { duration: failed ? 12000 : 4000 },
+            );
           },
           error: () => {
             this.busy.set(false);

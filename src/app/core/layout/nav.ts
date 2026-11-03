@@ -117,6 +117,7 @@ export const NAV: NavSection[] = [
           { path: '/finance', label: 'Översikt', icon: 'monitoring', exact: true, badge: 'none' },
           { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
           { path: '/finance/receipts', label: 'Kvitton', icon: 'receipt' },
+          { path: '/finance/register', label: 'Kassa', icon: 'point_of_sale' },
           { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
         ],
       },
