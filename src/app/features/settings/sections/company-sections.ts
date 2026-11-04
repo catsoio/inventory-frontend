@@ -3,6 +3,8 @@ import { FormBuilder } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { OnlineBookingApi } from '../../../core/api/online-booking-api';
 import { OnlineBookingSettings } from '../../../core/models';
+import { MatDialog } from '@angular/material/dialog';
+import { FeaturesDialog } from '../features-dialog/features-dialog';
 import { SettingsStore } from '../settings-store';
 
 /** Företagsuppgifter: det som skrivs ut på faktura och kvitto. */
@@ -201,6 +203,9 @@ export class SettingsStaff {
                 Växla
               </button>
             }
+            @if (s.auth.isSuperAdmin()) {
+              <button mat-stroked-button type="button" (click)="features(c)">Funktioner</button>
+            }
           </div>
         }
       </div>
@@ -227,6 +232,16 @@ export class SettingsStaff {
 })
 export class SettingsCompanies {
   readonly s = inject(SettingsStore);
+  private readonly dialog = inject(MatDialog);
+
+  /** Catso styr vad bolaget får använda (plan och delar på/av). */
+  features(c: { id: string; name: string }) {
+    this.dialog.open(FeaturesDialog, {
+      data: { id: c.id, name: c.name },
+      width: '640px',
+      maxWidth: '95vw',
+    });
+  }
 }
 
 /**

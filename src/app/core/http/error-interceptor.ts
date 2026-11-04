@@ -53,12 +53,18 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                 : err.status === 400 && e?.message
                   ? `Ogiltiga uppgifter: ${e.message}`
                   : 'Något gick fel. Försök igen.');
-      if (err.status !== 401 && code !== 'NO_GARAGE')
-        snack.open(message, 'Stäng', { duration: 6000 });
       if (code === 'SUBSCRIPTION_REQUIRED') {
         const billing = injector.get(Billing);
         billing.refresh();
-        billing.openPlans();
+        // Hela abonnemanget har gått ut: förklara och visa planerna. Annars är det bara en del som
+        // är avstängd för garaget (Catso eller planen), och den syns inte i menyn: ett anrop i
+        // bakgrunden (Hem, sökning) ska då inte störa med ett felmeddelande.
+        if (billing.blocked()) {
+          snack.open(message, 'Stäng', { duration: 6000 });
+          billing.openPlans();
+        }
+      } else if (err.status !== 401 && code !== 'NO_GARAGE') {
+        snack.open(message, 'Stäng', { duration: 6000 });
       }
       const apiError: ApiError = { code, message, status: err.status, details: e?.details };
       return throwError(() => apiError);

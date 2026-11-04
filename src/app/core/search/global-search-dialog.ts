@@ -14,6 +14,7 @@ import {
   switchMap,
   tap,
 } from 'rxjs';
+import { Billing } from '../billing/billing';
 import { QUICK_ACTIONS } from './quick-actions';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { SharedModule } from '../../shared/shared-module';
@@ -227,7 +228,8 @@ export class GlobalSearchDialog {
   readonly recent = signal<string[]>(this.loadRecent());
   private readonly flat = computed(() => this.groups().flatMap((g) => g.hits));
 
-  readonly actions = QUICK_ACTIONS;
+  private readonly billing = inject(Billing);
+  readonly actions = QUICK_ACTIONS.filter((a) => this.billing.allows(a.module));
 
   constructor() {
     this.q.valueChanges

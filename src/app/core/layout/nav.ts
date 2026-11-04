@@ -3,6 +3,7 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { debounceTime, filter, merge } from 'rxjs';
 import { Auth } from '../auth/auth';
+import { Billing } from '../billing/billing';
 import { Todo, todoBadges } from '../todo';
 import { environment } from '../../../environments/environment';
 
@@ -13,6 +14,8 @@ export interface NavItem {
   /** Markeras bara på exakt den adressen. */
   exact?: boolean;
   adminOnly?: boolean;
+  /** Delen av appen (modul) som måste vara påslagen för garaget, annars visas posten inte. */
+  module?: string;
   /** Dold tills funktionen är påslagen. */
   hidden?: boolean;
   /** Visas bara på dator eller bara på mobil. */
@@ -46,12 +49,13 @@ export const NAV: NavSection[] = [
   {
     title: 'Arbete',
     items: [
-      { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month' },
+      { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month', module: 'tidsbokning' },
       // Kundens egen bokningssida; ägaren formar den här, Catso sätter adressen.
       {
         path: '/online-booking',
         label: 'Onlinebokning',
         icon: 'language',
+        module: 'onlinebokning',
         adminOnly: true,
         only: 'desktop',
       },
@@ -59,6 +63,7 @@ export const NAV: NavSection[] = [
         path: '/workorders',
         label: 'Arbetsorder',
         icon: 'handyman',
+        module: 'arbetsorder',
         hidden: !environment.workOrders,
       },
     ],
@@ -66,7 +71,7 @@ export const NAV: NavSection[] = [
   {
     title: 'Däck och lager',
     items: [
-      { path: '/storage', label: 'Däckhotell', icon: 'warehouse' },
+      { path: '/storage', label: 'Däckhotell', icon: 'warehouse', module: 'dackhotell' },
       // Översikt och Lagerlogg är flikar här.
       {
         path: '/inventory',
@@ -85,6 +90,7 @@ export const NAV: NavSection[] = [
         path: '/dealership',
         label: 'Bilar till salu',
         icon: 'directions_car',
+        module: 'bilhandel',
         only: 'desktop',
         match: ['/dealership'],
       },
@@ -119,6 +125,7 @@ export const NAV: NavSection[] = [
         path: '/quotes',
         label: 'Offert',
         icon: 'request_quote',
+        module: 'arbetsorder',
         hidden: !environment.workOrders,
       },
       {
@@ -132,6 +139,7 @@ export const NAV: NavSection[] = [
         path: '/finance',
         label: 'Ekonomi',
         icon: 'account_balance_wallet',
+        module: 'bokforing',
         adminOnly: true,
         match: ['/finance', '/bookkeeping'],
         children: [
@@ -167,8 +175,8 @@ const MECHANIC_NAV: NavSection[] = [
  */
 export const MOBILE_TABS: NavItem[] = [
   { path: '/dashboard', label: 'Hem', icon: 'home', exact: true },
-  { path: '/bookings', label: 'Tider', icon: 'calendar_month' },
-  { path: '/storage', label: 'Hotell', icon: 'warehouse' },
+  { path: '/bookings', label: 'Tider', icon: 'calendar_month', module: 'tidsbokning' },
+  { path: '/storage', label: 'Hotell', icon: 'warehouse', module: 'dackhotell' },
   { path: '/inventory', label: 'Lager', icon: 'inventory_2', match: ['/inventory', '/reports'] },
 ];
 
@@ -179,12 +187,14 @@ export const MOBILE_MORE: NavItem[] = [
     path: '/workorders',
     label: 'Arbetsorder',
     icon: 'handyman',
+    module: 'arbetsorder',
     hidden: !environment.workOrders,
   },
   {
     path: '/quotes',
     label: 'Offert',
     icon: 'request_quote',
+    module: 'arbetsorder',
     hidden: !environment.workOrders,
   },
   {
@@ -209,6 +219,7 @@ export const MOBILE_MORE: NavItem[] = [
 export class Nav {
   private readonly auth = inject(Auth);
   private readonly todo = inject(Todo);
+  private readonly billing = inject(Billing);
   private readonly router = inject(Router);
 
   /** Nuvarande adress (utan query). */
@@ -236,6 +247,7 @@ export class Nav {
   private visible(i: NavItem, mobile: boolean): boolean {
     return (
       !i.hidden &&
+      this.billing.allows(i.module) &&
       (!i.adminOnly || this.admin) &&
       (!i.only || i.only === (mobile ? 'mobile' : 'desktop'))
     );
@@ -263,7 +275,7 @@ export class Nav {
   readonly tabs = computed<NavItem[]>(() =>
     this.auth.isMechanic()
       ? [{ path: '/workorders/mine', label: 'Order', icon: 'handyman' }]
-      : MOBILE_TABS,
+      : MOBILE_TABS.filter((i) => this.billing.allows(i.module)),
   );
   readonly more = computed<NavItem[]>(() =>
     this.auth.isMechanic() ? [] : MOBILE_MORE.filter((i) => this.visible(i, true)),
@@ -284,6 +296,10 @@ export class Nav {
     });
     // Siffrorna uppdateras när garaget byts och efter varje sidbyte (t.ex. efter en försäljning),
     // ett anrop per omgång även om flera händer samtidigt.
+    // Vad garaget får använda hämtas när garaget byts (banderollen gör det bara för vanliga användare).
+    toObservable(computed(() => this.auth.garage()?.id))
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe((id) => id && !this.auth.isSuperAdmin() && this.billing.refresh());
     merge(toObservable(computed(() => this.auth.garage()?.id)), done$)
       .pipe(debounceTime(400), takeUntilDestroyed(inject(DestroyRef)))
       .subscribe(() => this.refresh());

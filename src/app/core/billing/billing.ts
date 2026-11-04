@@ -22,8 +22,14 @@ export interface BillingPlan {
 export interface BillingStatus {
   state: AccessState;
   plan: PlanId | null;
-  /** Vad garaget får använda just nu, t.ex. 'tidsbokning'. */
+  /**
+   * Vad garaget får använda just nu, t.ex. 'tidsbokning': planen och Catsos undantag per garage
+   * ihopräknade av servern. Medan betalning inte är påslagen blockerar planen inget, men det Catso
+   * stängt av är av.
+   */
   modules: string[];
+  /** Catsos undantag från planen för det här garaget. */
+  overrides?: { add: string[]; remove: string[] };
   trialDaysLeft: number;
   /** Falskt medan betalning rullas ut: inget blockeras än. */
   enforced: boolean;
@@ -67,10 +73,10 @@ export class Billing {
     });
   }
 
-  /** Om fliken ingår i planen. Alltid sant tills betalning är påslaget. */
-  allows(module: string): boolean {
+  /** Om garaget får använda en del (servern har redan räknat in plan och Catsos val). Sant tills statusen kommit. */
+  allows(module: string | undefined): boolean {
     const s = this.status();
-    return !s || !s.enforced || s.modules.includes(module);
+    return !module || !s || s.modules.includes(module);
   }
 
   checkout(plan: PlanId): Observable<{ url: string }> {

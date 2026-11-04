@@ -968,7 +968,15 @@ export interface VehicleTech {
 export type VehicleInput = Partial<
   Pick<
     Vehicle,
-    'customerId' | 'regNo' | 'make' | 'model' | 'year' | 'vin' | 'notes' | 'classOverride' | 'active'
+    | 'customerId'
+    | 'regNo'
+    | 'make'
+    | 'model'
+    | 'year'
+    | 'vin'
+    | 'notes'
+    | 'classOverride'
+    | 'active'
   >
 >;
 
@@ -1739,7 +1747,13 @@ export interface SalesCardDetail extends SalesCardItem {
   reservedKind?: InvoiceKind | null;
   reopenings?: { at: string; by: string; kind: InvoiceKind; number: number }[];
   /** Satt när ett registrerat kvitto har tagits tillbaka med en retur. */
-  returned?: { at: string; by: string; receiptNumber: number; reason: string; total: number } | null;
+  returned?: {
+    at: string;
+    by: string;
+    receiptNumber: number;
+    reason: string;
+    total: number;
+  } | null;
   /** Vid retur: hur återbetalningen av en kortbetalning gick. */
   refunds?: { paymentId: string; status: 'done' | 'failed'; error?: string }[];
   /** Gånger dokumentet mejlats till kunden; ett skickat dokument kan inte återöppnas. */
@@ -2117,7 +2131,11 @@ export interface RegisterEntry {
   returnOf: number | null;
   zNumber: number | null;
   reason: string | null;
-  receipt: { total: number; totalVat: number; payments: { means: string; amount: number }[] } | null;
+  receipt: {
+    total: number;
+    totalVat: number;
+    payments: { means: string; amount: number }[];
+  } | null;
   report: RegisterReport | null;
   signature: { certified: boolean; controlSerial: string } | null;
   registerVersion: string;
@@ -2125,8 +2143,7 @@ export interface RegisterEntry {
 }
 
 export type RegisterChain =
-  | { ok: true; entries: number }
-  | { ok: false; brokenAtSeq: number; reason: string };
+  { ok: true; entries: number } | { ok: false; brokenAtSeq: number; reason: string };
 
 export interface PaymentAccount {
   connected: boolean;
@@ -2264,6 +2281,8 @@ export interface SiteSettings {
   slug: string | null;
   title: string | null;
   intro: string | null;
+  /** Dölj regnumret för besökare. */
+  hideRegNo: boolean;
   domains: SiteDomain[];
   /** Adressen på plattformen, t.ex. /bilhandel/dackmaster. */
   path: string | null;
@@ -2283,7 +2302,8 @@ export interface PublicSiteProfile {
 /** En bil som besökaren ser: inget om ägare eller intern data. */
 export interface PublicCar {
   id: string;
-  regNo: string;
+  /** Null när verkstaden döljer regnumret. */
+  regNo: string | null;
   heading: string;
   make: string | null;
   model: string | null;

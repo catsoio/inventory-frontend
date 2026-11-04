@@ -144,8 +144,15 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
             <mat-label>Välkomsttext (valfri)</mat-label>
             <textarea matInput rows="3" maxlength="600" formControlName="intro"></textarea>
           </mat-form-field>
+          <mat-slide-toggle formControlName="hideRegNo"
+            >Dölj registreringsnummer på sidan</mat-slide-toggle
+          >
+          <p class="mt-1 text-xs text-gray-500">
+            Regnumret tas bort från annonserna. Bilderna ändras inte, så ett synligt nummer på en
+            bild ligger kvar.
+          </p>
           @if (error(); as e) {
-            <p class="text-sm text-red-700">{{ e }}</p>
+            <p class="mt-2 text-sm text-red-700">{{ e }}</p>
           }
         </form>
 
@@ -234,7 +241,7 @@ export class SitePage implements OnInit, HasUnsaved {
   readonly error = signal<string | null>(null);
   readonly adminError = signal<string | null>(null);
 
-  readonly form = this.fb.nonNullable.group({ title: '', intro: '' });
+  readonly form = this.fb.nonNullable.group({ title: '', intro: '', hideRegNo: false });
   readonly admin = this.fb.nonNullable.group({ enabled: false, slug: '' });
   readonly newDomain = this.fb.nonNullable.control('');
 
@@ -248,7 +255,8 @@ export class SitePage implements OnInit, HasUnsaved {
 
   private load(s: SiteSettings, keepText = false) {
     this.site.set(s);
-    if (!keepText) this.form.reset({ title: s.title ?? '', intro: s.intro ?? '' });
+    if (!keepText)
+      this.form.reset({ title: s.title ?? '', intro: s.intro ?? '', hideRegNo: s.hideRegNo });
     this.admin.reset({ enabled: s.enabled, slug: s.slug ?? '' });
   }
 
@@ -256,17 +264,23 @@ export class SitePage implements OnInit, HasUnsaved {
     const v = this.form.getRawValue();
     this.busy.set(true);
     this.error.set(null);
-    this.api.save({ title: v.title.trim() || null, intro: v.intro.trim() || null }).subscribe({
-      next: (s) => {
-        this.busy.set(false);
-        this.load(s);
-        this.snack.open('Sparat', undefined, { duration: 2000 });
-      },
-      error: (e: ApiError) => {
-        this.busy.set(false);
-        this.error.set(e.error?.error?.message ?? 'Det gick inte att spara.');
-      },
-    });
+    this.api
+      .save({
+        title: v.title.trim() || null,
+        intro: v.intro.trim() || null,
+        hideRegNo: v.hideRegNo,
+      })
+      .subscribe({
+        next: (s) => {
+          this.busy.set(false);
+          this.load(s);
+          this.snack.open('Sparat', undefined, { duration: 2000 });
+        },
+        error: (e: ApiError) => {
+          this.busy.set(false);
+          this.error.set(e.error?.error?.message ?? 'Det gick inte att spara.');
+        },
+      });
   }
 
   /** Körs av operatören: adress och på/av. */

@@ -67,7 +67,7 @@ export class SiteApi {
 
   /** `enabled` och `slug` får bara plattformens operatör ändra (403 annars). */
   save(
-    body: Partial<Pick<SiteSettings, 'enabled' | 'slug' | 'title' | 'intro'>>,
+    body: Partial<Pick<SiteSettings, 'enabled' | 'slug' | 'title' | 'intro' | 'hideRegNo'>>,
   ): Observable<SiteSettings> {
     return this.http.put<SiteSettings>(this.base, body);
   }

@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { SharedModule } from '../../shared/shared-module';
+import { FeaturesDialog } from './features-dialog/features-dialog';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
 import {
   SettingsCompanies,
@@ -38,6 +39,7 @@ export { SettingsPage };
     SettingsPayments,
     SettingsRegister,
     ResetPasswordDialog,
+    FeaturesDialog,
   ],
   imports: [SharedModule],
 })
