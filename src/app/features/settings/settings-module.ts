@@ -1,7 +1,12 @@
 import { NgModule } from '@angular/core';
 import { SharedModule } from '../../shared/shared-module';
 import { ResetPasswordDialog } from './reset-password-dialog/reset-password-dialog';
-import { SettingsCompanies, SettingsCompany, SettingsStaff } from './sections/company-sections';
+import {
+  SettingsCompanies,
+  SettingsCompany,
+  SettingsStaff,
+  SettingsWebsite,
+} from './sections/company-sections';
 import { SettingsPassword, SettingsView } from './sections/personal-sections';
 import { SettingsPayments, SettingsRegister } from './sections/payment-sections';
 import {
@@ -25,6 +30,7 @@ export { SettingsPage };
     SettingsCompany,
     SettingsStaff,
     SettingsCompanies,
+    SettingsWebsite,
     SettingsPricing,
     SettingsStock,
     SettingsCustomers,

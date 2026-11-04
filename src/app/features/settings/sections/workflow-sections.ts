@@ -31,12 +31,16 @@ import { SettingsStore } from '../settings-store';
           aria-label="Arbetssätt"
         >
           <label class="choice" [class.is-on]="s.pricingForm.controls.profile.value === 'service'">
-            <mat-radio-button value="service" class="font-medium">Däck och service</mat-radio-button>
+            <mat-radio-button value="service" class="font-medium"
+              >Däck och service</mat-radio-button
+            >
             <span class="choice-text">Ett pris per order. Snabbt i kassan, inga prisrader.</span>
           </label>
           <label class="choice" [class.is-on]="s.pricingForm.controls.profile.value === 'workshop'">
             <mat-radio-button value="workshop" class="font-medium">Bilverkstad</mat-radio-button>
-            <span class="choice-text">Jobb med egna priser, offerter och förbrukningsmaterial.</span>
+            <span class="choice-text"
+              >Jobb med egna priser, offerter och förbrukningsmaterial.</span
+            >
           </label>
         </mat-radio-group>
         <p class="mt-2 text-xs text-gray-500">
@@ -61,13 +65,27 @@ import { SettingsStore } from '../settings-store';
       <form [formGroup]="s.pricingForm" (ngSubmit)="s.savePricing()">
         @switch (sub()) {
           @case ('order') {
-            <mat-radio-group formControlName="priceEntry" class="mb-6 grid gap-3 sm:grid-cols-2" aria-label="Så prissätts en order">
-              <label class="choice" [class.is-on]="s.pricingForm.controls.priceEntry.value === 'order'">
-                <mat-radio-button value="order" class="font-medium">Ett pris per order</mat-radio-button>
+            <mat-radio-group
+              formControlName="priceEntry"
+              class="mb-6 grid gap-3 sm:grid-cols-2"
+              aria-label="Så prissätts en order"
+            >
+              <label
+                class="choice"
+                [class.is-on]="s.pricingForm.controls.priceEntry.value === 'order'"
+              >
+                <mat-radio-button value="order" class="font-medium"
+                  >Ett pris per order</mat-radio-button
+                >
                 <span class="choice-text">Raderna är en checklista för mekanikern, utan pris.</span>
               </label>
-              <label class="choice" [class.is-on]="s.pricingForm.controls.priceEntry.value === 'lines'">
-                <mat-radio-button value="lines" class="font-medium">Jobb med priser</mat-radio-button>
+              <label
+                class="choice"
+                [class.is-on]="s.pricingForm.controls.priceEntry.value === 'lines'"
+              >
+                <mat-radio-button value="lines" class="font-medium"
+                  >Jobb med priser</mat-radio-button
+                >
                 <span class="choice-text">Varje jobb har eget pris, med delar under sig.</span>
               </label>
             </mat-radio-group>
@@ -92,13 +110,24 @@ import { SettingsStore } from '../settings-store';
               </mat-form-field>
               <mat-form-field subscriptSizing="dynamic">
                 <mat-label>Får avvika (%)</mat-label>
-                <input matInput type="number" min="0" max="100" formControlName="quoteTolerancePercent" />
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  max="100"
+                  formControlName="quoteTolerancePercent"
+                />
                 <mat-hint>Konsumenttjänstlagen: högst 15 % om inget annat avtalats</mat-hint>
               </mat-form-field>
             </div>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
               <mat-label>Villkor under förslaget</mat-label>
-              <textarea matInput rows="3" formControlName="quoteTerms" [placeholder]="s.defaultTerms()"></textarea>
+              <textarea
+                matInput
+                rows="3"
+                formControlName="quoteTerms"
+                [placeholder]="s.defaultTerms()"
+              ></textarea>
               <mat-hint>Tomt = standardtexten</mat-hint>
             </mat-form-field>
           }
@@ -110,7 +139,14 @@ import { SettingsStore } from '../settings-store';
             <div class="mb-6 grid gap-x-4 gap-y-3 sm:grid-cols-3">
               <mat-form-field subscriptSizing="dynamic">
                 <mat-label>Procent av arbetet</mat-label>
-                <input matInput type="number" min="0" max="100" step="0.5" formControlName="consumablesPercent" />
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  formControlName="consumablesPercent"
+                />
                 <mat-hint>Tomt = av</mat-hint>
               </mat-form-field>
               <mat-form-field subscriptSizing="dynamic">
@@ -132,12 +168,26 @@ import { SettingsStore } from '../settings-store';
           }
           @case ('stock') {
             <h3 class="sec">Delar tas ur lagret</h3>
-            <mat-radio-group formControlName="stockOut" class="mb-6 grid gap-3 sm:grid-cols-2" aria-label="När delar tas ur lagret">
-              <label class="choice" [class.is-on]="s.pricingForm.controls.stockOut.value === 'work_order_done'">
-                <mat-radio-button value="work_order_done" class="font-medium">När ordern är klar</mat-radio-button>
+            <mat-radio-group
+              formControlName="stockOut"
+              class="mb-6 grid gap-3 sm:grid-cols-2"
+              aria-label="När delar tas ur lagret"
+            >
+              <label
+                class="choice"
+                [class.is-on]="s.pricingForm.controls.stockOut.value === 'work_order_done'"
+              >
+                <mat-radio-button value="work_order_done" class="font-medium"
+                  >När ordern är klar</mat-radio-button
+                >
               </label>
-              <label class="choice" [class.is-on]="s.pricingForm.controls.stockOut.value === 'sales_card_posted'">
-                <mat-radio-button value="sales_card_posted" class="font-medium">När säljkortet bokförs</mat-radio-button>
+              <label
+                class="choice"
+                [class.is-on]="s.pricingForm.controls.stockOut.value === 'sales_card_posted'"
+              >
+                <mat-radio-button value="sales_card_posted" class="font-medium"
+                  >När säljkortet bokförs</mat-radio-button
+                >
               </label>
             </mat-radio-group>
             <h3 class="sec">Inköp</h3>

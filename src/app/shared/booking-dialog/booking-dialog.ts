@@ -13,6 +13,7 @@ import {
   BOOKING_STATUS_LABELS,
   Booking,
   BookingStatus,
+  Customer,
   Resource,
   ServiceType,
   Vehicle,
@@ -319,9 +320,11 @@ export class BookingDialog {
   readonly orderLoaded = signal(false);
   readonly orderStatuses = WORK_ORDER_STATUS_LABELS;
   /** "Förfrågan" väljs aldrig för hand: den kommer från bokningssidan och bekräftas till "Bokad". */
-  readonly statuses = Object.entries(BOOKING_STATUS_LABELS).filter(
-    ([s]) => s !== 'requested' || this.data.booking?.status === 'requested',
-  );
+  get statuses() {
+    return Object.entries(BOOKING_STATUS_LABELS).filter(
+      ([s]) => s !== 'requested' || this.data.booking?.status === 'requested',
+    );
+  }
   readonly resourceOptions = signal<Resource[]>([]);
   readonly resourcesLoaded = signal(false);
   readonly mechanicOptions = computed(() =>
@@ -529,12 +532,26 @@ export class BookingDialog {
     this.busy.set(true);
     // Telefonnumret söks som siffror: servern matchar det hur det än är sparat.
     const digits = (b.phone ?? '').replace(/\D/g, '');
-    const known$: Observable<string | undefined> = digits
-      ? this.workshop.customers({ q: digits, limit: 5 }).pipe(
-          map((p) => p.items[0]?.id),
-          catchError(() => of(undefined)),
-        )
-      : of(undefined);
+    const email = /^E-post: (\S+@\S+)$/m.exec(b.notes ?? '')?.[1]?.toLowerCase();
+    // Samma kund = samma mobilnummer (sista nio siffrorna, oavsett 0/+46) eller samma e-post.
+    const tail = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '').slice(-9);
+    const search = (q: string) =>
+      this.workshop.customers({ q, limit: 10 }).pipe(
+        map((p) => p.items),
+        catchError(() => of([] as Customer[])),
+      );
+    const known$: Observable<string | undefined> = (
+      digits ? search(digits) : of([] as Customer[])
+    ).pipe(
+      switchMap((byPhone) => {
+        const hit = byPhone.find(
+          (c) => tail(c.phone).length >= 7 && tail(c.phone) === tail(digits),
+        );
+        if (hit || !email) return of(hit);
+        return search(email).pipe(map((l) => l.find((c) => c.email?.toLowerCase() === email)));
+      }),
+      map((c) => c?.id),
+    );
     known$
       .pipe(
         switchMap((customerId) =>
@@ -545,6 +562,8 @@ export class BookingDialog {
               customerId,
               customerName: b.customerName,
               customerPhone: b.phone ?? undefined,
+              // Bokningssidan sparar kundens e-post i anteckningen ("E-post: …").
+              customerEmail: /^E-post: (\S+@\S+)$/m.exec(b.notes ?? '')?.[1],
               regNo: b.regNo ?? undefined,
             },
           }),

@@ -72,6 +72,9 @@ export interface SettingsTab {
         @case ('bolag') {
           <app-settings-companies />
         }
+        @case ('webbsida') {
+          <app-settings-website />
+        }
         @case ('prissattning') {
           <app-settings-pricing />
         }
@@ -101,7 +104,9 @@ export class SettingsPage {
   private readonly confirm = inject(Confirm);
   protected readonly version = pkg.version;
 
-  readonly tab = signal(inject<{ tab?: string } | null>(DIALOG_DATA, { optional: true })?.tab ?? 'visning');
+  readonly tab = signal(
+    inject<{ tab?: string } | null>(DIALOG_DATA, { optional: true })?.tab ?? 'visning',
+  );
 
   readonly tabs = computed<SettingsTab[]>(() => {
     const t: SettingsTab[] = [
@@ -111,6 +116,7 @@ export class SettingsPage {
     if (!this.store.admin) return t;
     t.push({ key: 'foretag', label: 'Företaget' }, { key: 'personal', label: 'Personal' });
     if (this.store.showCompanies()) t.push({ key: 'bolag', label: 'Bolag' });
+    if (this.store.auth.isSuperAdmin()) t.push({ key: 'webbsida', label: 'Onlinebokning' });
     t.push(
       { key: 'prissattning', label: 'Prissättning' },
       { key: 'artiklar', label: 'Artiklar och lager' },

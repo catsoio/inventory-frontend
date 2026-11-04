@@ -10,7 +10,8 @@ import {
 } from '../models';
 
 /**
- * Verkstadens publika bokningssida. Ägaren styr den under Webbsida (inställningarna); kunden
+ * Verkstadens publika bokningssida. Adress och på/av sätter plattformens operatör (Inställningar →
+ * Webbsida), ägaren formar sidan under Webbsida i menyn; kunden
  * använder de publika anropen utan inloggning, och adressen i länken är nyckeln.
  */
 @Injectable({ providedIn: 'root' })
@@ -30,6 +31,13 @@ export class OnlineBookingApi {
     >,
   ): Observable<OnlineBookingSettings> {
     return this.http.put<OnlineBookingSettings>(this.settingsUrl, body);
+  }
+
+  /** Laddar upp en bild (JPEG, PNG eller WebP, högst 5 MB); svaret är filnamnet som sparas på åtgärden. */
+  uploadImage(file: File): Observable<{ image: string }> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<{ image: string }>(`${this.settingsUrl}/images`, body);
   }
 
   profile(slug: string): Observable<PublicBookingProfile> {

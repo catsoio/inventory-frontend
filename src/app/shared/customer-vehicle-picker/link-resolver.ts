@@ -29,6 +29,7 @@ export class LinkResolver {
         type: 'private',
         name: p.customerName ?? '',
         ...(p.customerPhone ? { phone: p.customerPhone } : {}),
+        ...(p.customerEmail ? { email: p.customerEmail } : {}),
       });
     // Bara en ny kund, ingen bil.
     const regNo = p.regNo;

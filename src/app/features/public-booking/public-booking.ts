@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { environment } from '../../../environments/environment';
 import { OnlineBookingApi } from '../../core/api/online-booking-api';
 import {
   DAY_PART_LABELS,
@@ -187,6 +188,14 @@ import { PICKABLE_CLASSES, campaignNote, priceText, problems, toE164 } from './b
                     (click)="selected.set(s.id)"
                     [attr.aria-pressed]="selected() === s.id"
                   >
+                    @if (s.image) {
+                      <img
+                        [src]="media(s.image)"
+                        alt=""
+                        loading="lazy"
+                        class="mb-2 h-36 w-full rounded-lg object-cover"
+                      />
+                    }
                     <div class="flex items-baseline justify-between gap-3">
                       <span class="font-medium">{{ s.title }}</span>
                       <span class="shrink-0 font-semibold tabular-nums">{{ price(s) }}</span>
@@ -330,6 +339,9 @@ export class PublicBooking implements OnInit {
   private readonly api = inject(OnlineBookingApi);
   private readonly slug = inject(ActivatedRoute).snapshot.paramMap.get('slug') ?? '';
   private readonly fb = inject(FormBuilder);
+
+  /** Bildens adress: sökvägen från servern ligger under API:ets bas. */
+  readonly media = (path: string) => environment.apiUrl + path;
 
   readonly classes = PICKABLE_CLASSES;
   readonly parts = (Object.entries(DAY_PART_LABELS) as [DayPart, string][]).map(

@@ -47,6 +47,14 @@ export const NAV: NavSection[] = [
     title: 'Arbete',
     items: [
       { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month' },
+      // Kundens egen bokningssida; ägaren formar den här, Catso sätter adressen.
+      {
+        path: '/online-booking',
+        label: 'Onlinebokning',
+        icon: 'language',
+        adminOnly: true,
+        only: 'desktop',
+      },
       {
         path: '/workorders',
         label: 'Arbetsorder',
@@ -70,6 +78,19 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    // Bilar verkstaden säljer, med en egen webbplats på verkstadens domän.
+    title: 'Bilhandel',
+    items: [
+      {
+        path: '/dealership',
+        label: 'Bilar till salu',
+        icon: 'directions_car',
+        only: 'desktop',
+        match: ['/dealership'],
+      },
+    ],
+  },
+  {
     // Det verkstaden ställer in: vem som jobbar, vilka platser som finns och vad man utför.
     title: 'Verkstad',
     items: [
@@ -80,13 +101,6 @@ export const NAV: NavSection[] = [
         only: 'desktop',
       },
       { path: '/service-types', label: 'Åtgärder', icon: 'build', only: 'desktop' },
-      {
-        path: '/online-booking',
-        label: 'Webbsida',
-        icon: 'language',
-        adminOnly: true,
-        only: 'desktop',
-      },
     ],
   },
   {

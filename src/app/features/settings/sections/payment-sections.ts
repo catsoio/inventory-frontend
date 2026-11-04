@@ -17,8 +17,9 @@ import { Confirm } from '../../../shared/confirm';
   template: `
     <h2 class="text-lg font-semibold">Betalningar via Stripe</h2>
     <p class="mt-1 mb-5 text-sm text-gray-600">
-      Kunden kan betala fakturan med kort eller Swish från länken, och kort kan tas på en kortläsare vid
-      disken. Pengarna går direkt till ert eget Stripe-konto; fakturan markeras betald av sig själv.
+      Kunden kan betala fakturan med kort eller Swish från länken, och kort kan tas på en kortläsare
+      vid disken. Pengarna går direkt till ert eget Stripe-konto; fakturan markeras betald av sig
+      själv.
     </p>
 
     @if (account(); as a) {
@@ -32,7 +33,13 @@ import { Confirm } from '../../../shared/confirm';
           } @else {
             <app-pill tone="gray">Inte kopplat</app-pill>
           }
-          <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="connect()">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="busy()"
+            (click)="connect()"
+          >
             {{ a.connected ? 'Fortsätt registreringen hos Stripe' : 'Koppla till Stripe' }}
           </button>
           @if (a.connected) {
@@ -45,7 +52,9 @@ import { Confirm } from '../../../shared/confirm';
           </p>
         }
         @if (a.feePercent > 0) {
-          <p class="mt-2 text-xs text-gray-500">Avgift till Axle: {{ a.feePercent }} % av varje betalning.</p>
+          <p class="mt-2 text-xs text-gray-500">
+            Avgift till Axle: {{ a.feePercent }} % av varje betalning.
+          </p>
         }
       </section>
 
@@ -56,8 +65,9 @@ import { Confirm } from '../../../shared/confirm';
             Erbjud Swish på betalsidan
           </mat-slide-toggle>
           <p class="mt-1 text-sm text-gray-600">
-            Stripe måste ha aktiverat Swish för kontot först (det begärs hos Stripe). Slå på det här först när
-            det är gjort, så att kunden aldrig får en betalmetod som inte fungerar. Swish gäller privatkunder.
+            Stripe måste ha aktiverat Swish för kontot först (det begärs hos Stripe). Slå på det här
+            först när det är gjort, så att kunden aldrig får en betalmetod som inte fungerar. Swish
+            gäller privatkunder.
           </p>
         </section>
 
@@ -67,7 +77,9 @@ import { Confirm } from '../../../shared/confirm';
             <div class="mb-2 flex items-center gap-3">
               <mat-icon class="text-gray-500">contactless</mat-icon>
               <span class="font-medium">{{ r.label }}</span>
-              <app-pill [tone]="r.status === 'online' ? 'green' : 'gray'">{{ r.status === 'online' ? 'Online' : 'Offline' }}</app-pill>
+              <app-pill [tone]="r.status === 'online' ? 'green' : 'gray'">{{
+                r.status === 'online' ? 'Online' : 'Offline'
+              }}</app-pill>
               @if (r.busy) {
                 <span class="text-sm text-gray-500">upptagen</span>
               }
@@ -112,7 +124,10 @@ export class SettingsPayments implements OnInit {
   readonly account = signal<PaymentAccount | null>(null);
   readonly readers = signal<PaymentReader[]>([]);
   readonly busy = signal(false);
-  readonly code = new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(3)] });
+  readonly code = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.minLength(3)],
+  });
   readonly label = new FormControl('', { nonNullable: true, validators: [Validators.required] });
 
   ngOnInit() {
@@ -164,9 +179,9 @@ export class SettingsPayments implements OnInit {
   template: `
     <h2 class="text-lg font-semibold">Kassaregister</h2>
     <p class="mt-1 mb-5 text-sm text-gray-600">
-      Skatteverket kräver kassaregister när ni säljer för mer än fyra prisbasbelopp per år med kort, Swish
-      eller kontant (fakturor räknas inte). Kvitton som utfärdas här registreras i en journal som inte går att
-      ändra, och varje kvitto får en kontrollkod.
+      Skatteverket kräver kassaregister när ni säljer för mer än fyra prisbasbelopp per år med kort,
+      Swish eller kontant (fakturor räknas inte). Kvitton som utfärdas här registreras i en journal
+      som inte går att ändra, och varje kvitto får en kontrollkod.
     </p>
 
     @if (status(); as s) {
@@ -175,52 +190,78 @@ export class SettingsPayments implements OnInit {
           Skapa kassaregister
         </button>
         <p class="mt-2 text-sm text-gray-600">
-          Företagsuppgifterna hämtas från Företaget. Kvittonumren fortsätter efter det senaste kvittot.
+          Företagsuppgifterna hämtas från Företaget. Kvittonumren fortsätter efter det senaste
+          kvittot.
         </p>
       } @else if (s.unit; as u) {
         @if (!u.control.certified) {
           <p class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-900">
-            <b>Utvecklingsläge.</b> Kontrollsystemet är inte certifierat, så kvitton som utfärdas nu är inte
-            giltiga och får inte användas i den riktiga verksamheten.
+            <b>Utvecklingsläge.</b> Kontrollsystemet är inte certifierat, så kvitton som utfärdas nu
+            är inte giltiga och får inte användas i den riktiga verksamheten.
           </p>
         }
         <div class="mb-4 flex flex-wrap items-center gap-3">
-          <app-pill [tone]="u.status === 'active' ? 'green' : 'gray'">{{ u.status === 'active' ? 'På' : 'Av' }}</app-pill>
+          <app-pill [tone]="u.status === 'active' ? 'green' : 'gray'">{{
+            u.status === 'active' ? 'På' : 'Av'
+          }}</app-pill>
           @if (s.control && !s.control.reachable) {
             <app-pill tone="red">Kontrollsystemet svarar inte</app-pill>
           }
-          <button mat-stroked-button type="button" [disabled]="busy()" (click)="toggle(u.status !== 'active')">
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="busy()"
+            (click)="toggle(u.status !== 'active')"
+          >
             {{ u.status === 'active' ? 'Stäng av' : 'Slå på' }}
           </button>
-          <button mat-button type="button" [disabled]="busy()" (click)="refreshCompany()">Hämta företagsuppgifterna igen</button>
+          <button mat-button type="button" [disabled]="busy()" (click)="refreshCompany()">
+            Hämta företagsuppgifterna igen
+          </button>
         </div>
         <dl class="grid max-w-2xl grid-cols-[11rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt class="text-gray-500">Kassabeteckning</dt><dd>{{ u.label }}</dd>
-          <dt class="text-gray-500">Kassaregisternummer</dt><dd class="font-mono">{{ s.registerNumber }}</dd>
-          <dt class="text-gray-500">Modell och version</dt><dd>{{ s.model }} · {{ s.program }} {{ s.version }}</dd>
+          <dt class="text-gray-500">Kassabeteckning</dt>
+          <dd>{{ u.label }}</dd>
+          <dt class="text-gray-500">Kassaregisternummer</dt>
+          <dd class="font-mono">{{ s.registerNumber }}</dd>
+          <dt class="text-gray-500">Modell och version</dt>
+          <dd>{{ s.model }} · {{ s.program }} {{ s.version }}</dd>
           <dt class="text-gray-500">Kontrollsystem</dt>
-          <dd>{{ u.control.provider }} · <span class="font-mono">{{ u.control.serial }}</span></dd>
-          <dt class="text-gray-500">Företag</dt><dd>{{ u.company.name }}, {{ u.company.orgNo }}</dd>
-          <dt class="text-gray-500">Försäljningsställe</dt><dd>{{ u.company.address }}</dd>
+          <dd>
+            {{ u.control.provider }} · <span class="font-mono">{{ u.control.serial }}</span>
+          </dd>
+          <dt class="text-gray-500">Företag</dt>
+          <dd>{{ u.company.name }}, {{ u.company.orgNo }}</dd>
+          <dt class="text-gray-500">Försäljningsställe</dt>
+          <dd>{{ u.company.address }}</dd>
           @if (s.counters; as c) {
-            <dt class="text-gray-500">Senaste kvittonummer</dt><dd>{{ c.receipt }}</dd>
-            <dt class="text-gray-500">Z-rapporter</dt><dd>{{ c.z }}</dd>
+            <dt class="text-gray-500">Senaste kvittonummer</dt>
+            <dd>{{ c.receipt }}</dd>
+            <dt class="text-gray-500">Z-rapporter</dt>
+            <dd>{{ c.z }}</dd>
           }
         </dl>
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <a mat-stroked-button routerLink="/finance/register"><mat-icon>point_of_sale</mat-icon> Rapporter och journal</a>
-          <button mat-button type="button" [disabled]="busy()" (click)="verify()">Kontrollera journalen</button>
+          <a mat-stroked-button routerLink="/finance/register"
+            ><mat-icon>point_of_sale</mat-icon> Rapporter och journal</a
+          >
+          <button mat-button type="button" [disabled]="busy()" (click)="verify()">
+            Kontrollera journalen
+          </button>
           @if (chain(); as ch) {
             @if (ch.ok) {
               <span class="text-sm text-teal-800">Journalen är hel ({{ ch.entries }} rader).</span>
             } @else {
-              <span class="text-sm font-medium text-red-700">Journalen stämmer inte vid rad {{ ch.brokenAtSeq }}: {{ ch.reason }}</span>
+              <span class="text-sm font-medium text-red-700"
+                >Journalen stämmer inte vid rad {{ ch.brokenAtSeq }}: {{ ch.reason }}</span
+              >
             }
           }
         </div>
         <p class="mt-4 max-w-2xl text-xs text-gray-500">
-          Registret är inte tillverkardeklarerat hos Skatteverket än. Ett kvitto i registret kan inte återöppnas:
-          det tas tillbaka med en retur. Priser måste vara inkl. moms och utan avrundning till hela kronor.
+          Registret är inte tillverkardeklarerat hos Skatteverket än. Ett kvitto i registret kan
+          inte återöppnas: det tas tillbaka med en retur. Priser måste vara inkl. moms och utan
+          avrundning till hela kronor.
         </p>
       }
     } @else {

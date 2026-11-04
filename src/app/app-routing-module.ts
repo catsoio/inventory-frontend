@@ -2,6 +2,10 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { adminGuard, authGuard, garageGuard, mechanicGuard } from './core/auth/auth-guard';
 import { Shell } from './core/layout/shell/shell';
+import { onCustomDomain } from './features/public-site/site-context';
+
+const loadPublicSite = () =>
+  import('./features/public-site/public-site-module').then((m) => m.PublicSiteModule);
 
 const routes: Routes = [
   {
@@ -28,6 +32,18 @@ const routes: Routes = [
     path: 'boka/:slug',
     loadChildren: () =>
       import('./features/public-booking/public-booking-module').then((m) => m.PublicBookingModule),
+  },
+  {
+    // Verkstadens webbplats på plattformen: utan inloggning, adressen är nyckeln.
+    path: 'bilhandel/:slug',
+    loadChildren: loadPublicSite,
+  },
+  {
+    // På en kunds egen domän (däckmaster.se) är webbplatsen startsidan. Går inte adressen att
+    // matcha här faller routern vidare till övriga rutter (t.ex. /boka/<adress>).
+    path: '',
+    canMatch: [() => onCustomDomain()],
+    loadChildren: loadPublicSite,
   },
   {
     path: 'onboarding',
@@ -140,8 +156,14 @@ const routes: Routes = [
           import('./features/finance/finance-module').then((m) => m.FinanceModule),
       },
       {
+        path: 'dealership',
+        title: 'Bilhandel',
+        loadChildren: () =>
+          import('./features/dealership/dealership-module').then((m) => m.DealershipModule),
+      },
+      {
         path: 'online-booking',
-        title: 'Webbsida',
+        title: 'Onlinebokning',
         canActivate: [adminGuard],
         loadChildren: () =>
           import('./features/online-booking/online-booking-module').then(

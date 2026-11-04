@@ -957,6 +957,7 @@ export const EN: Record<string, string> = {
   'Fordon: ej valt': 'Vehicle: not chosen',
   'Fordon, för åtgärdernas pris': "Vehicle, for the services' prices",
   Webbsida: 'Web page',
+  Onlinebokning: 'Online booking',
   Bokningssidan: 'The booking page',
   Påslagen: 'Switched on',
   'Välkomsttext (valfritt)': 'Welcome text (optional)',
