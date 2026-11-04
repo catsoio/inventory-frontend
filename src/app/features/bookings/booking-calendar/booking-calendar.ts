@@ -33,6 +33,7 @@ const VIEWS: Mode[] = ['board', 'day', 'week', 'month-grid', 'list'];
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const COLORS: Record<BookingStatus, string> = {
+  requested: '#7c3aed',
   booked: '#1976d2',
   arrived: '#f59e0b',
   done: '#16a34a',
@@ -372,9 +373,14 @@ export class BookingCalendar implements OnInit {
   private toEvent(b: Booking): CalendarEvent {
     const off = b.status === 'cancelled' || b.status === 'no_show';
     const resource = this.resources().find((r) => r.id === b.resourceId);
-    const mark = { done: '✓ ', cancelled: '✗ ', no_show: '✗ ', arrived: '→ ', booked: '' }[
-      b.status
-    ];
+    const mark = {
+      requested: '? ',
+      done: '✓ ',
+      cancelled: '✗ ',
+      no_show: '✗ ',
+      arrived: '→ ',
+      booked: '',
+    }[b.status];
     // Arbetsordern: ⚠ del saknas, ⏳ väntar på del, ▣ klar.
     const o = this.orders.get(b.id);
     const ao = !o

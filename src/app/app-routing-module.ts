@@ -24,6 +24,12 @@ const routes: Routes = [
       ),
   },
   {
+    // Verkstadens bokningssida för kunder: utan inloggning, adressen i länken är nyckeln.
+    path: 'boka/:slug',
+    loadChildren: () =>
+      import('./features/public-booking/public-booking-module').then((m) => m.PublicBookingModule),
+  },
+  {
     path: 'onboarding',
     title: 'Kom igång',
     canActivate: [authGuard],
@@ -132,6 +138,15 @@ const routes: Routes = [
         canActivate: [adminGuard],
         loadChildren: () =>
           import('./features/finance/finance-module').then((m) => m.FinanceModule),
+      },
+      {
+        path: 'online-booking',
+        title: 'Webbsida',
+        canActivate: [adminGuard],
+        loadChildren: () =>
+          import('./features/online-booking/online-booking-module').then(
+            (m) => m.OnlineBookingModule,
+          ),
       },
       {
         path: 'activity',

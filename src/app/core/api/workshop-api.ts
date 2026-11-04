@@ -103,10 +103,14 @@ export class WorkshopApi {
     return this.http.get<VehicleDetail>(`${this.base}/vehicles/${id}`);
   }
 
-  /** Märke, modell, år och chassinummer för ett regnr. Svarar alltid med en status, aldrig fel. */
-  lookupVehicle(regNo: string): Observable<VehicleLookup> {
+  /**
+   * Allt registret vet om ett regnr (däck och fälg per axel, vikter, drivlina, besiktning).
+   * Svarar alltid med en status, aldrig fel. `refresh` läser registret på nytt och uppdaterar bilen.
+   */
+  lookupVehicle(regNo: string, refresh = false): Observable<VehicleLookup> {
     return this.http.get<VehicleLookup>(
       `${this.base}/vehicles/lookup/${encodeURIComponent(regNo)}`,
+      refresh ? { params: { refresh: 'true' } } : {},
     );
   }
 

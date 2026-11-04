@@ -119,6 +119,14 @@ describe('menyns siffror', () => {
     expect(b['/quotes'].text).toBe('2 godkända');
     expect(b['/workorders'].text).toBe('1 väntar på del');
   });
+
+  it('bokningsförfrågningar från bokningssidan är en gul siffra på Tidsbokning', () => {
+    const b = todoBadges(buildTodo(input({ requests: 3 })));
+    expect(b['/bookings'].text).toBe('3 förfrågningar');
+    expect(b['/bookings'].tone).toContain('amber');
+    expect(todoBadges(buildTodo(input({ requests: 1 })))['/bookings'].text).toBe('1 förfrågan');
+    expect(todoBadges(buildTodo(input({ requests: 0 })))).toEqual({});
+  });
 });
 
 describe('Att göra på Hem', () => {

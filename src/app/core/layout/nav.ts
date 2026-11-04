@@ -80,6 +80,13 @@ export const NAV: NavSection[] = [
         only: 'desktop',
       },
       { path: '/service-types', label: 'Åtgärder', icon: 'build', only: 'desktop' },
+      {
+        path: '/online-booking',
+        label: 'Webbsida',
+        icon: 'language',
+        adminOnly: true,
+        only: 'desktop',
+      },
     ],
   },
   {

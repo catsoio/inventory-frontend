@@ -3,6 +3,7 @@ import { catchError, of } from 'rxjs';
 import { kronor } from '../shared/chart/chart-kit';
 import { invoiceStatus } from '../shared/invoice-status';
 import { AxleApi } from './api/axle-api';
+import { BookingApi } from './api/booking-api';
 import { QuoteApi } from './api/quote-api';
 import { SalesCardApi } from './api/sales-card-api';
 import { StorageApi } from './api/storage-api';
@@ -58,6 +59,8 @@ export interface TodoInput {
   /** Arbetsorder där en del saknas. */
   partsOrders: number;
   quotes: { approved: number; waiting: number };
+  /** Bokningsförfrågningar från bokningssidan som ingen bekräftat än. */
+  requests?: number;
 }
 
 const RANK: Record<Urgency, number> = { urgent: 0, wait: 1, info: 2 };
@@ -151,6 +154,20 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       params: { status: late ? 'overdue' : 'unpaid' },
     });
   }
+  if ((i.requests ?? 0) > 0) {
+    const n = i.requests!;
+    out.push({
+      key: 'booking-requests',
+      urgency: 'wait',
+      menus: ['/bookings'],
+      badgeCount: n,
+      badgeNoun: ['förfrågan', 'förfrågningar'],
+      text: `${n} ${plural(n, 'bokningsförfrågan väntar', 'bokningsförfrågningar väntar')} på svar`,
+      icon: 'event_available',
+      link: '/bookings',
+      params: { view: 'list' },
+    });
+  }
   if (i.quotes.approved > 0) {
     const n = i.quotes.approved;
     out.push({
@@ -242,6 +259,7 @@ export class Todo {
   private readonly orders = inject(WorkOrderApi);
   private readonly cards = inject(SalesCardApi);
   private readonly quoteApi = inject(QuoteApi);
+  private readonly bookingApi = inject(BookingApi);
 
   private readonly stock = signal<Summary | null>(null);
   private readonly hotel = signal<StorageSummary | null>(null);
@@ -249,6 +267,7 @@ export class Todo {
   private readonly partsOrders = signal(0);
   private readonly approved = signal(0);
   private readonly waiting = signal(0);
+  private readonly requests = signal(0);
   private readonly invoices = signal<TodoInput['invoices']>(null);
 
   readonly items = computed(() =>
@@ -259,6 +278,7 @@ export class Todo {
       invoices: this.invoices(),
       partsOrders: this.partsOrders(),
       quotes: { approved: this.approved(), waiting: this.waiting() },
+      requests: this.requests(),
     }),
   );
 
@@ -284,6 +304,12 @@ export class Todo {
       .list({ status: 'draft', limit: 1 })
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.drafts.set(x?.pagination.total ?? 0));
+    // Förfrågningar från bokningssidan, de närmaste två månaderna (så långt kalendern läser åt gången).
+    const now = new Date();
+    this.bookingApi
+      .between(now, new Date(now.getTime() + 60 * 24 * 3600 * 1000))
+      .pipe(catchError(() => of(null)))
+      .subscribe((x) => this.requests.set(x?.filter((b) => b.status === 'requested').length ?? 0));
     if (environment.workOrders) {
       this.orders
         .list({ needsAction: true, limit: 1 })
