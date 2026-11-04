@@ -18,6 +18,7 @@ import {
   Resource,
   SalesCardItem,
   ServiceType,
+  Vehicle,
   WORK_ORDER_STATUS_LABELS,
   WorkOrderDetail,
   WorkOrderInput,
@@ -25,6 +26,8 @@ import {
   WorkOrderLineType,
   WorkOrderStatus,
 } from '../../../core/models';
+import { priceContextOf, priceOfService, priceTitle } from '../../../core/service-pricing';
+import { KrPipe } from '../../../shared/kr-pipe';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Confirm } from '../../../shared/confirm';
 import { LinkResolver } from '../../../shared/customer-vehicle-picker/link-resolver';
@@ -383,8 +386,8 @@ interface JobValue {
                         @for (s of serviceMatches(job.value.title); track s.id) {
                           <mat-option [value]="s">
                             {{ s.name }}
-                            @if (s.priceFrom !== null) {
-                              <span class="ml-2 text-xs text-gray-500">{{ s.priceFrom | kr }}</span>
+                            @if (priceHint(s); as hint) {
+                              <span class="ml-2 text-xs text-gray-500">{{ hint }}</span>
                             }
                           </mat-option>
                         }
@@ -869,6 +872,8 @@ export class WorkOrderCard implements OnInit {
   readonly serviceTypes = signal<ServiceType[]>([]);
   /** Kunden på ordern, för kundtyp och kundrabatt. */
   readonly customer = signal<Customer | null>(null);
+  /** Bilen på ordern; åtgärdernas pris räknas efter dess klass och fälgstorlek. */
+  readonly vehicle = signal<Vehicle | null>(null);
   readonly mechanics = computed(() => this.resources().filter((r) => r.kind === 'mechanic'));
   readonly places = computed(() => this.resources().filter((r) => r.kind !== 'mechanic'));
   /** Orderns prisläge: inkl. moms (standard) eller exkl. moms. */
@@ -1032,7 +1037,10 @@ export class WorkOrderCard implements OnInit {
         filter(() => !!this.id && this.form.dirty && !this.busy() && !this.locked()),
       )
       .subscribe(() => this.save({ silent: true }));
-    this.form.controls.link.valueChanges.subscribe((v) => this.loadCustomer(v?.customerId));
+    this.form.controls.link.valueChanges.subscribe((v) => {
+      this.loadCustomer(v?.customerId);
+      this.loadVehicle(v?.vehicleId, v?.vehicle);
+    });
     this.partSearch
       .pipe(
         debounceTime(200),
@@ -1066,6 +1074,34 @@ export class WorkOrderCard implements OnInit {
         this.incl.set(this.pricing.includeVatFor(c.type === 'company'));
       }
     });
+  }
+
+  /** Bilen med registrets uppgifter; en vald bil ur listan har dem redan, annars hämtas den. */
+  private loadVehicle(vehicleId: string | undefined, picked?: Vehicle) {
+    if (!vehicleId) {
+      this.vehicle.set(null);
+      return;
+    }
+    if (this.vehicle()?.id === vehicleId) return;
+    if (picked?.tech !== undefined) {
+      this.vehicle.set(picked);
+      return;
+    }
+    this.workshop.vehicle(vehicleId).subscribe((v) => this.vehicle.set(v));
+  }
+
+  private readonly krText = new KrPipe();
+
+  /** Priset som visas vid en åtgärd: för bilen på ordern när den är vald, annars det lägsta ("från"). */
+  priceHint(s: ServiceType): string | null {
+    const car = this.vehicle();
+    const p = car ? priceOfService(s, priceContextOf(car)) : null;
+    if (p) {
+      const text = this.krText.transform(p.total);
+      return p.unit === 'wheel' ? `${text} (${p.quantity} hjul)` : text;
+    }
+    if (s.prices?.length && s.from) return `från ${this.krText.transform(s.from.total)}`;
+    return s.priceFrom === null ? null : this.krText.transform(s.priceFrom);
   }
 
   private newJob(init?: Partial<WorkOrderJob>) {
@@ -1317,8 +1353,10 @@ export class WorkOrderCard implements OnInit {
     const job = this.jobs.controls.find((g) => g.value.id === jobId);
     const work = this.work(jobId);
     const labour = s.lines?.find((t) => t.type === 'labour');
-    if (job) job.patchValue({ title: s.name });
-    const price = labour?.unitPrice ?? s.priceFrom;
+    // Priset följer bilens klass och fälgstorlek (och en pågående kampanj); per hjul skrivs antalet i texten.
+    const quoted = priceOfService(s, priceContextOf(this.vehicle()));
+    if (job) job.patchValue({ title: priceTitle(s.name, quoted) });
+    const price = quoted?.total ?? null;
     if (work) {
       if (work.value.unitPrice == null && price != null) {
         work.patchValue({ unitPrice: kr(inMode(price, incl)) });

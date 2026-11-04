@@ -30,7 +30,10 @@ export interface PickerValue {
    * Något är skrivet men inte valt ur listan: kunden och/eller bilen skapas när formuläret sparas
    * (se `LinkResolver`). `customerId`/`vehicleId` är då tomma.
    */
-  pending?: { customerId?: string; customerName?: string; customerPhone?: string; regNo?: string };
+  pending?: { customerId?: string; customerName?: string; customerPhone?: string;
+    customerEmail?: string;
+    regNo?: string;
+  };
 }
 
 /** Skrivet som ett telefonnummer (siffror, mellanslag, bindestreck, +, parenteser) och inte ett namn. */

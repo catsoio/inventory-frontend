@@ -2,13 +2,22 @@ import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
+import { ReaderPayment } from './reader-payment';
+import { ReturnDialog } from './return-dialog';
 import { SalesCardPage } from './sales-card';
 import { SalesSendDialog } from './sales-send-dialog';
 import { SalesInvoicePage } from './sales-invoice';
 import { SalesList } from './sales-list';
 
 @NgModule({
-  declarations: [SalesList, SalesCardPage, SalesInvoicePage, SalesSendDialog],
+  declarations: [
+    SalesList,
+    SalesCardPage,
+    SalesInvoicePage,
+    SalesSendDialog,
+    ReaderPayment,
+    ReturnDialog,
+  ],
   imports: [
     SharedModule,
     RouterModule.forChild([

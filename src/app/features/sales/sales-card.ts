@@ -1,3 +1,4 @@
+import { ReturnDialog } from './return-dialog';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
@@ -35,8 +36,13 @@ import {
   SellerDetails,
   ServiceType,
   StorageDeposit,
+  VEHICLE_CLASS_LABELS,
+  Vehicle,
+  VehicleClass,
 } from '../../core/models';
 import { Pricing } from '../../core/pricing';
+import { priceContextOf, priceOfService, today } from '../../core/service-pricing';
+import { KrPipe } from '../../shared/kr-pipe';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
 import { Gap, invoiceGap, sellerGap } from '../../shared/invoice-gap';
@@ -114,7 +120,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             </button>
           }
           @if (c.status === 'posted') {
-            @if (isOwner) {
+            @if (isOwner && !c.document?.register) {
               <button
                 mat-stroked-button
                 type="button"
@@ -123,6 +129,18 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 (click)="reopen()"
               >
                 <mat-icon>undo</mat-icon> Återöppna
+              </button>
+            }
+            @if (isOwner && c.document?.register && !c.returned) {
+              <button
+                mat-stroked-button
+                color="warn"
+                type="button"
+                [disabled]="busy()"
+                matTooltip="Registrerade kvitton kan inte återöppnas: de tas tillbaka med ett returkvitto"
+                (click)="giveBack()"
+              >
+                <mat-icon>undo</mat-icon> Retur
               </button>
             }
             <a mat-stroked-button [routerLink]="['/sales', c.id, 'invoice']">
@@ -235,6 +253,21 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             <button mat-stroked-button type="button" [matMenuTriggerFor]="serviceMenu">
               <mat-icon>build</mat-icon> Åtgärd
             </button>
+            @if (!vehicle()) {
+              <!-- Utan vald bil: välj fordon, så får åtgärderna sitt pris (punktering per däck, husvagn per hjul). -->
+              <select
+                class="h-10 px-2 text-sm text-gray-700 field"
+                aria-label="Fordon, för åtgärdernas pris"
+                (change)="manualClass.set($any($event.target).value || null)"
+              >
+                <option value="" [selected]="!manualClass()">Fordon: ej valt</option>
+                @for (c of classOptions; track c.value) {
+                  <option [value]="c.value" [selected]="manualClass() === c.value">
+                    {{ c.label }}
+                  </option>
+                }
+              </select>
+            }
             <button
               mat-stroked-button
               type="button"
@@ -254,8 +287,8 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             @for (s of serviceTypes(); track s.id) {
               <button mat-menu-item type="button" (click)="addService(s)">
                 {{ s.name }}
-                @if (s.priceFrom) {
-                  <span class="ml-2 text-gray-500">{{ s.priceFrom | kr }}</span>
+                @if (priceHint(s); as hint) {
+                  <span class="ml-2 text-gray-500">{{ hint }}</span>
                 }
               </button>
             } @empty {
@@ -619,6 +652,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 <mat-icon>visibility</mat-icon> Förhandsgranska utkast
               </a>
             </div>
+            @if (kind() === 'receipt') {
+              <app-reader-payment [cardId]="c.id" [disabled]="dirty()" (booked)="load(c.id)" />
+            }
           </section>
         } @else if (c.document; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -635,9 +671,26 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   }
                 </app-pill>
                 <span class="text-sm text-gray-600"
-                  >Ett kvitto är betalt när det utfärdas. Blev det fel: återöppna kortet.</span
+                  >Ett kvitto är betalt när det utfärdas.
+                  {{ inv.register ? 'Blev det fel: ta tillbaka kvittot med en retur.' : 'Blev det fel: återöppna kortet.' }}</span
                 >
               </div>
+              @if (inv.register; as r) {
+                <p class="mt-3 text-sm text-gray-600">
+                  Registrerat i kassaregistret: kvitto <b>{{ r.receiptNumber }}</b>, Z-rapport
+                  {{ r.zNumber }}.
+                  @if (!r.certified) {
+                    <span class="font-medium text-red-700">
+                      Utvecklingsläge – inte ett giltigt kvitto.</span
+                    >
+                  }
+                </p>
+              }
+              @if (c.returned; as ret) {
+                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                  Tillbakatagen med returkvitto {{ ret.receiptNumber }}: {{ ret.reason }}.
+                </p>
+              }
             } @else {
               @if (inv.dueAt) {
                 <p class="mb-3 text-sm text-gray-600">
@@ -682,6 +735,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   </button>
                 }
               </div>
+              @if (!inv.paidAt) {
+                <app-reader-payment [cardId]="c.id" (booked)="load(c.id)" />
+              }
             }
           </section>
         }
@@ -753,6 +809,13 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly sections = signal<SalesSection[]>([]);
   /** Kunden, för kundtyp och kundrabatt. */
   private readonly customer = signal<Customer | null>(null);
+  /** Bilen, för åtgärdernas pris efter klass och fälgstorlek. */
+  protected readonly vehicle = signal<Vehicle | null>(null);
+  /** Utan bil på kortet: det fordon man valt för hand, så att åtgärderna ändå får rätt pris. */
+  readonly manualClass = signal<VehicleClass | null>(null);
+  readonly classOptions = (Object.entries(VEHICLE_CLASS_LABELS) as [VehicleClass, string][]).map(
+    ([value, label]) => ({ value, label }),
+  );
 
   readonly card = signal<SalesCardDetail | null>(null);
   readonly rows = signal<Row[]>([]);
@@ -926,6 +989,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.linkCtl.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => {
       this.link.set(v);
       this.loadCustomer(v?.customerId);
+      this.loadVehicle(v?.vehicleId, v?.vehicle);
       this.touch();
     });
   }
@@ -981,6 +1045,41 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     });
   }
 
+  /** Bilen med registrets uppgifter; en vald bil ur listan har dem redan, annars hämtas den. */
+  private loadVehicle(vehicleId: string | undefined, picked?: Vehicle) {
+    if (!vehicleId) {
+      this.vehicle.set(null);
+      return;
+    }
+    if (this.vehicle()?.id === vehicleId) return;
+    if (picked?.tech !== undefined) {
+      this.vehicle.set(picked);
+      return;
+    }
+    this.workshop.vehicle(vehicleId).subscribe((v) => this.vehicle.set(v));
+  }
+
+  private readonly krText = new KrPipe();
+
+  /** Det som prissätter en åtgärd: bilen på kortet, annars det fordon man valt för hand. */
+  private priceCtx() {
+    const car = this.vehicle();
+    return car
+      ? priceContextOf(car)
+      : { vehicleClass: this.manualClass(), rimDiameter: null, on: today() };
+  }
+
+  /** Priset som visas vid en åtgärd: för bilen eller fordonet som valts, annars det lägsta ("från"). */
+  priceHint(s: ServiceType): string | null {
+    const p = this.vehicle() || this.manualClass() ? priceOfService(s, this.priceCtx()) : null;
+    if (p) {
+      const text = this.krText.transform(p.total);
+      return p.unit === 'wheel' ? `${text} (${p.quantity} hjul)` : text;
+    }
+    if (s.prices?.length && s.from) return `från ${this.krText.transform(s.from.total)}`;
+    return s.priceFrom ? this.krText.transform(s.priceFrom) : null;
+  }
+
   /** Byter prisläge och räknar om radernas priser så att kunden betalar detsamma. */
   private setIncl(toIncl: boolean) {
     if (toIncl === this.incl()) return;
@@ -1021,7 +1120,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.dirty.set(true);
   }
 
-  private load(id: string) {
+  protected load(id: string) {
     this.api.get(id).subscribe((c) => this.apply(c));
   }
 
@@ -1054,6 +1153,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     );
     this.link.set(this.linkCtl.value);
     if (c.customerId && this.customer()?.id !== c.customerId) this.loadCustomer(c.customerId);
+    this.loadVehicle(c.vehicleId ?? undefined);
     this.discType.set(c.discount?.type ?? 'percent');
     this.discValue.set(
       c.discount ? (c.discount.type === 'amount' ? c.discount.value / 100 : c.discount.value) : 0,
@@ -1110,12 +1210,14 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   }
 
   addService(s: ServiceType) {
+    // Priset följer bilens klass och fälgstorlek; per hjul blir antalet hjul radens antal.
+    const p = priceOfService(s, this.priceCtx());
     this.push({
       type: 'service',
       code: s.opCode ?? null,
       description: s.name,
-      quantity: 1,
-      price: inMode(s.priceFrom ?? 0, this.incl()) / 100,
+      quantity: p?.quantity ?? 1,
+      price: inMode(p?.unitPrice ?? s.priceFrom ?? 0, this.incl()) / 100,
       discountPercent: this.customer()?.labourDiscount ?? 0,
       vatRate: STANDARD_VAT,
     });
@@ -1356,6 +1458,40 @@ export class SalesCardPage implements OnInit, HasUnsaved {
             this.busy.set(false);
             this.apply(r);
             this.snack.open('Kortet är återöppnat', 'OK', { duration: 4000 });
+          },
+          error: () => {
+            this.busy.set(false);
+            this.load(c.id);
+          },
+        });
+      });
+  }
+
+  /** Tar ett registrerat kvitto tillbaka: ett returkvitto i kassaregistret, lagret tillbaka, kortbetalningen återbetald. */
+  giveBack() {
+    const c = this.card();
+    if (!c?.document) return;
+    this.dialog
+      .open(ReturnDialog, {
+        data: { code: c.documentCode, total: c.totals.total },
+        width: '440px',
+      })
+      .afterClosed()
+      .subscribe((reason?: string) => {
+        if (!reason) return;
+        this.busy.set(true);
+        this.api.returnReceipt(c.id, reason).subscribe({
+          next: (r) => {
+            this.busy.set(false);
+            this.apply(r);
+            const failed = r.refunds?.some((x) => x.status === 'failed');
+            this.snack.open(
+              failed
+                ? 'Returen är registrerad, men återbetalningen till kunden misslyckades: återbetala den för hand.'
+                : 'Returen är registrerad',
+              'OK',
+              { duration: failed ? 12000 : 4000 },
+            );
           },
           error: () => {
             this.busy.set(false);

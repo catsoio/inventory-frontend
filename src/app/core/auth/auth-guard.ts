@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateChildFn, CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
+import { Billing } from '../billing/billing';
 import { Auth } from './auth';
 
 export const authGuard: CanActivateFn = () => {
@@ -23,6 +24,15 @@ export const adminGuard: CanActivateFn = () => {
   const auth = inject(Auth);
   return auth.isAdmin() || auth.isSuperAdmin() || inject(Router).createUrlTree(['/dashboard']);
 };
+
+/**
+ * En del som Catso stängt av (eller som planen saknar) går inte att nå med adressen heller: man
+ * hamnar på Hem. Medan statusen inte kommit släpps man in, och servern avgör ändå.
+ */
+export const moduleGuard =
+  (module: string): CanActivateFn =>
+  () =>
+    inject(Billing).allows(module) || inject(Router).createUrlTree(['/dashboard']);
 
 /** Mekanikern kommer bara åt arbetsorder; allt annat leder till hens egen lista. */
 export const mechanicGuard: CanActivateChildFn = (_route, state) => {

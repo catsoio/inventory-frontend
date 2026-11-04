@@ -13,11 +13,14 @@ import {
   BOOKING_STATUS_LABELS,
   Booking,
   BookingStatus,
+  Customer,
   Resource,
   ServiceType,
+  Vehicle,
   WORK_ORDER_STATUS_LABELS,
   WorkOrder,
 } from '../../core/models';
+import { priceContextOf, priceOfService, priceTitle } from '../../core/service-pricing';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-picker';
 import { LinkResolver, type ResolvedLink } from '../customer-vehicle-picker/link-resolver';
@@ -57,6 +60,33 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
       <mat-dialog-content
         class="!grid content-start gap-x-10 gap-y-5 !pt-2 md:grid-cols-2 md:items-start"
       >
+        @if (data.booking?.status === 'requested'; as _) {
+          <div
+            class="rounded-lg bg-violet-50 p-3 text-sm text-violet-900 max-md:order-0 md:col-span-2"
+          >
+            <b>Förfrågan från bokningssidan.</b>
+            {{ data.booking!.customerName
+            }}{{ data.booking!.phone ? ' · ' + data.booking!.phone : ''
+            }}{{ data.booking!.regNo ? ' · ' + data.booking!.regNo : '' }}. Välj tid och mekaniker
+            och bekräfta.
+            {{
+              data.booking!.regNo
+                ? 'Kunden och bilen skapas i registren om de saknas.'
+                : 'Kunden har inget regnummer: välj kund och bil nedan först.'
+            }}
+            <div class="mt-2">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="busy()"
+                (click)="confirmRequest()"
+              >
+                Bekräfta tiden
+              </button>
+            </div>
+          </div>
+        }
         <div class="flex flex-col gap-5 max-md:contents">
           <section class="flex flex-col gap-3 max-md:order-1">
             <h3 class="sec">Kund och bil</h3>
@@ -289,7 +319,12 @@ export class BookingDialog {
   readonly order = signal<WorkOrder | null>(null);
   readonly orderLoaded = signal(false);
   readonly orderStatuses = WORK_ORDER_STATUS_LABELS;
-  readonly statuses = Object.entries(BOOKING_STATUS_LABELS);
+  /** "Förfrågan" väljs aldrig för hand: den kommer från bokningssidan och bekräftas till "Bokad". */
+  get statuses() {
+    return Object.entries(BOOKING_STATUS_LABELS).filter(
+      ([s]) => s !== 'requested' || this.data.booking?.status === 'requested',
+    );
+  }
   readonly resourceOptions = signal<Resource[]>([]);
   readonly resourcesLoaded = signal(false);
   readonly mechanicOptions = computed(() =>
@@ -299,6 +334,8 @@ export class BookingDialog {
     this.resourceOptions().filter((r) => r.kind !== 'mechanic'),
   );
   readonly serviceOptions = signal<ServiceType[]>([]);
+  /** Bilen på bokningen; åtgärdens pris räknas efter dess klass och fälgstorlek. */
+  private readonly vehicle = signal<Vehicle | null>(null);
   /** Bokning från före registren: texten visas tills kund och bil väljs om. */
   readonly legacy: { customer: string; regNo: string } | null;
   readonly form;
@@ -360,6 +397,8 @@ export class BookingDialog {
     // Ändrar man dag eller starttid följer sluttiden med, så att tiden inte blir ogiltig.
     let duration = end.getTime() - start.getTime();
     const f = this.form.controls;
+    f.link.valueChanges.subscribe((v) => this.loadVehicle(v?.vehicleId, v?.vehicle));
+    this.loadVehicle(b?.vehicleId ?? undefined);
     f.endTime.valueChanges.subscribe(() => {
       const ms =
         at(f.day.value, f.endTime.value).getTime() - at(f.day.value, f.startTime.value).getTime();
@@ -382,16 +421,40 @@ export class BookingDialog {
     );
   }
 
-  /** Åtgärden fyller i rubrik, tid och pris (bara det som inte redan är ifyllt). */
+  /** Bilen med registrets uppgifter; en vald bil ur listan har dem redan, annars hämtas den. */
+  private loadVehicle(vehicleId: string | undefined, picked?: Vehicle) {
+    if (!vehicleId) {
+      this.vehicle.set(null);
+      return;
+    }
+    if (this.vehicle()?.id === vehicleId) return;
+    if (picked?.tech !== undefined) {
+      this.vehicle.set(picked);
+      return;
+    }
+    this.workshop.vehicle(vehicleId).subscribe((v) => this.vehicle.set(v));
+  }
+
+  /**
+   * Åtgärden fyller i rubrik, tid och pris (bara det som inte redan är ifyllt). Priset följer
+   * bilens klass och fälgstorlek och en pågående kampanj; per hjul skrivs antalet i rubriken.
+   */
   pickService(id: string) {
     const t = this.serviceOptions().find((x) => x.id === id);
     if (!t) return;
     const f = this.form.controls;
+    const quoted = priceOfService(t, priceContextOf(this.vehicle()));
     const previous = this.serviceOptions().find((x) => x.name === f.title.value);
-    if (!f.title.value || previous) f.title.setValue(t.name);
+    if (!f.title.value || previous) f.title.setValue(priceTitle(t.name, quoted));
     const start = at(f.day.value, f.startTime.value);
     f.endTime.setValue(hm(new Date(start.getTime() + t.durationMinutes * 60_000)));
-    const price = t.priceTo ?? t.priceFrom;
+    // En prisrad eller en pågående kampanj styr; annars gäller åtgärdens eget spann som förut (till-priset först).
+    const price =
+      quoted && (quoted.basis === 'rule' || quoted.campaign)
+        ? quoted.total
+        : t.prices?.length
+          ? null
+          : (t.priceTo ?? t.priceFrom);
     if (f.price.value == null && price !== null) f.price.setValue(price / 100);
   }
 
@@ -448,6 +511,74 @@ export class BookingDialog {
       .subscribe({
         next: (b) => this.ref.close(b),
         error: () => this.busy.set(false),
+      });
+  }
+
+  /**
+   * Bekräftar en förfrågan från bokningssidan: status Bokad, och kunden och bilen skapas om de
+   * saknas (en kund med samma telefonnummer återanvänds). Har kunden inget regnummer måste
+   * personalen välja kund och bil först.
+   */
+  confirmRequest() {
+    const b = this.data.booking!;
+    const f = this.form.controls;
+    f.status.setValue('booked');
+    if (f.link.value) return this.save();
+    if (!b.regNo) {
+      f.status.setValue('requested');
+      this.snack.open('Välj kund och bil först', undefined, { duration: 3000 });
+      return;
+    }
+    this.busy.set(true);
+    // Telefonnumret söks som siffror: servern matchar det hur det än är sparat.
+    const digits = (b.phone ?? '').replace(/\D/g, '');
+    const email = /^E-post: (\S+@\S+)$/m.exec(b.notes ?? '')?.[1]?.toLowerCase();
+    // Samma kund = samma mobilnummer (sista nio siffrorna, oavsett 0/+46) eller samma e-post.
+    const tail = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '').slice(-9);
+    const search = (q: string) =>
+      this.workshop.customers({ q, limit: 10 }).pipe(
+        map((p) => p.items),
+        catchError(() => of([] as Customer[])),
+      );
+    const known$: Observable<string | undefined> = (
+      digits ? search(digits) : of([] as Customer[])
+    ).pipe(
+      switchMap((byPhone) => {
+        const hit = byPhone.find(
+          (c) => tail(c.phone).length >= 7 && tail(c.phone) === tail(digits),
+        );
+        if (hit || !email) return of(hit);
+        return search(email).pipe(map((l) => l.find((c) => c.email?.toLowerCase() === email)));
+      }),
+      map((c) => c?.id),
+    );
+    known$
+      .pipe(
+        switchMap((customerId) =>
+          this.links.resolve({
+            customerId: '',
+            vehicleId: '',
+            pending: {
+              customerId,
+              customerName: b.customerName,
+              customerPhone: b.phone ?? undefined,
+              // Bokningssidan sparar kundens e-post i anteckningen ("E-post: …").
+              customerEmail: /^E-post: (\S+@\S+)$/m.exec(b.notes ?? '')?.[1],
+              regNo: b.regNo ?? undefined,
+            },
+          }),
+        ),
+      )
+      .subscribe({
+        next: (r) => {
+          this.busy.set(false);
+          f.link.setValue({ customerId: r.customerId, vehicleId: r.vehicleId });
+          this.save();
+        },
+        error: () => {
+          this.busy.set(false);
+          f.status.setValue('requested');
+        },
       });
   }
 

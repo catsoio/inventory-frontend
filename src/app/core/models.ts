@@ -742,9 +742,10 @@ export const closingCode = (n: number): string => `BS-${String(n).padStart(4, '0
 
 // --- Tidsbokning ---
 
-export type BookingStatus = 'booked' | 'arrived' | 'done' | 'cancelled' | 'no_show';
+export type BookingStatus = 'requested' | 'booked' | 'arrived' | 'done' | 'cancelled' | 'no_show';
 
 export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
+  requested: 'Förfrågan',
   booked: 'Bokad',
   arrived: 'Anlänt',
   done: 'Klar',
@@ -866,19 +867,117 @@ export interface Vehicle {
   vin: string | null;
   /** Färgen enligt fordonsregistret, t.ex. "Svart". */
   color?: string | null;
-  /** Däckdimension, t.ex. "205/55 R16". */
+  /** Däckdimension fram, t.ex. "205/55 R16". */
   tyreSize?: string | null;
   rimSize?: string | null;
+  /** Däck och fälg bak, när bilen har andra mått där. */
+  tyreSizeRear?: string | null;
+  rimSizeRear?: string | null;
   /** Alla tekniska rader från fordonsuppslaget (t.ex. första registrering). */
   specs?: Record<string, string> | null;
+  /** De typade uppgifterna från registret; saknas på bilar som inte uppdaterats än. */
+  tech?: VehicleTech | null;
+  /** När registret senast lästes för bilen (ISO). */
+  registryFetchedAt?: string | null;
+  /** Prisklass satt för hand; null = det registret säger. */
+  classOverride?: VehicleClass | null;
   /** Bestående anmärkningar som följer bilen. */
   notes: string | null;
   active: boolean;
   customer: { id: string; code: string; name: string; phone: string | null } | null;
 }
 
+/** Prisklasser, samma som backend (`VEHICLE_CLASSES`). */
+export type VehicleClass = 'passenger' | 'large' | 'trailer' | 'heavy' | 'motorcycle' | 'other';
+
+export const VEHICLE_CLASS_LABELS: Record<VehicleClass, string> = {
+  passenger: 'Personbil',
+  large: 'Större bil',
+  trailer: 'Husvagn / släp',
+  heavy: 'Lastbil / buss',
+  motorcycle: 'MC / moped',
+  other: 'Övrigt',
+};
+
+/** Ett däckmått uppdelat: "195/65 R15 91H". `raw` finns alltid, delarna kan saknas. */
+export interface TyreSize {
+  raw: string;
+  width: number | null;
+  profile: number | null;
+  diameter: number | null;
+  loadIndex: number | null;
+  speedIndex: string | null;
+}
+
+/** Ett fälgmått uppdelat: "6Jx15 ET43". */
+export interface RimSize {
+  raw: string;
+  width: number | null;
+  diameter: number | null;
+  offset: number | null;
+}
+
+/** En axel, fram först. */
+export interface AxleTech {
+  tyre: TyreSize | null;
+  rim: RimSize | null;
+  maxLoadKg: number | null;
+  trackMm: number | null;
+}
+
+/** Bilens byggnad enligt registret. Aldrig ägaruppgifter. Mätarställningen är i km. */
+export interface VehicleTech {
+  vehicleClass: VehicleClass;
+  vehicleType: string | null;
+  euCategory: string | null;
+  bodyCode: string | null;
+  bodyText: string | null;
+  fuels: string[];
+  electrified: boolean | null;
+  gearbox: string | null;
+  powerKw: number | null;
+  powerHp: number | null;
+  displacementCc: number | null;
+  fourWheelDrive: boolean | null;
+  seats: number | null;
+  maxSpeedKmh: number | null;
+  lengthMm: number | null;
+  widthMm: number | null;
+  heightMm: number | null;
+  wheelbaseMm: number | null;
+  serviceWeightKg: number | null;
+  grossWeightKg: number | null;
+  maxLoadKg: number | null;
+  maxTrailerBrakedKg: number | null;
+  maxTrailerUnbrakedKg: number | null;
+  axles: AxleTech[];
+  odometerKm: number | null;
+  odometerAt: string | null;
+  inspectionLast: string | null;
+  inspectionDue: string | null;
+  inspectionStatus: string | null;
+  previousInspection: string | null;
+  previousOdometerKm: number | null;
+  firstRegisteredAt: string | null;
+  inTrafficSwedenAt: string | null;
+  manufacturedAt: string | null;
+  statusText: string | null;
+  typeApprovalNo: string | null;
+}
+
 export type VehicleInput = Partial<
-  Pick<Vehicle, 'customerId' | 'regNo' | 'make' | 'model' | 'year' | 'vin' | 'notes' | 'active'>
+  Pick<
+    Vehicle,
+    | 'customerId'
+    | 'regNo'
+    | 'make'
+    | 'model'
+    | 'year'
+    | 'vin'
+    | 'notes'
+    | 'classOverride'
+    | 'active'
+  >
 >;
 
 /** Vad fordonsregistret vet om ett regnr. Aldrig ägaruppgifter. */
@@ -891,12 +990,18 @@ export interface VehicleInfo {
   color: string | null;
   tyreSize: string | null;
   rimSize: string | null;
+  tyreSizeRear?: string | null;
+  rimSizeRear?: string | null;
+  specs?: Record<string, string>;
+  tech?: VehicleTech | null;
 }
 
 export interface VehicleLookup {
   /** `unavailable`: källan gick inte att använda just nu, fyll i för hand. */
   status: 'found' | 'not_found' | 'unavailable';
   info: VehicleInfo | null;
+  /** När registret lästes (ISO); null när okänt. */
+  fetchedAt?: string | null;
 }
 
 /** Bilens kort: bilen med dess senaste bokningar. */
@@ -946,7 +1051,146 @@ export interface ServiceType {
   opCode?: string | null;
   /** Mallrader som läggs på ett jobb på en gång. */
   lines?: ServiceTemplateLine[];
+  /** Pris per fordonsklass och fälgstorlek, per bil eller per hjul. Tom = ett pris för alla. */
+  prices?: PriceRule[];
+  /** Ett tillfälligt pris eller en procent av, med datum. */
+  campaign?: PriceCampaign | null;
+  /** Det lägsta priset åtgärden kan kosta i dag, det "från" som visas. Räknas av servern. */
+  from?: ServicePrice | null;
+  /** Hur åtgärden ser ut på bokningssidan; null = visas inte där. */
+  online?: ServiceOnline | null;
   active: boolean;
+}
+
+/** Åtgärdens ansikte på verkstadens publika bokningssida. */
+export interface ServiceOnline {
+  published: boolean;
+  /** Rubriken på sidan; null = åtgärdens namn. */
+  title: string | null;
+  description: string | null;
+  /** Plats på sidan, lägst först. */
+  order: number;
+  /** Uppladdad bild (filnamn, se `OnlineBookingSettings.mediaPath`); null = ingen. */
+  image?: string | null;
+}
+
+/** Den publika bokningssidans inställningar (Webbsida). */
+export interface OnlineBookingSettings {
+  enabled: boolean;
+  slug: string | null;
+  intro: string | null;
+  leadDays: number;
+  horizonDays: number;
+  /** Sidans adress i appen, t.ex. /boka/dackmasterab; null tills en adress valts. */
+  path: string | null;
+  /** Där verkstadens bilder ligger (lägg till `/<filnamn>`; ligger under `environment.apiUrl`). */
+  mediaPath: string;
+}
+
+/** En åtgärd som kunden ser på bokningssidan. */
+export interface PublicBookingService {
+  id: string;
+  /** Sökväg till bilden under `environment.apiUrl`, eller null. */
+  image: string | null;
+  title: string;
+  description: string | null;
+  durationMinutes: number;
+  /** Det lägsta priset, eller null när åtgärden saknar pris. */
+  from: ServicePrice | null;
+}
+
+export interface PublicBookingProfile {
+  name: string;
+  phone: string | null;
+  address: string | null;
+  intro: string | null;
+  /** Första och sista dagen kunden kan be om (YYYY-MM-DD). */
+  window: { from: string; to: string };
+  services: PublicBookingService[];
+}
+
+/** Bilen som kunden slagit upp, utan chassinummer och utan något om ägaren. */
+export interface PublicBookingVehicle {
+  regNo: string;
+  title: string;
+  color: string | null;
+  tyreSize: string | null;
+  rimSize: string | null;
+  tyreSizeRear: string | null;
+  rimSizeRear: string | null;
+  vehicleClass: VehicleClass | null;
+}
+
+export interface PublicBookingVehicleAnswer {
+  status: 'found' | 'not_found' | 'unavailable';
+  vehicle: PublicBookingVehicle | null;
+  /** Pris per åtgärd för bilen; null = verkstaden har inget pris för den här bilen. */
+  prices: Record<string, ServicePrice | null>;
+}
+
+export type DayPart = 'morning' | 'afternoon';
+
+export const DAY_PART_LABELS: Record<DayPart, string> = {
+  morning: 'Förmiddag',
+  afternoon: 'Eftermiddag',
+};
+
+/** Kundens förfrågan från bokningssidan. */
+export interface PublicBookingRequest {
+  serviceTypeId: string;
+  regNo?: string | null;
+  vehicleClass?: VehicleClass | null;
+  name: string;
+  phone: string;
+  email?: string | null;
+  day: string;
+  part: DayPart;
+  note?: string | null;
+  consent: boolean;
+  /** Dolt fält; riktiga kunder lämnar det tomt. */
+  website?: string | null;
+}
+
+/** `vehicle` = ett pris för bilen, `wheel` = ett pris per hjul (punktering, husvagn). */
+export type PriceUnit = 'vehicle' | 'wheel';
+
+/** En prisrad. Priser i öre inkl. moms. Samma som backend (`service-pricing.ts`). */
+export interface PriceRule {
+  /** Gäller bara den klassen; null = alla. */
+  vehicleClass: VehicleClass | null;
+  /** Fälgstorlek i tum, båda ändar med; null = öppet. Båda null = alla storlekar. */
+  rimFrom: number | null;
+  rimTo: number | null;
+  unit: PriceUnit;
+  /** Per hjul: hur många hjul en order börjar med (1 punktering, 2 husvagn, 4 bil). */
+  quantity: number;
+  /** Öre inkl. moms per enhet. */
+  price: number;
+}
+
+export interface PriceCampaign {
+  /** Öre per enhet medan den gäller; null när procent används. */
+  price: number | null;
+  /** 1–99 % av; null när pris används. */
+  percent: number | null;
+  /** Första och sista dagen (YYYY-MM-DD, båda med); null = öppet. */
+  from: string | null;
+  to: string | null;
+  /** Vad kunden får veta: "Höstkampanj". */
+  label: string | null;
+}
+
+/** Vad en åtgärd kostar för en bil. */
+export interface ServicePrice {
+  unit: PriceUnit;
+  quantity: number;
+  /** Öre per enhet efter eventuell kampanj. */
+  unitPrice: number;
+  /** Öre per enhet före kampanjen. */
+  listUnitPrice: number;
+  total: number;
+  campaign: { label: string | null; to: string | null } | null;
+  basis: 'rule' | 'service';
 }
 
 /** En mallrad på en åtgärd (som Standard Service Line i Business Central). */
@@ -1090,6 +1334,27 @@ export interface WorkOrderInvoice {
   sections?: InvoiceDocSection[];
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+  /** Satt när kvittot är registrerat i kassaregistret: dess nummer, kontrollkod och kassa. */
+  register?: RegisteredReceiptRef;
+}
+
+/** Det ett registrerat kvitto bär med sig, så att det kan skrivas ut med kontrollkod och nummer. */
+export interface RegisteredReceiptRef {
+  unitId: string;
+  /** Kassabeteckning. */
+  label: string;
+  manufacturingNumber: string;
+  receiptNumber: number;
+  /** Z-rapporten kvittot räknas i. */
+  zNumber: number;
+  occurredAt: string;
+  code: string;
+  codeType: 'avstamningskod' | 'kontrollkod';
+  controlSerial: string;
+  registerVersion: string;
+  /** Falskt för utvecklingsläget: ett sådant kvitto är inte giltigt. */
+  certified: boolean;
+  provider: string;
 }
 
 /** En rubrik (jobb) på dokumentet med delsumma, öre i dokumentets prisläge. */
@@ -1481,6 +1746,16 @@ export interface SalesCardDetail extends SalesCardItem {
   reservedDocumentCode?: string | null;
   reservedKind?: InvoiceKind | null;
   reopenings?: { at: string; by: string; kind: InvoiceKind; number: number }[];
+  /** Satt när ett registrerat kvitto har tagits tillbaka med en retur. */
+  returned?: {
+    at: string;
+    by: string;
+    receiptNumber: number;
+    reason: string;
+    total: number;
+  } | null;
+  /** Vid retur: hur återbetalningen av en kortbetalning gick. */
+  refunds?: { paymentId: string; status: 'done' | 'failed'; error?: string }[];
   /** Gånger dokumentet mejlats till kunden; ett skickat dokument kan inte återöppnas. */
   sends?: { channel: 'email'; to: string; at: string }[];
   /** När kunden först öppnade länken. */
@@ -1787,4 +2062,274 @@ export interface PublicDocument {
   document: WorkOrderInvoice;
   regNo: string | null;
   vehicle: string | null;
+  /** Kan kunden betala fakturan här, och hur. */
+  payment?: { available: boolean; paid: boolean; methods: ('card' | 'swish')[] };
+}
+
+// --- Kassaregister och betalningar ---
+
+/** Kassaregistrets läge för verkstaden. */
+export interface RegisterStatus {
+  configured: boolean;
+  version: string;
+  model: string;
+  program: string;
+  registerNumber: string | null;
+  unit: {
+    id: string;
+    label: string;
+    manufacturingNumber: string;
+    status: 'active' | 'suspended';
+    company: { name: string; orgNo: string; address: string };
+    control: { provider: string; serial: string; certified: boolean };
+  } | null;
+  counters: {
+    seq: number;
+    receipt: number;
+    copy: number;
+    z: number;
+    grandSales: number;
+    grandReturns: number;
+  } | null;
+  control: {
+    reachable: boolean;
+    certified: boolean;
+    provider: string;
+    detail: string | null;
+  } | null;
+}
+
+export interface RegisterReport {
+  kind: 'X' | 'Z';
+  number: number | null;
+  from: string | null;
+  to: string;
+  totalSales: number;
+  vat: { rate: number; vat: number }[];
+  goodsSold: number;
+  servicesSold: number;
+  receipts: number;
+  copies: number;
+  copiesAmount: number;
+  payments: { means: 'card' | 'swish' | 'cash'; amount: number }[];
+  returns: number;
+  returnsAmount: number;
+  discounts: number;
+  grandTotalSales: number;
+  grandTotalReturns: number;
+  grandTotalNet: number;
+}
+
+/** En rad i kassaregistrets journal. */
+export interface RegisterEntry {
+  seq: number;
+  kind: 'start' | 'sale' | 'return' | 'copy' | 'x_report' | 'z_report';
+  occurredAt: string;
+  operator: string | null;
+  code: string | null;
+  receiptNumber: number | null;
+  returnOf: number | null;
+  zNumber: number | null;
+  reason: string | null;
+  receipt: {
+    total: number;
+    totalVat: number;
+    payments: { means: string; amount: number }[];
+  } | null;
+  report: RegisterReport | null;
+  signature: { certified: boolean; controlSerial: string } | null;
+  registerVersion: string;
+  hash: string;
+}
+
+export type RegisterChain =
+  { ok: true; entries: number } | { ok: false; brokenAtSeq: number; reason: string };
+
+export interface PaymentAccount {
+  connected: boolean;
+  accountId: string | null;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  ready: boolean;
+  swish: boolean;
+  terminalLocationId: string | null;
+  readers: { id: string; label: string }[];
+  feePercent: number;
+}
+
+export interface PaymentReader {
+  id: string;
+  label: string;
+  deviceType: string | null;
+  status: 'online' | 'offline';
+  busy: boolean;
+}
+
+/** En betalning via Stripe för ett säljkort. */
+export interface PaymentRow {
+  id: string;
+  cardId: string;
+  purpose: 'invoice' | 'receipt';
+  channel: 'checkout' | 'reader';
+  amount: number;
+  applicationFee: number;
+  method: PaymentMethod | null;
+  status: 'pending' | 'succeeded' | 'failed' | 'canceled';
+  failureReason: string | null;
+  /** Hur det gick att bokföra betalningen på kortet; `failed` = pengarna är inne men kvittot kunde inte utfärdas. */
+  receipt: 'not_needed' | 'pending' | 'done' | 'failed';
+  receiptError: string | null;
+  refundedAt: string | null;
+  refundError: string | null;
+  createdAt: string;
+  paidAt: string | null;
+}
+
+// ---- Bilhandel: bilar till salu och verkstadens publika webbplats ----
+
+export type ListingStatus = 'draft' | 'active' | 'reserved' | 'sold';
+
+export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
+  draft: 'Utkast',
+  active: 'Till salu',
+  reserved: 'Reserverad',
+  sold: 'Såld',
+};
+
+export interface ListingInquiry {
+  name: string;
+  phone: string;
+  email: string | null;
+  message: string | null;
+  at: string;
+}
+
+/** En bil till salu, som personalen ser den. Priset är öre inkl. moms; null = pris på förfrågan. */
+export interface CarListing {
+  id: string;
+  regNo: string;
+  heading: string;
+  make: string | null;
+  model: string | null;
+  variant: string | null;
+  year: number | null;
+  title: string | null;
+  description: string | null;
+  price: number | null;
+  mileageKm: number | null;
+  color: string | null;
+  fuel: string | null;
+  gearbox: string | null;
+  powerHp: number | null;
+  bodyText: string | null;
+  fourWheelDrive: boolean | null;
+  inspectionDue: string | null;
+  equipment: string[];
+  /** Filnamn, i den ordning de visas; första är omslagsbild. */
+  images: string[];
+  /** Adresser till bilderna (under `environment.apiUrl`), i samma ordning. */
+  imageUrls: (string | null)[];
+  status: ListingStatus;
+  inquiries: ListingInquiry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CarListingInput = Partial<
+  Pick<
+    CarListing,
+    | 'make'
+    | 'model'
+    | 'variant'
+    | 'year'
+    | 'title'
+    | 'description'
+    | 'price'
+    | 'mileageKm'
+    | 'color'
+    | 'fuel'
+    | 'gearbox'
+    | 'powerHp'
+    | 'bodyText'
+    | 'fourWheelDrive'
+    | 'inspectionDue'
+    | 'equipment'
+    | 'images'
+    | 'status'
+  >
+>;
+
+export type DomainStatus = 'pending' | 'active' | 'error';
+
+export interface DnsRecord {
+  type: 'CNAME' | 'TXT' | 'A';
+  name: string;
+  value: string;
+}
+
+export interface SiteDomain {
+  hostname: string;
+  status: DomainStatus;
+  records: DnsRecord[];
+  error: string | null;
+}
+
+/** Verkstadens publika webbplats: adress, påslagen och vilka domäner som leder dit. */
+export interface SiteSettings {
+  enabled: boolean;
+  slug: string | null;
+  title: string | null;
+  intro: string | null;
+  /** Dölj regnumret för besökare. */
+  hideRegNo: boolean;
+  domains: SiteDomain[];
+  /** Adressen på plattformen, t.ex. /bilhandel/dackmaster. */
+  path: string | null;
+}
+
+export interface PublicSiteProfile {
+  name: string;
+  title: string;
+  intro: string | null;
+  phone: string | null;
+  address: string | null;
+  /** Bokningssidans adress om verkstaden har en påslagen, för länken "Boka tid". */
+  bookingSlug: string | null;
+  carCount: number;
+}
+
+/** En bil som besökaren ser: inget om ägare eller intern data. */
+export interface PublicCar {
+  id: string;
+  /** Null när verkstaden döljer regnumret. */
+  regNo: string | null;
+  heading: string;
+  make: string | null;
+  model: string | null;
+  variant: string | null;
+  year: number | null;
+  price: number | null;
+  mileageKm: number | null;
+  color: string | null;
+  fuel: string | null;
+  gearbox: string | null;
+  powerHp: number | null;
+  bodyText: string | null;
+  fourWheelDrive: boolean | null;
+  inspectionDue: string | null;
+  description: string | null;
+  equipment: string[];
+  reserved: boolean;
+  /** Adresser till bilderna under `environment.apiUrl`. */
+  images: (string | null)[];
+}
+
+export interface CarInquiryBody {
+  name: string;
+  phone: string;
+  email?: string | null;
+  message?: string | null;
+  consent: boolean;
+  website?: string | null;
 }

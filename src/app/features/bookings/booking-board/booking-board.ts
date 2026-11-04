@@ -13,6 +13,7 @@ const HOUR_PX = 64;
 const HOURS = Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => FIRST_HOUR + i);
 
 const STATUS_COLOR: Record<BookingStatus, string> = {
+  requested: '#7c3aed',
   booked: '#1976d2',
   arrived: '#f59e0b',
   done: '#16a34a',

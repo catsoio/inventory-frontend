@@ -1,4 +1,10 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { FormBuilder } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { OnlineBookingApi } from '../../../core/api/online-booking-api';
+import { OnlineBookingSettings } from '../../../core/models';
+import { MatDialog } from '@angular/material/dialog';
+import { FeaturesDialog } from '../features-dialog/features-dialog';
 import { SettingsStore } from '../settings-store';
 
 /** Företagsuppgifter: det som skrivs ut på faktura och kvitto. */
@@ -197,6 +203,9 @@ export class SettingsStaff {
                 Växla
               </button>
             }
+            @if (s.auth.isSuperAdmin()) {
+              <button mat-stroked-button type="button" (click)="features(c)">Funktioner</button>
+            }
           </div>
         }
       </div>
@@ -223,4 +232,106 @@ export class SettingsStaff {
 })
 export class SettingsCompanies {
   readonly s = inject(SettingsStore);
+  private readonly dialog = inject(MatDialog);
+
+  /** Catso styr vad bolaget får använda (plan och delar på/av). */
+  features(c: { id: string; name: string }) {
+    this.dialog.open(FeaturesDialog, {
+      data: { id: c.id, name: c.name },
+      width: '640px',
+      maxWidth: '95vw',
+    });
+  }
+}
+
+/**
+ * Onlinebokning (bara superadmin): vi sätter upp verkstadens bokningsadress och slår på sidan åt dem.
+ * Verkstaden formar sidan själv under Onlinebokning i menyn (text, åtgärder, bilder), men kan inte ändra adressen.
+ */
+@Component({
+  selector: 'app-settings-website',
+  standalone: false,
+  template: `
+    <app-settings-section
+      title="Onlinebokning"
+      text="Adressen kunderna bokar på och om sidan är påslagen. Gäller bolaget du är i just nu; verkstaden ändrar inte adressen själv."
+      [dirty]="form.dirty"
+      [valid]="form.valid"
+      [busy]="busy()"
+      (save)="save()"
+      (discard)="reset()"
+    >
+      <form [formGroup]="form" (ngSubmit)="save()" class="flex max-w-xl flex-col gap-4">
+        <mat-slide-toggle formControlName="enabled">Påslagen</mat-slide-toggle>
+        <label class="flex flex-col gap-0.5 text-xs text-gray-500"
+          >Adress
+          <span class="flex items-center gap-2">
+            <span class="text-sm text-gray-500">{{ origin }}/boka/</span>
+            <input
+              formControlName="slug"
+              maxlength="60"
+              placeholder="dackmasterab"
+              class="h-10 min-w-0 flex-1 px-2 text-sm text-gray-900 field"
+            />
+          </span>
+        </label>
+        @if (error(); as e) {
+          <p class="text-sm text-red-700">{{ e }}</p>
+        }
+        @if (saved()?.path; as path) {
+          <p class="text-sm text-gray-600">
+            Länk:
+            <a class="underline" [href]="path" target="_blank" rel="noopener"
+              >{{ origin }}{{ path }}</a
+            >
+          </p>
+        }
+      </form>
+    </app-settings-section>
+  `,
+})
+export class SettingsWebsite implements OnInit {
+  private readonly api = inject(OnlineBookingApi);
+  private readonly snack = inject(MatSnackBar);
+  readonly origin = globalThis.location?.origin ?? '';
+  readonly busy = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly saved = signal<OnlineBookingSettings | null>(null);
+  readonly form = inject(FormBuilder).nonNullable.group({ enabled: false, slug: '' });
+
+  ngOnInit() {
+    this.api.settings().subscribe((s) => this.load(s));
+  }
+
+  private load(s: OnlineBookingSettings) {
+    this.saved.set(s);
+    this.form.reset({ enabled: s.enabled, slug: s.slug ?? '' });
+  }
+
+  reset() {
+    const s = this.saved();
+    if (s) this.load(s);
+    this.error.set(null);
+  }
+
+  save() {
+    const v = this.form.getRawValue();
+    this.busy.set(true);
+    this.error.set(null);
+    this.api.saveSettings({ enabled: v.enabled, slug: v.slug.trim() || null }).subscribe({
+      next: (s) => {
+        this.busy.set(false);
+        this.load(s);
+        this.snack.open('Sparat', undefined, { duration: 2000 });
+      },
+      error: (e: { status?: number; error?: { error?: { message?: string } } }) => {
+        this.busy.set(false);
+        this.error.set(
+          e.status === 409
+            ? 'Den adressen används redan. Välj en annan.'
+            : (e.error?.error?.message ?? 'Det gick inte att spara.'),
+        );
+      },
+    });
+  }
 }

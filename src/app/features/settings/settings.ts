@@ -72,6 +72,9 @@ export interface SettingsTab {
         @case ('bolag') {
           <app-settings-companies />
         }
+        @case ('webbsida') {
+          <app-settings-website />
+        }
         @case ('prissattning') {
           <app-settings-pricing />
         }
@@ -84,6 +87,12 @@ export interface SettingsTab {
         @case ('dackhotell') {
           <app-settings-hotel />
         }
+        @case ('betalningar') {
+          <app-settings-payments />
+        }
+        @case ('kassaregister') {
+          <app-settings-register />
+        }
       }
       <div class="mt-6 text-xs text-gray-400 tabular-nums">Version {{ version }}</div>
     </div>
@@ -95,7 +104,9 @@ export class SettingsPage {
   private readonly confirm = inject(Confirm);
   protected readonly version = pkg.version;
 
-  readonly tab = signal(inject<{ tab?: string } | null>(DIALOG_DATA, { optional: true })?.tab ?? 'visning');
+  readonly tab = signal(
+    inject<{ tab?: string } | null>(DIALOG_DATA, { optional: true })?.tab ?? 'visning',
+  );
 
   readonly tabs = computed<SettingsTab[]>(() => {
     const t: SettingsTab[] = [
@@ -105,11 +116,14 @@ export class SettingsPage {
     if (!this.store.admin) return t;
     t.push({ key: 'foretag', label: 'Företaget' }, { key: 'personal', label: 'Personal' });
     if (this.store.showCompanies()) t.push({ key: 'bolag', label: 'Bolag' });
+    if (this.store.auth.isSuperAdmin()) t.push({ key: 'webbsida', label: 'Onlinebokning' });
     t.push(
       { key: 'prissattning', label: 'Prissättning' },
       { key: 'artiklar', label: 'Artiklar och lager' },
       { key: 'kunder', label: 'Kunder' },
       { key: 'dackhotell', label: 'Däckhotell' },
+      { key: 'betalningar', label: 'Betalningar' },
+      { key: 'kassaregister', label: 'Kassaregister' },
     );
     return t;
   });

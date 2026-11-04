@@ -55,6 +55,19 @@ export class SalesCardApi {
     );
   }
 
+  /** Kunden trycker Betala: Stripes sida för fakturan. Svaret är adressen att skicka kunden till. */
+  payPublic(token: string): Observable<{ url: string }> {
+    return this.http.post<{ url: string }>(
+      `${environment.apiUrl}/inventory/public/documents/${token}/pay`,
+      {},
+    );
+  }
+
+  /** Tar ett kvitto som är registrerat i kassaregistret tillbaka med en retur (ägaren). */
+  returnReceipt(id: string, reason: string): Observable<SalesCardDetail> {
+    return this.http.post<SalesCardDetail>(`${this.base}/${id}/return`, { reason });
+  }
+
   get(id: string): Observable<SalesCardDetail> {
     return this.http.get<SalesCardDetail>(`${this.base}/${id}`);
   }

@@ -1,11 +1,12 @@
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { Component, HostListener, effect, inject, untracked } from '@angular/core';
+import { Component, HostListener, effect, inject, untracked, computed } from '@angular/core';
 import { AxleApi } from '../../api/axle-api';
 import { Auth } from '../../auth/auth';
 import { GARAGE_ROLE_LABELS } from '../../models';
 import { PageTitle } from '../../page-title';
 import { Pricing } from '../../pricing';
+import { Billing } from '../../billing/billing';
 import { QUICK_GROUPS, type QuickAction } from '../../search/quick-actions';
 import { GlobalSearch } from '../../search/global-search';
 import { Settings } from '../../settings';
@@ -34,9 +35,7 @@ import { Nav } from '../nav';
   template: `
     <app-garage-menu #gm="garageMenu" />
 
-    <header
-      class="flex h-14 shrink-0 items-center bg-brand text-white shadow-sm"
-    >
+    <header class="flex h-14 shrink-0 items-center bg-brand text-white shadow-sm">
       <!-- Loggan och garaget, lika brett som sidomenyn under (288 px: ett långt bolagsnamn ska få plats). -->
       <div
         class="hidden h-full shrink-0 items-center gap-2 px-3 transition-[width] duration-200 md:flex"
@@ -53,9 +52,7 @@ import { Nav } from '../nav';
               [matMenuTriggerFor]="gm.menu"
               aria-label="Byt garage"
             >
-              <span class="truncate text-sm font-semibold">{{
-                auth.companyName() || 'Axle'
-              }}</span>
+              <span class="truncate text-sm font-semibold">{{ auth.companyName() || 'Axle' }}</span>
               <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] opacity-80">unfold_more</mat-icon>
             </button>
           } @else {
@@ -74,7 +71,7 @@ import { Nav } from '../nav';
         @if (!auth.isMechanic()) {
           <!-- Genvägar för att skapa något (dator), i grupper som sidomenyns avsnitt: samma som under sökrutan. -->
           <div class="hidden items-center gap-2 lg:flex xl:gap-3">
-            @for (g of quickGroups; track g.title) {
+            @for (g of quickGroups(); track g.title) {
               <div class="flex items-center gap-1" role="group" [attr.aria-label]="g.title">
                 @for (a of g.actions; track a.label) {
                   <button
@@ -157,7 +154,14 @@ export class Shell {
   readonly auth = inject(Auth);
   readonly nav = inject(Nav);
   readonly search = inject(GlobalSearch);
-  readonly quickGroups = QUICK_GROUPS;
+  private readonly billing = inject(Billing);
+  /** Genvägarna, bara för det garaget har påslaget. */
+  readonly quickGroups = computed(() =>
+    QUICK_GROUPS.map((g) => ({
+      ...g,
+      actions: g.actions.filter((a) => this.billing.allows(a.module)),
+    })).filter((g) => g.actions.length),
+  );
   run(a: QuickAction) {
     if (a.go) void this.router.navigate(a.go);
     else {
@@ -170,8 +174,10 @@ export class Shell {
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
 
-  openSettings(): void {
-    void import('../../../features/settings/settings').then((m) => m.openSettings(this.dialog));
+  openSettings(tab?: string): void {
+    void import('../../../features/settings/settings').then((m) =>
+      m.openSettings(this.dialog, tab),
+    );
   }
   /** Sidans namn i topbaren. */
   readonly pageName = inject(PageTitle).page;
@@ -190,6 +196,11 @@ export class Shell {
       }
     });
     inject(Settings).loadCompany();
+    // Stripe skickar ägaren tillbaka hit efter registreringen (`/?payments=return`): visa Betalningar.
+    if (new URLSearchParams(window.location.search).has('payments')) {
+      history.replaceState(null, '', window.location.pathname + window.location.hash);
+      queueMicrotask(() => this.openSettings('betalningar'));
+    }
     // Prissättningen gäller bolaget man är i (ägare och personal; mekaniker har ingen åtkomst).
     const pricing = inject(Pricing);
     effect(() => {

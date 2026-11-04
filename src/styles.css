@@ -55,7 +55,7 @@ body {
 html {
   -webkit-text-size-adjust: 100%;
 }
-main {
+app-shell main {
   overscroll-behavior: contain;
   overflow-x: hidden;
 }

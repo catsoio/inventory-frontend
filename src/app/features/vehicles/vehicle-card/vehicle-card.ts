@@ -126,6 +126,8 @@ import { carColorHex } from '../../../shared/car-color';
       </form>
 
       @if (card(); as c) {
+        <app-vehicle-tech [vehicle]="c" (refreshed)="load()" />
+
         @if (workOrdersOn) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-lg font-semibold">Arbetsorder</h2>
@@ -250,7 +252,7 @@ export class VehicleCard implements OnInit {
     if (customerId) this.form.controls.customerId.setValue(customerId);
   }
 
-  private load() {
+  load() {
     this.api.vehicle(this.id!).subscribe((v) => {
       this.card.set(v);
       this.form.reset({

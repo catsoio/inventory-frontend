@@ -3,6 +3,8 @@ export interface QuickAction {
   icon: string;
   /** `null` = bokningsdialogen. */
   go: string[] | null;
+  /** Delen av appen som måste vara påslagen för garaget. */
+  module?: string;
 }
 
 /**
@@ -14,20 +16,27 @@ export const QUICK_GROUPS: { title: string; actions: QuickAction[] }[] = [
   {
     title: 'Arbete',
     actions: [
-      { label: 'Ny bokning', icon: 'event', go: null },
-      { label: 'Ny arbetsorder', icon: 'assignment_add', go: ['/workorders', 'new'] },
+      { label: 'Ny bokning', icon: 'event', go: null, module: 'tidsbokning' },
+      {
+        label: 'Ny arbetsorder',
+        icon: 'assignment_add',
+        go: ['/workorders', 'new'],
+        module: 'arbetsorder',
+      },
     ],
   },
   {
     title: 'Försäljning',
     actions: [
-      { label: 'Ny offert', icon: 'request_quote', go: ['/quotes', 'new'] },
+      { label: 'Ny offert', icon: 'request_quote', go: ['/quotes', 'new'], module: 'arbetsorder' },
       { label: 'Ny försäljning', icon: 'point_of_sale', go: ['/sales', 'new'] },
     ],
   },
   {
     title: 'Däck och lager',
-    actions: [{ label: 'Ny inlämning', icon: 'warehouse', go: ['/storage', 'new'] }],
+    actions: [
+      { label: 'Ny inlämning', icon: 'warehouse', go: ['/storage', 'new'], module: 'dackhotell' },
+    ],
   },
   {
     title: 'Kunder',

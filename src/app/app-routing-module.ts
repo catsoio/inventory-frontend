@@ -1,7 +1,17 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { adminGuard, authGuard, garageGuard, mechanicGuard } from './core/auth/auth-guard';
+import {
+  adminGuard,
+  authGuard,
+  garageGuard,
+  mechanicGuard,
+  moduleGuard,
+} from './core/auth/auth-guard';
 import { Shell } from './core/layout/shell/shell';
+import { onCustomDomain } from './features/public-site/site-context';
+
+const loadPublicSite = () =>
+  import('./features/public-site/public-site-module').then((m) => m.PublicSiteModule);
 
 const routes: Routes = [
   {
@@ -22,6 +32,24 @@ const routes: Routes = [
       import('./features/public-document/public-document-module').then(
         (m) => m.PublicDocumentModule,
       ),
+  },
+  {
+    // Verkstadens bokningssida för kunder: utan inloggning, adressen i länken är nyckeln.
+    path: 'boka/:slug',
+    loadChildren: () =>
+      import('./features/public-booking/public-booking-module').then((m) => m.PublicBookingModule),
+  },
+  {
+    // Verkstadens webbplats på plattformen: utan inloggning, adressen är nyckeln.
+    path: 'bilhandel/:slug',
+    loadChildren: loadPublicSite,
+  },
+  {
+    // På en kunds egen domän (däckmaster.se) är webbplatsen startsidan. Går inte adressen att
+    // matcha här faller routern vidare till övriga rutter (t.ex. /boka/<adress>).
+    path: '',
+    canMatch: [() => onCustomDomain()],
+    loadChildren: loadPublicSite,
   },
   {
     path: 'onboarding',
@@ -51,12 +79,14 @@ const routes: Routes = [
       },
       {
         path: 'storage',
+        canActivate: [moduleGuard('dackhotell')],
         title: 'Däckhotell',
         loadChildren: () =>
           import('./features/storage/storage-module').then((m) => m.StorageModule),
       },
       {
         path: 'bookings',
+        canActivate: [moduleGuard('tidsbokning')],
         title: 'Tidsbokning',
         loadChildren: () =>
           import('./features/bookings/bookings-module').then((m) => m.BookingsModule),
@@ -98,11 +128,13 @@ const routes: Routes = [
       },
       {
         path: 'quotes',
+        canActivate: [moduleGuard('arbetsorder')],
         title: 'Offert',
         loadChildren: () => import('./features/quotes/quotes-module').then((m) => m.QuotesModule),
       },
       {
         path: 'workorders',
+        canActivate: [moduleGuard('arbetsorder')],
         title: 'Arbetsorder',
         loadChildren: () =>
           import('./features/work-orders/work-orders-module').then((m) => m.WorkOrdersModule),
@@ -122,16 +154,32 @@ const routes: Routes = [
       {
         path: 'bookkeeping',
         title: 'Moms och bokföring',
-        canActivate: [adminGuard],
+        canActivate: [adminGuard, moduleGuard('bokforing')],
         loadChildren: () =>
           import('./features/bookkeeping/bookkeeping-module').then((m) => m.BookkeepingModule),
       },
       {
         path: 'finance',
         title: 'Ekonomi',
-        canActivate: [adminGuard],
+        canActivate: [adminGuard, moduleGuard('bokforing')],
         loadChildren: () =>
           import('./features/finance/finance-module').then((m) => m.FinanceModule),
+      },
+      {
+        path: 'dealership',
+        canActivate: [moduleGuard('bilhandel')],
+        title: 'Bilhandel',
+        loadChildren: () =>
+          import('./features/dealership/dealership-module').then((m) => m.DealershipModule),
+      },
+      {
+        path: 'online-booking',
+        title: 'Onlinebokning',
+        canActivate: [adminGuard, moduleGuard('onlinebokning')],
+        loadChildren: () =>
+          import('./features/online-booking/online-booking-module').then(
+            (m) => m.OnlineBookingModule,
+          ),
       },
       {
         path: 'activity',

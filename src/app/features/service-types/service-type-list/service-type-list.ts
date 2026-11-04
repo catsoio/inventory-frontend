@@ -22,12 +22,21 @@ const COLS: DtCol<ServiceType>[] = [
     key: 'price',
     label: 'Pris inkl. moms',
     right: true,
-    value: (t) => t.priceFrom ?? 0,
-    fmt: (t) =>
-      t.priceFrom === null
+    value: (t) => (t.prices?.length ? (t.from?.total ?? 0) : (t.priceFrom ?? 0)),
+    fmt: (t) => {
+      // Med prisrader efter bil visas det lägsta, och en pågående kampanj märks.
+      if (t.prices?.length) {
+        return t.from
+          ? `från ${kr.transform(t.from.total)}${t.from.campaign ? ' (kampanj)' : ''}`
+          : '–';
+      }
+      return t.priceFrom === null
         ? '–'
         : kr.transform(t.priceFrom) +
-          (t.priceTo !== null && t.priceTo !== t.priceFrom ? ` – ${kr.transform(t.priceTo)}` : ''),
+            (t.priceTo !== null && t.priceTo !== t.priceFrom
+              ? ` – ${kr.transform(t.priceTo)}`
+              : '');
+    },
   },
   { key: 'status', label: 'Status', value: (t) => (t.active ? 'Aktiv' : 'Arkiverad') },
 ];
