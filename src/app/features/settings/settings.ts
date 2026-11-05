@@ -87,6 +87,9 @@ export interface SettingsTab {
         @case ('dackhotell') {
           <app-settings-hotel />
         }
+        @case ('anslutningar') {
+          <app-settings-connections />
+        }
         @case ('betalningar') {
           <app-settings-payments />
         }
@@ -122,6 +125,7 @@ export class SettingsPage {
       { key: 'artiklar', label: 'Artiklar och lager' },
       { key: 'kunder', label: 'Kunder' },
       { key: 'dackhotell', label: 'Däckhotell' },
+      { key: 'anslutningar', label: 'Anslutningar' },
       { key: 'betalningar', label: 'Betalningar' },
       { key: 'kassaregister', label: 'Kassaregister' },
     );

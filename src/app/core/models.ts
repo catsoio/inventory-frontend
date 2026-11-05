@@ -877,6 +877,8 @@ export interface Vehicle {
   specs?: Record<string, string> | null;
   /** De typade uppgifterna från registret; saknas på bilar som inte uppdaterats än. */
   tech?: VehicleTech | null;
+  /** Allt källan visar om bilen, som tabeller; följer bara med bilens eget kort. */
+  details?: VehicleDetails | null;
   /** När registret senast lästes för bilen (ISO). */
   registryFetchedAt?: string | null;
   /** Prisklass satt för hand; null = det registret säger. */
@@ -926,6 +928,37 @@ export interface AxleTech {
 }
 
 /** Bilens byggnad enligt registret. Aldrig ägaruppgifter. Mätarställningen är i km. */
+export interface CarInfoStatus {
+  connected: boolean;
+  email: string | null;
+}
+
+/** `heading`: underrubrik i en grupp. `columns`: rubrikrad i en tabell med flera värden per rad. */
+export interface DetailRow {
+  label: string;
+  cells: string[];
+  kind?: 'heading' | 'columns';
+  level?: number;
+}
+
+export interface DetailGroup {
+  title: string;
+  /** Det en verkstad tittar på först; resten är ihopfällt tills man öppnar. */
+  important: boolean;
+  rows: DetailRow[];
+}
+
+export interface DetailSection {
+  title: string;
+  important: boolean;
+  groups: DetailGroup[];
+}
+
+export interface VehicleDetails {
+  source: string;
+  sections: DetailSection[];
+}
+
 export interface VehicleTech {
   vehicleClass: VehicleClass;
   vehicleType: string | null;

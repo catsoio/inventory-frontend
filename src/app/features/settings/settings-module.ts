@@ -10,6 +10,7 @@ import {
 } from './sections/company-sections';
 import { SettingsPassword, SettingsView } from './sections/personal-sections';
 import { SettingsPayments, SettingsRegister } from './sections/payment-sections';
+import { CarInfoConnectionDialog, SettingsConnections } from './sections/connections-section';
 import {
   SettingsCustomers,
   SettingsHotel,
@@ -38,6 +39,8 @@ export { SettingsPage };
     SettingsHotel,
     SettingsPayments,
     SettingsRegister,
+    SettingsConnections,
+    CarInfoConnectionDialog,
     ResetPasswordDialog,
     FeaturesDialog,
   ],

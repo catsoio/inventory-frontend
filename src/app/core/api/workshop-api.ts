@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  CarInfoStatus,
   Customer,
   CustomerDetail,
   CustomerInput,
@@ -112,6 +113,20 @@ export class WorkshopApi {
       `${this.base}/vehicles/lookup/${encodeURIComponent(regNo)}`,
       refresh ? { params: { refresh: 'true' } } : {},
     );
+  }
+
+  /** Verkstadens egen inloggning hos car.info; aldrig lösenordet. */
+  carInfo(): Observable<CarInfoStatus> {
+    return this.http.get<CarInfoStatus>(`${this.base}/settings/carinfo`);
+  }
+
+  /** Kontrollerar inloggningen hos car.info och sparar den (ägare). */
+  saveCarInfo(email: string, password: string): Observable<CarInfoStatus> {
+    return this.http.put<CarInfoStatus>(`${this.base}/settings/carinfo`, { email, password });
+  }
+
+  clearCarInfo(): Observable<CarInfoStatus> {
+    return this.http.delete<CarInfoStatus>(`${this.base}/settings/carinfo`);
   }
 
   createVehicle(body: VehicleInput): Observable<Vehicle> {

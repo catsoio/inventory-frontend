@@ -978,4 +978,13 @@ export const EN: Record<string, string> = {
   Förfrågan: 'Request',
   'Bekräfta tiden': 'Confirm the time',
   'Förfrågan från bokningssidan.': 'Request from the booking page.',
+  Anslutningar: 'Connections',
+  'Testa anslutning': 'Test connection',
+  Ansluten: 'Connected',
+  'Anslutningen fungerar': 'The connection works',
+  'Ta bort anslutningen?': 'Remove the connection?',
+  'Alla fordonsuppgifter': 'All vehicle details',
+  'Sök i uppgifterna': 'Search the details',
+  'Fäll ut alla': 'Expand all',
+  'Fäll ihop alla': 'Collapse all',
 };

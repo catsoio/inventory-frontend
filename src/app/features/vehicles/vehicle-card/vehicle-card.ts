@@ -27,7 +27,8 @@ import { carColorHex } from '../../../shared/car-color';
       listLink="/vehicles"
       listLabel="Bilar"
       newTitle="Ny bil"
-      [title]="card()?.regNo ?? ''"
+      [wide]="true"
+      [title]="headline()"
       [code]="card()?.code ?? null"
       [archived]="!!card() && !card()!.active"
     >
@@ -52,159 +53,210 @@ import { carColorHex } from '../../../shared/car-color';
         <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">Spara</button>
       </div>
 
-      <form
-        [formGroup]="form"
-        class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6"
-      >
-        <app-customer-select
-          class="sm:col-span-4"
-          [allowNew]="true"
-          label="Ägare"
-          formControlName="customerId"
-        />
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>Registreringsnummer</mat-label>
-          <app-sv-flag matPrefix class="mr-2" />
-          <input matInput formControlName="regNo" appRegNo class="uppercase" (blur)="lookup()" />
-          <mat-error>Ange regnr</mat-error>
-        </mat-form-field>
-        @if (looking()) {
-          <p class="mb-3 text-sm text-gray-500 sm:col-span-6">Hämtar bilinfo…</p>
-        }
-        @if (note(); as n) {
-          <p
-            class="mb-3 rounded-lg px-3 py-2 text-sm sm:col-span-6"
-            [class]="n.warn ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'"
-          >
-            {{ n.text }}
-            @if (n.link) {
-              <a class="font-medium underline" [routerLink]="n.link">Öppna bilen</a>
+      <div class="grid items-stretch gap-4 lg:grid-cols-3">
+        <div class="flex flex-col gap-4 lg:col-span-1">
+          <form [formGroup]="form" class="flex flex-col rounded-xl bg-white p-5 shadow-sm">
+            <app-customer-select
+              class="sm:col-span-4"
+              [allowNew]="true"
+              label="Kund"
+              formControlName="customerId"
+            />
+            <div class="flex gap-3">
+              <mat-form-field class="w-40 shrink-0">
+                <mat-label>Registreringsnummer</mat-label>
+                <app-sv-flag matPrefix class="mr-2" />
+                <input
+                  matInput
+                  formControlName="regNo"
+                  appRegNo
+                  class="uppercase"
+                  (blur)="lookup()"
+                />
+                <mat-error>Ange regnr</mat-error>
+              </mat-form-field>
+              <mat-form-field class="min-w-0 flex-1">
+                <mat-label>Anmärkning</mat-label>
+                <input matInput formControlName="notes" placeholder="Visas för mekanikern" />
+              </mat-form-field>
+            </div>
+            @if (looking()) {
+              <p class="mb-3 text-sm text-gray-500 sm:col-span-6">Hämtar bilinfo…</p>
             }
-            @if (locked()) {
-              <button type="button" class="ml-2 font-medium underline" (click)="unlock()">
-                Ändra manuellt
-              </button>
+            @if (note(); as n) {
+              <p
+                class="mb-3 rounded-lg px-3 py-2 text-sm sm:col-span-6"
+                [class]="n.warn ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'"
+              >
+                {{ n.text }}
+                @if (n.link) {
+                  <a class="font-medium underline" [routerLink]="n.link">Öppna bilen</a>
+                }
+                @if (locked()) {
+                  <button type="button" class="ml-2 font-medium underline" (click)="unlock()">
+                    Ändra manuellt
+                  </button>
+                }
+              </p>
             }
-          </p>
+            @if (
+              !looking() &&
+              form.controls.regNo.value &&
+              !form.controls.make.value &&
+              !form.controls.model.value
+            ) {
+              <mat-form-field class="sm:col-span-2">
+                <mat-label>Märke</mat-label>
+                <input matInput formControlName="make" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2">
+                <mat-label>Modell</mat-label>
+                <input matInput formControlName="model" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2">
+                <mat-label>Årsmodell</mat-label>
+                <input matInput type="number" inputmode="numeric" formControlName="year" />
+                <mat-error>Ogiltigt år</mat-error>
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-6">
+                <mat-label>Chassinummer (VIN)</mat-label>
+                <input matInput formControlName="vin" />
+              </mat-form-field>
+            }
+            @if (card(); as c) {
+              <div class="flex flex-col gap-1 border-t border-gray-100 pt-3 text-sm">
+                @if (c.customer; as cu) {
+                  <div class="flex justify-between gap-4">
+                    <span class="text-gray-500">Kund</span>
+                    <span class="text-right font-medium">
+                      {{ cu.name }}
+                      @if (cu.phone) {
+                        · <a class="underline" [href]="'tel:' + cu.phone">{{ cu.phone }}</a>
+                      }
+                    </span>
+                  </div>
+                }
+                @if (c.vin) {
+                  <div class="flex justify-between gap-4">
+                    <span class="text-gray-500">Chassinummer</span>
+                    <span class="font-medium tabular-nums">{{ c.vin }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </form>
+          @if (card()?.details; as d) {
+            <app-vehicle-status class="block flex-1" [details]="d" />
+          }
+        </div>
+        @if (card()?.details; as d) {
+          <app-vehicle-overview class="block lg:col-span-2" [details]="d" />
         }
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>Märke</mat-label>
-          <input matInput formControlName="make" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>Modell</mat-label>
-          <input matInput formControlName="model" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>Årsmodell</mat-label>
-          <input matInput type="number" inputmode="numeric" formControlName="year" />
-          <mat-error>Ogiltigt år</mat-error>
-        </mat-form-field>
-        @if (card()?.color; as col) {
-          <div class="mb-4 flex items-center gap-2 text-sm sm:col-span-2">
-            <span class="text-gray-500">Färg</span>
-            <span
-              class="inline-block h-4 w-4 rounded-full ring-1 ring-black/20"
-              [style.background]="hex(col)"
-            ></span>
-            <span>{{ col }}</span>
-          </div>
-        }
-        <mat-form-field class="sm:col-span-6">
-          <mat-label>Chassinummer (VIN)</mat-label>
-          <input matInput formControlName="vin" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-6">
-          <mat-label>Anmärkning på bilen</mat-label>
-          <textarea
-            matInput
-            rows="2"
-            formControlName="notes"
-            placeholder="t.ex. Dragkrok helt rostad. Visas för mekanikern vid varje besök."
-          ></textarea>
-        </mat-form-field>
-      </form>
+      </div>
 
       @if (card(); as c) {
         <app-vehicle-tech [vehicle]="c" (refreshed)="load()" />
-
-        @if (workOrdersOn) {
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-2 text-lg font-semibold">Arbetsorder</h2>
-            @for (o of c.workOrders; track o.id) {
-              <a
-                [routerLink]="['/workorders', o.id]"
-                class="flex flex-wrap items-center gap-x-4 border-t border-gray-100 py-2 text-sm hover:bg-gray-50"
-              >
-                <span class="text-xs text-gray-500">{{ o.code }}</span>
-                <span class="tabular-nums">{{ o.receivedAt | date: 'yyyy-MM-dd' }}</span>
-                <span class="text-gray-500">{{ o.resourceName }}</span>
-                <span class="flex-1"></span>
-                <app-pill
-                  [tone]="
-                    o.status === 'done' ? 'green' : o.status === 'cancelled' ? 'gray' : 'blue'
-                  "
-                  >{{ orderStatuses[o.status] }}</app-pill
-                >
-              </a>
-            } @empty {
-              <p class="text-sm text-gray-500">Inga arbetsorder än.</p>
-            }
-          </section>
+        @if (c.details) {
+          <app-vehicle-details [details]="c.details" />
         }
 
-        <section class="rounded-xl bg-white p-5 shadow-sm">
-          <div class="mb-2 flex items-center">
-            <h2 class="flex-1 text-lg font-semibold">Säljkort</h2>
-            @if (c.active) {
-              <a
-                mat-stroked-button
-                routerLink="/sales/new"
-                [queryParams]="{ customerId: c.customerId, vehicleId: c.id }"
-              >
-                <mat-icon>add</mat-icon> Ny försäljning
-              </a>
-            }
-          </div>
-          <app-sales-card-history [vehicleId]="c.id" empty="Inget sålt till den här bilen än." />
-        </section>
-
         @if (workOrdersOn) {
-          <section class="rounded-xl bg-white p-5 shadow-sm">
+          <details class="rounded-xl bg-white shadow-sm">
+            <summary class="cursor-pointer px-5 py-4 text-lg font-semibold select-none">
+              Arbetsorder
+            </summary>
+            <div class="px-5 pb-5">
+              @for (o of c.workOrders; track o.id) {
+                <a
+                  [routerLink]="['/workorders', o.id]"
+                  class="flex flex-wrap items-center gap-x-4 border-t border-gray-100 py-2 text-sm hover:bg-gray-50"
+                >
+                  <span class="text-xs text-gray-500">{{ o.code }}</span>
+                  <span class="tabular-nums">{{ o.receivedAt | date: 'yyyy-MM-dd' }}</span>
+                  <span class="text-gray-500">{{ o.resourceName }}</span>
+                  <span class="flex-1"></span>
+                  <app-pill
+                    [tone]="
+                      o.status === 'done' ? 'green' : o.status === 'cancelled' ? 'gray' : 'blue'
+                    "
+                    >{{ orderStatuses[o.status] }}</app-pill
+                  >
+                </a>
+              } @empty {
+                <p class="text-sm text-gray-500">Inga arbetsorder än.</p>
+              }
+            </div>
+          </details>
+        }
+
+        <details class="rounded-xl bg-white shadow-sm">
+          <summary class="cursor-pointer px-5 py-4 text-lg font-semibold select-none">
+            Säljkort
+          </summary>
+          <div class="px-5 pb-5">
             <div class="mb-2 flex items-center">
-              <h2 class="flex-1 text-lg font-semibold">Offerter</h2>
+              <span class="flex-1"></span>
               @if (c.active) {
                 <a
                   mat-stroked-button
-                  routerLink="/quotes/new"
+                  routerLink="/sales/new"
                   [queryParams]="{ customerId: c.customerId, vehicleId: c.id }"
                 >
-                  <mat-icon>add</mat-icon> Ny offert
+                  <mat-icon>add</mat-icon> Ny försäljning
                 </a>
               }
             </div>
-            <app-quote-history [vehicleId]="c.id" empty="Inga offerter för den här bilen än." />
-          </section>
+            <app-sales-card-history [vehicleId]="c.id" empty="Inget sålt till den här bilen än." />
+          </div>
+        </details>
+
+        @if (workOrdersOn) {
+          <details class="rounded-xl bg-white shadow-sm">
+            <summary class="cursor-pointer px-5 py-4 text-lg font-semibold select-none">
+              Offerter
+            </summary>
+            <div class="px-5 pb-5">
+              <div class="mb-2 flex items-center">
+                <span class="flex-1"></span>
+                @if (c.active) {
+                  <a
+                    mat-stroked-button
+                    routerLink="/quotes/new"
+                    [queryParams]="{ customerId: c.customerId, vehicleId: c.id }"
+                  >
+                    <mat-icon>add</mat-icon> Ny offert
+                  </a>
+                }
+              </div>
+              <app-quote-history [vehicleId]="c.id" empty="Inga offerter för den här bilen än." />
+            </div>
+          </details>
         }
 
-        <section class="rounded-xl bg-white p-5 shadow-sm">
-          <h2 class="mb-2 text-lg font-semibold">Bokningar</h2>
-          @for (b of c.bookings; track b.id) {
-            <div class="flex flex-wrap items-center gap-x-4 border-t border-gray-100 py-2 text-sm">
-              <span class="text-xs text-gray-500">{{ b.code }}</span>
-              <span class="tabular-nums">{{ b.start | date: 'yyyy-MM-dd HH:mm' }}</span>
-              <span class="font-medium">{{ b.title }}</span>
-              <span class="text-gray-500">{{ b.resourceName }}</span>
-              <span class="flex-1"></span>
-              <app-pill
-                [tone]="b.status === 'done' ? 'green' : b.status === 'booked' ? 'blue' : 'gray'"
-                >{{ statuses[b.status] }}</app-pill
+        <details class="rounded-xl bg-white shadow-sm">
+          <summary class="cursor-pointer px-5 py-4 text-lg font-semibold select-none">
+            Bokningar
+          </summary>
+          <div class="px-5 pb-5">
+            @for (b of c.bookings; track b.id) {
+              <div
+                class="flex flex-wrap items-center gap-x-4 border-t border-gray-100 py-2 text-sm"
               >
-            </div>
-          } @empty {
-            <p class="text-sm text-gray-500">Inga bokningar än.</p>
-          }
-        </section>
+                <span class="text-xs text-gray-500">{{ b.code }}</span>
+                <span class="tabular-nums">{{ b.start | date: 'yyyy-MM-dd HH:mm' }}</span>
+                <span class="font-medium">{{ b.title }}</span>
+                <span class="text-gray-500">{{ b.resourceName }}</span>
+                <span class="flex-1"></span>
+                <app-pill
+                  [tone]="b.status === 'done' ? 'green' : b.status === 'booked' ? 'blue' : 'gray'"
+                  >{{ statuses[b.status] }}</app-pill
+                >
+              </div>
+            } @empty {
+              <p class="text-sm text-gray-500">Inga bokningar än.</p>
+            }
+          </div>
+        </details>
       }
     </app-card-page>
   `,
@@ -220,6 +272,15 @@ export class VehicleCard implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly id = this.route.snapshot.paramMap.get('id');
+
+  /** Rubriken: regnr, märke, modell och färg, så bilen syns överallt i kortet. */
+  headline(): string {
+    const f = this.form.controls;
+    const reg = (f.regNo.value || this.card()?.regNo || '').toUpperCase();
+    return [reg, f.make.value, f.model.value, this.card()?.color]
+      .filter((p): p is string => !!p)
+      .join(' · ');
+  }
 
   readonly statuses = BOOKING_STATUS_LABELS;
   readonly orderStatuses = WORK_ORDER_STATUS_LABELS;

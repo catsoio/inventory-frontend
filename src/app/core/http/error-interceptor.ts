@@ -19,6 +19,8 @@ const MESSAGES: Record<string, string> = {
   OWNER_CANNOT_LEAVE: 'Ägaren kan inte tas bort.',
   INVALID_CURRENT_PASSWORD: 'Nuvarande lösenord stämmer inte.',
   INVALID_MEMBER_ACTION: 'Det går inte att göra så med den användaren.',
+  CARINFO_LOGIN_FAILED:
+    'car.info godtog inte e-postadressen och lösenordet. Kontrollera dem och försök igen.',
   INVALID_DEPOSIT: 'Ogiltig inlämning. Kontrollera uppgifterna.',
   INVALID_DEPOSIT_STATE: 'Åtgärden passar inte inlämningens status.',
   INVALID_PERIOD: 'Perioden är ogiltig. Slutdatum måste ligga efter startdatum.',

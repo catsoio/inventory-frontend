@@ -4,10 +4,22 @@ import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
 import { VehicleCard } from './vehicle-card/vehicle-card';
 import { VehicleList } from './vehicle-list/vehicle-list';
+import {
+  VehicleDetailsView,
+  VehicleOverview,
+  VehicleStatus,
+} from './vehicle-details/vehicle-details';
 import { VehicleTech } from './vehicle-tech/vehicle-tech';
 
 @NgModule({
-  declarations: [VehicleList, VehicleCard, VehicleTech],
+  declarations: [
+    VehicleList,
+    VehicleCard,
+    VehicleTech,
+    VehicleDetailsView,
+    VehicleOverview,
+    VehicleStatus,
+  ],
   imports: [
     SharedModule,
     RouterModule.forChild([
