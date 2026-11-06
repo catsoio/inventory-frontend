@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Auth } from '../../core/auth/auth';
+import { Nav } from '../../core/layout/nav';
 import type { SectionTab } from '../section-tabs/section-tabs';
 
 /**
@@ -16,12 +17,23 @@ import type { SectionTab } from '../section-tabs/section-tabs';
 export class FinanceTabs {
   private readonly auth = inject(Auth);
   private readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
-  /** Hela Ekonomi är för ägaren. */
-  readonly tabs: SectionTab[] = [
-    { path: '/finance', label: 'Översikt', exact: true },
-    { path: '/finance/invoices', label: 'Fakturor' },
-    { path: '/finance/receipts', label: 'Kvitton' },
-    { path: '/finance/register', label: 'Kassa' },
-    { path: '/bookkeeping', label: 'Moms och bokföring' },
-  ].filter(() => this.admin);
+  private readonly hall = inject(Nav).product() === 'hall';
+  /**
+   * Hela Ekonomi är för ägaren. Hall har sin egen översikt och ingen kassa; fakturorna och
+   * bokföringen är samma sidor i båda.
+   */
+  readonly tabs: SectionTab[] = (this.hall
+    ? [
+        { path: '/dealership/finance', label: 'Översikt', exact: true },
+        { path: '/finance/invoices', label: 'Fakturor' },
+        { path: '/bookkeeping', label: 'Moms och bokföring' },
+      ]
+    : [
+        { path: '/finance', label: 'Översikt', exact: true },
+        { path: '/finance/invoices', label: 'Fakturor' },
+        { path: '/finance/receipts', label: 'Kvitton' },
+        { path: '/finance/register', label: 'Kassa' },
+        { path: '/bookkeeping', label: 'Moms och bokföring' },
+      ]
+  ).filter(() => this.admin);
 }

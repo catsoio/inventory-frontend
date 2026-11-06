@@ -23,12 +23,7 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
   selector: 'app-site-page',
   standalone: false,
   template: `
-    <app-card-page
-      listLink="/dealership"
-      listLabel="Bilhandel"
-      newTitle="Webbplats"
-      title="Webbplats"
-    >
+    <app-card-page listLink="/dealership" listLabel="Hem" newTitle="Webbplats" title="Webbplats">
       <div actions>
         <button
           mat-flat-button

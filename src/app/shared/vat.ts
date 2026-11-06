@@ -32,7 +32,13 @@ export interface PricedRow {
   vatRate?: number;
   /** Jobbet (prisgruppen) raden hör till. */
   group?: string | null;
+  /** En bil såld med vinstmarginalbeskattning: momsen är 20 % av priset över `purchase` och visas inte. */
+  margin?: { purchase: number };
 }
+
+/** Momsen vid vinstmarginalbeskattning (VMB): 20 % av det priset ligger över inköpspriset. */
+export const marginVat = (price: number, purchase: number) =>
+  Math.round(Math.max(0, price - purchase) * 0.2);
 
 /** Ett jobb med fast pris: kostar exakt `fixedPrice` hur raderna än summerar. */
 export interface PriceGroup {
@@ -135,9 +141,18 @@ export function totalsOf(
   const buckets = new Map<number, number>();
   let before = 0;
   let sum = 0;
+  const margin = { sales: 0, purchase: 0, vat: 0 };
+  let hasMargin = false;
   rows.forEach((r, i) => {
     before += Math.round(r.quantity * r.unitPrice);
     sum += amounts[i];
+    if (r.margin) {
+      hasMargin = true;
+      margin.sales += amounts[i];
+      margin.purchase += r.margin.purchase;
+      margin.vat += marginVat(amounts[i], r.margin.purchase);
+      return;
+    }
     const rate = r.vatRate ?? STANDARD_VAT;
     buckets.set(rate, (buckets.get(rate) ?? 0) + amounts[i]);
   });
@@ -149,7 +164,7 @@ export function totalsOf(
         : { rate, base: amount, vat: vatOn(amount, rate) },
     );
   const vat = byRate.reduce((s, b) => s + b.vat, 0);
-  const net = byRate.reduce((s, b) => s + b.base, 0);
+  const net = byRate.reduce((s, b) => s + b.base, 0) + margin.sales;
   const exact = net + vat;
   const total = mode.roundToKrona ? Math.round(exact / 100) * 100 : exact;
   return {
@@ -160,6 +175,7 @@ export function totalsOf(
     rounding: total - exact,
     total,
     byRate,
+    ...(hasMargin ? { margin } : {}),
     pricesIncludeVat: incl,
   };
 }

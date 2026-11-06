@@ -3,6 +3,8 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
+import { Nav } from '../../core/layout/nav';
+import { ProductScope, inScope } from '../../core/layout/products';
 import { paymentLabel } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
@@ -123,6 +125,7 @@ type StatusFilter = 'all' | 'unpaid' | 'overdue' | 'paid';
             <mat-button-toggle value="overdue">Förfallna</mat-button-toggle>
             <mat-button-toggle value="paid">Betalda</mat-button-toggle>
           </mat-button-toggle-group>
+          <app-product-filter [(value)]="scope" />
           <span class="text-sm text-gray-600">{{ summary() }}</span>
         </div>
         <a actions mat-stroked-button routerLink="/finance/invoices/new" class="max-md:!hidden">
@@ -208,16 +211,24 @@ export class InvoiceList {
       .filter(Boolean)
       .join(' · ');
 
-  private readonly items = signal<InvoiceItem[]>([]);
+  private readonly all = signal<InvoiceItem[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');
+  /**
+   * Fakturorna gäller bolaget, inte en produkt: sidan visar den produkt man kom från, och "Alla"
+   * visar hela fordran. Ägaren med både verkstad och bilhandel ser alltså aldrig bara halva.
+   */
+  readonly scope = signal<ProductScope>(inject(Nav).product());
+  private readonly items = computed(() =>
+    this.all().filter((o) => inScope(this.scope(), o.product)),
+  );
   readonly status = signal<StatusFilter>(
     ((q) => (q === 'unpaid' || q === 'overdue' || q === 'paid' ? q : 'all'))(
       inject(ActivatedRoute).snapshot.queryParamMap.get('status'),
     ),
   );
 
-  /** Siffrorna gäller alla fakturor, inte bara de som filtret visar. */
+  /** Siffrorna gäller alla fakturor i vald produkt, inte bara de som statusfiltret visar. */
   readonly figures = computed(() => invoiceFigures(this.items()));
   readonly overdueHint = computed(() => {
     if (this.loading()) return '';
@@ -253,7 +264,7 @@ export class InvoiceList {
   constructor() {
     loadInvoices(this.api, this.cardsApi).subscribe({
       next: (l) => {
-        this.items.set(onlyInvoices(l));
+        this.all.set(onlyInvoices(l));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

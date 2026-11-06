@@ -36,6 +36,8 @@ export class SalesCardApi {
       workOrderId?: string;
       /** true = betalda, false = bokförda men obetalda. */
       paid?: boolean;
+      /** hall = bilaffärer (kort med en bil), axle = verkstadens övriga kort. */
+      product?: 'axle' | 'hall';
       limit?: number;
       offset?: number;
     } = {},

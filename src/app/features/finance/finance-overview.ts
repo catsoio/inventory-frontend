@@ -24,7 +24,7 @@ const sameMonth = (iso: string | null | undefined, d: Date) => {
 };
 
 /**
- * Ekonomins startsida: vad som väntar på ägaren (obetalt, ofakturerat, moms), hur de senaste
+ * Axles ekonomi, startsidan: vad som väntar på ägaren (obetalt, ofakturerat, moms), hur de senaste
  * dagarna gick mot dagarna innan och tre diagram över året. Månadsdiagrammen byggs av en enda
  * dagsrapport från servern, inte av tusentals dokument.
  */
@@ -335,7 +335,8 @@ export class FinanceOverview {
     loadInvoices(this.orders, this.cards)
       .pipe(catchError(() => of([] as InvoiceItem[])))
       .subscribe((l) => {
-        this.invoices.set(onlyInvoices(l));
+        // Axles översikt räknar verkstadens fakturor; bilaffärerna ligger i Halls ekonomi.
+        this.invoices.set(onlyInvoices(l).filter((o) => o.product === 'axle'));
         this.loaded.set(true);
       });
     const start = new Date(this.now.getFullYear(), this.now.getMonth(), 1);

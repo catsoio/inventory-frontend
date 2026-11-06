@@ -1,15 +1,23 @@
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { Component, HostListener, effect, inject, untracked, computed } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  OnDestroy,
+  effect,
+  inject,
+  untracked,
+  computed,
+} from '@angular/core';
 import { AxleApi } from '../../api/axle-api';
 import { Auth } from '../../auth/auth';
 import { GARAGE_ROLE_LABELS } from '../../models';
-import { PageTitle } from '../../page-title';
 import { Pricing } from '../../pricing';
 import { Billing } from '../../billing/billing';
-import { QUICK_GROUPS, type QuickAction } from '../../search/quick-actions';
+import { quickGroupsOf, type QuickAction } from '../../search/quick-actions';
 import { GlobalSearch } from '../../search/global-search';
 import { Settings } from '../../settings';
+import { Todo } from '../../todo';
 import { Nav } from '../nav';
 
 /**
@@ -35,36 +43,127 @@ import { Nav } from '../nav';
   template: `
     <app-garage-menu #gm="garageMenu" />
 
-    <header class="flex h-14 shrink-0 items-center bg-brand text-white shadow-sm">
-      <!-- Loggan och garaget, lika brett som sidomenyn under (288 px: ett långt bolagsnamn ska få plats). -->
-      <div
-        class="hidden h-full shrink-0 items-center gap-2 px-3 transition-[width] duration-200 md:flex"
-        [class]="nav.collapsed() ? 'w-[72px] justify-center' : 'w-72'"
+    <!-- Överst (dator): loggan, Catso Garage med flikarna Axle och Hall, och garaget och kontot till höger. -->
+    <nav
+      class="hidden h-14 shrink-0 items-center gap-2 border-b border-white/15 bg-brand px-4 text-white md:flex"
+      aria-label="Produkt"
+    >
+      <a
+        [routerLink]="home()"
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white"
+        aria-label="Hem"
       >
-        <a routerLink="/dashboard" class="shrink-0 rounded-lg bg-white p-1" aria-label="Hem">
-          <img src="catso-logo.png" alt="Catso" class="h-7 w-7 object-contain" />
-        </a>
-        @if (!nav.collapsed()) {
-          @if (auth.isSuperAdmin()) {
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-1 rounded-lg px-2 py-1 text-left hover:bg-white/15"
-              [matMenuTriggerFor]="gm.menu"
-              aria-label="Byt garage"
+        <img src="catso-logo.png" alt="Catso" class="h-6 w-6 object-contain" />
+      </a>
+      <span class="mr-3 ml-1 text-[15px] font-semibold tracking-tight">Catso Garage</span>
+      @if (!auth.isMechanic()) {
+        <div class="flex items-center gap-1 rounded-xl bg-black/20 p-1">
+          @for (p of products(); track p.id) {
+            <a
+              [routerLink]="p.link"
+              class="product-tab flex h-9 items-center relative w-36 justify-center gap-2 rounded-lg px-6 text-sm font-medium transition-colors"
+              [class]="
+                nav.product() === p.id
+                  ? 'bg-white/20 text-white'
+                  : 'text-white/75 hover:bg-white/10 hover:text-white'
+              "
+              [attr.aria-current]="nav.product() === p.id ? 'page' : null"
             >
-              <span class="truncate text-sm font-semibold">{{ auth.companyName() || 'Axle' }}</span>
-              <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px] opacity-80">unfold_more</mat-icon>
-            </button>
-          } @else {
-            <a routerLink="/dashboard" class="min-w-0 flex-1 truncate text-sm font-semibold">{{
-              auth.companyName() || 'Axle'
-            }}</a>
+              <mat-icon class="!h-5 !w-5 !text-[20px] !leading-5">{{ p.icon }}</mat-icon>
+              {{ p.label }}
+              @if (nav.product() !== p.id && waiting()[p.id]; as u) {
+                <!-- Något väntar i den andra produkten: röd = brådskande, gul = väntar på dig. -->
+                <span
+                  class="absolute top-1.5 right-2 h-2.5 w-2.5 rounded-full ring-2 ring-white/40"
+                  [class]="u === 'urgent' ? 'bg-red-400' : 'bg-amber-300'"
+                  [matTooltip]="u === 'urgent' ? 'Något är försenat här' : 'Något väntar här'"
+                  role="img"
+                  [attr.aria-label]="u === 'urgent' ? 'Något är försenat' : 'Något väntar'"
+                ></span>
+              }
+            </a>
           }
-        }
-      </div>
+        </div>
+      }
+      <div class="min-w-0 flex-1"></div>
+      @if (auth.isSuperAdmin()) {
+        <button
+          type="button"
+          class="flex h-9 min-w-0 items-center gap-1 rounded-lg px-3 text-sm font-medium text-white/90 hover:bg-white/10"
+          [matMenuTriggerFor]="gm.menu"
+          aria-label="Byt garage"
+        >
+          <span class="truncate">{{ auth.companyName() || 'Catso Garage' }}</span>
+          <mat-icon class="!h-5 !w-5 shrink-0 !text-[20px]">unfold_more</mat-icon>
+        </button>
+      } @else {
+        <span class="truncate px-3 text-sm font-medium text-white/90">{{
+          auth.companyName() || 'Catso Garage'
+        }}</span>
+      }
+      <span class="mx-1 h-6 w-px bg-white/25" aria-hidden="true"></span>
+      <span
+        class="hdr-btn grid place-items-center text-white/80"
+        [matTooltip]="who() + ' · ' + role()"
+      >
+        <mat-icon>person</mat-icon>
+      </span>
+      <button
+        type="button"
+        class="hdr-btn grid place-items-center"
+        matTooltip="Inställningar"
+        aria-label="Inställningar"
+        (click)="openSettings()"
+      >
+        <mat-icon>settings</mat-icon>
+      </button>
+      <button
+        type="button"
+        class="hdr-btn grid place-items-center"
+        matTooltip="Logga ut"
+        aria-label="Logga ut"
+        (click)="auth.logout()"
+      >
+        <mat-icon>logout</mat-icon>
+      </button>
+    </nav>
 
+    <header class="flex h-14 shrink-0 items-center bg-brand text-white shadow-sm">
       <div class="flex min-w-0 flex-1 items-center gap-2 pr-2 pl-4 md:gap-3 md:px-6">
-        <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">{{ pageName() ?? '' }}</h1>
+        <!-- Mobil: produktbytet sitter i toppen, eftersom produktfältet bara finns på dator. -->
+        @if (!auth.isMechanic() && products().length > 1) {
+          <div
+            class="flex shrink-0 rounded-xl bg-black/15 p-0.5 md:hidden"
+            role="tablist"
+            aria-label="Produkt"
+          >
+            @for (p of products(); track p.id) {
+              <a
+                [routerLink]="p.link"
+                role="tab"
+                class="relative flex h-9 items-center gap-1.5 rounded-[10px] px-3 text-sm font-semibold transition-colors"
+                [class]="
+                  nav.product() === p.id
+                    ? 'bg-white text-brand'
+                    : 'text-white/85 active:bg-white/15'
+                "
+                [attr.aria-selected]="nav.product() === p.id"
+              >
+                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] !leading-[18px]">{{
+                  p.icon
+                }}</mat-icon>
+                {{ p.label }}
+                @if (nav.product() !== p.id && waiting()[p.id]; as u) {
+                  <span
+                    class="absolute top-1 right-1 h-2 w-2 rounded-full"
+                    [class]="u === 'urgent' ? 'bg-red-400' : 'bg-amber-300'"
+                  ></span>
+                }
+              </a>
+            }
+          </div>
+        }
+        <div class="min-w-0 flex-1"></div>
 
         <app-billing-banner />
 
@@ -94,12 +193,16 @@ import { Nav } from '../nav';
           <!-- Dator: ett fält att klicka i; mobil: bara en ikon. -->
           <button
             type="button"
-            class="hidden h-10 w-72 items-center gap-2 rounded-xl bg-white/15 px-3 text-left text-sm text-white/90 transition-colors hover:bg-white/25 lg:flex xl:w-96"
+            class="hidden h-10 w-[26rem] max-w-full order-first items-center gap-2 rounded-xl bg-white/15 px-3 text-left text-sm text-white/90 transition-colors hover:bg-white/25 lg:flex xl:w-96"
             (click)="search.open()"
             aria-label="Sök"
           >
             <mat-icon class="!h-5 !w-5 !text-xl opacity-90">search</mat-icon>
-            <span class="min-w-0 flex-1 truncate">Sök regnr, kund eller plats…</span>
+            <span class="min-w-0 flex-1 truncate">{{
+              nav.product() === 'hall'
+                ? 'Sök regnr, bil eller kund…'
+                : 'Sök regnr, kund eller plats…'
+            }}</span>
             <kbd class="rounded bg-white/20 px-1.5 py-0.5 text-xs">/</kbd>
           </button>
           <button
@@ -111,31 +214,6 @@ import { Nav } from '../nav';
             <mat-icon>search</mat-icon>
           </button>
         }
-
-        <span
-          class="grid h-10 w-10 place-items-center text-white/80 max-md:hidden"
-          [matTooltip]="who() + ' · ' + role()"
-        >
-          <mat-icon>person</mat-icon>
-        </span>
-        <button
-          type="button"
-          class="hdr-btn grid place-items-center max-md:hidden"
-          matTooltip="Inställningar"
-          aria-label="Inställningar"
-          (click)="openSettings()"
-        >
-          <mat-icon>settings</mat-icon>
-        </button>
-        <button
-          type="button"
-          class="hdr-btn grid place-items-center max-md:hidden"
-          matTooltip="Logga ut"
-          aria-label="Logga ut"
-          (click)="auth.logout()"
-        >
-          <mat-icon>logout</mat-icon>
-        </button>
       </div>
     </header>
 
@@ -150,18 +228,32 @@ import { Nav } from '../nav';
     </div>
   `,
 })
-export class Shell {
+export class Shell implements OnDestroy {
   readonly auth = inject(Auth);
   readonly nav = inject(Nav);
   readonly search = inject(GlobalSearch);
   private readonly billing = inject(Billing);
+  private readonly todo = inject(Todo);
+  /** Det mest brådskande som väntar i varje produkt, för pricken på produktfliken. */
+  readonly waiting = this.todo.urgencyOf;
   /** Genvägarna, bara för det garaget har påslaget. */
   readonly quickGroups = computed(() =>
-    QUICK_GROUPS.map((g) => ({
-      ...g,
-      actions: g.actions.filter((a) => this.billing.allows(a.module)),
-    })).filter((g) => g.actions.length),
+    quickGroupsOf(this.nav.product())
+      .map((g) => ({
+        ...g,
+        actions: g.actions.filter((a) => this.billing.allows(a.module)),
+      }))
+      .filter((g) => g.actions.length),
   );
+  /** Produkterna man kan växla mellan; Hall bara när garaget har bilhandel. */
+  readonly products = computed(() =>
+    [
+      { id: 'axle' as const, label: 'Axle', icon: 'build', link: '/dashboard' },
+      { id: 'hall' as const, label: 'Hall', icon: 'directions_car', link: '/dealership' },
+    ].filter((p) => p.id === 'axle' || this.billing.allows('bilhandel')),
+  );
+  /** Startsidan i produkten man är i. */
+  readonly home = computed(() => (this.nav.product() === 'hall' ? '/dealership' : '/dashboard'));
   run(a: QuickAction) {
     if (a.go) void this.router.navigate(a.go);
     else {
@@ -179,11 +271,14 @@ export class Shell {
       m.openSettings(this.dialog, tab),
     );
   }
-  /** Sidans namn i topbaren. */
-  readonly pageName = inject(PageTitle).page;
   private readonly api = inject(AxleApi);
 
   constructor() {
+    // Produkten färgar appen (Hall är blå, Axle är teal). Attributet sitter på <html> eftersom
+    // dialoger och menyer ritas utanför skalet.
+    effect(() => {
+      document.documentElement.dataset['product'] = this.nav.product();
+    });
     // Bolagsnamnet överst följer Fakturauppgifter för det bolag man är i.
     effect(() => {
       const id = this.auth.garage()?.id;
@@ -207,6 +302,10 @@ export class Shell {
       const id = this.auth.garage()?.id;
       if (id && !this.auth.isMechanic()) untracked(() => pricing.load());
     });
+  }
+
+  ngOnDestroy(): void {
+    delete document.documentElement.dataset['product'];
   }
 
   who(): string {

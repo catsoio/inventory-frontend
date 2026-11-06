@@ -150,6 +150,8 @@ export class HomeData {
     const out: Attention[] = this.todo
       .items()
       .filter((t) => !t.desktopOnly || this.desktop())
+      // Halls saker hör till Halls startsida, inte till Axles.
+      .filter((t) => t.product === 'axle')
       .map((t) => ({
         key: t.key,
         icon: t.icon,
@@ -195,12 +197,12 @@ export class HomeData {
       .subscribe((x) => this.resources.set(x));
     this.loadBookings();
     this.cards
-      .list({ status: 'draft', limit: 1 })
+      .list({ status: 'draft', product: 'axle', limit: 1 })
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.drafts.set(x?.pagination.total ?? 0));
     if (this.admin) {
       this.cards
-        .list({ status: 'posted', paid: false, limit: 100 })
+        .list({ status: 'posted', paid: false, product: 'axle', limit: 100 })
         .pipe(catchError(() => of(null)))
         .subscribe((x) =>
           this.unpaid.set(

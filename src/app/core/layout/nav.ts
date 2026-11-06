@@ -4,6 +4,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { debounceTime, filter, merge } from 'rxjs';
 import { Auth } from '../auth/auth';
 import { Billing } from '../billing/billing';
+import { productOf, toInternal, type Product } from './products';
 import { Todo, todoBadges } from '../todo';
 import { environment } from '../../../environments/environment';
 
@@ -40,12 +41,36 @@ export interface NavSection {
 }
 
 /**
+ * Axles ekonomi. Hall har en egen översikt (`/dealership/finance`). Fakturor och de andra
+ * ekonomisidorna är undermenyn här. Mobilen har ingen sidomeny och visar dem som flikar
+ * (`FinanceTabs`).
+ */
+const FINANCE_NAV: NavItem = {
+  path: '/finance',
+  label: 'Ekonomi',
+  icon: 'account_balance_wallet',
+  module: 'bokforing',
+  adminOnly: true,
+  match: ['/finance', '/bookkeeping'],
+  children: [
+    { path: '/finance', label: 'Översikt', icon: 'monitoring', exact: true, badge: 'none' },
+    { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
+    { path: '/finance/receipts', label: 'Kvitton', icon: 'receipt' },
+    { path: '/finance/register', label: 'Kassa', icon: 'point_of_sale' },
+    { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
+  ],
+};
+
+/**
  * Sidomenyn på dator. Ordningen är hur ofta det används, inte hur data är modellerad: det man gör
  * flera gånger om dagen ligger överst, ett val per avsnitt (resten är flikar i avsnittet) och
  * sådant som ställs in en gång (registren) ligger längst ned under Register.
  */
-export const NAV: NavSection[] = [
-  { title: '', items: [{ path: '/dashboard', label: 'Hem', icon: 'home', exact: true }] },
+export const NAV_AXLE: NavSection[] = [
+  {
+    title: '',
+    items: [{ path: '/dashboard', label: 'Hem', icon: 'home', exact: true }],
+  },
   {
     title: 'Arbete',
     items: [
@@ -83,20 +108,6 @@ export const NAV: NavSection[] = [
     ],
   },
   {
-    // Bilar verkstaden säljer, med en egen webbplats på verkstadens domän.
-    title: 'Bilhandel',
-    items: [
-      {
-        path: '/dealership',
-        label: 'Bilar till salu',
-        icon: 'directions_car',
-        module: 'bilhandel',
-        only: 'desktop',
-        match: ['/dealership'],
-      },
-    ],
-  },
-  {
     // Det verkstaden ställer in: vem som jobbar, vilka platser som finns och vad man utför.
     title: 'Verkstad',
     items: [
@@ -113,7 +124,7 @@ export const NAV: NavSection[] = [
     title: 'Kunder',
     items: [
       { path: '/customers', label: 'Kunder', icon: 'groups' },
-      { path: '/vehicles', label: 'Bilar', icon: 'directions_car' },
+      { path: '/vehicles', label: 'Kundbilar', icon: 'directions_car' },
     ],
   },
   {
@@ -133,25 +144,72 @@ export const NAV: NavSection[] = [
         label: 'Försäljning',
         icon: 'point_of_sale',
       },
-      // Fakturor och de andra ekonomisidorna är undermenyn här. Mobilen har ingen sidomeny och
-      // visar dem som flikar (`FinanceTabs`).
+      FINANCE_NAV,
+    ],
+  },
+];
+
+/**
+ * Halls ekonomi: egen översikt (vinst per bil, lager, moms på bilarna), medan Fakturor och Moms och
+ * bokföring är samma sidor som i Axle, med Hall förvalt (`app-product-filter`). Fakturanummer, moms
+ * och bokföring gäller bolaget, inte en produkt.
+ */
+const HALL_FINANCE_NAV: NavItem = {
+  path: '/dealership/finance',
+  label: 'Ekonomi',
+  icon: 'account_balance_wallet',
+  module: 'bilhandel',
+  adminOnly: true,
+  match: ['/dealership/finance', '/finance', '/bookkeeping'],
+  children: [
+    {
+      path: '/dealership/finance',
+      label: 'Översikt',
+      icon: 'monitoring',
+      exact: true,
+      badge: 'none',
+    },
+    { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
+    { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
+  ],
+};
+
+/**
+ * Hall (bilhandeln). Handlarens ord är bilen och affären: vad som står i lager, vad som är till salu
+ * och vad som sålts. Kunder delas med Axle.
+ */
+export const NAV_HALL: NavSection[] = [
+  {
+    title: '',
+    items: [{ path: '/dealership', label: 'Hem', icon: 'home', exact: true, module: 'bilhandel' }],
+  },
+  {
+    title: 'Bilhandel',
+    items: [
+      // Till salu, Inköpta och Sålda är flikar här, och bilens kort hör också hit.
       {
-        path: '/finance',
-        label: 'Ekonomi',
-        icon: 'account_balance_wallet',
-        module: 'bokforing',
+        path: '/dealership/cars',
+        label: 'Bilar',
+        icon: 'directions_car',
+        module: 'bilhandel',
+      },
+      {
+        path: '/dealership/deals',
+        label: 'Affärer',
+        icon: 'handshake',
+        module: 'bilhandel',
+      },
+      {
+        path: '/dealership/site',
+        label: 'Webbplats',
+        icon: 'language',
+        module: 'bilhandel',
         adminOnly: true,
-        match: ['/finance', '/bookkeeping'],
-        children: [
-          { path: '/finance', label: 'Översikt', icon: 'monitoring', exact: true, badge: 'none' },
-          { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
-          { path: '/finance/receipts', label: 'Kvitton', icon: 'receipt' },
-          { path: '/finance/register', label: 'Kassa', icon: 'point_of_sale' },
-          { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
-        ],
       },
     ],
   },
+  { title: 'Kunder', items: [{ path: '/customers', label: 'Kunder', icon: 'groups' }] },
+  { title: 'Ekonomi', items: [HALL_FINANCE_NAV] },
 ];
 
 /** Längst ned i sidomenyn: sådant som ställs in en gång. Bara ägaren, bara på dator. */
@@ -180,6 +238,29 @@ export const MOBILE_TABS: NavItem[] = [
   { path: '/inventory', label: 'Lager', icon: 'inventory_2', match: ['/inventory', '/reports'] },
 ];
 
+/**
+ * Mobilens flikar i Hall: bilhandlaren går mellan bilarna på tomten. Hem visar frågor och det som
+ * väntar, Bilar är listan att öppna och fota i, Kunder att ringa.
+ */
+export const MOBILE_TABS_HALL: NavItem[] = [
+  { path: '/dealership', label: 'Hem', icon: 'home', exact: true, module: 'bilhandel' },
+  { path: '/dealership/cars', label: 'Bilar', icon: 'directions_car', module: 'bilhandel' },
+  { path: '/customers', label: 'Kunder', icon: 'groups' },
+];
+
+/** "Mer" i Hall. */
+export const MOBILE_MORE_HALL: NavItem[] = [
+  { path: '/dealership/deals', label: 'Affärer', icon: 'handshake', module: 'bilhandel' },
+  {
+    path: '/dealership/finance',
+    label: 'Ekonomi',
+    icon: 'account_balance_wallet',
+    module: 'bilhandel',
+    adminOnly: true,
+    match: ['/dealership/finance', '/finance', '/bookkeeping'],
+  },
+];
+
 /** "Mer" på mobil: det som behövs ibland men inte i farten. */
 export const MOBILE_MORE: NavItem[] = [
   // Verkstad som kör ute hos kunden skapar order och offerter i bilen (beslut 2026-10-31).
@@ -203,7 +284,7 @@ export const MOBILE_MORE: NavItem[] = [
     icon: 'point_of_sale',
   },
   { path: '/customers', label: 'Kunder', icon: 'groups' },
-  { path: '/vehicles', label: 'Bilar', icon: 'directions_car' },
+  { path: '/vehicles', label: 'Kundbilar', icon: 'directions_car' },
   { path: '/purchases', label: 'Inköp', icon: 'shopping_cart_checkout' },
   {
     path: '/finance',
@@ -222,8 +303,15 @@ export class Nav {
   private readonly billing = inject(Billing);
   private readonly router = inject(Router);
 
-  /** Nuvarande adress (utan query). */
-  readonly url = signal(this.router.url.split(/[?#]/)[0]);
+  /** Nuvarande adress (utan query), som rutterna heter internt (`/workorders`, inte `/axle/workorders`). */
+  readonly url = signal(toInternal(this.router.url).split(/[?#]/)[0]);
+
+  /**
+   * Produkten man är i: Axle eller Hall. Styr produktfältet och sidomenyn. Sidor som hör till båda
+   * (Kunder, Ekonomi) låter produkten vara som den var, så man stannar där man jobbade. Valet sparas
+   * per webbläsare.
+   */
+  readonly product = signal<Product>(this.initialProduct());
 
   /** Hopfälld sidomeny (bara ikoner); valet sparas per webbläsare. */
   readonly collapsed = signal(this.stored('garagestock.sidebar') === 'collapsed');
@@ -238,7 +326,7 @@ export class Nav {
    * Siffrorna i menyn: det som väntar på någon, ett antal med ett ord ("1 utkast"), röd när något är
    * sent eller slut och gul när det väntar på dig. Samma lista som Hem visar (`core/todo.ts`).
    */
-  readonly badges = computed(() => todoBadges(this.todo.items()));
+  readonly badges = computed(() => todoBadges(this.todo.itemsFor(this.product())));
 
   private get admin(): boolean {
     return this.auth.isAdmin() || this.auth.isSuperAdmin();
@@ -258,35 +346,49 @@ export class Nav {
     if (this.auth.isMechanic()) return MECHANIC_NAV;
     const shown = (i: NavItem): NavItem =>
       i.children ? { ...i, children: i.children.filter((c) => this.visible(c, false)) } : i;
-    return NAV.map((s) => ({
-      ...s,
-      items: s.items
-        .filter((i) => this.visible(i, false))
-        .map(shown)
-        .filter((i) => !i.children || i.children.length),
-    })).filter((s) => s.items.length);
+    return (this.product() === 'hall' ? NAV_HALL : NAV_AXLE)
+      .map((s) => ({
+        ...s,
+        items: s.items
+          .filter((i) => this.visible(i, false))
+          .map(shown)
+          .filter((i) => !i.children || i.children.length),
+      }))
+      .filter((s) => s.items.length);
   });
 
   readonly footer = computed<NavItem[]>(() =>
-    this.auth.isMechanic() ? [] : FOOTER_NAV.filter((i) => this.visible(i, false)),
+    // Registret (artikeltyper, lager, aktivitetslogg) hör till Axle.
+    this.auth.isMechanic() || this.product() !== 'axle'
+      ? []
+      : FOOTER_NAV.filter((i) => this.visible(i, false)),
   );
 
   /** Mobilens flikar och "Mer". Mekanikern har bara sina order. */
   readonly tabs = computed<NavItem[]>(() =>
     this.auth.isMechanic()
       ? [{ path: '/workorders/mine', label: 'Order', icon: 'handyman' }]
-      : MOBILE_TABS.filter((i) => this.billing.allows(i.module)),
+      : (this.product() === 'hall' ? MOBILE_TABS_HALL : MOBILE_TABS).filter((i) =>
+          this.billing.allows(i.module),
+        ),
   );
   readonly more = computed<NavItem[]>(() =>
-    this.auth.isMechanic() ? [] : MOBILE_MORE.filter((i) => this.visible(i, true)),
+    this.auth.isMechanic()
+      ? []
+      : (this.product() === 'hall' ? MOBILE_MORE_HALL : MOBILE_MORE).filter((i) =>
+          this.visible(i, true),
+        ),
   );
 
   constructor() {
     const done$ = this.router.events.pipe(filter((e) => e instanceof NavigationEnd));
     done$.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((e) => {
-      this.url.set(e.urlAfterRedirects.split(/[?#]/)[0]);
+      const url = toInternal(e.urlAfterRedirects).split(/[?#]/)[0];
+      this.url.set(url);
+      const product = productOf(url);
+      if (product && product !== this.product()) this.setProduct(product);
       // Kommer man in i en grupp (t.ex. via en länk på Hem) fälls den ut, även om man stängt den förut.
-      for (const s of NAV) {
+      for (const s of [...NAV_AXLE, ...NAV_HALL]) {
         for (const i of s.items) {
           if (i.children && this.matches(i) && this.groups()[i.path] === false) {
             this.setGroup(i.path, true);
@@ -303,6 +405,28 @@ export class Nav {
     merge(toObservable(computed(() => this.auth.garage()?.id)), done$)
       .pipe(debounceTime(400), takeUntilDestroyed(inject(DestroyRef)))
       .subscribe(() => this.refresh());
+  }
+
+  private initialProduct(): Product {
+    const fromUrl = productOf(toInternal(this.router.url));
+    if (fromUrl) {
+      try {
+        localStorage.setItem('garagestock.product', fromUrl);
+      } catch {
+        /* sparas bara som bekvämlighet */
+      }
+      return fromUrl;
+    }
+    return this.stored('garagestock.product') === 'hall' ? 'hall' : 'axle';
+  }
+
+  private setProduct(p: Product) {
+    this.product.set(p);
+    try {
+      localStorage.setItem('garagestock.product', p);
+    } catch {
+      /* sparas bara som bekvämlighet */
+    }
   }
 
   toggle() {
@@ -358,6 +482,6 @@ export class Nav {
   }
 
   private refresh() {
-    this.todo.refresh();
+    this.todo.refresh(this.billing.allows('bilhandel'));
   }
 }

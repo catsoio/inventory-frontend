@@ -1,3 +1,4 @@
+import { toInternal } from '../layout/products';
 import { inject } from '@angular/core';
 import { CanActivateChildFn, CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
@@ -37,6 +38,6 @@ export const moduleGuard =
 /** Mekanikern kommer bara åt arbetsorder; allt annat leder till hens egen lista. */
 export const mechanicGuard: CanActivateChildFn = (_route, state) => {
   const auth = inject(Auth);
-  if (!auth.isMechanic() || state.url.startsWith('/workorders')) return true;
+  if (!auth.isMechanic() || toInternal(state.url).startsWith('/workorders')) return true;
   return inject(Router).createUrlTree(['/workorders/mine']);
 };

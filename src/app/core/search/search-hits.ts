@@ -1,6 +1,8 @@
 import {
   Article,
+  CarListing,
   Customer,
+  LISTING_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   STORAGE_CONTENTS_LABELS,
   Quote,
@@ -15,7 +17,20 @@ import {
 import { KrPipe } from '../../shared/kr-pipe';
 
 export type HitKind =
-  'storage' | 'vehicle' | 'customer' | 'order' | 'quote' | 'sale' | 'article' | 'supplier';
+  'storage' | 'vehicle' | 'customer' | 'order' | 'quote' | 'sale' | 'article' | 'supplier' | 'car';
+
+/** Vad man söker bland i varje produkt. Kunder är gemensamma; resten hör till sin produkt. */
+export const KINDS_AXLE: HitKind[] = [
+  'storage',
+  'vehicle',
+  'customer',
+  'order',
+  'quote',
+  'sale',
+  'article',
+  'supplier',
+];
+export const KINDS_HALL: HitKind[] = ['car', 'customer', 'sale'];
 
 /** En träff i sökningen: en rad med rubrik, förklaring och vart den leder. */
 export interface Hit {
@@ -36,13 +51,14 @@ export interface Hit {
 
 export const KIND_LABELS: Record<HitKind, string> = {
   storage: 'Däckhotell',
-  vehicle: 'Bilar',
+  vehicle: 'Kundbilar',
   customer: 'Kunder',
   order: 'Arbetsorder',
   quote: 'Offerter',
   sale: 'Säljkort',
   article: 'Artiklar',
   supplier: 'Leverantörer',
+  car: 'Bilar',
 };
 
 export const KIND_ICONS: Record<HitKind, string> = {
@@ -54,6 +70,7 @@ export const KIND_ICONS: Record<HitKind, string> = {
   sale: 'receipt_long',
   article: 'inventory_2',
   supplier: 'local_shipping',
+  car: 'directions_car',
 };
 
 const kr = new KrPipe();
@@ -155,6 +172,17 @@ export const articleHit = (a: Article): Hit => ({
   link: ['/inventory', a.id],
 });
 
+export const carHit = (c: CarListing): Hit => ({
+  kind: 'car',
+  id: c.id,
+  title: c.regNo,
+  plate: c.regNo,
+  sub: join(c.heading, c.year, LISTING_STATUS_LABELS[c.status]),
+  side: c.status === 'sold' ? 'Såld' : c.price == null ? 'På förfrågan' : kr.transform(c.price),
+  tone: c.status === 'sold' ? 'gray' : c.status === 'reserved' ? 'amber' : 'green',
+  link: ['/dealership/cars', c.id],
+});
+
 export const supplierHit = (s: Supplier): Hit => ({
   kind: 'supplier',
   id: s.id,
@@ -182,6 +210,13 @@ export function groupOrder(q: string): HitKind[] {
   if (/^[\d\s+()-]{5,}$/.test(t))
     return ['customer', 'vehicle', 'storage', 'order', 'quote', 'sale', 'article', 'supplier'];
   return ['customer', 'vehicle', 'storage', 'order', 'quote', 'sale', 'article', 'supplier'];
+}
+
+/** Ordningen i Hall: bilen först, sedan kunden och affären. */
+export function groupOrderHall(q: string): HitKind[] {
+  return /^(sk|fak)-?\d/i.test(q.trim()) || /^[\d\s+()-]{5,}$/.test(q.trim())
+    ? ['sale', 'customer', 'car']
+    : ['car', 'customer', 'sale'];
 }
 
 /** "ABC 123" och "abc123" är samma regnr: skicka utan blanksteg när det ser ut som ett. */

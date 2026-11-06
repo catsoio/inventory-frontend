@@ -1,7 +1,16 @@
 import { ReturnDialog } from './return-dialog';
-import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  OnInit,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl } from '@angular/forms';
+import { FormControl, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -15,14 +24,22 @@ import {
   switchMap,
 } from 'rxjs';
 import { AxleApi } from '../../core/api/axle-api';
+import { CarApi } from '../../core/api/car-api';
+import { Nav } from '../../core/layout/nav';
+import { carEconomy } from '../../shared/car-economy';
+import { environment } from '../../../environments/environment';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { SalesSendDialog } from './sales-send-dialog';
 import { Auth } from '../../core/auth/auth';
 import { StorageApi } from '../../core/api/storage-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import {
+  CarListing,
   Article,
+  CUSTOMER_TYPE_LABELS,
   Customer,
+  CustomerInput,
+  CustomerType,
   DocumentChoice,
   InvoiceKind,
   paidWith,
@@ -72,6 +89,9 @@ interface Row {
   description: string;
   articleId?: string;
   depositId?: string;
+  carId?: string;
+  /** Vad bilen kostade (öre); satt = vinstmarginalbeskattning. */
+  vmbPurchase?: number | null;
   quantity: number;
   /** Kronor per styck, i kortets prisläge. */
   price: number;
@@ -100,9 +120,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
   template: `
     <app-card-page
       [wide]="true"
-      listLink="/sales"
-      listLabel="Försäljning"
-      newTitle="Ny försäljning"
+      [listLink]="hall() ? '/dealership/deals' : '/sales'"
+      [listLabel]="hall() ? 'Affärer' : 'Försäljning'"
+      [newTitle]="hall() ? 'Ny affär' : 'Ny försäljning'"
       [title]="title()"
       [code]="card()?.code ?? null"
     >
@@ -179,7 +199,8 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
           ändras i efterhand). Betalningen går att ändra.
           @if (card()!.sends?.length; as n) {
             <br />
-            <b>Skickat till kunden</b> {{ lastSent(card()!) }}{{ n > 1 ? ' (' + n + ' gånger)' : '' }}.
+            <b>Skickat till kunden</b> {{ lastSent(card()!)
+            }}{{ n > 1 ? ' (' + n + ' gånger)' : '' }}.
             @if (card()!.viewedAt) {
               Kunden har öppnat länken.
             }
@@ -187,268 +208,610 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         </p>
       }
 
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-2 text-base font-semibold">Kund och bil</h2>
-        @if (readOnly()) {
-          <div class="text-sm">
-            @if (card()?.links?.customer; as cu) {
-              <a class="text-brand" [routerLink]="['/customers', cu.id]">{{ cu.name }}</a>
-              <span class="text-gray-500"> · {{ cu.code }}</span>
-            } @else {
-              Kontantkund
+      @if (hall()) {
+        <!-- Bilaffär: köparen, bilen och det som följer med. Inget av verkstadens (artiklar, åtgärder, däckhotell). -->
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 class="text-base font-semibold">Köpare</h2>
+            @if (customer(); as cu) {
+              <span class="text-sm text-gray-500">{{ cu.code }}</span>
+              <a class="text-brand text-sm hover:underline" [routerLink]="['/customers', cu.id]"
+                >Öppna kundkortet</a
+              >
             }
-            @if (card()?.links?.vehicle; as v) {
-              · <a class="text-brand" [routerLink]="['/vehicles', v.id]">{{ v.regNo }}</a>
-              {{ v.label }}
+            <span class="flex-1"></span>
+            @if (!readOnly()) {
+              <mat-button-toggle-group
+                hideSingleSelectionIndicator
+                [formControl]="buyer.controls.type"
+                aria-label="Privatperson eller företag"
+              >
+                @for (t of customerTypes; track t[0]) {
+                  <mat-button-toggle [value]="t[0]">{{ t[1] }}</mat-button-toggle>
+                }
+              </mat-button-toggle-group>
             }
           </div>
-        } @else {
-          <app-customer-vehicle-picker
-            [formControl]="linkCtl"
-            [optional]="true"
-            customerLabel="Kund (tomt = kontantförsäljning)"
-          />
-        }
-      </section>
-
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-3 text-base font-semibold">Rader</h2>
-
-        @if (!readOnly()) {
-          <div class="mb-3 flex flex-wrap items-center gap-2">
-            <div class="relative min-w-60 flex-1">
-              <mat-icon class="pointer-events-none absolute top-2.5 left-3 text-gray-400"
-                >search</mat-icon
-              >
-              <input
-                type="search"
-                [formControl]="search"
-                (keydown.enter)="addFirst()"
-                placeholder="Lägg till artikel: storlek, märke, artikelnummer…"
-                class="h-11 w-full pr-3 pl-11 field"
-              />
-              @if (results().length) {
-                <div
-                  class="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-xl bg-white shadow-lg"
-                >
-                  @for (a of results(); track a.id) {
-                    <button
-                      type="button"
-                      class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left last:border-b-0"
-                      (click)="addArticle(a)"
-                    >
-                      <span class="truncate">
-                        <span class="font-medium">{{ a.sizeLabel }}</span> · {{ a.brand }}
-                        {{ a.model }}
-                      </span>
-                      <span class="flex shrink-0 items-center gap-3 text-sm">
-                        <span class="text-gray-600">{{ a.quantity }} st</span>
-                        <span class="font-medium">{{ a.sellPrice | kr }}</span>
-                      </span>
-                    </button>
-                  }
+          @if (readOnly()) {
+            @if (customer(); as cu) {
+              <dl class="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div class="lg:col-span-2">
+                  <dt class="text-xs text-gray-500">
+                    {{ cu.type === 'company' ? 'Företag' : 'Privatperson' }}
+                  </dt>
+                  <dd class="font-medium">{{ cu.name }}</dd>
                 </div>
+                <div>
+                  <dt class="text-xs text-gray-500">
+                    {{ cu.type === 'company' ? 'Organisationsnummer' : 'Personnummer' }}
+                  </dt>
+                  <dd>{{ cu.orgNo || '–' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">Telefon</dt>
+                  <dd>{{ cu.phone || '–' }}</dd>
+                </div>
+                <div class="lg:col-span-2">
+                  <dt class="text-xs text-gray-500">Adress</dt>
+                  <dd>
+                    {{
+                      [cu.address, [cu.postalCode, cu.city].join(' ').trim()]
+                        .filter((x) => x)
+                        .join(', ') || '–'
+                    }}
+                  </dd>
+                </div>
+                @if (cu.type === 'company') {
+                  <div class="lg:col-span-2">
+                    <dt class="text-xs text-gray-500">Kontaktperson</dt>
+                    <dd>{{ cu.contactPerson || '–' }}</dd>
+                  </div>
+                }
+              </dl>
+            }
+          } @else {
+            <!-- Som kundkortet, men i halvstorlek: ändringarna sparas på kunden när affären sparas. -->
+            <div class="grid gap-x-3 sm:grid-cols-2 lg:grid-cols-4">
+              <app-customer-vehicle-picker
+                class="block sm:col-span-2"
+                [formControl]="linkCtl"
+                [optional]="true"
+                [withVehicle]="false"
+                [customerLabel]="isCompany() ? 'Företagsnamn' : 'Namn'"
+              />
+              <mat-form-field>
+                <mat-label>{{ isCompany() ? 'Organisationsnummer' : 'Personnummer' }}</mat-label>
+                <input
+                  matInput
+                  [formControl]="buyer.controls.orgNo"
+                  [placeholder]="isCompany() ? '556123-4567' : 'ÅÅMMDD-XXXX'"
+                  autocomplete="off"
+                />
+                @if (isCompany()) {
+                  <mat-hint>Krävs på faktura</mat-hint>
+                }
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Telefon</mat-label>
+                <input matInput type="tel" [formControl]="buyer.controls.phone" />
+              </mat-form-field>
+              <mat-form-field class="sm:col-span-2">
+                <mat-label>Adress</mat-label>
+                <input matInput [formControl]="buyer.controls.address" autocomplete="off" />
+                <mat-hint>Krävs på faktura</mat-hint>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Postnummer</mat-label>
+                <input matInput [formControl]="buyer.controls.postalCode" autocomplete="off" />
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Ort</mat-label>
+                <input matInput [formControl]="buyer.controls.city" autocomplete="off" />
+              </mat-form-field>
+              @if (isCompany()) {
+                <mat-form-field class="sm:col-span-2">
+                  <mat-label>Kontaktperson</mat-label>
+                  <input matInput [formControl]="buyer.controls.contactPerson" autocomplete="off" />
+                </mat-form-field>
               }
             </div>
-            <button mat-stroked-button type="button" [matMenuTriggerFor]="serviceMenu">
-              <mat-icon>build</mat-icon> Åtgärd
-            </button>
-            @if (!vehicle()) {
-              <!-- Utan vald bil: välj fordon, så får åtgärderna sitt pris (punktering per däck, husvagn per hjul). -->
-              <select
-                class="h-10 px-2 text-sm text-gray-700 field"
-                aria-label="Fordon, för åtgärdernas pris"
-                (change)="manualClass.set($any($event.target).value || null)"
-              >
-                <option value="" [selected]="!manualClass()">Fordon: ej valt</option>
-                @for (c of classOptions; track c.value) {
-                  <option [value]="c.value" [selected]="manualClass() === c.value">
-                    {{ c.label }}
-                  </option>
-                }
-              </select>
-            }
-            <button
-              mat-stroked-button
-              type="button"
-              [matMenuTriggerFor]="hotelMenu"
-              (menuOpened)="loadDeposits()"
-            >
-              <mat-icon>warehouse</mat-icon> Däckhotell
-            </button>
-            <button mat-stroked-button type="button" (click)="addLabour()">
-              <mat-icon>schedule</mat-icon> Arbete
-            </button>
-            <button mat-stroked-button type="button" (click)="addFree()">
-              <mat-icon>add</mat-icon> Fri rad
-            </button>
-          </div>
-          <mat-menu #serviceMenu="matMenu">
-            @for (s of serviceTypes(); track s.id) {
-              <button mat-menu-item type="button" (click)="addService(s)">
-                {{ s.name }}
-                @if (priceHint(s); as hint) {
-                  <span class="ml-2 text-gray-500">{{ hint }}</span>
-                }
-              </button>
-            } @empty {
-              <span class="px-4 py-2 text-sm text-gray-500">Inga åtgärder inlagda</span>
-            }
-          </mat-menu>
-          <mat-menu #hotelMenu="matMenu">
-            @for (d of deposits(); track d.id) {
-              <button mat-menu-item type="button" (click)="addDeposit(d)">
-                {{ d.code }} · {{ d.vehicle.regNo }} · {{ d.fee | kr }}
-              </button>
-            } @empty {
-              <span class="px-4 py-2 text-sm text-gray-500">
-                {{ depositsHint() }}
-              </span>
-            }
-          </mat-menu>
-        }
+            <p class="text-xs text-gray-500">
+              En bil säljs alltid till en namngiven köpare, aldrig som kontantförsäljning. Sök på
+              namn eller telefon för att hämta en kund, eller skriv ett nytt namn.
+            </p>
+          }
+        </section>
 
-        @if (rows().length) {
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[640px] text-left text-sm">
-              <thead
-                class="border-b border-gray-100 text-xs font-medium tracking-wide text-gray-500 uppercase"
-              >
-                <tr>
-                  <th class="py-2">Beskrivning</th>
-                  <th class="w-20 py-2 text-right">Antal</th>
-                  <th class="w-32 py-2 text-right">À-pris</th>
-                  <th class="w-24 py-2 text-right">Rabatt %</th>
-                  <th class="w-28 py-2 text-right">Summa</th>
-                  <th class="w-10 py-2"></th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                @for (g of display(); track g.key) {
-                  @for (it of g.items; track it.r.key) {
-                    @let r = it.r;
-                    @let i = it.i;
-                    <tr class="align-top">
-                      <td class="py-2 pr-2">
-                        @if (readOnly() || r.type === 'storage') {
-                          <div class="py-2">{{ r.description }}</div>
-                        } @else {
-                          <input
-                            class="h-10 w-full px-2 field"
-                            [value]="r.description"
-                            (input)="edit(i, { description: $any($event.target).value })"
-                          />
-                        }
-                        @if (
-                          r.type === 'article' && r.maxQty !== undefined && r.quantity > r.maxQty
-                        ) {
-                          <div class="text-xs text-red-600">Bara {{ r.maxQty }} st i lager.</div>
-                        }
-                      </td>
-                      <td class="py-2 pr-2 text-right">
-                        @if (readOnly() || r.type === 'storage') {
-                          <div class="py-2 tabular-nums">{{ r.quantity }}</div>
-                        } @else {
-                          <input
-                            type="number"
-                            min="0"
-                            [step]="r.type === 'article' ? 1 : 0.25"
-                            class="h-10 w-full px-2 text-right field"
-                            [value]="r.quantity"
-                            (focus)="$any($event.target).select()"
-                            (input)="edit(i, { quantity: $any($event.target).valueAsNumber })"
-                          />
-                        }
-                      </td>
-                      <td class="py-2 pr-2 text-right">
-                        @if (readOnly()) {
-                          <div class="py-2 tabular-nums">{{ r.price * 100 | kr }}</div>
-                        } @else {
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            class="h-10 w-full px-2 text-right field"
-                            [value]="r.price"
-                            (focus)="$any($event.target).select()"
-                            (input)="edit(i, { price: $any($event.target).valueAsNumber })"
-                          />
-                        }
-                      </td>
-                      <td class="py-2 pr-2 text-right">
-                        @if (readOnly()) {
-                          <div class="py-2 tabular-nums">{{ r.discountPercent || '' }}</div>
-                        } @else {
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
-                            class="h-10 w-full px-2 text-right field"
-                            [value]="r.discountPercent || ''"
-                            (focus)="$any($event.target).select()"
-                            (input)="
-                              edit(i, { discountPercent: $any($event.target).valueAsNumber || 0 })
-                            "
-                          />
-                        }
-                      </td>
-                      <td class="py-2 text-right tabular-nums">
-                        <div class="py-2">{{ amounts()[i] | kr }}</div>
-                      </td>
-                      <td class="py-2 text-right">
-                        @if (!readOnly()) {
-                          <button
-                            mat-icon-button
-                            type="button"
-                            (click)="removeRow(i)"
-                            aria-label="Ta bort raden"
-                          >
-                            <mat-icon>close</mat-icon>
-                          </button>
-                        }
-                      </td>
-                    </tr>
-                  }
-                  @if (g.section; as sec) {
-                    <tr class="bg-gray-50">
-                      <td class="py-2 pl-2 font-semibold" colspan="3">Delsumma {{ sec.title }}</td>
-                      <td class="py-2 pr-2 text-right text-xs text-gray-500" colspan="1">
-                        @if (readOnly()) {
-                          {{ sec.fixedPrice != null ? 'Fast pris' : '' }}
-                        } @else {
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="Fast pris"
-                            aria-label="Fast pris för jobbet"
-                            class="h-9 w-full px-2 text-right field"
-                            [value]="sec.fixedPrice != null ? sec.fixedPrice / 100 : ''"
-                            (input)="setFixed(sec.id, $any($event.target).value)"
-                          />
-                        }
-                      </td>
-                      <td class="py-2 text-right font-semibold tabular-nums">
-                        {{ sectionTotals()[sec.id] ?? 0 | kr }}
-                      </td>
-                      <td></td>
-                    </tr>
-                  }
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-base font-semibold">Bilen</h2>
+          @if (carRow(); as cr) {
+            <div class="flex flex-wrap items-center gap-4">
+              @if (dealCar(); as car) {
+                @if (car.imageUrls[0]) {
+                  <img
+                    [src]="media(car.imageUrls[0])"
+                    alt=""
+                    class="h-16 w-24 shrink-0 rounded-lg bg-gray-100 object-cover"
+                  />
+                } @else {
+                  <span
+                    class="grid h-16 w-24 shrink-0 place-items-center rounded-lg bg-gray-100 text-gray-400"
+                  >
+                    <mat-icon>directions_car</mat-icon>
+                  </span>
                 }
-              </tbody>
-            </table>
-          </div>
-        } @else {
-          <p class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-            Inga rader än. Sök en artikel ovan, eller lägg till en åtgärd, ett däckhotell eller en
-            fri rad.
-          </p>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-reg-plate [value]="car.regNo" size="sm" />
+                    <a
+                      class="truncate font-semibold hover:underline"
+                      [routerLink]="['/dealership/cars', car.id]"
+                      >{{ car.heading }}</a
+                    >
+                  </div>
+                  <div class="mt-1 text-sm text-gray-600">
+                    {{ car.year }}
+                    @if (car.mileageKm != null) {
+                      · {{ car.mileageKm / 10 | number: '1.0-0' }} mil
+                    }
+                    ·
+                    {{
+                      car.vatScheme === 'margin' ? 'Vinstmarginalbeskattning (VMB)' : 'Vanlig moms'
+                    }}
+                  </div>
+                </div>
+              } @else {
+                <div class="min-w-0 flex-1 text-sm font-medium">{{ cr.description }}</div>
+              }
+              <div class="w-44">
+                @if (readOnly()) {
+                  <div class="text-right text-lg font-semibold tabular-nums">
+                    {{ amounts()[carIndex()] | kr }}
+                  </div>
+                } @else {
+                  <mat-form-field subscriptSizing="dynamic" class="w-full">
+                    <mat-label>Pris, kr inkl. moms</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="1"
+                      [value]="cr.price"
+                      (focus)="$any($event.target).select()"
+                      (input)="edit(carIndex(), { price: $any($event.target).valueAsNumber })"
+                    />
+                  </mat-form-field>
+                }
+              </div>
+              @if (!readOnly()) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="removeCar()"
+                  aria-label="Välj en annan bil"
+                  matTooltip="Välj en annan bil"
+                >
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </div>
+            @if (dealProfit(); as e) {
+              <dl
+                class="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4 text-sm sm:grid-cols-4"
+              >
+                <div>
+                  <dt class="text-xs text-gray-500">Inköp och kostnader</dt>
+                  <dd class="font-medium tabular-nums">{{ e.totalCost ?? 0 | kr }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">Moms till staten</dt>
+                  <dd class="font-medium tabular-nums">{{ e.vatToPay ?? 0 | kr }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">Vinst på affären</dt>
+                  <dd class="font-semibold tabular-nums">{{ e.profit ?? 0 | kr }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">Marginal</dt>
+                  <dd class="font-medium tabular-nums">{{ e.marginPercent ?? 0 }} %</dd>
+                </div>
+              </dl>
+            }
+            @if (cr.vmbPurchase != null) {
+              <p class="mt-3 text-xs text-gray-500">
+                Säljs med vinstmarginalbeskattning: fakturan visar ingen moms, och momsen betalas på
+                vinsten (20 % av skillnaden mot inköpspriset).
+              </p>
+            }
+          } @else if (!readOnly()) {
+            <p class="mb-3 text-sm text-gray-600">Välj bilen som ska säljas.</p>
+            <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              @for (c of carsForSale(); track c.id) {
+                <button
+                  type="button"
+                  class="hover:bg-brand-soft flex items-center gap-3 rounded-xl border border-gray-200 p-2.5 text-left"
+                  (click)="addCar(c)"
+                >
+                  @if (c.imageUrls[0]) {
+                    <img
+                      [src]="media(c.imageUrls[0])"
+                      alt=""
+                      class="h-12 w-[4.5rem] shrink-0 rounded-md bg-gray-100 object-cover"
+                    />
+                  } @else {
+                    <span
+                      class="grid h-12 w-[4.5rem] shrink-0 place-items-center rounded-md bg-gray-100 text-gray-400"
+                    >
+                      <mat-icon>directions_car</mat-icon>
+                    </span>
+                  }
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-semibold">{{ c.heading }}</span>
+                    <span class="block text-xs text-gray-500"
+                      >{{ c.regNo }}{{ c.status === 'reserved' ? ' · Reserverad' : '' }}</span
+                    >
+                  </span>
+                  <span class="shrink-0 text-sm font-medium tabular-nums">{{
+                    c.price == null ? 'Pris saknas' : (c.price | kr)
+                  }}</span>
+                </button>
+              } @empty {
+                <p class="text-sm text-gray-500 sm:col-span-2 xl:col-span-3">
+                  Inga bilar att sälja. Köp in en bil under Bilar först.
+                </p>
+              }
+            </div>
+          }
+        </section>
+
+        @if (carRow()) {
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <h2 class="mb-1 text-base font-semibold">Tillägg</h2>
+            <p class="mb-3 text-sm text-gray-600">
+              Sådant som följer med affären: garanti, ägarbyte, leverans, tillbehör.
+            </p>
+            @for (x of extras(); track x.r.key) {
+              <div class="mb-2 flex items-center gap-2">
+                @if (readOnly()) {
+                  <span class="min-w-0 flex-1 text-sm">{{ x.r.description }}</span>
+                  <span class="w-28 text-right text-sm tabular-nums">{{
+                    amounts()[x.i] | kr
+                  }}</span>
+                } @else {
+                  <input
+                    class="h-10 min-w-0 flex-1 px-2 field"
+                    placeholder="Beskrivning"
+                    [value]="x.r.description"
+                    (input)="edit(x.i, { description: $any($event.target).value })"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="kr"
+                    aria-label="Pris, kr inkl. moms"
+                    class="h-10 w-28 px-2 text-right field"
+                    [value]="x.r.price"
+                    (focus)="$any($event.target).select()"
+                    (input)="edit(x.i, { price: $any($event.target).valueAsNumber })"
+                  />
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="removeRow(x.i)"
+                    aria-label="Ta bort raden"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+              </div>
+            } @empty {
+              @if (readOnly()) {
+                <p class="text-sm text-gray-500">Inga tillägg.</p>
+              }
+            }
+            @if (!readOnly()) {
+              <div class="mt-3 flex flex-wrap gap-2">
+                @for (s of extraSuggestions; track s) {
+                  <button mat-stroked-button type="button" (click)="addExtra(s)">
+                    <mat-icon>add</mat-icon> {{ s }}
+                  </button>
+                }
+                <button mat-stroked-button type="button" (click)="addExtra('')">
+                  <mat-icon>add</mat-icon> Annan rad
+                </button>
+              </div>
+            }
+          </section>
         }
-      </section>
+      } @else {
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-2 text-base font-semibold">Kund och bil</h2>
+          @if (readOnly()) {
+            <div class="text-sm">
+              @if (card()?.links?.customer; as cu) {
+                <a class="text-brand" [routerLink]="['/customers', cu.id]">{{ cu.name }}</a>
+                <span class="text-gray-500"> · {{ cu.code }}</span>
+              } @else {
+                Kontantkund
+              }
+              @if (card()?.links?.vehicle; as v) {
+                · <a class="text-brand" [routerLink]="['/vehicles', v.id]">{{ v.regNo }}</a>
+                {{ v.label }}
+              }
+            </div>
+          } @else {
+            <app-customer-vehicle-picker
+              [formControl]="linkCtl"
+              [optional]="true"
+              customerLabel="Kund (tomt = kontantförsäljning)"
+            />
+          }
+        </section>
+
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-base font-semibold">Rader</h2>
+
+          @if (!readOnly()) {
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+              <div class="relative min-w-60 flex-1">
+                <mat-icon class="pointer-events-none absolute top-2.5 left-3 text-gray-400"
+                  >search</mat-icon
+                >
+                <input
+                  type="search"
+                  [formControl]="search"
+                  (keydown.enter)="addFirst()"
+                  placeholder="Lägg till artikel: storlek, märke, artikelnummer…"
+                  class="h-11 w-full pr-3 pl-11 field"
+                />
+                @if (results().length) {
+                  <div
+                    class="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-xl bg-white shadow-lg"
+                  >
+                    @for (a of results(); track a.id) {
+                      <button
+                        type="button"
+                        class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left last:border-b-0"
+                        (click)="addArticle(a)"
+                      >
+                        <span class="truncate">
+                          <span class="font-medium">{{ a.sizeLabel }}</span> · {{ a.brand }}
+                          {{ a.model }}
+                        </span>
+                        <span class="flex shrink-0 items-center gap-3 text-sm">
+                          <span class="text-gray-600">{{ a.quantity }} st</span>
+                          <span class="font-medium">{{ a.sellPrice | kr }}</span>
+                        </span>
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+              <button mat-stroked-button type="button" [matMenuTriggerFor]="serviceMenu">
+                <mat-icon>build</mat-icon> Åtgärd
+              </button>
+              @if (!vehicle()) {
+                <!-- Utan vald bil: välj fordon, så får åtgärderna sitt pris (punktering per däck, husvagn per hjul). -->
+                <select
+                  class="h-10 px-2 text-sm text-gray-700 field"
+                  aria-label="Fordon, för åtgärdernas pris"
+                  (change)="manualClass.set($any($event.target).value || null)"
+                >
+                  <option value="" [selected]="!manualClass()">Fordon: ej valt</option>
+                  @for (c of classOptions; track c.value) {
+                    <option [value]="c.value" [selected]="manualClass() === c.value">
+                      {{ c.label }}
+                    </option>
+                  }
+                </select>
+              }
+              <button
+                mat-stroked-button
+                type="button"
+                [matMenuTriggerFor]="hotelMenu"
+                (menuOpened)="loadDeposits()"
+              >
+                <mat-icon>warehouse</mat-icon> Däckhotell
+              </button>
+              @if (cars.enabled()) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [matMenuTriggerFor]="carMenu"
+                  (menuOpened)="loadCars()"
+                >
+                  <mat-icon>directions_car</mat-icon> Bil
+                </button>
+              }
+              <button mat-stroked-button type="button" (click)="addLabour()">
+                <mat-icon>schedule</mat-icon> Arbete
+              </button>
+              <button mat-stroked-button type="button" (click)="addFree()">
+                <mat-icon>add</mat-icon> Fri rad
+              </button>
+            </div>
+            <mat-menu #serviceMenu="matMenu">
+              @for (s of serviceTypes(); track s.id) {
+                <button mat-menu-item type="button" (click)="addService(s)">
+                  {{ s.name }}
+                  @if (priceHint(s); as hint) {
+                    <span class="ml-2 text-gray-500">{{ hint }}</span>
+                  }
+                </button>
+              } @empty {
+                <span class="px-4 py-2 text-sm text-gray-500">Inga åtgärder inlagda</span>
+              }
+            </mat-menu>
+            <mat-menu #carMenu="matMenu">
+              @for (c of carsForSale(); track c.id) {
+                <button mat-menu-item type="button" (click)="addCar(c)">
+                  {{ c.regNo }} · {{ c.heading }} ·
+                  {{ c.price == null ? 'Pris saknas' : (c.price | kr) }}
+                </button>
+              } @empty {
+                <span class="px-4 py-2 text-sm text-gray-500">Inga bilar att sälja</span>
+              }
+            </mat-menu>
+            <mat-menu #hotelMenu="matMenu">
+              @for (d of deposits(); track d.id) {
+                <button mat-menu-item type="button" (click)="addDeposit(d)">
+                  {{ d.code }} · {{ d.vehicle.regNo }} · {{ d.fee | kr }}
+                </button>
+              } @empty {
+                <span class="px-4 py-2 text-sm text-gray-500">
+                  {{ depositsHint() }}
+                </span>
+              }
+            </mat-menu>
+          }
+
+          @if (rows().length) {
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[640px] text-left text-sm">
+                <thead
+                  class="border-b border-gray-100 text-xs font-medium tracking-wide text-gray-500 uppercase"
+                >
+                  <tr>
+                    <th class="py-2">Beskrivning</th>
+                    <th class="w-20 py-2 text-right">Antal</th>
+                    <th class="w-32 py-2 text-right">À-pris</th>
+                    <th class="w-24 py-2 text-right">Rabatt %</th>
+                    <th class="w-28 py-2 text-right">Summa</th>
+                    <th class="w-10 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  @for (g of display(); track g.key) {
+                    @for (it of g.items; track it.r.key) {
+                      @let r = it.r;
+                      @let i = it.i;
+                      <tr class="align-top">
+                        <td class="py-2 pr-2">
+                          @if (readOnly() || r.type === 'storage' || r.type === 'car') {
+                            <div class="py-2">{{ r.description }}</div>
+                          } @else {
+                            <input
+                              class="h-10 w-full px-2 field"
+                              [value]="r.description"
+                              (input)="edit(i, { description: $any($event.target).value })"
+                            />
+                          }
+                          @if (
+                            r.type === 'article' && r.maxQty !== undefined && r.quantity > r.maxQty
+                          ) {
+                            <div class="text-xs text-red-600">Bara {{ r.maxQty }} st i lager.</div>
+                          }
+                        </td>
+                        <td class="py-2 pr-2 text-right">
+                          @if (readOnly() || r.type === 'storage' || r.type === 'car') {
+                            <div class="py-2 tabular-nums">{{ r.quantity }}</div>
+                          } @else {
+                            <input
+                              type="number"
+                              min="0"
+                              [step]="r.type === 'article' ? 1 : 0.25"
+                              class="h-10 w-full px-2 text-right field"
+                              [value]="r.quantity"
+                              (focus)="$any($event.target).select()"
+                              (input)="edit(i, { quantity: $any($event.target).valueAsNumber })"
+                            />
+                          }
+                        </td>
+                        <td class="py-2 pr-2 text-right">
+                          @if (readOnly()) {
+                            <div class="py-2 tabular-nums">{{ r.price * 100 | kr }}</div>
+                          } @else {
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              class="h-10 w-full px-2 text-right field"
+                              [value]="r.price"
+                              (focus)="$any($event.target).select()"
+                              (input)="edit(i, { price: $any($event.target).valueAsNumber })"
+                            />
+                          }
+                        </td>
+                        <td class="py-2 pr-2 text-right">
+                          @if (readOnly()) {
+                            <div class="py-2 tabular-nums">{{ r.discountPercent || '' }}</div>
+                          } @else {
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="1"
+                              class="h-10 w-full px-2 text-right field"
+                              [value]="r.discountPercent || ''"
+                              (focus)="$any($event.target).select()"
+                              (input)="
+                                edit(i, { discountPercent: $any($event.target).valueAsNumber || 0 })
+                              "
+                            />
+                          }
+                        </td>
+                        <td class="py-2 text-right tabular-nums">
+                          <div class="py-2">{{ amounts()[i] | kr }}</div>
+                        </td>
+                        <td class="py-2 text-right">
+                          @if (!readOnly()) {
+                            <button
+                              mat-icon-button
+                              type="button"
+                              (click)="removeRow(i)"
+                              aria-label="Ta bort raden"
+                            >
+                              <mat-icon>close</mat-icon>
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                    @if (g.section; as sec) {
+                      <tr class="bg-gray-50">
+                        <td class="py-2 pl-2 font-semibold" colspan="3">
+                          Delsumma {{ sec.title }}
+                        </td>
+                        <td class="py-2 pr-2 text-right text-xs text-gray-500" colspan="1">
+                          @if (readOnly()) {
+                            {{ sec.fixedPrice != null ? 'Fast pris' : '' }}
+                          } @else {
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Fast pris"
+                              aria-label="Fast pris för jobbet"
+                              class="h-9 w-full px-2 text-right field"
+                              [value]="sec.fixedPrice != null ? sec.fixedPrice / 100 : ''"
+                              (input)="setFixed(sec.id, $any($event.target).value)"
+                            />
+                          }
+                        </td>
+                        <td class="py-2 text-right font-semibold tabular-nums">
+                          {{ sectionTotals()[sec.id] ?? 0 | kr }}
+                        </td>
+                        <td></td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+              Inga rader än. Sök en artikel ovan, eller lägg till en åtgärd, ett däckhotell eller en
+              fri rad.
+            </p>
+          }
+        </section>
+      }
 
       <div class="grid items-start gap-4 lg:grid-cols-2">
         <section class="rounded-xl bg-white p-5 shadow-sm">
-          <h2 class="mb-2 text-base font-semibold">Rabatt på hela kortet</h2>
+          <h2 class="mb-2 text-base font-semibold">
+            {{ hall() ? 'Rabatt' : 'Rabatt på hela kortet' }}
+          </h2>
           @if (readOnly()) {
             <p class="text-sm">
               @if (card()?.discount; as d) {
@@ -482,12 +845,16 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 />
               </mat-form-field>
               <mat-form-field subscriptSizing="dynamic" class="min-w-52 flex-1">
-                <mat-label>Anledning (syns inte på kvittot)</mat-label>
+                <mat-label>{{
+                  hall() ? 'Anledning (syns inte på fakturan)' : 'Anledning (syns inte på kvittot)'
+                }}</mat-label>
                 <input
                   matInput
                   [value]="discReason()"
                   (input)="discReason.set($any($event.target).value); touch()"
-                  placeholder="t.ex. 4 bilar på däckhotell"
+                  [placeholder]="
+                    hall() ? 't.ex. kampanj eller inbytesbonus' : 't.ex. 4 bilar på däckhotell'
+                  "
                 />
               </mat-form-field>
             </div>
@@ -529,20 +896,27 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         <h2 class="mb-2 text-base font-semibold">Text och anteckning</h2>
         <div class="grid gap-x-4 sm:grid-cols-2">
           <mat-form-field class="sm:col-span-2">
-            <mat-label>Text under raderna på kvittot</mat-label>
+            <mat-label>{{
+              hall() ? 'Villkor och text på fakturan' : 'Text under raderna på kvittot'
+            }}</mat-label>
             <textarea
               matInput
               rows="2"
               [disabled]="readOnly()"
               [value]="performed()"
               (input)="performed.set($any($event.target).value); touch()"
-              placeholder="t.ex. Bytt däck och balanserat"
+              [placeholder]="
+                hall()
+                  ? 't.ex. Bilen säljs i befintligt skick. Leverans den 15 november.'
+                  : 't.ex. Bytt däck och balanserat'
+              "
             ></textarea>
           </mat-form-field>
           <mat-form-field>
             <mat-label>Garanti</mat-label>
             <input
               matInput
+              [placeholder]="hall() ? 't.ex. 12 månaders begagnatgaranti' : ''"
               [disabled]="readOnly()"
               [value]="warranty()"
               (input)="warranty.set($any($event.target).value); touch()"
@@ -564,12 +938,20 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         @if (c.status === 'draft') {
           <section class="rounded-xl bg-white p-5 shadow-sm">
             <h2 class="mb-1 text-base font-semibold">Bokför</h2>
-            <p class="mb-3 text-sm text-gray-600">
-              Vad ska kunden få? Vid bokföring minskar lagret för artiklarna på raderna och
-              dokumentet får sitt nummer i sin egen serie. Därefter går kortet inte att ändra, och
-              ett kvitto kan inte göras om till en faktura. Tills dess kan du förhandsgranska
-              utkastet.
-            </p>
+            @if (hall()) {
+              <p class="mb-3 text-sm text-gray-600">
+                Vid bokföring sätts bilen som såld och låses (pris, inköp och kostnader går inte att
+                ändra) och dokumentet får sitt nummer. Därefter går affären inte att ändra. Tills
+                dess kan du förhandsgranska utkastet.
+              </p>
+            } @else {
+              <p class="mb-3 text-sm text-gray-600">
+                Vad ska kunden få? Vid bokföring minskar lagret för artiklarna på raderna och
+                dokumentet får sitt nummer i sin egen serie. Därefter går kortet inte att ändra, och
+                ett kvitto kan inte göras om till en faktura. Tills dess kan du förhandsgranska
+                utkastet.
+              </p>
+            }
             <mat-radio-group
               class="mb-4 grid gap-3 sm:grid-cols-2"
               aria-label="Vad kunden får"
@@ -579,17 +961,19 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             >
               <label class="choice" [class.is-on]="kind() === 'invoice'">
                 <mat-radio-button value="invoice" class="font-medium">Faktura</mat-radio-button>
-                <span class="choice-text"
-                  >Kunden betalar senare, inom betalningsvillkoren. Får ett fakturanummer (FAK-) och
-                  hamnar under Fakturor. Passar företag och större jobb.</span
-                >
+                <span class="choice-text">{{
+                  hall()
+                    ? 'Köparen betalar inom betalningsvillkoren, oftast med banköverföring. Det vanliga för en bil. Får ett fakturanummer (FAK-) och hamnar under Fakturor.'
+                    : 'Kunden betalar senare, inom betalningsvillkoren. Får ett fakturanummer (FAK-) och hamnar under Fakturor. Passar företag och större jobb.'
+                }}</span>
               </label>
               <label class="choice" [class.is-on]="kind() === 'receipt'">
                 <mat-radio-button value="receipt" class="font-medium">Kvitto</mat-radio-button>
-                <span class="choice-text"
-                  >Kunden betalar nu. Får ett kvittonummer (KV-) och hamnar under Kvitton, inte
-                  bland fakturorna.</span
-                >
+                <span class="choice-text">{{
+                  hall()
+                    ? 'Köparen betalar nu med kort eller Swish. Går inte om bilen säljs med vinstmarginalbeskattning (VMB).'
+                    : 'Kunden betalar nu. Får ett kvittonummer (KV-) och hamnar under Kvitton, inte bland fakturorna.'
+                }}</span>
               </label>
             </mat-radio-group>
             @if (kind() === 'invoice') {
@@ -672,13 +1056,17 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 </app-pill>
                 <span class="text-sm text-gray-600"
                   >Ett kvitto är betalt när det utfärdas.
-                  {{ inv.register ? 'Blev det fel: ta tillbaka kvittot med en retur.' : 'Blev det fel: återöppna kortet.' }}</span
+                  {{
+                    inv.register
+                      ? 'Blev det fel: ta tillbaka kvittot med en retur.'
+                      : 'Blev det fel: återöppna kortet.'
+                  }}</span
                 >
               </div>
               @if (inv.register; as r) {
                 <p class="mt-3 text-sm text-gray-600">
-                  Registrerat i kassaregistret: kvitto <b>{{ r.receiptNumber }}</b>, Z-rapport
-                  {{ r.zNumber }}.
+                  Registrerat i kassaregistret: kvitto <b>{{ r.receiptNumber }}</b
+                  >, Z-rapport {{ r.zNumber }}.
                   @if (!r.certified) {
                     <span class="font-medium text-red-700">
                       Utvecklingsläge – inte ett giltigt kvitto.</span
@@ -745,6 +1133,11 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-base font-semibold">Hör ihop med</h2>
           <div class="flex flex-wrap gap-2 text-sm">
+            @if (hall() && carRow()?.carId; as cid) {
+              <a mat-stroked-button [routerLink]="['/dealership/cars', cid]">
+                <mat-icon>directions_car</mat-icon> Bilen
+              </a>
+            }
             @if (c.links.customer; as cu) {
               <a mat-stroked-button [routerLink]="['/customers', cu.id]">
                 <mat-icon>person</mat-icon> {{ cu.name }}
@@ -766,6 +1159,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               </a>
             }
             @if (
+              !hall() &&
               !c.links.customer &&
               !c.links.vehicle &&
               !c.links.workOrder &&
@@ -790,6 +1184,21 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   private readonly confirm = inject(Confirm);
   private readonly dialog = inject(MatDialog);
   private readonly auth = inject(Auth);
+  private readonly carApi = inject(CarApi);
+  private readonly nav = inject(Nav);
+  /**
+   * En bilaffär (Hall) och inte en verkstadsaffär: ett sparat kort säger det själv (det har en
+   * bilrad), ett nytt kort följer produkten man kom från. Hall visar bara köparen, bilen och
+   * tilläggen; verkstadens artiklar, åtgärder och däckhotell hör inte dit.
+   */
+  readonly hall = computed(() => {
+    const c = this.card();
+    return c ? c.product === 'hall' : this.nav.product() === 'hall';
+  });
+  readonly media = (path: string | null) => (path ? environment.apiUrl + path : '');
+  readonly extraSuggestions = ['Garanti', 'Ägarbyte och registrering', 'Leverans', 'Tillbehör'];
+  readonly cars = { enabled: () => !this.auth.isMechanic() };
+  readonly carsForSale = signal<CarListing[]>([]);
   /** Bara ägaren återöppnar ett bokfört kort. */
   readonly isOwner = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly router = inject(Router);
@@ -808,7 +1217,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   private inclFixed = false;
   readonly sections = signal<SalesSection[]>([]);
   /** Kunden, för kundtyp och kundrabatt. */
-  private readonly customer = signal<Customer | null>(null);
+  protected readonly customer = signal<Customer | null>(null);
   /** Bilen, för åtgärdernas pris efter klass och fälgstorlek. */
   protected readonly vehicle = signal<Vehicle | null>(null);
   /** Utan bil på kortet: det fordon man valt för hand, så att åtgärderna ändå får rätt pris. */
@@ -819,7 +1228,39 @@ export class SalesCardPage implements OnInit, HasUnsaved {
 
   readonly card = signal<SalesCardDetail | null>(null);
   readonly rows = signal<Row[]>([]);
+  /** Bilen på kortet (en bilaffär har en), dess plats i radlistan och det som följer med. */
+  readonly carRow = computed(() => this.rows().find((r) => r.type === 'car') ?? null);
+  readonly carIndex = computed(() => this.rows().findIndex((r) => r.type === 'car'));
+  readonly extras = computed(() =>
+    this.rows()
+      .map((r, i) => ({ r, i }))
+      .filter((x) => x.r.type !== 'car'),
+  );
+  /** Bilens böcker (inköp, kostnader, momsregim), för vinsten på affären. */
+  readonly dealCar = signal<CarListing | null>(null);
+  /** Vad affären ger: priset på kortet (efter rabatt) mot bilens inköp och kostnader. */
+  readonly dealProfit = computed(() => {
+    const car = this.dealCar();
+    const i = this.carIndex();
+    if (!car || i < 0) return null;
+    return carEconomy({ ...car, status: 'sold', soldPrice: this.amounts()[i] ?? 0 });
+  });
   readonly linkCtl = new FormControl<PickerValue | null>(null);
+  readonly customerTypes = Object.entries(CUSTOMER_TYPE_LABELS);
+  /**
+   * Köparens uppgifter i en bilaffär: som kundkortet i halvstorlek. De hör till kunden och sparas
+   * dit när affären sparas (`saveBuyer`); bara fält som ändrats skickas.
+   */
+  readonly buyer = new FormGroup({
+    type: new FormControl<CustomerType>('private', { nonNullable: true }),
+    orgNo: new FormControl('', { nonNullable: true }),
+    phone: new FormControl('', { nonNullable: true }),
+    contactPerson: new FormControl('', { nonNullable: true }),
+    address: new FormControl('', { nonNullable: true }),
+    postalCode: new FormControl('', { nonNullable: true }),
+    city: new FormControl('', { nonNullable: true }),
+  });
+  readonly isCompany = () => this.buyer.controls.type.value === 'company';
   private readonly link = signal<PickerValue | null>(null);
   readonly discType = signal<'percent' | 'amount'>('percent');
   readonly discValue = signal(0);
@@ -848,7 +1289,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       // Ett återöppnat kort är samma dokument igen: numret hör till dess serie.
       this.card()?.reservedKind ??
       this.docKind() ??
-      (this.customer()?.type === 'company' ? 'invoice' : 'receipt'),
+      // En bil betalas nästan alltid mot faktura; ett kvitto är ett val.
+      (this.hall() || this.customer()?.type === 'company' ? 'invoice' : 'receipt'),
   );
   /** Betalningsvillkoren som verkstaden har ställt in (Företaget), tills man skriver egna dagar. */
   private readonly defaultTerms = signal(30);
@@ -878,8 +1320,26 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly blocker = computed<Gap | null>(() => {
     const own = sellerGap(this.seller(), this.isOwner, () => this.openCompanySettings());
     if (own) return own;
-    if (this.kind() !== 'invoice') return null;
     const l = this.link();
+    if (this.hall() && !l?.customerId && !l?.pending?.customerId && !l?.pending?.customerName) {
+      return { text: 'Välj köparen: en bil säljs aldrig som kontantförsäljning.', fixes: [] };
+    }
+    if (this.hall()) {
+      // Köparens uppgifter står på kortet ovan, så ingen länk till kundkortet behövs.
+      const cu = this.customer();
+      if (this.kind() !== 'invoice' || !cu) return null;
+      const missing = [
+        cu.type === 'company' && !cu.orgNo && 'organisationsnummer',
+        !(cu.address && cu.postalCode && cu.city) && 'adress',
+      ].filter(Boolean);
+      return missing.length
+        ? {
+            text: `Köparen saknar ${missing.join(' och ')}. Fyll i det under Köpare och spara, eller bokför som kvitto.`,
+            fixes: [this.receiptFix],
+          }
+        : null;
+    }
+    if (this.kind() !== 'invoice') return null;
     if (!l?.customerId && !l?.pending?.customerId && !l?.pending?.customerName) {
       return {
         text: 'En faktura behöver en kund. Välj kund högst upp, eller bokför som kvitto.',
@@ -918,7 +1378,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly title = computed(() => {
     const c = this.card();
     if (!c) return '';
-    return [c.regNo, c.customerName ?? 'Kontantkund'].filter(Boolean).join(' · ');
+    return [c.carLabel ?? c.regNo, c.customerName ?? 'Kontantkund'].filter(Boolean).join(' · ');
   });
 
   private readonly priced = computed(() =>
@@ -928,6 +1388,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       discountPercent: r.discountPercent || 0,
       vatRate: r.vatRate,
       group: r.sectionId ?? null,
+      ...(r.vmbPurchase != null ? { margin: { purchase: r.vmbPurchase } } : {}),
     })),
   );
   private readonly groups = computed(() =>
@@ -986,6 +1447,21 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         takeUntilDestroyed(),
       )
       .subscribe((p) => this.results.set(p?.items ?? []));
+    // Bilens böcker hämtas när en bil hamnar på kortet (från listan, från bilkortet eller ett sparat kort).
+    effect(() => {
+      const id = this.carRow()?.carId;
+      untracked(() => {
+        if (!id) this.dealCar.set(null);
+        else if (this.dealCar()?.id !== id)
+          this.carApi.get(id).subscribe((c) => this.dealCar.set(c));
+      });
+    });
+    // Köparkortet följer kunden som väljs; skriver man ett nytt namn töms det.
+    effect(() => {
+      const c = this.customer();
+      untracked(() => this.fillBuyer(c));
+    });
+    this.buyer.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.touch());
     this.linkCtl.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => {
       this.link.set(v);
       this.loadCustomer(v?.customerId);
@@ -1016,6 +1492,11 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     if (articleId) {
       this.inventory.article(articleId).subscribe((a) => this.addArticle(a));
     }
+    // "Sälj bilen" på en bil öppnar ett nytt kort med bilen på första raden.
+    const carId = q.get('carId');
+    if (carId) {
+      this.carApi.get(carId).subscribe((c) => this.addCar(c));
+    }
     const depositId = q.get('depositId');
     if (depositId) {
       this.storage.deposit(depositId).subscribe((d) => {
@@ -1025,11 +1506,46 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         this.addDeposit(d);
       });
     }
+    if (this.hall()) this.loadCars();
     this.dirty.set(false);
   }
 
   hasUnsaved() {
     return this.dirty();
+  }
+
+  private fillBuyer(c: Customer | null) {
+    this.buyer.reset(
+      {
+        type: c?.type ?? 'private',
+        orgNo: c?.orgNo ?? '',
+        phone: c?.phone ?? '',
+        contactPerson: c?.contactPerson ?? '',
+        address: c?.address ?? '',
+        postalCode: c?.postalCode ?? '',
+        city: c?.city ?? '',
+      },
+      { emitEvent: false },
+    );
+  }
+
+  /** Det som ändrats på köparkortet, redo att skickas till kunden; tomt när inget ändrats. */
+  private buyerPatch(): CustomerInput {
+    const v = this.buyer.getRawValue();
+    const c = this.buyer.controls;
+    const text = (x: string) => x.trim() || null;
+    const patch: CustomerInput = {};
+    if (c.type.dirty) patch.type = v.type;
+    if (c.orgNo.dirty) patch.orgNo = text(v.orgNo);
+    if (c.phone.dirty) patch.phone = text(v.phone);
+    // Kontaktperson finns bara på ett företag: byter man till privatperson töms den.
+    if (c.contactPerson.dirty || c.type.dirty) {
+      patch.contactPerson = v.type === 'company' ? text(v.contactPerson) : null;
+    }
+    if (c.address.dirty) patch.address = text(v.address);
+    if (c.postalCode.dirty) patch.postalCode = text(v.postalCode);
+    if (c.city.dirty) patch.city = text(v.city);
+    return patch;
   }
 
   /** Kundtypen styr ett nytt korts prisläge (Prissättning); kundens rabatt förifyller rader. */
@@ -1139,6 +1655,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         description: l.description,
         articleId: l.articleId ?? undefined,
         depositId: l.depositId ?? undefined,
+        carId: l.carId ?? undefined,
+        vmbPurchase: l.vmbPurchase ?? null,
         quantity: l.quantity,
         price: l.unitPrice / 100,
         discountPercent: l.discountPercent,
@@ -1249,6 +1767,53 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     });
   }
 
+  /** Bilar som går att sälja: inte redan sålda, och inte på ett annat kort. */
+  loadCars() {
+    this.carApi.list().subscribe((list) => {
+      const taken = new Set(this.rows().map((r) => r.carId));
+      this.carsForSale.set(
+        list.filter((c) => !c.soldCardId && c.status !== 'sold' && !taken.has(c.id)),
+      );
+    });
+  }
+
+  /** En bil är en rad med bilens pris. Såld med VMB (momsen på vinsten) räknas momsen ur inköpspriset. */
+  addCar(c: CarListing) {
+    if (this.rows().some((r) => r.carId === c.id)) return;
+    this.dealCar.set(c);
+    this.push({
+      type: 'car',
+      description: `${c.heading} (${c.regNo})`,
+      carId: c.id,
+      vmbPurchase: c.vatScheme === 'margin' ? (c.purchase?.price ?? null) : null,
+      quantity: 1,
+      price: (c.price ?? 0) / 100,
+      discountPercent: 0,
+      vatRate: c.vatScheme === 'margin' ? 0 : STANDARD_VAT,
+    });
+  }
+
+  /** Väljer en annan bil: tar bort den på kortet och visar listan över bilar att sälja igen. */
+  removeCar() {
+    const i = this.carIndex();
+    if (i < 0) return;
+    this.removeRow(i);
+    this.dealCar.set(null);
+    this.loadCars();
+  }
+
+  /** Något som följer med bilaffären (garanti, ägarbyte, leverans): en rad med text och pris. */
+  addExtra(description: string) {
+    this.push({
+      type: 'service',
+      description,
+      quantity: 1,
+      price: 0,
+      discountPercent: 0,
+      vatRate: STANDARD_VAT,
+    });
+  }
+
   addDeposit(d: StorageDeposit) {
     if (this.rows().some((r) => r.depositId === d.id)) return;
     this.push({
@@ -1285,6 +1850,16 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   private async body(): Promise<SalesCardInput> {
     const link = this.link();
     const resolved = link ? await firstValueFrom(this.links.resolve(link)) : null;
+    if (this.hall() && resolved?.customerId) {
+      const patch = this.buyerPatch();
+      if (Object.keys(patch).length) {
+        const saved = await firstValueFrom(
+          this.workshop.updateCustomer(resolved.customerId, patch),
+        );
+        this.customer.set({ ...this.customer(), ...saved } as Customer);
+        this.fillBuyer(this.customer());
+      }
+    }
     return {
       customerId: resolved?.customerId || null,
       vehicleId: resolved?.vehicleId || null,
@@ -1298,6 +1873,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         description: r.description || undefined,
         articleId: r.articleId,
         depositId: r.depositId,
+        carId: r.carId,
         quantity: r.quantity,
         unitPrice: ore(r.price),
         discountPercent: r.discountPercent || 0,
@@ -1313,6 +1889,16 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   }
 
   async save(): Promise<boolean> {
+    if (this.hall() && !this.carRow()) {
+      this.snack.open('Välj bilen som ska säljas.', 'OK', { duration: 4000 });
+      return false;
+    }
+    if (this.hall() && this.buyer.dirty && !this.link()) {
+      this.snack.open('Skriv köparens namn först: uppgifterna hör till köparen.', 'OK', {
+        duration: 4000,
+      });
+      return false;
+    }
     if (this.rows().some((r) => !(r.quantity > 0) || !(r.price >= 0))) {
       this.snack.open('Kontrollera antal och pris på raderna', 'OK', { duration: 4000 });
       return false;
@@ -1362,7 +1948,9 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.confirm
       .ask({
         title: `Bokför ${c.code} som ${invoice ? 'faktura' : 'kvitto'}?`,
-        message: `Kunden får ${gets}. Lagret minskas för artiklarna på raderna och dokumentet får sitt nummer. Därefter går varken kortet eller dokumentet att ändra.`,
+        message: this.hall()
+          ? `Köparen får ${gets}. Bilen sätts som såld och låses, och dokumentet får sitt nummer. Därefter går varken affären eller dokumentet att ändra.`
+          : `Kunden får ${gets}. Lagret minskas för artiklarna på raderna och dokumentet får sitt nummer. Därefter går varken kortet eller dokumentet att ändra.`,
         confirmText: 'Bokför',
       })
       .subscribe((ok) => {
@@ -1543,7 +2131,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         if (!ok) return;
         this.api.remove(c.id).subscribe(() => {
           this.dirty.set(false);
-          void this.router.navigate(['/sales']);
+          void this.router.navigate([this.hall() ? '/dealership/deals' : '/sales']);
         });
       });
   }

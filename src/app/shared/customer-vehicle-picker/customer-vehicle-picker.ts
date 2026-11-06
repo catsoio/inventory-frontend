@@ -30,7 +30,10 @@ export interface PickerValue {
    * Något är skrivet men inte valt ur listan: kunden och/eller bilen skapas när formuläret sparas
    * (se `LinkResolver`). `customerId`/`vehicleId` är då tomma.
    */
-  pending?: { customerId?: string; customerName?: string; customerPhone?: string;
+  pending?: {
+    customerId?: string;
+    customerName?: string;
+    customerPhone?: string;
     customerEmail?: string;
     regNo?: string;
   };
@@ -56,7 +59,7 @@ const filled = (min: number) => (c: AbstractControl) => {
   selector: 'app-customer-vehicle-picker',
   standalone: false,
   template: `
-    <div class="grid gap-x-3 sm:grid-cols-2">
+    <div class="grid gap-x-3" [class]="withVehicle ? 'sm:grid-cols-2' : ''">
       <mat-form-field>
         <mat-label>{{ customerLabel }}</mat-label>
         <mat-icon matPrefix class="mr-2 text-gray-400">person</mat-icon>
@@ -83,37 +86,41 @@ const filled = (min: number) => (c: AbstractControl) => {
         <mat-error>Ange kund</mat-error>
       </mat-form-field>
 
-      <mat-form-field>
-        <mat-label>Registreringsnummer</mat-label>
-        <app-sv-flag matPrefix class="mr-2" />
-        <input
-          matInput
-          [formControl]="vehicle"
-          [matAutocomplete]="vehicleAuto"
-          (input)="edited.set(true)"
-          appRegNo
-          class="uppercase"
-          [placeholder]="customerRef() ? 'Kundens bilar eller nytt regnr' : 'Sök eller skriv regnr'"
-        />
-        <mat-autocomplete
-          #vehicleAuto="matAutocomplete"
-          [displayWith]="showVehicle"
-          (optionSelected)="pickVehicle($event.option.value)"
-        >
-          @for (v of vehicleOptions(); track v.id) {
-            <mat-option [value]="v">
-              {{ v.regNo }}
-              <span class="ml-2 text-xs text-gray-500">
-                {{ carLabel(v) }}
-                @if (!customerRef() && v.customer) {
-                  · {{ v.customer.name }}
-                }
-              </span>
-            </mat-option>
-          }
-        </mat-autocomplete>
-        <mat-error>Ange registreringsnummer</mat-error>
-      </mat-form-field>
+      @if (withVehicle) {
+        <mat-form-field>
+          <mat-label>Registreringsnummer</mat-label>
+          <app-sv-flag matPrefix class="mr-2" />
+          <input
+            matInput
+            [formControl]="vehicle"
+            [matAutocomplete]="vehicleAuto"
+            (input)="edited.set(true)"
+            appRegNo
+            class="uppercase"
+            [placeholder]="
+              customerRef() ? 'Kundens bilar eller nytt regnr' : 'Sök eller skriv regnr'
+            "
+          />
+          <mat-autocomplete
+            #vehicleAuto="matAutocomplete"
+            [displayWith]="showVehicle"
+            (optionSelected)="pickVehicle($event.option.value)"
+          >
+            @for (v of vehicleOptions(); track v.id) {
+              <mat-option [value]="v">
+                {{ v.regNo }}
+                <span class="ml-2 text-xs text-gray-500">
+                  {{ carLabel(v) }}
+                  @if (!customerRef() && v.customer) {
+                    · {{ v.customer.name }}
+                  }
+                </span>
+              </mat-option>
+            }
+          </mat-autocomplete>
+          <mat-error>Ange registreringsnummer</mat-error>
+        </mat-form-field>
+      }
     </div>
 
     @if (newCustomer() || newVehicle()) {
@@ -121,7 +128,8 @@ const filled = (min: number) => (c: AbstractControl) => {
         <mat-icon class="!h-4 !w-4 shrink-0 !text-base text-brand">add_circle</mat-icon>
         <span>
           @if (newCustomer() && newVehicle()) {
-            Ny kund{{ phoneOnly() ? ' med bara telefonnummer' : '' }} och ny bil skapas när du sparar.
+            Ny kund{{ phoneOnly() ? ' med bara telefonnummer' : '' }} och ny bil skapas när du
+            sparar.
           } @else if (newCustomer()) {
             Ny kund{{ phoneOnly() ? ' med bara telefonnummer' : '' }} skapas när du sparar.
           } @else {
@@ -159,6 +167,11 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
 
   /** Rubrik på kundfältet. */
   @Input() customerLabel = 'Kund';
+  /**
+   * Falskt när bara kunden ska väljas (en bilaffär: köparens egna bilar hör inte hit). Då visas inget
+   * regnummerfält och kundens bil väljs aldrig av sig själv.
+   */
+  @Input() withVehicle = true;
   /** Valfritt: bilen får saknas, och hela väljaren får vara tom (t.ex. kontantförsäljning). */
   @Input() set optional(v: boolean) {
     const [c, r] = v ? [[], []] : [filled(1), filled(2)];
@@ -284,6 +297,7 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     this.customerRef.set(c);
     this.customer.setValue(c, { emitEvent: false });
     this.customerText.set('');
+    if (!this.withVehicle) return this.emit();
     this.api.vehicles({ customerId: c.id, limit: 100 }).subscribe((p) => {
       this.ownCars.set(p.items);
       // En enda bil: välj den direkt.

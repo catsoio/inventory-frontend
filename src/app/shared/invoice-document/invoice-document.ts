@@ -115,7 +115,9 @@ import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
                       <td class="py-2 text-right tabular-nums">
                         {{ r.discountPercent ? r.discountPercent + ' %' : '' }}
                       </td>
-                      <td class="py-2 text-right tabular-nums">{{ r.vatRate }} %</td>
+                      <td class="py-2 text-right tabular-nums">
+                        {{ r.vmb ? '' : r.vatRate + ' %' }}
+                      </td>
                       <td class="py-2 text-right tabular-nums">{{ r.total | kr }}</td>
                     }
                   </tr>
@@ -166,9 +168,22 @@ import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
         }
 
         <section class="mt-4 ml-auto w-full max-w-sm">
-          <div class="flex justify-between py-0.5">
-            <span>Summa exkl. moms</span><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
-          </div>
+          @if (inv.totals.margin) {
+            <!-- Vinstmarginalbeskattning: inget momsbelopp får stå på dokumentet. -->
+            @if (inv.totals.byRate.length) {
+              <div class="flex justify-between py-0.5">
+                <span>Summa exkl. moms (övriga rader)</span>
+                <span class="tabular-nums">{{
+                  inv.totals.net - inv.totals.margin.sales | kr
+                }}</span>
+              </div>
+            }
+          } @else {
+            <div class="flex justify-between py-0.5">
+              <span>Summa exkl. moms</span
+              ><span class="tabular-nums">{{ inv.totals.net | kr }}</span>
+            </div>
+          }
           @for (b of inv.totals.byRate; track b.rate) {
             <div class="flex justify-between py-0.5 text-[#4b5563]">
               <span>Moms {{ b.rate }} % på {{ b.base | kr }}</span>
@@ -184,10 +199,17 @@ import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
           <div
             class="mt-1 flex justify-between gap-6 border-t-2 border-[#4b5563] pt-1 text-lg font-bold"
           >
-            <span>{{ totalLabel(inv) }} inkl. moms</span>
+            <span>{{ totalLabel(inv) }}{{ inv.totals.margin ? '' : ' inkl. moms' }}</span>
             <span class="tabular-nums">{{ inv.totals.total | kr }}</span>
           </div>
         </section>
+
+        @if (inv.totals.margin) {
+          <p class="mt-3 text-xs">
+            Vinstmarginalbeskattning – begagnade varor. Moms på bilen redovisas enligt reglerna för
+            vinstmarginalbeskattning och får inte dras av av köparen.
+          </p>
+        }
 
         <section class="mt-10 text-xs">
           @if (inv.kind === 'invoice') {

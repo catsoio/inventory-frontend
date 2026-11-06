@@ -54,6 +54,7 @@ describe('invoiceFigures', () => {
   const item = (over: Partial<InvoiceItem>): InvoiceItem => ({
     id: 'x',
     source: 'card',
+    product: 'axle',
     kind: 'invoice',
     code: 'FAK-1',
     invoicedAt: at(2026, 10, 1),

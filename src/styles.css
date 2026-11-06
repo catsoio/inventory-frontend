@@ -21,6 +21,20 @@
   --color-brand-soft: color-mix(in srgb, var(--mat-sys-primary) 10%, white);
 }
 
+/*
+ * Hall (bilhandeln) har en egen färg så att man alltid ser vilken del man är i: Axle är teal, Hall är
+ * blå. Skalet sätter `data-product` på <html>; allt som läser `--mat-sys-primary` (toppfältet,
+ * knappar, markeringar, fokus) följer med. Diagrammen på canvas (`ACCENT`) läser inte variabeln och
+ * ska inte användas på Halls sidor förrän de gör det.
+ */
+html[data-product='hall'] {
+  --mat-sys-primary: #2a4a9c;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #dbe4ff;
+  --mat-sys-on-primary-container: #0f2557;
+  --mat-sys-surface-tint: #2a4a9c;
+}
+
 /* Utskrift (t.ex. en bokföring som PDF): bara innehållet, inga menyer. */
 body {
   font-feature-settings: 'cv11', 'ss01';

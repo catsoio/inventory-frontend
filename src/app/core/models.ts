@@ -818,9 +818,12 @@ export interface Customer {
   number: number;
   type: CustomerType;
   name: string;
+  /** Organisationsnummer för ett företag, personnummer för en privatperson (skrivs aldrig på fakturan). */
   orgNo: string | null;
   /** Momsregistreringsnummer (företag), t.ex. SE556123456701. */
   vatNumber: string | null;
+  /** Vem man pratar med på ett företag. */
+  contactPerson: string | null;
   /** Faktureringsadress – krävs på en företagsfaktura. */
   address: string | null;
   postalCode: string | null;
@@ -842,6 +845,7 @@ export type CustomerInput = Partial<
     | 'name'
     | 'orgNo'
     | 'vatNumber'
+    | 'contactPerson'
     | 'address'
     | 'postalCode'
     | 'city'
@@ -1311,6 +1315,8 @@ export interface OrderTotals {
   /** Att betala, inkl. moms och öresutjämning. */
   total: number;
   byRate: VatBucket[];
+  /** Satt när dokumentet säljer en bil med vinstmarginalbeskattning: momsen visas inte, den redovisas härifrån. */
+  margin?: { sales: number; purchase: number; vat: number };
   /** Hur dokumentet var prissatt; saknas på äldre dokument = inkl. moms. */
   pricesIncludeVat?: boolean;
 }
@@ -1409,6 +1415,8 @@ export interface InvoiceDocRow {
   unitPrice: number;
   discountPercent: number;
   vatRate: number;
+  /** En bil såld med vinstmarginalbeskattning: skrivs utan momsbelopp. */
+  vmb?: boolean;
   total: number;
 }
 
@@ -1438,6 +1446,8 @@ export interface VatReport {
   receipts: VatSource;
   stockSales: VatSource;
   hotel: VatSource;
+  /** Bilar sålda med vinstmarginalbeskattning: momsen på vinsten, aldrig på fakturan. */
+  margin: { count: number; sales: number; purchase: number; base: number; vat: number };
   total: { net: number; vat: number; gross: number; byRate: VatBucket[] };
   doneNotInvoiced: number;
 }
@@ -1688,7 +1698,7 @@ export interface SupplierDetail extends Supplier {
 // --- Säljkort ---
 
 export type SalesCardStatus = 'draft' | 'posted';
-export type SalesLineType = 'article' | 'service' | 'labour' | 'storage' | 'free';
+export type SalesLineType = 'article' | 'service' | 'labour' | 'storage' | 'free' | 'car';
 
 export interface SalesLine {
   id: string;
@@ -1698,6 +1708,10 @@ export interface SalesLine {
   description: string;
   articleId: string | null;
   depositId: string | null;
+  /** Bilen på en `car`-rad. */
+  carId?: string | null;
+  /** Vad bilen kostade verkstaden (öre) när raden skapades; satt = vinstmarginalbeskattning (VMB). */
+  vmbPurchase?: number | null;
   quantity: number;
   /** Öre per styck, i kortets prisläge. */
   unitPrice: number;
@@ -1749,6 +1763,10 @@ export interface SalesCardItem {
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
   kind: InvoiceKind | null;
+  /** Bilhandelns (Hall) om kortet har en bilrad, annars verkstadens (Axle). */
+  product: 'axle' | 'hall';
+  /** Bilen på kortet så som raden lyder ("Volvo V70 (ABC123)"); null utan bil. */
+  carLabel: string | null;
   note: string | null;
   createdAt: string;
   updatedAt: string;
@@ -1804,6 +1822,7 @@ export interface SalesLineInput {
   description?: string;
   articleId?: string;
   depositId?: string;
+  carId?: string;
   quantity?: number;
   unitPrice?: number;
   discountPercent?: number;
@@ -2224,7 +2243,7 @@ export interface PaymentRow {
 export type ListingStatus = 'draft' | 'active' | 'reserved' | 'sold';
 
 export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
-  draft: 'Utkast',
+  draft: 'Inköpt',
   active: 'Till salu',
   reserved: 'Reserverad',
   sold: 'Såld',
@@ -2238,7 +2257,49 @@ export interface ListingInquiry {
   at: string;
 }
 
-/** En bil till salu, som personalen ser den. Priset är öre inkl. moms; null = pris på förfrågan. */
+/**
+ * Hur momsen på försäljningen hanteras. `margin` = vinstmarginalbeskattning (VMB): moms bara på
+ * vinstmarginalen, inget momsbelopp på fakturan; kräver ett inköp utan moms. `standard` = 25 % på
+ * hela priset.
+ */
+export type VatScheme = 'margin' | 'standard';
+
+/** Vad bilen kostade: öre som betalades säljaren, med moms om köpehandlingen har någon. */
+export interface CarPurchase {
+  price: number;
+  /** Momsen på köpehandlingen: 0 = ingen, 25 = faktura med avdragsgill moms. */
+  vatRate: number;
+  date: string | null;
+  seller: string | null;
+  /** Säljarens person- eller organisationsnummer, som skrivet. */
+  sellerId: string | null;
+}
+
+/** Pengar som lagts på bilen efter köpet (däck, reparation, transport). Öre som betalades, inkl. moms. */
+export interface CarCost {
+  id: string;
+  label: string;
+  amount: number;
+  /** Momsen i beloppet; 0 = ingen. */
+  vatRate: number;
+}
+
+/** Vad bilen ger, räknat av servern (spegel: `shared/car-economy.ts`). Öre. */
+export interface CarEconomy {
+  basis: 'sold' | 'asking' | null;
+  salePrice: number | null;
+  purchaseNet: number | null;
+  costsNet: number;
+  totalCost: number | null;
+  outputVat: number | null;
+  inputVat: number;
+  vatToPay: number | null;
+  profit: number | null;
+  marginPercent: number | null;
+  markupPercent: number | null;
+}
+
+/** En bil till salu, som personalen ser den. Priset är öre; null = pris på förfrågan. */
 export interface CarListing {
   id: string;
   regNo: string;
@@ -2265,6 +2326,16 @@ export interface CarListing {
   imageUrls: (string | null)[];
   status: ListingStatus;
   inquiries: ListingInquiry[];
+  purchase: CarPurchase | null;
+  costs: CarCost[];
+  vatScheme: VatScheme;
+  /** Köpehandlingar (filnamn) som ligger på bilen; hämtas med inloggning, aldrig publika. */
+  purchaseDocuments: string[];
+  /** Säljkortet bilen är såld på; satt = bilens pengar är låsta. */
+  soldCardId: string | null;
+  soldPrice: number | null;
+  soldAt: string | null;
+  economy: CarEconomy;
   createdAt: string;
   updatedAt: string;
 }
@@ -2290,6 +2361,11 @@ export type CarListingInput = Partial<
     | 'equipment'
     | 'images'
     | 'status'
+    | 'purchase'
+    | 'costs'
+    | 'vatScheme'
+    | 'soldPrice'
+    | 'soldAt'
   >
 >;
 

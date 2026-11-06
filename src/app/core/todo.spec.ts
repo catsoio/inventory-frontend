@@ -1,5 +1,6 @@
 import { buildTodo, todoBadges, type TodoInput } from './todo';
 import type { StorageSummary, Summary } from './models';
+import type { CarTodo } from '../shared/car-stock';
 
 const hotel = (over: Partial<StorageSummary> = {}): StorageSummary => ({
   stored: 8,
@@ -126,6 +127,55 @@ describe('menyns siffror', () => {
     expect(b['/bookings'].tone).toContain('amber');
     expect(todoBadges(buildTodo(input({ requests: 1 })))['/bookings'].text).toBe('1 förfrågan');
     expect(todoBadges(buildTodo(input({ requests: 0 })))).toEqual({});
+  });
+});
+
+describe('bilhandel', () => {
+  const cars = (over: Partial<CarTodo> = {}): CarTodo => ({
+    sellersMissing: 0,
+    idle: 0,
+    inspectionSoon: 0,
+    unlisted: 0,
+    ...over,
+  });
+
+  it('inköpta bilar utan uppgift om säljaren är en gul siffra på Bilar', () => {
+    const b = todoBadges(buildTodo(input({ cars: cars({ sellersMissing: 2 }) })));
+    expect(b['/dealership/cars'].text).toBe('2 saknar säljare');
+    expect(b['/dealership/cars'].tone).toContain('amber');
+    expect(todoBadges(buildTodo(input({ cars: cars() })))).toEqual({});
+  });
+
+  it('länkarna bär filtret så att siffran går att hitta i bil-listan', () => {
+    const items = buildTodo(
+      input({ cars: cars({ sellersMissing: 1, idle: 3, inspectionSoon: 2, unlisted: 1 }) }),
+    );
+    const by = (k: string) => items.find((i) => i.key === k)!;
+    expect(by('car-sellers').params).toEqual({ flag: 'sellers' });
+    expect(by('cars-idle').params).toEqual({ flag: 'idle' });
+    expect(by('cars-inspection').params).toEqual({ flag: 'inspection' });
+    expect(by('cars-unlisted').params).toEqual({ flag: 'unlisted' });
+    expect(items.every((i) => i.product === 'hall')).toBe(true);
+  });
+
+  it('bilhandelns saker visas inte i verkstadens meny, och tvärtom', () => {
+    const items = buildTodo(
+      input({
+        drafts: 1,
+        hallDrafts: 2,
+        invoices: { unpaid: 1, overdue: 0, amount: 100, more: false },
+        hallInvoices: { unpaid: 3, overdue: 1, amount: 900, more: false },
+      }),
+    );
+    const axle = todoBadges(items.filter((i) => i.product === 'axle'));
+    const hall = todoBadges(items.filter((i) => i.product === 'hall'));
+    expect(axle['/sales'].text).toBe('1 utkast');
+    expect(axle['/finance/invoices'].text).toBe('1 obetald');
+    expect(axle['/dealership/deals']).toBeUndefined();
+    expect(hall['/dealership/deals'].text).toBe('2 utkast');
+    expect(hall['/finance/invoices'].text).toBe('1 förfallen');
+    expect(hall['/dealership/finance'].text).toBe('1 förfallen');
+    expect(hall['/sales']).toBeUndefined();
   });
 });
 

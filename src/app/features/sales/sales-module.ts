@@ -10,19 +10,17 @@ import { SalesInvoicePage } from './sales-invoice';
 import { SalesList } from './sales-list';
 
 @NgModule({
-  declarations: [
-    SalesList,
-    SalesCardPage,
-    SalesInvoicePage,
-    SalesSendDialog,
-    ReaderPayment,
-    ReturnDialog,
-  ],
+  declarations: [SalesCardPage, SalesInvoicePage, SalesSendDialog, ReaderPayment, ReturnDialog],
   imports: [
     SharedModule,
     RouterModule.forChild([
       { path: '', component: SalesList },
-      { path: 'new', title: 'Ny försäljning', component: SalesCardPage, canDeactivate: [unsavedGuard] },
+      {
+        path: 'new',
+        title: 'Ny försäljning',
+        component: SalesCardPage,
+        canDeactivate: [unsavedGuard],
+      },
       { path: ':id/invoice', title: 'Faktura', component: SalesInvoicePage },
       { path: ':id', title: 'Säljkort', component: SalesCardPage, canDeactivate: [unsavedGuard] },
     ]),

@@ -77,6 +77,27 @@ const ymd = (d: Date) =>
             </tr>
           </tbody>
         </table>
+        @if (r.margin.count > 0) {
+          <h3 class="mt-4 text-sm font-semibold">Bilar sålda med vinstmarginalbeskattning (VMB)</h3>
+          <table class="w-full max-w-3xl text-sm">
+            <tr>
+              <td class="py-0.5">{{ r.margin.count }} affärer · sålt för</td>
+              <td class="py-0.5 text-right tabular-nums">{{ r.margin.sales | kr }}</td>
+            </tr>
+            <tr>
+              <td class="py-0.5">Inköpspris</td>
+              <td class="py-0.5 text-right tabular-nums">{{ r.margin.purchase | kr }}</td>
+            </tr>
+            <tr>
+              <td class="py-0.5">Underlag (vinstmarginal utan moms), ruta 07</td>
+              <td class="py-0.5 text-right tabular-nums">{{ r.margin.base | kr }}</td>
+            </tr>
+            <tr class="font-semibold">
+              <td class="py-0.5">Moms på vinstmarginalen, ingår i Totalt</td>
+              <td class="py-0.5 text-right tabular-nums">{{ r.margin.vat | kr }}</td>
+            </tr>
+          </table>
+        }
         <h3 class="mt-4 text-sm font-semibold">Per momssats</h3>
         <table class="w-full max-w-md text-sm">
           @for (b of r.total.byRate; track b.rate) {

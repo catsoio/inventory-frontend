@@ -37,10 +37,16 @@ export interface CustomerDialogData {
           <input matInput formControlName="name" autocomplete="off" />
           <mat-error>Ange namn</mat-error>
         </mat-form-field>
+        <mat-form-field class="sm:col-span-2">
+          <mat-label>{{
+            form.controls.type.value === 'company' ? 'Organisationsnummer' : 'Personnummer'
+          }}</mat-label>
+          <input matInput formControlName="orgNo" autocomplete="off" />
+        </mat-form-field>
         @if (form.controls.type.value === 'company') {
           <mat-form-field class="sm:col-span-2">
-            <mat-label>Organisationsnummer</mat-label>
-            <input matInput formControlName="orgNo" />
+            <mat-label>Kontaktperson</mat-label>
+            <input matInput formControlName="contactPerson" autocomplete="off" />
           </mat-form-field>
         }
         <mat-form-field>
@@ -79,6 +85,7 @@ export class CustomerDialog {
       type: [(c?.type ?? 'private') as CustomerType],
       name: [c?.name ?? data.name ?? '', Validators.required],
       orgNo: [c?.orgNo ?? ''],
+      contactPerson: [c?.contactPerson ?? ''],
       phone: [c?.phone ?? ''],
       email: [c?.email ?? '', Validators.email],
       notes: [c?.notes ?? ''],
@@ -91,7 +98,8 @@ export class CustomerDialog {
     const v = this.form.getRawValue();
     const body = {
       ...v,
-      orgNo: v.type === 'company' ? v.orgNo || null : null,
+      orgNo: v.orgNo || null,
+      contactPerson: v.type === 'company' ? v.contactPerson || null : null,
       phone: v.phone || null,
       email: v.email || null,
       notes: v.notes || null,

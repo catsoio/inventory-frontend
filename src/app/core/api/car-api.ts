@@ -50,6 +50,22 @@ export class CarApi {
     return this.http.post<CarListing>(`${this.base}/${id}/images`, body);
   }
 
+  /** Sparar en köpehandling (PDF eller bild, högst 10 MB) på bilen. Aldrig publik. */
+  addDocument(id: string, file: File): Observable<CarListing> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<CarListing>(`${this.base}/${id}/documents`, body);
+  }
+
+  /** Filen själv; den kräver inloggning, så den hämtas hit och inte med en vanlig länk. */
+  document(id: string, name: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${id}/documents/${name}`, { responseType: 'blob' });
+  }
+
+  removeDocument(id: string, name: string): Observable<CarListing> {
+    return this.http.delete<CarListing>(`${this.base}/${id}/documents/${name}`);
+  }
+
   remove(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
   }

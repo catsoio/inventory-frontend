@@ -1,14 +1,17 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { kronor } from '../shared/chart/chart-kit';
+import { CarTodo, carTodo } from '../shared/car-stock';
 import { invoiceStatus } from '../shared/invoice-status';
 import { AxleApi } from './api/axle-api';
 import { BookingApi } from './api/booking-api';
+import { CarApi } from './api/car-api';
 import { QuoteApi } from './api/quote-api';
 import { SalesCardApi } from './api/sales-card-api';
 import { StorageApi } from './api/storage-api';
 import { WorkOrderApi } from './api/work-order-api';
 import { Auth } from './auth/auth';
+import type { Product } from './layout/products';
 import { StorageSummary, Summary } from './models';
 import { environment } from '../../environments/environment';
 
@@ -35,6 +38,8 @@ export interface Badge {
 /** En sak som väntar på någon. Hem ("Att göra") och menyns siffror läser samma lista. */
 export interface TodoItem {
   key: string;
+  /** Vilken produkt det väntar i: Axle (verkstaden) eller Hall (bilhandeln). */
+  product: Product;
   urgency: Urgency;
   /** Menyvalen (adresser i `NAV`) som visar siffran. Tomt = bara på Hem. */
   menus: string[];
@@ -50,17 +55,32 @@ export interface TodoItem {
   desktopOnly?: boolean;
 }
 
+/** Obetalda fakturor (ägaren), och hur många av dem som har förfallit. */
+export interface UnpaidInvoices {
+  unpaid: number;
+  overdue: number;
+  amount: number;
+  more: boolean;
+}
+
 export interface TodoInput {
   stock: Summary | null;
   hotel: StorageSummary | null;
+  /** Säljkort som väntar på att bokföras (verkstadens, utan bil). */
   drafts: number;
-  /** Obetalda fakturor (ägaren), och hur många av dem som har förfallit. */
-  invoices: { unpaid: number; overdue: number; amount: number; more: boolean } | null;
+  /** Verkstadens obetalda fakturor. */
+  invoices: UnpaidInvoices | null;
   /** Arbetsorder där en del saknas. */
   partsOrders: number;
   quotes: { approved: number; waiting: number };
   /** Bokningsförfrågningar från bokningssidan som ingen bekräftat än. */
   requests?: number;
+  /** Bilhandeln: det som väntar i bilarnas böcker. */
+  cars?: CarTodo;
+  /** Bilhandelns affärer (säljkort med bil) som väntar på att bokföras. */
+  hallDrafts?: number;
+  /** Bilhandelns obetalda fakturor. */
+  hallInvoices?: UnpaidInvoices | null;
 }
 
 const RANK: Record<Urgency, number> = { urgent: 0, wait: 1, info: 2 };
@@ -71,6 +91,99 @@ const TONES: Record<Exclude<Urgency, 'info'>, { tone: string; dot: string }> = {
 };
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/**
+ * Obetalda fakturor för en produkt. Siffran ligger på Fakturor (som är gemensam) och på
+ * Ekonomi-raden i den produktens egen meny.
+ */
+function unpaidInvoices(product: Product, inv: UnpaidInvoices): TodoItem[] {
+  if (inv.unpaid <= 0) return [];
+  const late = inv.overdue > 0;
+  return [
+    {
+      key: product === 'hall' ? 'hall-unpaid-invoices' : 'unpaid-invoices',
+      product,
+      urgency: late ? 'urgent' : 'wait',
+      // På Fakturor, och på Ekonomi (gruppens rad när den är hopfälld, och mobilens "Mer").
+      menus: ['/finance/invoices', product === 'hall' ? '/dealership/finance' : '/finance'],
+      badgeCount: late ? inv.overdue : inv.unpaid,
+      badgeNoun: late ? ['förfallen', 'förfallna'] : ['obetald', 'obetalda'],
+      text:
+        `${inv.unpaid} ${plural(inv.unpaid, 'obetald faktura', 'obetalda fakturor')}` +
+        (late ? `, varav ${inv.overdue} ${plural(inv.overdue, 'förfallen', 'förfallna')}` : '') +
+        ` · ${kronor(inv.amount)}${inv.more ? '+' : ''}`,
+      icon: 'receipt_long',
+      link: '/finance/invoices',
+      params: { status: late ? 'overdue' : 'unpaid' },
+    },
+  ];
+}
+
+/** Det som väntar i bilhandelns bilar. Länkarna bär `flag` så att siffran går att hitta i listan. */
+function carItems(c: CarTodo | undefined): TodoItem[] {
+  if (!c) return [];
+  const car = (
+    key: string,
+    n: number,
+    icon: string,
+    flag: string,
+    noun: [string, string],
+    text: string,
+    desktopOnly = false,
+  ): TodoItem[] =>
+    n > 0
+      ? [
+          {
+            key,
+            product: 'hall',
+            urgency: 'wait',
+            menus: ['/dealership/cars'],
+            badgeCount: n,
+            badgeNoun: noun,
+            text,
+            icon,
+            link: '/dealership/cars',
+            params: { flag },
+            desktopOnly,
+          },
+        ]
+      : [];
+  return [
+    ...car(
+      'car-sellers',
+      c.sellersMissing,
+      'person_search',
+      'sellers',
+      ['saknar säljare', 'saknar säljare'],
+      `${c.sellersMissing} ${plural(c.sellersMissing, 'inköpt bil saknar', 'inköpta bilar saknar')} uppgift om vem ni köpte av`,
+      true,
+    ),
+    ...car(
+      'cars-unlisted',
+      c.unlisted,
+      'publish',
+      'unlisted',
+      ['ej utlagd', 'ej utlagda'],
+      `${c.unlisted} ${plural(c.unlisted, 'inköpt bil är', 'inköpta bilar är')} inte utlagd${c.unlisted === 1 ? '' : 'a'} till salu`,
+    ),
+    ...car(
+      'cars-inspection',
+      c.inspectionSoon,
+      'fact_check',
+      'inspection',
+      ['besiktning', 'besiktningar'],
+      `${c.inspectionSoon} ${plural(c.inspectionSoon, 'bil', 'bilar')} behöver besiktas inom 30 dagar`,
+    ),
+    ...car(
+      'cars-idle',
+      c.idle,
+      'hourglass_top',
+      'idle',
+      ['står länge', 'står länge'],
+      `${c.idle} ${plural(c.idle, 'bil har', 'bilar har')} stått 90 dagar eller mer, se över priset`,
+    ),
+  ];
+}
 
 /**
  * Allt som väntar, mest brådskande först. Här, och bara här, bestäms vad som räknas och hur
@@ -84,6 +197,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (h && h.overdue > 0) {
     out.push({
       key: 'late-sets',
+      product: 'axle',
       urgency: 'urgent',
       menus: ['/storage'],
       badgeCount: h.overdue,
@@ -97,6 +211,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (h && h.unpaid > 0) {
     out.push({
       key: 'unpaid-sets',
+      product: 'axle',
       urgency: 'wait',
       menus: ['/storage'],
       badgeCount: h.unpaid,
@@ -113,6 +228,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (s && s.reorderSoldOut > 0) {
     out.push({
       key: 'sold-out',
+      product: 'axle',
       urgency: 'urgent',
       menus: ['/inventory'],
       badgeCount: s.reorderSoldOut,
@@ -126,6 +242,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (s && s.reorderLow > 0) {
     out.push({
       key: 'to-order',
+      product: 'axle',
       urgency: 'wait',
       menus: ['/inventory'],
       badgeCount: s.reorderLow,
@@ -136,28 +253,12 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       params: { lowStock: true, inStock: true },
     });
   }
-  if (inv && inv.unpaid > 0) {
-    const late = inv.overdue > 0;
-    out.push({
-      key: 'unpaid-invoices',
-      urgency: late ? 'urgent' : 'wait',
-      // På Fakturor, och på Ekonomi (gruppens rad när den är hopfälld, och mobilens "Mer").
-      menus: ['/finance/invoices', '/finance'],
-      badgeCount: late ? inv.overdue : inv.unpaid,
-      badgeNoun: late ? ['förfallen', 'förfallna'] : ['obetald', 'obetalda'],
-      text:
-        `${inv.unpaid} ${plural(inv.unpaid, 'obetald faktura', 'obetalda fakturor')}` +
-        (late ? `, varav ${inv.overdue} ${plural(inv.overdue, 'förfallen', 'förfallna')}` : '') +
-        ` · ${kronor(inv.amount)}${inv.more ? '+' : ''}`,
-      icon: 'receipt_long',
-      link: '/finance/invoices',
-      params: { status: late ? 'overdue' : 'unpaid' },
-    });
-  }
+  if (inv) out.push(...unpaidInvoices('axle', inv));
   if ((i.requests ?? 0) > 0) {
     const n = i.requests!;
     out.push({
       key: 'booking-requests',
+      product: 'axle',
       urgency: 'wait',
       menus: ['/bookings'],
       badgeCount: n,
@@ -168,10 +269,13 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       params: { view: 'list' },
     });
   }
+  out.push(...carItems(i.cars));
+  if (i.hallInvoices) out.push(...unpaidInvoices('hall', i.hallInvoices));
   if (i.quotes.approved > 0) {
     const n = i.quotes.approved;
     out.push({
       key: 'quotes-approved',
+      product: 'axle',
       urgency: 'wait',
       menus: ['/quotes'],
       badgeCount: n,
@@ -185,6 +289,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (i.drafts > 0) {
     out.push({
       key: 'drafts',
+      product: 'axle',
       urgency: 'wait',
       menus: ['/sales'],
       badgeCount: i.drafts,
@@ -195,9 +300,25 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       params: { show: 'draft' },
     });
   }
+  if ((i.hallDrafts ?? 0) > 0) {
+    const n = i.hallDrafts!;
+    out.push({
+      key: 'hall-drafts',
+      product: 'hall',
+      urgency: 'wait',
+      menus: ['/dealership/deals'],
+      badgeCount: n,
+      badgeNoun: ['utkast', 'utkast'],
+      text: `${n} ${plural(n, 'bilaffär väntar', 'bilaffärer väntar')} på att bokföras`,
+      icon: 'edit_note',
+      link: '/dealership/deals',
+      params: { show: 'draft' },
+    });
+  }
   if (i.partsOrders > 0) {
     out.push({
       key: 'parts',
+      product: 'axle',
       urgency: 'wait',
       menus: ['/workorders'],
       badgeCount: i.partsOrders,
@@ -213,6 +334,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
     const n = i.quotes.waiting;
     out.push({
       key: 'quotes-waiting',
+      product: 'axle',
       urgency: 'info',
       menus: [],
       badgeCount: n,
@@ -260,6 +382,7 @@ export class Todo {
   private readonly cards = inject(SalesCardApi);
   private readonly quoteApi = inject(QuoteApi);
   private readonly bookingApi = inject(BookingApi);
+  private readonly carApi = inject(CarApi);
 
   private readonly stock = signal<Summary | null>(null);
   private readonly hotel = signal<StorageSummary | null>(null);
@@ -268,7 +391,10 @@ export class Todo {
   private readonly approved = signal(0);
   private readonly waiting = signal(0);
   private readonly requests = signal(0);
+  private readonly cars = signal<CarTodo | undefined>(undefined);
+  private readonly hallDrafts = signal(0);
   private readonly invoices = signal<TodoInput['invoices']>(null);
+  private readonly hallInvoices = signal<TodoInput['hallInvoices']>(null);
 
   readonly items = computed(() =>
     buildTodo({
@@ -279,8 +405,28 @@ export class Todo {
       partsOrders: this.partsOrders(),
       quotes: { approved: this.approved(), waiting: this.waiting() },
       requests: this.requests(),
+      cars: this.cars(),
+      hallDrafts: this.hallDrafts(),
+      hallInvoices: this.hallInvoices(),
     }),
   );
+
+  /** Det som väntar i en produkt. Menyn och Hem visar bara den produktens saker. */
+  itemsFor(product: Product): TodoItem[] {
+    return this.items().filter((t) => t.product === product);
+  }
+
+  /**
+   * Hur brådskande det mest brådskande är i en produkt (för pricken på produktfliken), eller null när
+   * inget väntar. Bara sådant som blir en siffra räknas, inte "bra att veta".
+   */
+  readonly urgencyOf = computed<Record<Product, Exclude<Urgency, 'info'> | null>>(() => {
+    const worst = (p: Product) => {
+      const mine = this.items().filter((t) => t.product === p && t.urgency !== 'info');
+      return mine.some((t) => t.urgency === 'urgent') ? 'urgent' : mine.length ? 'wait' : null;
+    };
+    return { axle: worst('axle'), hall: worst('hall') };
+  });
 
   /** Lager och hotell hämtade, så att "Allt under kontroll" inte visas innan svaret kommit. */
   readonly ready = computed(() => this.stock() !== null && this.hotel() !== null);
@@ -289,7 +435,11 @@ export class Todo {
     return this.auth.isAdmin() || this.auth.isSuperAdmin();
   }
 
-  refresh(): void {
+  /**
+   * `hall` = garaget har bilhandel (modulen är påslagen). Todo känner inte till abonnemanget, så den
+   * som anropar säger det; utan bilhandel hämtas inga bilar och inga bilaffärer.
+   */
+  refresh(hall = false): void {
     // Mekanikern har inga lager- eller hotellsiffror att visa (och skulle få 403).
     if (this.auth.isMechanic() || !this.auth.garage()) return;
     this.inventory
@@ -301,7 +451,7 @@ export class Todo {
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.hotel.set(x));
     this.cards
-      .list({ status: 'draft', limit: 1 })
+      .list({ status: 'draft', product: 'axle', limit: 1 })
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.drafts.set(x?.pagination.total ?? 0));
     // Förfrågningar från bokningssidan, de närmaste två månaderna (så långt kalendern läser åt gången).
@@ -310,6 +460,17 @@ export class Todo {
       .between(now, new Date(now.getTime() + 60 * 24 * 3600 * 1000))
       .pipe(catchError(() => of(null)))
       .subscribe((x) => this.requests.set(x?.filter((b) => b.status === 'requested').length ?? 0));
+    // Bilhandeln: utan modulen svarar servern 402 (tyst) och inget av det här visas.
+    if (hall) {
+      this.carApi
+        .list()
+        .pipe(catchError(() => of(null)))
+        .subscribe((x) => this.cars.set(x ? carTodo(x) : undefined));
+      this.cards
+        .list({ status: 'draft', product: 'hall', limit: 1 })
+        .pipe(catchError(() => of(null)))
+        .subscribe((x) => this.hallDrafts.set(x?.pagination.total ?? 0));
+    }
     if (environment.workOrders) {
       this.orders
         .list({ needsAction: true, limit: 1 })
@@ -327,24 +488,27 @@ export class Todo {
     }
     if (!this.admin) return;
     // Pengarna är bara för ägare.
-    this.cards
-      .list({ status: 'posted', paid: false, limit: 100 })
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => {
-        if (!x) return this.invoices.set(null);
-        const today = new Date();
-        this.invoices.set({
-          unpaid: x.pagination.total,
-          overdue: x.items.filter(
-            (c) =>
-              invoiceStatus(
-                { kind: c.kind ?? 'invoice', dueAt: c.dueAt, paidAt: c.paidAt },
-                today,
-              ) === 'overdue',
-          ).length,
-          amount: x.items.reduce((t, c) => t + c.total, 0),
-          more: x.pagination.total > x.items.length,
+    const unpaid = (product: 'axle' | 'hall', set: (v: UnpaidInvoices | null) => void) =>
+      this.cards
+        .list({ status: 'posted', paid: false, product, limit: 100 })
+        .pipe(catchError(() => of(null)))
+        .subscribe((x) => {
+          if (!x) return set(null);
+          const today = new Date();
+          set({
+            unpaid: x.pagination.total,
+            overdue: x.items.filter(
+              (c) =>
+                invoiceStatus(
+                  { kind: c.kind ?? 'invoice', dueAt: c.dueAt, paidAt: c.paidAt },
+                  today,
+                ) === 'overdue',
+            ).length,
+            amount: x.items.reduce((t, c) => t + c.total, 0),
+            more: x.pagination.total > x.items.length,
+          });
         });
-      });
+    unpaid('axle', (v) => this.invoices.set(v));
+    if (hall) unpaid('hall', (v) => this.hallInvoices.set(v));
   }
 }

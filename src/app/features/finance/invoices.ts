@@ -3,6 +3,7 @@ import { Observable, expand, forkJoin, map, reduce } from 'rxjs';
 import { EMPTY } from 'rxjs';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
+import type { Product } from '../../core/layout/products';
 import { InvoiceKind, PaymentMethod, SalesCardItem, WorkOrder } from '../../core/models';
 import { daysPastDue, invoiceStatus } from '../../shared/invoice-status';
 
@@ -14,6 +15,8 @@ export interface InvoiceItem {
   source: 'card' | 'order';
   /** Faktura (betalas senare) eller kvitto (betalt på stället). */
   kind: InvoiceKind;
+  /** Verkstadens (Axle) eller bilhandelns (Hall). Äldre arbetsorderdokument är alltid verkstadens. */
+  product: Product;
   code: string;
   invoicedAt: string | null;
   /** Förfallodatum. Bara en faktura har ett. */
@@ -88,6 +91,7 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
         .map((o): InvoiceItem => ({
           id: o.id,
           source: 'order',
+          product: 'axle',
           // Äldre svar saknar typen: en faktura är det som har ett förfallodatum.
           kind: o.invoiceKind ?? (o.invoiceDueAt ? 'invoice' : 'receipt'),
           code: o.invoiceCode!,
@@ -114,6 +118,7 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
       all.map((c): InvoiceItem => ({
         id: c.id,
         source: 'card',
+        product: c.product ?? 'axle',
         kind: c.kind ?? (c.dueAt ? 'invoice' : 'receipt'),
         code: c.documentCode ?? c.code,
         invoicedAt: c.invoicedAt,

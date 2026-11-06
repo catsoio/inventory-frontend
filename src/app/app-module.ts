@@ -22,6 +22,8 @@ import { envelopeInterceptor } from './core/http/envelope-interceptor';
 import { errorInterceptor } from './core/http/error-interceptor';
 import { garageHeaderInterceptor } from './core/http/garage-header-interceptor';
 import { appLocale } from './core/i18n/locale';
+import { UrlSerializer } from '@angular/router';
+import { ProductUrlSerializer } from './core/layout/products';
 import { SharedModule } from './shared/shared-module';
 
 registerLocaleData(localeSv);
@@ -32,6 +34,8 @@ registerLocaleData(localeEnGb);
   imports: [BrowserModule, AppRoutingModule, SharedModule],
   providers: [
     provideBrowserGlobalErrorListeners(),
+    // Adresserna får produktens prefix: /axle/… och /hall/… (se core/layout/products.ts).
+    { provide: UrlSerializer, useClass: ProductUrlSerializer },
     { provide: TitleStrategy, useClass: AppTitleStrategy },
     // Språket läses vid start; byts språk laddas appen om (se I18n.set).
     { provide: LOCALE_ID, useFactory: appLocale },

@@ -1,6 +1,7 @@
 import { appLocale } from '../../core/i18n/locale';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { SharedModule } from '../../shared/shared-module';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { SalesCardItem } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
@@ -25,6 +26,7 @@ const toneOf = (c: SalesCardItem) => {
   return s ? STATUS_TONE[s] : 'gray';
 };
 
+/** Verkstadens kolumner. Bilhandelns affär är en bil, så Regnr byts mot Bil och Rader utgår. */
 const COLS: DtCol<SalesCardItem>[] = [
   { key: 'code', label: 'Nr', value: (c) => c.number },
   {
@@ -47,23 +49,34 @@ const COLS: DtCol<SalesCardItem>[] = [
   { key: 'status', label: 'Status', value: statusOf },
 ];
 
+const HALL_COLS: DtCol<SalesCardItem>[] = COLS.filter(
+  (c) => c.key !== 'regNo' && c.key !== 'lines',
+).flatMap((c) =>
+  c.key === 'customer'
+    ? [c, { key: 'car', label: 'Bil', value: (x: SalesCardItem) => x.carLabel ?? '' }]
+    : [c],
+);
+
 type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
 
-/** Alla säljkort: utkast, bokförda och betalda. En affär per kort. */
+/**
+ * Säljkorten: utkast, bokförda och betalda, en affär per kort. Samma lista i båda produkterna: i Axle
+ * visas verkstadens kort, i Hall (`/dealership/deals`, ruttdata `product: 'hall'`) bilaffärerna.
+ */
 @Component({
   selector: 'app-sales-list',
-  standalone: false,
+  imports: [SharedModule],
   host: { class: 'flex h-full flex-col' },
   template: `
     <app-list-page
-      title="Försäljning"
+      [title]="hall ? 'Affärer' : 'Försäljning'"
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
       newLink="/sales/new"
-      newLabel="Ny försäljning"
-      emptyText="Inga säljkort än. Skapa ett med knappen, eller från en arbetsorder eller ett däckhotell."
-      searchPlaceholder="Sök nummer, kund eller regnr…"
+      [newLabel]="hall ? 'Ny affär' : 'Ny försäljning'"
+      [emptyText]="empty"
+      [searchPlaceholder]="hall ? 'Sök nummer, kund eller bil…' : 'Sök nummer, kund eller regnr…'"
       (search)="q.set($event); load()"
       (rowClick)="router.navigate(['/sales', $event.id])"
     >
@@ -90,7 +103,9 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
               <span class="text-xs text-gray-500">{{ dateOf(c) }}</span>
             </div>
             <div class="truncate text-sm text-gray-700">{{ c.customerName ?? 'Kontantkund' }}</div>
-            @if (c.regNo) {
+            @if (c.carLabel) {
+              <div class="truncate text-sm font-medium">{{ c.carLabel }}</div>
+            } @else if (c.regNo) {
               <app-reg-plate class="mt-1" [value]="c.regNo" size="sm" />
             }
           </div>
@@ -115,7 +130,12 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
 export class SalesList {
   private readonly api = inject(SalesCardApi);
   readonly router = inject(Router);
-  readonly cols = COLS;
+  /** Bilhandelns affärer (`/dealership/deals`) eller verkstadens försäljning (`/sales`). */
+  readonly hall = inject(ActivatedRoute).snapshot.data['product'] === 'hall';
+  readonly cols = this.hall ? HALL_COLS : COLS;
+  readonly empty = this.hall
+    ? 'Inga affärer än. Öppna en bil och välj Sälj bilen.'
+    : 'Inga säljkort än. Skapa ett med knappen, eller från en arbetsorder eller ett däckhotell.';
   readonly statusOf = statusOf;
   readonly toneOf = toneOf;
   readonly kr = (ore: number) => kr.transform(ore);
@@ -143,6 +163,7 @@ export class SalesList {
       .list({
         q: this.q() || undefined,
         status: f === 'draft' ? 'draft' : undefined,
+        product: this.hall ? 'hall' : 'axle',
         paid: f === 'paid' ? true : f === 'unpaid' ? false : undefined,
         limit: 100,
       })

@@ -82,6 +82,16 @@ import { Auth } from '../../../core/auth/auth';
             <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
             <mat-hint>Valfritt för svenska företag</mat-hint>
           </mat-form-field>
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Kontaktperson</mat-label>
+            <input matInput formControlName="contactPerson" autocomplete="off" />
+          </mat-form-field>
+        } @else {
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Personnummer</mat-label>
+            <input matInput formControlName="orgNo" placeholder="ÅÅMMDD-XXXX" autocomplete="off" />
+            <mat-hint>Valfritt. Behövs vid bilköp. Skrivs aldrig på en faktura.</mat-hint>
+          </mat-form-field>
         }
         <mat-form-field class="sm:col-span-2">
           <mat-label
@@ -228,10 +238,7 @@ import { Auth } from '../../../core/auth/auth';
                 </a>
               }
             </div>
-            <app-quote-history
-              [customerId]="c.id"
-              empty="Inga offerter till den här kunden än."
-            />
+            <app-quote-history [customerId]="c.id" empty="Inga offerter till den här kunden än." />
           </section>
         }
 
@@ -281,6 +288,7 @@ export class CustomerCard implements OnInit {
     name: ['', Validators.required],
     orgNo: [''],
     vatNumber: [''],
+    contactPerson: [''],
     address: [''],
     postalCode: [''],
     city: [''],
@@ -318,6 +326,7 @@ export class CustomerCard implements OnInit {
         name: c.name,
         orgNo: c.orgNo ?? '',
         vatNumber: c.vatNumber ?? '',
+        contactPerson: c.contactPerson ?? '',
         address: c.address ?? '',
         postalCode: c.postalCode ?? '',
         city: c.city ?? '',
@@ -350,8 +359,10 @@ export class CustomerCard implements OnInit {
     const body = {
       type: v.type,
       name: v.name,
-      orgNo: v.type === 'company' ? v.orgNo || null : null,
+      // Org.nr för ett företag, personnummer för en privatperson.
+      orgNo: v.orgNo || null,
       vatNumber: v.type === 'company' ? v.vatNumber || null : null,
+      contactPerson: v.type === 'company' ? v.contactPerson || null : null,
       address: v.address || null,
       postalCode: v.postalCode || null,
       city: v.city || null,

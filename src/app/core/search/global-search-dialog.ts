@@ -15,10 +15,12 @@ import {
   tap,
 } from 'rxjs';
 import { Billing } from '../billing/billing';
-import { QUICK_ACTIONS } from './quick-actions';
+import { Nav } from '../layout/nav';
+import { quickActionsOf } from './quick-actions';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { SharedModule } from '../../shared/shared-module';
 import { AxleApi } from '../api/axle-api';
+import { CarApi } from '../api/car-api';
 import { QuoteApi } from '../api/quote-api';
 import { SalesCardApi } from '../api/sales-card-api';
 import { StorageApi } from '../api/storage-api';
@@ -31,8 +33,10 @@ import {
   KIND_ICONS,
   KIND_LABELS,
   articleHit,
+  carHit,
   customerHit,
   groupOrder,
+  groupOrderHall,
   normalize,
   orderHit,
   quoteHit,
@@ -106,7 +110,7 @@ const PER_GROUP = 5;
           Genvägar
         </div>
         <div class="grid grid-cols-2 gap-2 p-1 md:grid-cols-4">
-          @for (a of actions; track a.label) {
+          @for (a of actions(); track a.label) {
             <button
               type="button"
               class="flex min-h-14 items-center gap-3 rounded-xl bg-white px-3 text-left text-sm font-medium shadow-sm ring-1 ring-black/5 hover:bg-gray-50 active:bg-gray-100"
@@ -207,12 +211,15 @@ export class GlobalSearchDialog {
   private readonly cards = inject(SalesCardApi);
   private readonly quotes = inject(QuoteApi);
   private readonly inventory = inject(AxleApi);
+  private readonly cars = inject(CarApi);
 
   readonly icons = KIND_ICONS;
-  readonly placeholder =
-    window.innerWidth >= 768
-      ? 'Sök regnr, kund, telefon, plats eller storlek…'
-      : 'Sök regnr, kund, plats…';
+  readonly placeholder = ((hall: boolean, wide: boolean) =>
+    hall
+      ? 'Sök regnr, märke, kund eller telefon…'
+      : wide
+        ? 'Sök regnr, kund, telefon, plats eller storlek…'
+        : 'Sök regnr, kund, plats…')(inject(Nav).product() === 'hall', window.innerWidth >= 768);
   readonly tones = {
     gray: 'bg-gray-100 text-gray-700',
     amber: 'bg-amber-100 text-amber-800',
@@ -229,7 +236,10 @@ export class GlobalSearchDialog {
   private readonly flat = computed(() => this.groups().flatMap((g) => g.hits));
 
   private readonly billing = inject(Billing);
-  readonly actions = QUICK_ACTIONS.filter((a) => this.billing.allows(a.module));
+  private readonly nav = inject(Nav);
+  readonly actions = computed(() =>
+    quickActionsOf(this.nav.product()).filter((a) => this.billing.allows(a.module)),
+  );
 
   constructor() {
     this.q.valueChanges
@@ -258,17 +268,24 @@ export class GlobalSearchDialog {
         catchError(() => of([] as Hit[])),
       );
     const limit = PER_GROUP;
+    const hall = this.nav.product() === 'hall';
     const sources: Record<HitKind, Observable<Hit[]>> = {
+      car: hall
+        ? this.cars.list({ q }).pipe(
+            map((l) => l.slice(0, PER_GROUP).map(carHit)),
+            catchError(() => of([] as Hit[])),
+          )
+        : of([]),
       storage: quiet(this.storage.deposits({ q, limit }), storageHit),
       vehicle: quiet(this.workshop.vehicles({ q, limit }), vehicleHit),
       customer: quiet(this.workshop.customers({ q, limit }), customerHit),
       order: environment.workOrders ? quiet(this.orders.list({ q, limit }), orderHit) : of([]),
       quote: environment.workOrders ? quiet(this.quotes.list({ q, limit }), quoteHit) : of([]),
-      sale: quiet(this.cards.list({ q, limit }), saleHit),
+      sale: quiet(this.cards.list({ q, limit, product: hall ? 'hall' : 'axle' }), saleHit),
       article: quiet(this.inventory.articles({ q, limit }), articleHit),
       supplier: quiet(this.workshop.suppliers({ q, limit }), supplierHit),
     };
-    const order = groupOrder(q);
+    const order = hall ? groupOrderHall(q) : groupOrder(q).filter((k) => k !== 'car');
     return forkJoin(order.map((k) => sources[k])).pipe(
       map((lists) =>
         lists

@@ -1,4 +1,4 @@
-import { NgModule } from '@angular/core';
+import { NgModule, inject } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import {
   adminGuard,
@@ -7,6 +7,8 @@ import {
   mechanicGuard,
   moduleGuard,
 } from './core/auth/auth-guard';
+import { Billing } from './core/billing/billing';
+import { Nav } from './core/layout/nav';
 import { Shell } from './core/layout/shell/shell';
 import { onCustomDomain } from './features/public-site/site-context';
 
@@ -64,7 +66,15 @@ const routes: Routes = [
     canActivate: [authGuard, garageGuard],
     canActivateChild: [mechanicGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        // Startsidan är den i produkten man senast arbetade i (Hall bara när garaget har bilhandel).
+        path: '',
+        pathMatch: 'full',
+        redirectTo: () =>
+          inject(Nav).product() === 'hall' && inject(Billing).allows('bilhandel')
+            ? '/dealership'
+            : '/dashboard',
+      },
       {
         path: 'dashboard',
         title: 'Hem',
