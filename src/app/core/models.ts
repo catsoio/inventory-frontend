@@ -937,6 +937,36 @@ export interface CarInfoStatus {
   email: string | null;
 }
 
+/** Verkstadens anslutning till Blocket; aldrig nyckeln. `live` falskt = annonserna skickas dolda. */
+export interface BlocketStatus {
+  connected: boolean;
+  dealerCode: string | null;
+  live: boolean;
+}
+
+/** Var en bils annons står hos Blocket. `off` = aldrig skickad. */
+export type BlocketAdState = 'off' | 'pending' | 'live' | 'hidden' | 'removed' | 'error';
+
+export const BLOCKET_STATE_LABELS: Record<BlocketAdState, string> = {
+  off: 'Inte på Blocket',
+  pending: 'Skickas till Blocket…',
+  live: 'Publicerad på Blocket',
+  hidden: 'Skickad dold',
+  removed: 'Borttagen från Blocket',
+  error: 'Gick inte att skicka',
+};
+
+/** Bilens annons hos Blocket, som servern håller den i takt med bilen. */
+export interface CarBlocket {
+  /** Säljaren vill ha bilen på Blocket (den skickas medan den är till salu). */
+  enabled: boolean;
+  blocketAdId: string | null;
+  state: BlocketAdState;
+  /** Senaste felet, eller en anmärkning om något som inte kunde skickas. */
+  message: string | null;
+  syncedAt: string | null;
+}
+
 /** `heading`: underrubrik i en grupp. `columns`: rubrikrad i en tabell med flera värden per rad. */
 export interface DetailRow {
   label: string;
@@ -2335,6 +2365,7 @@ export interface CarListing {
   soldCardId: string | null;
   soldPrice: number | null;
   soldAt: string | null;
+  blocket: CarBlocket;
   economy: CarEconomy;
   createdAt: string;
   updatedAt: string;

@@ -43,6 +43,16 @@ export class CarApi {
     return this.http.post<CarListing>(`${this.base}/${id}/refresh`, {});
   }
 
+  /** Lägger bilen på Blocket eller tar ner den; den skickas medan den är till salu. */
+  setBlocket(id: string, enabled: boolean): Observable<CarListing> {
+    return this.http.post<CarListing>(`${this.base}/${id}/blocket`, { enabled });
+  }
+
+  /** Läser hur Blocket gick med annonsen: publicerad, nekad eller fortfarande på gång. */
+  refreshBlocket(id: string): Observable<CarListing> {
+    return this.http.post<CarListing>(`${this.base}/${id}/blocket/refresh`, {});
+  }
+
   /** Lägger en bild sist (JPEG, PNG eller WebP, högst 5 MB). */
   addImage(id: string, file: File): Observable<CarListing> {
     const body = new FormData();

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
@@ -6,8 +6,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { CarApi, SiteApi } from '../../core/api/car-api';
+import { WorkshopApi } from '../../core/api/workshop-api';
+import { Auth } from '../../core/auth/auth';
 import { shrinkImage } from '../../core/image-resize';
 import {
+  BLOCKET_STATE_LABELS,
+  BlocketAdState,
+  BlocketStatus,
   CarCost,
   CarListing,
   LISTING_STATUS_LABELS,
@@ -292,6 +297,62 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
               }
             </section>
 
+            <section class="rounded-xl bg-white p-5 shadow-sm lg:col-span-3 lg:col-start-1">
+              <div class="mb-1 flex flex-wrap items-center gap-3">
+                <h2 class="flex-1 text-base font-semibold">Blocket</h2>
+                @if (c.blocket.state !== 'off') {
+                  <app-pill [tone]="blocketTone(c.blocket.state)">{{
+                    blocketLabel(c.blocket.state)
+                  }}</app-pill>
+                }
+              </div>
+              <p class="mb-3 text-sm text-gray-600">{{ blocketHint() }}</p>
+              @if (c.blocket.message) {
+                <p class="mb-3 text-sm" [class.text-red-700]="c.blocket.state === 'error'">
+                  {{ c.blocket.message }}
+                </p>
+              }
+              <div class="flex flex-wrap items-center gap-2">
+                @if (!c.blocket.enabled) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="setBlocket(true)"
+                    [disabled]="busy() || form.dirty"
+                  >
+                    <mat-icon>campaign</mat-icon> Lägg ut på Blocket
+                  </button>
+                } @else {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="setBlocket(false)"
+                    [disabled]="busy() || form.dirty"
+                  >
+                    Ta bort från Blocket
+                  </button>
+                  @if (c.blocket.state === 'error') {
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="setBlocket(true)"
+                      [disabled]="busy() || form.dirty"
+                    >
+                      Försök igen
+                    </button>
+                  }
+                }
+                @if (blocketMissing()) {
+                  <button mat-button type="button" (click)="openConnections()">
+                    Anslut Blocket
+                  </button>
+                }
+                @if (form.dirty) {
+                  <span class="text-xs text-gray-500">Spara ändringarna först.</span>
+                }
+              </div>
+            </section>
+
             <section
               class="rounded-xl bg-white p-5 shadow-sm lg:col-span-2 lg:col-start-4 lg:row-span-2 lg:row-start-1"
             >
@@ -492,8 +553,13 @@ export class CarCard implements OnInit {
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
   private readonly fb = inject(FormBuilder);
+  private readonly workshop = inject(WorkshopApi);
+  private readonly auth = inject(Auth);
 
   readonly card = signal<CarListing | null>(null);
+  /** Blocket-anslutningen; bara ägaren får läsa den, så för övriga är den okänd. */
+  readonly blocketConnection = signal<BlocketStatus | null>(null);
+  private blocketTimer: ReturnType<typeof setInterval> | null = null;
   readonly site = signal<SiteSettings | null>(null);
   readonly busy = signal(false);
   readonly uploading = signal<string | null>(null);
@@ -555,6 +621,7 @@ export class CarCard implements OnInit {
   });
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.stopWatchingBlocket());
     // Momsen vid försäljning följer av inköpet: utan moms på köpet gäller vinstmarginalbeskattning
     // (VMB), med moms på köpet gäller vanlig moms. Användaren väljer inget av det.
     this.form.controls.purchaseVat.valueChanges.pipe(takeUntilDestroyed()).subscribe((rate) => {
@@ -596,6 +663,8 @@ export class CarCard implements OnInit {
 
   ngOnInit() {
     this.siteApi.get().subscribe((s) => this.site.set(s));
+    if (this.auth.isAdmin())
+      this.workshop.blocket().subscribe((s) => this.blocketConnection.set(s));
     const id = this.route.snapshot.paramMap.get('id');
     if (id) this.api.get(id).subscribe((c) => this.show(c));
   }
@@ -643,6 +712,89 @@ export class CarCard implements OnInit {
     });
     this.lockMoney(!!c.soldCardId);
     this.resetting = false;
+    this.watchBlocket();
+  }
+
+  readonly blocketLabel = (state: BlocketAdState) => BLOCKET_STATE_LABELS[state];
+  readonly blocketTone = (state: BlocketAdState) =>
+    ({
+      live: 'green',
+      pending: 'blue',
+      hidden: 'amber',
+      error: 'red',
+      removed: 'gray',
+      off: 'gray',
+    })[state] as 'green' | 'blue' | 'amber' | 'red' | 'gray';
+
+  /** Ägaren ser att Blocket inte är anslutet och kan gå dit; för personalen vet vi inte. */
+  readonly blocketMissing = computed(() => {
+    const s = this.blocketConnection();
+    return s !== null && !s.connected;
+  });
+
+  /** Vad som händer med bilen på Blocket just nu, i en mening. */
+  readonly blocketHint = computed(() => {
+    const c = this.card();
+    if (!c) return '';
+    const b = c.blocket;
+    if (!b.enabled) {
+      return 'Bilen läggs ut på Blocket och Bytbil medan den är till salu och tas ner när den är såld.';
+    }
+    if (c.status === 'draft') return 'Bilen skickas till Blocket när den har status Till salu.';
+    if (c.status === 'sold') return 'Annonsen är nedtagen från Blocket eftersom bilen är såld.';
+    if (this.blocketConnection()?.connected && this.blocketConnection()?.live === false) {
+      return 'Provläge: annonsen skickas dold och syns bara i Blockets adminpanel. Slå på publicering under Inställningar, Anslutningar.';
+    }
+    return b.blocketAdId
+      ? `Annonsen ändras på Blocket när du sparar bilen. Annons-id ${b.blocketAdId}.`
+      : 'Annonsen ändras på Blocket när du sparar bilen.';
+  });
+
+  setBlocket(enabled: boolean) {
+    const c = this.card();
+    if (!c) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.api.setBlocket(c.id, enabled).subscribe({
+      next: (r) => {
+        this.busy.set(false);
+        this.takeBlocket(r);
+      },
+      error: (e: ApiError) => this.fail(e, 'Det gick inte att ändra Blocket.'),
+    });
+  }
+
+  openConnections() {
+    void import('../settings/settings').then((m) => m.openSettings(this.dialog, 'anslutningar'));
+  }
+
+  /** Bara annonsens status byts: det som står osparat i formuläret ska vara kvar. */
+  private takeBlocket(r: CarListing) {
+    this.card.update((x) => (x ? { ...x, blocket: r.blocket } : x));
+    this.watchBlocket();
+  }
+
+  /** Blocket behandlar en annons efteråt, så medan den är på gång läser vi av den var fjärde sekund. */
+  private watchBlocket() {
+    this.stopWatchingBlocket();
+    if (this.card()?.blocket.state !== 'pending') return;
+    let tries = 0;
+    this.blocketTimer = setInterval(() => {
+      const c = this.card();
+      if (!c || ++tries > 20) return this.stopWatchingBlocket();
+      this.api.refreshBlocket(c.id).subscribe({
+        next: (r) => {
+          this.card.update((x) => (x ? { ...x, blocket: r.blocket } : x));
+          if (r.blocket.state !== 'pending') this.stopWatchingBlocket();
+        },
+        error: () => this.stopWatchingBlocket(),
+      });
+    }, 4000);
+  }
+
+  private stopWatchingBlocket() {
+    if (this.blocketTimer) clearInterval(this.blocketTimer);
+    this.blocketTimer = null;
   }
 
   /** En bil såld på ett bokfört säljkort har låsta pengar: fälten är avstängda och skickas inte med. */

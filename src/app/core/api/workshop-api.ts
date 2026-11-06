@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  BlocketStatus,
   CarInfoStatus,
   Customer,
   CustomerDetail,
@@ -127,6 +128,24 @@ export class WorkshopApi {
 
   clearCarInfo(): Observable<CarInfoStatus> {
     return this.http.delete<CarInfoStatus>(`${this.base}/settings/carinfo`);
+  }
+
+  /** Verkstadens anslutning till Blocket; aldrig nyckeln (ägare). */
+  blocket(): Observable<BlocketStatus> {
+    return this.http.get<BlocketStatus>(`${this.base}/settings/blocket`);
+  }
+
+  /** Kontrollerar en ny nyckel hos Blocket och sparar den; utan nyckel ändras bara resten (ägare). */
+  saveBlocket(body: {
+    token?: string;
+    dealerCode?: string | null;
+    live?: boolean;
+  }): Observable<BlocketStatus> {
+    return this.http.put<BlocketStatus>(`${this.base}/settings/blocket`, body);
+  }
+
+  clearBlocket(): Observable<BlocketStatus> {
+    return this.http.delete<BlocketStatus>(`${this.base}/settings/blocket`);
   }
 
   createVehicle(body: VehicleInput): Observable<Vehicle> {

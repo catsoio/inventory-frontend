@@ -21,6 +21,9 @@ const MESSAGES: Record<string, string> = {
   INVALID_MEMBER_ACTION: 'Det går inte att göra så med den användaren.',
   CARINFO_LOGIN_FAILED:
     'car.info godtog inte e-postadressen och lösenordet. Kontrollera dem och försök igen.',
+  BLOCKET_TOKEN_REJECTED:
+    'Blocket godtog inte nyckeln. Kontrollera att den är kopierad helt och försök igen.',
+  BLOCKET_FAILED: 'Blocket kunde inte nås eller svarade med ett fel. Försök igen om en stund.',
   INVALID_DEPOSIT: 'Ogiltig inlämning. Kontrollera uppgifterna.',
   INVALID_DEPOSIT_STATE: 'Åtgärden passar inte inlämningens status.',
   INVALID_PERIOD: 'Perioden är ogiltig. Slutdatum måste ligga efter startdatum.',

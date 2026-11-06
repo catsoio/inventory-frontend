@@ -3,7 +3,8 @@ import { FormControl, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { WorkshopApi } from '../../../core/api/workshop-api';
-import type { CarInfoStatus } from '../../../core/models';
+import { Billing } from '../../../core/billing/billing';
+import type { BlocketStatus, CarInfoStatus } from '../../../core/models';
 import { Confirm } from '../../../shared/confirm';
 
 /** Anslutningar till andra tjänster, ett kort per tjänst; klick öppnar inloggningen. */
@@ -37,17 +38,64 @@ import { Confirm } from '../../../shared/confirm';
           <mat-icon class="text-gray-500">add</mat-icon>
         }
       </button>
+      @if (hasCars()) {
+        <button
+          type="button"
+          class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 text-left hover:bg-gray-50"
+          (click)="openBlocket()"
+        >
+          <span
+            class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#1f4fd8] text-white"
+          >
+            <mat-icon>campaign</mat-icon>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block font-semibold">Blocket</span>
+            <span class="block text-sm text-gray-500">Lägg ut bilarna på Blocket och Bytbil</span>
+            @if (blocket(); as b) {
+              @if (b.connected) {
+                <span class="block truncate text-sm text-gray-500">
+                  {{ b.live ? 'Annonserna publiceras' : 'Annonserna skickas dolda' }}
+                </span>
+              }
+            }
+          </span>
+          @if (blocket()?.connected) {
+            <app-pill [tone]="blocket()?.live ? 'green' : 'amber'">{{
+              blocket()?.live ? 'Ansluten' : 'Provläge'
+            }}</app-pill>
+          } @else {
+            <mat-icon class="text-gray-500">add</mat-icon>
+          }
+        </button>
+      }
     </div>
   `,
 })
 export class SettingsConnections implements OnInit {
   private readonly api = inject(WorkshopApi);
   private readonly dialog = inject(MatDialog);
+  private readonly billing = inject(Billing);
 
   readonly status = signal<CarInfoStatus | null>(null);
+  readonly blocket = signal<BlocketStatus | null>(null);
+  /** Blocket gäller bilhandeln, så kortet visas bara för ett garage som har den. */
+  readonly hasCars = () => this.billing.allows('bilhandel');
 
   ngOnInit() {
     this.api.carInfo().subscribe((s) => this.status.set(s));
+    if (this.hasCars()) this.api.blocket().subscribe((s) => this.blocket.set(s));
+  }
+
+  openBlocket() {
+    this.dialog
+      .open<BlocketConnectionDialog, BlocketStatus | null, BlocketStatus>(BlocketConnectionDialog, {
+        data: this.blocket(),
+        width: '480px',
+        maxWidth: '95vw',
+      })
+      .afterClosed()
+      .subscribe((s) => s && this.blocket.set(s));
   }
 
   open() {
@@ -141,6 +189,132 @@ export class CarInfoConnectionDialog {
         if (!ok) return;
         this.busy.set(true);
         this.api.clearCarInfo().subscribe({
+          next: (s) => this.ref.close(s),
+          error: () => this.busy.set(false),
+        });
+      });
+  }
+}
+
+@Component({
+  selector: 'app-blocket-connection-dialog',
+  standalone: false,
+  template: `
+    <h2 mat-dialog-title>Blocket</h2>
+    <form (submit)="$event.preventDefault(); save()" autocomplete="off">
+      <mat-dialog-content class="!flex flex-col gap-2 !pt-2 !pb-4">
+        @if (!current?.connected) {
+          <p class="text-sm text-gray-600">
+            Bilarna läggs ut på Blocket och Bytbil med en API-nyckel från Blocket. Mejla
+            butikssupport&#64;blocket.se och be om nyckel till Pro Import API för ert handlarkonto.
+          </p>
+        }
+        <mat-form-field>
+          @if (current?.connected) {
+            <mat-label>Ny nyckel (lämna tom för att behålla)</mat-label>
+          } @else {
+            <mat-label>Nyckel från Blocket</mat-label>
+          }
+          <input matInput type="password" [formControl]="token" autocomplete="new-password" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Handlarkod (valfri)</mat-label>
+          <input matInput [formControl]="dealerCode" autocomplete="off" />
+          <mat-hint>Behövs bara om nyckeln gäller flera handlare.</mat-hint>
+        </mat-form-field>
+        <mat-radio-group
+          [formControl]="live"
+          class="mt-3 grid gap-3"
+          aria-label="Hur annonserna skickas"
+        >
+          <label class="choice" [class.is-on]="live.value === false">
+            <mat-radio-button [value]="false" class="font-medium">Provläge</mat-radio-button>
+            <span class="choice-text"
+              >Annonserna skickas dolda. De syns bara i Blockets adminpanel och kostar
+              ingenting.</span
+            >
+          </label>
+          <label class="choice" [class.is-on]="live.value === true">
+            <mat-radio-button [value]="true" class="font-medium">Publicera</mat-radio-button>
+            <span class="choice-text">Annonserna syns på Blocket och Bytbil.</span>
+          </label>
+        </mat-radio-group>
+      </mat-dialog-content>
+      @if (busy()) {
+        <mat-progress-bar mode="indeterminate" />
+      }
+      <mat-dialog-actions>
+        @if (current?.connected) {
+          <button mat-button type="button" color="warn" [disabled]="busy()" (click)="remove()">
+            Ta bort
+          </button>
+        }
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Avbryt</button>
+        <button mat-flat-button color="primary" [disabled]="busy() || !canSave()">
+          {{
+            token.value.trim()
+              ? busy()
+                ? 'Testar…'
+                : 'Testa anslutning'
+              : busy()
+                ? 'Sparar…'
+                : 'Spara'
+          }}
+        </button>
+      </mat-dialog-actions>
+    </form>
+  `,
+})
+export class BlocketConnectionDialog {
+  private readonly api = inject(WorkshopApi);
+  private readonly snack = inject(MatSnackBar);
+  private readonly confirm = inject(Confirm);
+  private readonly ref = inject<MatDialogRef<BlocketConnectionDialog, BlocketStatus>>(MatDialogRef);
+  readonly current = inject<BlocketStatus | null>(MAT_DIALOG_DATA);
+
+  readonly busy = signal(false);
+  readonly token = new FormControl('', { nonNullable: true });
+  readonly dealerCode = new FormControl(this.current?.dealerCode ?? '', { nonNullable: true });
+  readonly live = new FormControl(this.current?.live ?? false, { nonNullable: true });
+
+  /** En ny anslutning kräver nyckeln; en befintlig kan ändra resten utan den. */
+  canSave() {
+    return !!this.current?.connected || this.token.value.trim().length > 0;
+  }
+
+  save() {
+    if (!this.canSave()) return;
+    this.busy.set(true);
+    const token = this.token.value.trim();
+    this.api
+      .saveBlocket({
+        ...(token ? { token } : {}),
+        dealerCode: this.dealerCode.value.trim() || null,
+        live: this.live.value,
+      })
+      .subscribe({
+        next: (s) => {
+          this.snack.open(token ? 'Anslutningen fungerar' : 'Sparat', 'OK', { duration: 4000 });
+          this.ref.close(s);
+        },
+        error: () => this.busy.set(false),
+      });
+  }
+
+  remove() {
+    this.confirm
+      .ask({
+        title: 'Ta bort anslutningen?',
+        message:
+          'Annonser som redan ligger på Blocket tas inte bort, och bilarna uppdateras inte där längre. Ta bort annonserna först om de ska bort.',
+        confirmText: 'Ta bort',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.busy.set(true);
+        this.api.clearBlocket().subscribe({
           next: (s) => this.ref.close(s),
           error: () => this.busy.set(false),
         });
