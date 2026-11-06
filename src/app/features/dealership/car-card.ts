@@ -67,7 +67,7 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
               Lägg ut till salu
             </button>
           }
-          @if (!c.soldCardId) {
+          @if (!c.soldCardId && c.status !== 'sold') {
             <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ carId: c.id }">
               <mat-icon>point_of_sale</mat-icon> Sälj bilen
             </a>

@@ -12,6 +12,7 @@ import {
   isCarFlag,
   matchesFlag,
 } from '../../shared/car-stock';
+import { carColorHex } from '../../shared/car-color';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
 import type { SectionTab } from '../../shared/section-tabs/section-tabs';
@@ -19,6 +20,8 @@ import type { SectionTab } from '../../shared/section-tabs/section-tabs';
 const kr = new KrPipe();
 const money = (n: number | null | undefined) => (n == null ? '–' : kr.transform(n));
 const costsOf = (c: CarListing) => c.costs.reduce((sum, x) => sum + x.amount, 0);
+
+const totalCostOf = (c: CarListing) => (c.purchase?.price ?? 0) + costsOf(c);
 
 const TONE: Record<ListingStatus, 'green' | 'amber' | 'gray' | 'blue'> = {
   active: 'green',
@@ -57,6 +60,19 @@ const PURCHASE: DtCol<CarListing> = {
   value: (c) => c.purchase?.price ?? 0,
   fmt: (c) => money(c.purchase?.price),
 };
+const COLOR: DtCol<CarListing> = {
+  key: 'color',
+  label: 'Färg',
+  value: (c) => c.color ?? '',
+  fmt: (c) => c.color || '–',
+};
+const TOTAL_COST: DtCol<CarListing> = {
+  key: 'totalCost',
+  label: 'Total kostnad',
+  right: true,
+  value: totalCostOf,
+  fmt: (c) => money(totalCostOf(c)),
+};
 /** Dagar i lager (standtid): det en bilhandlare sorterar på. */
 const DAYS: DtCol<CarListing> = {
   key: 'days',
@@ -77,6 +93,7 @@ const PROFIT: DtCol<CarListing> = {
 const PURCHASES: DtCol<CarListing>[] = [
   REG,
   CAR,
+  COLOR,
   YEAR,
   MILEAGE,
   {
@@ -106,10 +123,12 @@ const PURCHASES: DtCol<CarListing>[] = [
 const FOR_SALE: DtCol<CarListing>[] = [
   REG,
   CAR,
+  COLOR,
   YEAR,
   STATUS,
   DAYS,
   PURCHASE,
+  TOTAL_COST,
   {
     key: 'price',
     label: 'Pris',
@@ -131,9 +150,11 @@ const FOR_SALE: DtCol<CarListing>[] = [
 const SOLD: DtCol<CarListing>[] = [
   REG,
   CAR,
+  COLOR,
   { key: 'soldAt', label: 'Såld', value: (c) => c.soldAt ?? '', fmt: (c) => c.soldAt ?? '' },
   DAYS,
   PURCHASE,
+  TOTAL_COST,
   {
     key: 'price',
     label: 'Såld för',
@@ -240,6 +261,12 @@ const TABS: SectionTab[] = [
         <ng-template #cell let-c="row" let-col="col" let-text="text">
           @if (col.key === 'status') {
             <app-pill [tone]="tone(c.status)">{{ text }}</app-pill>
+          } @else if (col.key === 'color' && c.color) {
+            <span
+              class="mr-1.5 inline-block h-3.5 w-3.5 rounded-full align-middle ring-1 ring-black/20"
+              [style.background]="hex(c.color)"
+            ></span
+            >{{ text }}
           } @else if (col.key === 'days' && c.status !== 'sold' && days(c) >= IDLE_DAYS) {
             <span class="font-medium text-red-700">{{ text }}</span>
           } @else {
@@ -261,6 +288,7 @@ export class CarList {
 
   readonly tabs = TABS;
   readonly IDLE_DAYS = IDLE_DAYS;
+  readonly hex = carColorHex;
   readonly days = (c: CarListing) => daysInStock(c);
   readonly statusText = (s: ListingStatus) => LISTING_STATUS_LABELS[s];
   readonly flagText = (f: CarFlag) => CAR_FLAGS[f];

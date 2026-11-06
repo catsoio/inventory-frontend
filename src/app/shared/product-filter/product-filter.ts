@@ -18,8 +18,8 @@ import type { ProductScope } from '../../core/layout/products';
         aria-label="Produkt"
       >
         <mat-button-toggle value="all">Alla</mat-button-toggle>
-        <mat-button-toggle value="axle">Axle</mat-button-toggle>
-        <mat-button-toggle value="hall">Hall</mat-button-toggle>
+        <mat-button-toggle value="axle">Verkstad</mat-button-toggle>
+        <mat-button-toggle value="hall">Bilhandel</mat-button-toggle>
       </mat-button-toggle-group>
     }
   `,

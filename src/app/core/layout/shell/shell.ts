@@ -55,7 +55,7 @@ import { Nav } from '../nav';
       >
         <img src="catso-logo.png" alt="Catso" class="h-6 w-6 object-contain" />
       </a>
-      <span class="mr-3 ml-1 text-[15px] font-semibold tracking-tight">Catso Garage</span>
+      <span class="mr-3 ml-1 text-[15px] font-semibold tracking-tight">Catso Axle</span>
       @if (!auth.isMechanic()) {
         <div class="flex items-center gap-1 rounded-xl bg-black/20 p-1">
           @for (p of products(); track p.id) {
@@ -248,8 +248,8 @@ export class Shell implements OnDestroy {
   /** Produkterna man kan växla mellan; Hall bara när garaget har bilhandel. */
   readonly products = computed(() =>
     [
-      { id: 'axle' as const, label: 'Axle', icon: 'build', link: '/dashboard' },
-      { id: 'hall' as const, label: 'Hall', icon: 'directions_car', link: '/dealership' },
+      { id: 'axle' as const, label: 'Verkstad', icon: 'build', link: '/dashboard' },
+      { id: 'hall' as const, label: 'Bilhandel', icon: 'directions_car', link: '/dealership' },
     ].filter((p) => p.id === 'axle' || this.billing.allows('bilhandel')),
   );
   /** Startsidan i produkten man är i. */
