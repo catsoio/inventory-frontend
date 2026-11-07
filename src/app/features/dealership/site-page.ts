@@ -1,7 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormArray, FormBuilder } from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Auth } from '../../core/auth/auth';
+import { environment } from '../../../environments/environment';
+import { shrinkImage } from '../../core/image-resize';
 import { SiteApi } from '../../core/api/car-api';
 import { SiteDomain, SiteSettings } from '../../core/models';
 import { HasUnsaved } from '../../core/unsaved-guard';
@@ -167,10 +169,19 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
                 <input type="color" formControlName="accent" class="h-9 w-12 cursor-pointer" />
               </label>
             </div>
-            <mat-form-field class="mt-3 w-full">
-              <mat-label>Logotyp (https-adress, valfri)</mat-label>
-              <input matInput formControlName="logoUrl" placeholder="https://…/logo.png" />
-            </mat-form-field>
+            <div class="mt-3">
+              <ng-container
+                *ngTemplateOutlet="
+                  picture;
+                  context: {
+                    label: 'Logotyp',
+                    ctrl: look.controls.logoUrl,
+                    key: 'logo',
+                    keep: true,
+                  }
+                "
+              />
+            </div>
           </div>
 
           <div>
@@ -191,10 +202,17 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
               <mat-label>Text under rubriken</mat-label>
               <textarea matInput rows="3" maxlength="400" formControlName="text"></textarea>
             </mat-form-field>
-            <mat-form-field class="w-full">
-              <mat-label>Bakgrundsbild (https-adress, valfri)</mat-label>
-              <input matInput formControlName="imageUrl" />
-            </mat-form-field>
+            <ng-container
+              *ngTemplateOutlet="
+                picture;
+                context: {
+                  label: 'Bakgrundsbild',
+                  ctrl: look.controls.imageUrl,
+                  key: 'hero',
+                  keep: false,
+                }
+              "
+            />
           </div>
 
           <div>
@@ -303,10 +321,17 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
                 <mat-label>Stad (tom = staden i Fakturauppgifter)</mat-label>
                 <input matInput formControlName="city" maxlength="60" />
               </mat-form-field>
-              <mat-form-field class="w-full">
-                <mat-label>Delningsbild (https, tom = första bilen)</mat-label>
-                <input matInput formControlName="ogImage" />
-              </mat-form-field>
+              <ng-container
+                *ngTemplateOutlet="
+                  picture;
+                  context: {
+                    label: 'Delningsbild (tom = första bilen)',
+                    ctrl: seo.controls.ogImage,
+                    key: 'og',
+                    keep: false,
+                  }
+                "
+              />
               <mat-form-field class="w-full">
                 <mat-label>Google Analytics-id (G-…)</mat-label>
                 <input matInput formControlName="gaId" maxlength="20" />
@@ -360,6 +385,43 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
           </section>
         }
       }
+      <ng-template #picture let-label="label" let-ctrl="ctrl" let-key="key" let-keep="keep">
+        <div class="flex items-center gap-3">
+          <div
+            class="grid h-16 w-28 shrink-0 place-items-center overflow-hidden rounded-lg bg-gray-100 text-gray-400"
+          >
+            @if (src(ctrl.value); as u) {
+              <img [src]="u" alt="" class="h-full w-full object-contain" />
+            } @else {
+              <mat-icon>image</mat-icon>
+            }
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium">{{ label }}</div>
+            <div class="mt-1 flex flex-wrap gap-2">
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="file.click()"
+                [disabled]="uploading() === key"
+              >
+                <mat-icon>upload</mat-icon>
+                {{ uploading() === key ? 'Laddar upp…' : ctrl.value ? 'Byt bild' : 'Ladda upp' }}
+              </button>
+              @if (ctrl.value) {
+                <button mat-button type="button" (click)="clear(ctrl)">Ta bort</button>
+              }
+            </div>
+            <input
+              #file
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="hidden"
+              (change)="upload($event, ctrl, key, keep)"
+            />
+          </div>
+        </div>
+      </ng-template>
     </app-card-page>
   `,
 })
@@ -407,6 +469,39 @@ export class SitePage implements OnInit, HasUnsaved {
     gaId: '',
   });
   readonly lookError = signal<string | null>(null);
+  readonly uploading = signal<string | null>(null);
+
+  /** En uppladdad bild ligger på backenden (adressen börjar med /), annars är det en egen adress. */
+  src(v: string | null): string {
+    return v ? (v.startsWith('/') ? environment.apiUrl + v : v) : '';
+  }
+
+  /** Laddar upp valt foto och lägger adressen i fältet; sparas med Spara. En logga behåller sitt format (genomskinlighet). */
+  async upload(ev: Event, ctrl: AbstractControl, key: string, keep: boolean) {
+    const input = ev.target as HTMLInputElement;
+    const picked = input.files?.[0];
+    input.value = '';
+    if (!picked) return;
+    this.uploading.set(key);
+    this.lookError.set(null);
+    const file = keep ? picked : await shrinkImage(picked);
+    this.api.uploadImage(file).subscribe({
+      next: (r) => {
+        ctrl.setValue(r.url);
+        ctrl.markAsDirty();
+        this.uploading.set(null);
+      },
+      error: (e: ApiError) => {
+        this.uploading.set(null);
+        this.lookError.set(e.error?.error?.message ?? 'Det gick inte att ladda upp bilden.');
+      },
+    });
+  }
+
+  clear(ctrl: AbstractControl) {
+    ctrl.setValue('');
+    ctrl.markAsDirty();
+  }
   get faq() {
     return this.look.controls.faq as FormArray;
   }

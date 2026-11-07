@@ -101,6 +101,13 @@ export class SiteApi {
     return this.http.put<SiteSettings>(this.base, body);
   }
 
+  /** Laddar upp en bild till landningssidan (JPEG, PNG eller WebP, högst 5 MB). Ger adressen att spara. */
+  uploadImage(file: File): Observable<{ url: string }> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<{ url: string }>(`${this.base}/images`, body);
+  }
+
   addDomain(hostname: string): Observable<SiteSettings> {
     return this.http.post<SiteSettings>(`${this.base}/domains`, { hostname });
   }
