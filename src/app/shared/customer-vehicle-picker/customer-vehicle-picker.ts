@@ -88,7 +88,7 @@ const filled = (min: number) => (c: AbstractControl) => {
 
       @if (withVehicle) {
         <mat-form-field>
-          <mat-label>Registreringsnummer</mat-label>
+          <mat-label>{{ carOptional ? 'Registreringsnummer (valfritt)' : 'Registreringsnummer' }}</mat-label>
           <app-sv-flag matPrefix class="mr-2" />
           <input
             matInput
@@ -182,7 +182,15 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     this.isOptional = v;
   }
 
+  /** Bara bilen är valfri, kunden krävs (t.ex. en gammal faktura på fälgar, som inte har något regnummer). */
+  @Input() set vehicleOptional(v: boolean) {
+    this.vehicle.setValidators(v ? [] : filled(2));
+    this.vehicle.updateValueAndValidity({ emitEvent: false });
+    this.carOptional = v;
+  }
+
   private isOptional = false;
+  carOptional = false;
   private hasLegacy = false;
   readonly customerOptions = signal<Customer[]>([]);
   private readonly ownCars = signal<Vehicle[]>([]);
@@ -345,10 +353,10 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
       });
     }
     // Valfri bil: bara en kund räcker.
-    if (this.isOptional && customer) {
+    if ((this.isOptional || this.carOptional) && customer) {
       return this.onChange({ customerId: customer.id, vehicleId: '', customer });
     }
-    if (this.isOptional && customerName) {
+    if ((this.isOptional || this.carOptional) && customerName) {
       return this.onChange({
         customerId: '',
         vehicleId: '',

@@ -123,7 +123,8 @@ export class WorkOrderApi {
    */
   importInvoice(body: {
     customerId: string;
-    vehicleId: string;
+    /** Utan bil, till exempel en försäljning av fälgar. */
+    vehicleId?: string;
     date: string;
     performed: string;
     price: number;

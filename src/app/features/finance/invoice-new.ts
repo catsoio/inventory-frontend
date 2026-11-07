@@ -53,7 +53,7 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
         </p>
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-base font-semibold">Kund och bil</h2>
-          <app-customer-vehicle-picker formControlName="link" />
+          <app-customer-vehicle-picker formControlName="link" [vehicleOptional]="true" />
           @if (gap(); as g) {
             <app-callout class="mt-3" [fixes]="g.fixes">{{ g.text }}</app-callout>
           }
@@ -247,7 +247,8 @@ export class InvoiceNew implements HasUnsaved {
       .pipe(
         switchMap((link) =>
           this.api.importInvoice({
-            ...link,
+            customerId: link.customerId,
+            vehicleId: link.vehicleId || undefined,
             date: v.date,
             performed: v.performed.trim(),
             price: Math.round(v.price * 100),
