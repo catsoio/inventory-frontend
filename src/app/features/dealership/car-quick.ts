@@ -151,9 +151,13 @@ const TONE: Record<ListingStatus, 'green' | 'amber' | 'gray' | 'blue'> = {
             <a mat-flat-button color="primary" [routerLink]="['/dealership/cars', c.id]">
               <mat-icon>open_in_new</mat-icon> Öppna bilen
             </a>
-            @if (c.status === 'active' || c.status === 'reserved') {
+            @if (c.soldCardId || c.dealCardId) {
+              <a mat-stroked-button [routerLink]="['/sales', c.soldCardId || c.dealCardId]">
+                Öppna affären
+              </a>
+            } @else if (c.status === 'active' || c.status === 'reserved') {
               <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ carId: c.id }">
-                Sälj bilen
+                Starta affär
               </a>
             }
           </footer>

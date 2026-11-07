@@ -134,7 +134,7 @@ export class SalesList {
   readonly hall = inject(ActivatedRoute).snapshot.data['product'] === 'hall';
   readonly cols = this.hall ? HALL_COLS : COLS;
   readonly empty = this.hall
-    ? 'Inga affärer än. Öppna en bil och välj Sälj bilen.'
+    ? 'Inga affärer än. Öppna en bil och välj Starta affär.'
     : 'Inga säljkort än. Skapa ett med knappen, eller från en arbetsorder eller ett däckhotell.';
   readonly statusOf = statusOf;
   readonly toneOf = toneOf;

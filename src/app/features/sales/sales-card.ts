@@ -1492,7 +1492,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     if (articleId) {
       this.inventory.article(articleId).subscribe((a) => this.addArticle(a));
     }
-    // "Sälj bilen" på en bil öppnar ett nytt kort med bilen på första raden.
+    // "Starta affär" på en bil öppnar ett nytt kort med bilen på första raden.
     const carId = q.get('carId');
     if (carId) {
       this.carApi.get(carId).subscribe((c) => this.addCar(c));

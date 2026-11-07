@@ -67,9 +67,24 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
               Lägg ut till salu
             </button>
           }
-          @if (!c.soldCardId && c.status !== 'sold') {
+          @if (c.soldCardId || c.dealCardId) {
+            <a
+              mat-stroked-button
+              [routerLink]="['/sales', c.soldCardId || c.dealCardId]"
+              matTooltip="Säljkortet för affären."
+            >
+              <mat-icon>point_of_sale</mat-icon> Öppna affären
+            </a>
+          } @else if (c.status === 'reserved') {
+            <button mat-stroked-button type="button" (click)="save('active')" [disabled]="busy()">
+              Släpp reservationen
+            </button>
             <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ carId: c.id }">
-              <mat-icon>point_of_sale</mat-icon> Sälj bilen
+              <mat-icon>point_of_sale</mat-icon> Starta affär
+            </a>
+          } @else if (c.status === 'active') {
+            <a mat-stroked-button routerLink="/sales/new" [queryParams]="{ carId: c.id }">
+              <mat-icon>point_of_sale</mat-icon> Starta affär
             </a>
           }
           <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">
@@ -244,7 +259,7 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
                 <mat-form-field>
                   <mat-label>Status</mat-label>
                   <mat-select formControlName="status">
-                    @for (s of statuses; track s.value) {
+                    @for (s of statusOptions(); track s.value) {
                       <mat-option [value]="s.value">{{ s.label }}</mat-option>
                     }
                   </mat-select>
@@ -567,6 +582,15 @@ export class CarCard implements OnInit {
   readonly statuses = (Object.entries(LISTING_STATUS_LABELS) as [ListingStatus, string][]).map(
     ([value, label]) => ({ value, label }),
   );
+  /**
+   * Såld sätts bara av bokföringen, och en bil på en öppen affär är Reserverad tills kortet tas bort:
+   * rullistan visar bara det som går att välja.
+   */
+  readonly statusOptions = computed(() => {
+    const c = this.card();
+    if (c?.soldCardId || c?.dealCardId) return this.statuses.filter((s) => s.value === c.status);
+    return this.statuses.filter((s) => s.value !== 'sold' || c?.status === 'sold');
+  });
   readonly regNo = this.fb.nonNullable.control('');
   readonly media = (path: string | null) => (path ? environment.apiUrl + path : '');
 

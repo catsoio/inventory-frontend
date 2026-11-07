@@ -2365,6 +2365,8 @@ export interface CarListing {
   purchaseDocuments: string[];
   /** Säljkortet bilen är såld på; satt = bilens pengar är låsta. */
   soldCardId: string | null;
+  /** Utkastet på säljkort som håller bilen (då är den Reserverad). */
+  dealCardId?: string | null;
   soldPrice: number | null;
   soldAt: string | null;
   blocket: CarBlocket;
