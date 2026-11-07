@@ -88,8 +88,16 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
           />
           <div class="mt-2 sm:col-span-6">
             <h3 class="mb-2 text-sm font-medium">Rader</h3>
+            <mat-radio-group
+              formControlName="vat"
+              class="mb-3 flex flex-wrap gap-x-6"
+              aria-label="Priserna på den gamla fakturan"
+            >
+              <mat-radio-button value="excl">Priserna är exkl. moms (som på den gamla fakturan)</mat-radio-button>
+              <mat-radio-button value="incl">Priserna är inkl. moms</mat-radio-button>
+            </mat-radio-group>
             <div class="mb-1 hidden grid-cols-[1fr_5rem_8rem_7rem_2.5rem] gap-2 text-xs text-gray-500 sm:grid">
-              <span>Text</span><span>Antal</span><span>À-pris inkl. moms</span>
+              <span>Text</span><span>Antal</span><span>{{ excl() ? 'À-pris exkl. moms' : 'À-pris inkl. moms' }}</span>
               <span class="text-right">Summa</span><span></span>
             </div>
             @for (r of rows.controls; track r; let i = $index) {
@@ -127,8 +135,13 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
               <mat-icon>add</mat-icon> Lägg till rad
             </button>
             <div class="mt-2 flex flex-col items-end border-t border-gray-100 pt-3">
-              <div class="text-base font-semibold">Att betala {{ total() | kr }}</div>
-              <div class="text-xs text-gray-500">{{ inclHint() }}</div>
+              @if (excl()) {
+                <div class="text-sm text-gray-600">Summa exkl. moms {{ total() | kr }}</div>
+                <div class="text-sm text-gray-600">Moms 25 % {{ vatOre() | kr }}</div>
+              } @else {
+                <div class="text-xs text-gray-500">varav moms {{ vatOre() | kr }}</div>
+              }
+              <div class="text-base font-semibold">Att betala {{ gross() | kr }}</div>
             </div>
           </div>
           <mat-form-field class="sm:col-span-3">
@@ -182,6 +195,7 @@ export class InvoiceNew implements HasUnsaved {
   readonly form = this.fb.nonNullable.group({
     link: [null as PickerValue | null, Validators.required],
     kind: ['invoice' as InvoiceKind],
+    vat: ['excl' as 'excl' | 'incl'],
     date: ['', Validators.required],
     warranty: [''],
     terms: [30, [Validators.required, Validators.min(0), Validators.max(365)]],
@@ -220,6 +234,14 @@ export class InvoiceNew implements HasUnsaved {
     const v = r.getRawValue() as { quantity: number; unitPrice: number };
     return Math.round((Number(v.quantity) || 0) * (Number(v.unitPrice) || 0) * 100);
   }
+
+  private readonly vatMode = toSignal(this.form.controls.vat.valueChanges, { initialValue: 'excl' });
+  readonly excl = computed(() => this.vatMode() === 'excl');
+  /** Att betala, och momsen i den, i öre; priserna kan vara skrivna exkl. eller inkl. moms. */
+  readonly gross = computed(() => (this.excl() ? Math.round(this.total() * 1.25) : this.total()));
+  readonly vatOre = computed(() =>
+    this.excl() ? this.gross() - this.total() : Math.round((this.total() * 0.25) / 1.25),
+  );
 
   readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'invoice' });
   readonly paid = toSignal(this.form.controls.paid.valueChanges, { initialValue: true });
@@ -296,13 +318,6 @@ export class InvoiceNew implements HasUnsaved {
     return this.form.dirty;
   }
 
-  inclHint() {
-    const p = this.total() / 100;
-    return p > 0
-      ? `varav moms ${(p * 0.2).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} kr`
-      : 'Alla priser är inkl. moms';
-  }
-
   save() {
     if (!ensureValid(this.form, this.snack)) return;
     if (!ensureValid(this.rows, this.snack)) return;
@@ -326,7 +341,7 @@ export class InvoiceNew implements HasUnsaved {
               return {
                 description: x.description.trim(),
                 quantity: Number(x.quantity),
-                unitPrice: Math.round(Number(x.unitPrice) * 100),
+                unitPrice: Math.round(Number(x.unitPrice) * (this.excl() ? 125 : 100)),
               };
             }),
             warranty: v.warranty.trim() || undefined,
