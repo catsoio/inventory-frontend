@@ -77,11 +77,11 @@ export function invoiceFigures(
 /** Alla utfärdade fakturor och kvitton (säljkort och äldre arbetsorder), nyast först. */
 export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observable<InvoiceItem[]> {
   const PAGE = 100;
-  const fromOrders = orders.list({ status: 'done', limit: PAGE, offset: 0 }).pipe(
+  const fromOrders = orders.list({ status: 'done', withImported: true, limit: PAGE, offset: 0 }).pipe(
     expand((p) => {
       const next = p.pagination.offset + p.pagination.limit;
       return next < p.pagination.total && next < 1000
-        ? orders.list({ status: 'done', limit: PAGE, offset: next })
+        ? orders.list({ status: 'done', withImported: true, limit: PAGE, offset: next })
         : EMPTY;
     }),
     reduce((all, p) => all.concat(p.items), [] as WorkOrder[]),

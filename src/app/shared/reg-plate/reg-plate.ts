@@ -28,6 +28,9 @@ export class SvFlag {
   standalone: false,
   host: { class: 'inline-flex align-middle' },
   template: `
+    @if (!text) {
+      <span class="text-gray-400">–</span>
+    } @else {
     <span
       class="inline-flex items-stretch overflow-hidden rounded-md bg-white text-gray-900 shadow-sm ring-1 ring-gray-400"
       [class]="size === 'lg' ? 'h-11' : size === 'sm' ? 'h-6' : 'h-8'"
@@ -41,6 +44,7 @@ export class SvFlag {
         >{{ text }}</span
       >
     </span>
+    }
   `,
 })
 export class RegPlate {

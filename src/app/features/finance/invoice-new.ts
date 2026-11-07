@@ -178,6 +178,13 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
             }
           </div>
         </section>
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <mat-checkbox formControlName="createOrder">Skapa även en arbetsorder</mat-checkbox>
+          <p class="mt-1 ml-8 text-sm text-gray-600">
+            Bara om arbetet ska synas i arbetsorderlistan. Fakturan finns i Fakturor och på kundens
+            historik i vilket fall.
+          </p>
+        </section>
       </form>
     </app-card-page>
   `,
@@ -200,6 +207,7 @@ export class InvoiceNew implements HasUnsaved {
     warranty: [''],
     terms: [30, [Validators.required, Validators.min(0), Validators.max(365)]],
     paid: [true],
+    createOrder: [false],
     method: ['invoice' as PaymentMethod],
   });
 
@@ -346,6 +354,7 @@ export class InvoiceNew implements HasUnsaved {
             }),
             warranty: v.warranty.trim() || undefined,
             kind: v.kind,
+            createOrder: v.createOrder,
             paymentTermsDays: receipt ? undefined : v.terms,
             // Ett kvitto är alltid betalt; en faktura bara om den redan betalats.
             paid: receipt || v.paid,

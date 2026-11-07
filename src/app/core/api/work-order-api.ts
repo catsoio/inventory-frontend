@@ -41,6 +41,8 @@ export class WorkOrderApi {
       unassigned?: boolean;
       /** Ej klara order med en del som måste beställas. */
       needsAction?: boolean;
+      /** Med gamla fakturor som lagts till i efterhand (fakturalistan). */
+      withImported?: boolean;
       /** Inlämnad eller hämtas från (inkl.) / till (exkl.), ISO-tid. */
       from?: string;
       to?: string;
@@ -129,6 +131,8 @@ export class WorkOrderApi {
     /** Vad som såldes: à-pris i öre inklusive moms. */
     rows: { description: string; quantity: number; unitPrice: number }[];
     warranty?: string;
+    /** Skapar också en arbetsorder i listan; annars bär ordern bara dokumentet. */
+    createOrder?: boolean;
     kind?: InvoiceKind;
     /** Dagar till förfallodatum (faktura). Standard: betalningsvillkoren i Företaget. */
     paymentTermsDays?: number;
