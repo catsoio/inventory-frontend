@@ -165,16 +165,17 @@ const SOLD: DtCol<CarListing>[] = [
   PROFIT,
 ];
 
-type Stage = 'sales' | 'purchases' | 'sold';
+type Stage = 'all' | 'sales' | 'purchases' | 'sold';
 
 const TABS: SectionTab[] = [
+  { path: '/dealership/cars/all', label: 'Alla' },
   { path: '/dealership/cars', label: 'Till salu', exact: true },
   { path: '/dealership/cars/purchases', label: 'Inköpta' },
   { path: '/dealership/cars/sold', label: 'Sålda' },
 ];
 
 /**
- * Bilarna i tre flikar: Till salu (utlagda och reserverade), Inköpta (ännu inte utlagda) och Sålda.
+ * Bilarna i fyra vyer (Alla, Till salu, Inköpta, Sålda) (undermeny i sidomenyn, flikar på mobil): Till salu (utlagda och reserverade), Inköpta (ännu inte utlagda) och Sålda.
  * Samma bilar, olika kolumner. En länk med `?flag=` (från Hem och menyns siffror) visar i stället alla
  * bilar i lager som flaggan gäller, oavsett flik. På mobil är varje bil ett fotokort med tid i lager.
  */
@@ -183,7 +184,7 @@ const TABS: SectionTab[] = [
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" label="Bilar" />
+    <app-section-tabs class="shrink-0" [tabs]="tabs" label="Bilar" [mobileOnly]="true" />
     @if (flag(); as f) {
       <app-callout
         class="mb-3 shrink-0"
@@ -318,11 +319,13 @@ export class CarList {
   );
   readonly empty = computed(() => {
     if (this.flag()) return 'Inga bilar att ta tag i. Allt är som det ska.';
-    return this.stage === 'sold'
-      ? 'Inga sålda bilar än.'
-      : this.stage === 'purchases'
-        ? 'Inga inköpta bilar. Skriv ett registreringsnummer så hämtas uppgifterna.'
-        : 'Inga bilar till salu. Lägg ut en inköpt bil, eller köp in en ny.';
+    return this.stage === 'all'
+      ? 'Inga bilar än. Skriv ett registreringsnummer så hämtas uppgifterna.'
+      : this.stage === 'sold'
+        ? 'Inga sålda bilar än.'
+        : this.stage === 'purchases'
+          ? 'Inga inköpta bilar. Skriv ett registreringsnummer så hämtas uppgifterna.'
+          : 'Inga bilar till salu. Lägg ut en inköpt bil, eller köp in en ny.';
   });
 
   private readonly items = signal<CarListing[]>([]);
@@ -338,13 +341,15 @@ export class CarList {
       .filter((c) => {
         const inStage = flag
           ? matchesFlag(flag, c, today)
-          : this.stage === 'purchases'
-            ? c.status === 'draft'
-            : this.stage === 'sold'
-              ? c.status === 'sold'
-              : status === 'all'
-                ? c.status === 'active' || c.status === 'reserved'
-                : c.status === status;
+          : this.stage === 'all'
+            ? true
+            : this.stage === 'purchases'
+              ? c.status === 'draft'
+              : this.stage === 'sold'
+                ? c.status === 'sold'
+                : status === 'all'
+                  ? c.status === 'active' || c.status === 'reserved'
+                  : c.status === status;
         return inStage && (!q || `${c.regNo} ${c.heading}`.toLowerCase().includes(q));
       })
       .sort((a, b) =>

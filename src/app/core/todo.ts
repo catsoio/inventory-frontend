@@ -119,6 +119,10 @@ function unpaidInvoices(product: Product, inv: UnpaidInvoices): TodoItem[] {
   ];
 }
 
+/** Menynycklarna för Bilar-undersidorna (`badge` i `NAV_HALL`). */
+const CARS_FOR_SALE = 'cars-for-sale';
+const CARS_PURCHASES = '/dealership/cars/purchases';
+
 /** Det som väntar i bilhandelns bilar. Länkarna bär `flag` så att siffran går att hitta i listan. */
 function carItems(c: CarTodo | undefined): TodoItem[] {
   if (!c) return [];
@@ -129,6 +133,7 @@ function carItems(c: CarTodo | undefined): TodoItem[] {
     flag: string,
     noun: [string, string],
     text: string,
+    page: string,
     desktopOnly = false,
   ): TodoItem[] =>
     n > 0
@@ -137,7 +142,8 @@ function carItems(c: CarTodo | undefined): TodoItem[] {
             key,
             product: 'hall',
             urgency: 'wait',
-            menus: ['/dealership/cars'],
+            // Gruppens rad (Bilar) och undersidan där bilarna finns.
+            menus: ['/dealership/cars', page],
             badgeCount: n,
             badgeNoun: noun,
             text,
@@ -156,6 +162,7 @@ function carItems(c: CarTodo | undefined): TodoItem[] {
       'sellers',
       ['saknar säljare', 'saknar säljare'],
       `${c.sellersMissing} ${plural(c.sellersMissing, 'inköpt bil saknar', 'inköpta bilar saknar')} uppgift om vem ni köpte av`,
+      CARS_PURCHASES,
       true,
     ),
     ...car(
@@ -165,6 +172,7 @@ function carItems(c: CarTodo | undefined): TodoItem[] {
       'unlisted',
       ['ej utlagd', 'ej utlagda'],
       `${c.unlisted} ${plural(c.unlisted, 'inköpt bil är', 'inköpta bilar är')} inte utlagd${c.unlisted === 1 ? '' : 'a'} till salu`,
+      CARS_PURCHASES,
     ),
     ...car(
       'cars-inspection',
@@ -173,6 +181,7 @@ function carItems(c: CarTodo | undefined): TodoItem[] {
       'inspection',
       ['besiktning', 'besiktningar'],
       `${c.inspectionSoon} ${plural(c.inspectionSoon, 'bil', 'bilar')} behöver besiktas inom 30 dagar`,
+      CARS_FOR_SALE,
     ),
     ...car(
       'cars-idle',
@@ -181,6 +190,7 @@ function carItems(c: CarTodo | undefined): TodoItem[] {
       'idle',
       ['står länge', 'står länge'],
       `${c.idle} ${plural(c.idle, 'bil har', 'bilar har')} stått 90 dagar eller mer, se över priset`,
+      CARS_FOR_SALE,
     ),
   ];
 }

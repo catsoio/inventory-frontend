@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { Auth } from '../../../core/auth/auth';
 import { WORK_ORDER_STATUS_LABELS, WorkOrder, WorkOrderStatus } from '../../../core/models';
+import { carColorHex } from '../../../shared/car-color';
 import { DtCol } from '../../../shared/data-table/data-table';
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(appLocale()) : '–');
@@ -12,6 +13,12 @@ const COLS: DtCol<WorkOrder>[] = [
   { key: 'code', label: 'Nr', value: (o) => o.number, fmt: (o) => o.code },
   { key: 'regNo', label: 'Regnr', value: (o) => o.regNo },
   { key: 'car', label: 'Bil', value: (o) => o.vehicle ?? '', fmt: (o) => o.vehicle || '–' },
+  {
+    key: 'color',
+    label: 'Färg',
+    value: (o) => o.vehicleColor ?? '',
+    fmt: (o) => o.vehicleColor || '–',
+  },
   { key: 'customer', label: 'Kund', value: (o) => o.customerName },
   {
     key: 'resource',
@@ -90,6 +97,12 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
               <app-pill tone="red" class="ml-1">Nekat</app-pill>
             }
           }
+        } @else if (col.key === 'color' && o.vehicleColor) {
+          <span
+            class="mr-1.5 inline-block h-3.5 w-3.5 rounded-full align-middle ring-1 ring-black/20"
+            [style.background]="hex(o.vehicleColor)"
+          ></span
+          >{{ text }}
         } @else if (col.key === 'regNo') {
           <app-reg-plate [value]="text" size="sm" />
         } @else {
@@ -131,6 +144,7 @@ export class WorkOrderList {
 
   readonly cols = COLS;
   readonly tones = TONES;
+  readonly hex = carColorHex;
   readonly items = signal<WorkOrder[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');

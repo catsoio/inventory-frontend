@@ -1588,6 +1588,8 @@ export interface WorkOrder {
   phone: string | null;
   regNo: string;
   vehicle: string | null;
+  /** Bilens färg ur bilkortet (bara i listan). */
+  vehicleColor?: string | null;
   resourceName: string | null;
   placeName: string | null;
   status: WorkOrderStatus;

@@ -25,6 +25,7 @@ import { SitePage } from './site-page';
     RouterModule.forChild([
       { path: '', title: 'Bilhandel', component: HallHome },
       { path: 'cars', title: 'Bilar till salu', component: CarList, data: { stage: 'sales' } },
+      { path: 'cars/all', title: 'Alla bilar', component: CarList, data: { stage: 'all' } },
       {
         path: 'cars/purchases',
         title: 'Inköpta bilar',

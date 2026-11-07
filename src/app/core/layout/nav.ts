@@ -186,12 +186,30 @@ export const NAV_HALL: NavSection[] = [
   {
     title: 'Bilhandel',
     items: [
-      // Till salu, Inköpta och Sålda är flikar här, och bilens kort hör också hit.
+      // Till salu, Inköpta och Sålda är undermenyn här; bilens kort hör också hit.
       {
         path: '/dealership/cars',
         label: 'Bilar',
         icon: 'directions_car',
         module: 'bilhandel',
+        match: ['/dealership/cars'],
+        children: [
+          {
+            path: '/dealership/cars/all',
+            label: 'Alla',
+            icon: 'directions_car',
+            badge: 'none',
+          },
+          {
+            path: '/dealership/cars',
+            label: 'Till salu',
+            icon: 'sell',
+            exact: true,
+            badge: 'cars-for-sale',
+          },
+          { path: '/dealership/cars/purchases', label: 'Inköpta', icon: 'shopping_cart' },
+          { path: '/dealership/cars/sold', label: 'Sålda', icon: 'task_alt' },
+        ],
       },
       {
         path: '/dealership/deals',

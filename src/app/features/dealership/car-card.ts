@@ -228,7 +228,7 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
                   </div>
                 } @empty {
                   <p class="col-span-full text-sm text-gray-500">
-                    Inga bilder än. Minst en bild behövs för att lägga ut bilen.
+                    Inga bilder än.
                   </p>
                 }
               </div>
