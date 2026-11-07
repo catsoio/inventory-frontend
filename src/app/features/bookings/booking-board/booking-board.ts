@@ -41,6 +41,7 @@ interface Block {
 }
 
 const minutes = (d: Date) => d.getHours() * 60 + d.getMinutes();
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 /**
  * Dagen per mekaniker och lyft: en kolumn per resurs med tidsaxeln nedåt, så att man ser vem som
@@ -246,8 +247,11 @@ export class BookingBoard implements OnChanges {
     const blocks: Block[] = mine.map((b) => {
       const start = new Date(b.start);
       const end = new Date(b.end);
-      const s = Math.max(minutes(start), FIRST_HOUR * 60);
-      const e = Math.min(Math.max(minutes(end), s + 15), LAST_HOUR * 60);
+      // Ett jobb över flera dagar fyller kolumnen de dagar som ligger mitt i, från öppning till stängning.
+      const first = sameDay(start, this.day) ? minutes(start) : FIRST_HOUR * 60;
+      const last = sameDay(end, this.day) ? minutes(end) : LAST_HOUR * 60;
+      const s = Math.max(first, FIRST_HOUR * 60);
+      const e = Math.min(Math.max(last, s + 15), LAST_HOUR * 60);
       let lane = laneEnds.findIndex((x) => x <= s);
       if (lane === -1) lane = laneEnds.length;
       laneEnds[lane] = e;

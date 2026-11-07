@@ -142,31 +142,30 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             <h3 class="sec">När</h3>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <app-date-field
-                class="col-span-2"
-                label="Datum"
+                class="col-span-1"
+                label="Startdatum"
                 icon="event"
                 error="Ange datum"
                 formControlName="day"
               />
-              <app-time-field class="col-span-1" label="Från" formControlName="startTime" />
+              <app-time-field class="col-span-1" label="Starttid" formControlName="startTime" />
+              <app-date-field
+                class="col-span-1"
+                label="Slutdatum"
+                icon="event_available"
+                error="Ange datum"
+                formControlName="endDay"
+              />
               <app-time-field
                 class="col-span-1"
-                label="Till"
+                label="Sluttid"
                 formControlName="endTime"
-                [error]="form.errors?.['order'] ? 'Efter starttiden' : ''"
+                [error]="form.errors?.['order'] ? 'Efter starten' : ''"
               />
-              <div class="col-span-2 flex flex-col gap-3" [class]="moreCls()">
-                <app-date-field
-                  label="Klar senast (om det dröjer)"
-                  icon="event_available"
-                  [error]="form.errors?.['due'] ? 'Före datumet' : ''"
-                  formControlName="dueDay"
-                />
-                <p class="-mt-2 text-xs text-gray-500">
-                  Lämna tomt om jobbet görs på tiden ovan. Annars blir det arbetsordernas "Klar
-                  senast".
-                </p>
-              </div>
+              <p class="col-span-2 -mt-1 text-xs text-gray-500">
+                Tar jobbet flera dagar sätter du ett senare slutdatum. Slutet blir arbetsordernas
+                "Klar senast".
+              </p>
             </div>
           </section>
 
@@ -296,7 +295,6 @@ export class BookingDialog {
       v.price ? `Pris ${v.price} kr` : '',
       mech ?? '',
       place ?? '',
-      v.dueDay ? `Klar senast ${v.dueDay}` : '',
       v.notes?.trim() ? 'Anmärkning' : '',
     ]
       .filter(Boolean)
@@ -348,6 +346,9 @@ export class BookingDialog {
     const b = data.booking;
     const start = b ? new Date(b.start) : data.start;
     const end = b ? new Date(b.end) : data.end;
+    // En äldre bokning med "Klar senast" efter slutet visar den dagen som slutdatum.
+    const due = b?.dueAt ? new Date(b.dueAt) : null;
+    const endShown = due && ymd(due) > ymd(end) ? at(ymd(due), hm(end)) : end;
     const kr = (ore: number | null | undefined) => (ore == null ? null : ore / 100);
     this.legacy =
       b && !(b.customerId && b.vehicleId)
@@ -367,7 +368,7 @@ export class BookingDialog {
         resourceId: [b?.resourceId ?? data.resourceId ?? ''],
         placeId: [b?.placeId ?? data.placeId ?? ''],
         day: [ymd(start), Validators.required],
-        dueDay: [b?.dueAt ? ymd(new Date(b.dueAt)) : ''],
+        endDay: [ymd(endShown), Validators.required],
         startTime: [hm(start), Validators.required],
         endTime: [hm(end), Validators.required],
         price: [kr(b?.priceTo ?? b?.priceFrom) as number | null, Validators.min(0)],
@@ -379,8 +380,9 @@ export class BookingDialog {
         validators: (g) => {
           const v = g.getRawValue();
           const errors: Record<string, boolean> = {};
-          if (v.startTime && v.endTime && v.endTime <= v.startTime) errors['order'] = true;
-          if (v.dueDay && v.dueDay < v.day) errors['due'] = true;
+          if (v.day && v.endDay && v.startTime && v.endTime) {
+            if (at(v.endDay, v.endTime) <= at(v.day, v.startTime)) errors['order'] = true;
+          }
           return Object.keys(errors).length ? errors : null;
         },
       },
@@ -395,20 +397,27 @@ export class BookingDialog {
       });
     }
     // Ändrar man dag eller starttid följer sluttiden med, så att tiden inte blir ogiltig.
-    let duration = end.getTime() - start.getTime();
+    let duration = endShown.getTime() - start.getTime();
     const f = this.form.controls;
     f.link.valueChanges.subscribe((v) => this.loadVehicle(v?.vehicleId, v?.vehicle));
     this.loadVehicle(b?.vehicleId ?? undefined);
-    f.endTime.valueChanges.subscribe(() => {
+    const keepDuration = () => {
       const ms =
-        at(f.day.value, f.endTime.value).getTime() - at(f.day.value, f.startTime.value).getTime();
+        at(f.endDay.value, f.endTime.value).getTime() -
+        at(f.day.value, f.startTime.value).getTime();
       if (ms > 0) duration = ms;
-    });
+    };
+    f.endTime.valueChanges.subscribe(keepDuration);
+    f.endDay.valueChanges.subscribe(keepDuration);
+    // Flyttar man starten följer slutet med (dag och tid), så att längden på jobbet är kvar.
     const followStart = () => {
+      if (!f.day.value || !f.startTime.value) return;
       const next = new Date(at(f.day.value, f.startTime.value).getTime() + duration);
-      if (ymd(next) === f.day.value) f.endTime.setValue(hm(next), { emitEvent: false });
+      f.endDay.setValue(ymd(next), { emitEvent: false });
+      f.endTime.setValue(hm(next), { emitEvent: false });
     };
     f.startTime.valueChanges.subscribe(followStart);
+    f.day.valueChanges.subscribe(followStart);
     forkJoin([this.workshop.resources(true), this.workshop.serviceTypes(true)]).subscribe(
       ([r, s]) => {
         // Arkiverade val syns bara om just den här bokningen använder dem.
@@ -447,7 +456,9 @@ export class BookingDialog {
     const previous = this.serviceOptions().find((x) => x.name === f.title.value);
     if (!f.title.value || previous) f.title.setValue(priceTitle(t.name, quoted));
     const start = at(f.day.value, f.startTime.value);
-    f.endTime.setValue(hm(new Date(start.getTime() + t.durationMinutes * 60_000)));
+    const finish = new Date(start.getTime() + t.durationMinutes * 60_000);
+    f.endDay.setValue(ymd(finish));
+    f.endTime.setValue(hm(finish));
     // En prisrad eller en pågående kampanj styr; annars gäller åtgärdens eget spann som förut (till-priset först).
     const price =
       quoted && (quoted.basis === 'rule' || quoted.campaign)
@@ -460,7 +471,7 @@ export class BookingDialog {
 
   save() {
     // Ett fel i ett dolt fält ska synas: öppna "Fler val" då.
-    if (this.form.errors?.['due'] || this.form.controls.price.invalid) this.more.set(true);
+    if (this.form.controls.price.invalid) this.more.set(true);
     if (!ensureValid(this.form, this.snack)) return;
 
     const v = this.form.getRawValue();
@@ -471,9 +482,9 @@ export class BookingDialog {
       serviceTypeId: v.serviceTypeId || null,
       title: v.title,
       start: at(v.day, v.startTime).toISOString(),
-      end: at(v.day, v.endTime).toISOString(),
-      // Klar senast är en dag; mitt på dagen så att tidszonen inte flyttar den.
-      dueAt: v.dueDay ? at(v.dueDay, '12:00').toISOString() : null,
+      end: at(v.endDay, v.endTime).toISOString(),
+      // Slutdatumet är "Klar senast"; ett gammalt särskilt datum tas bort.
+      dueAt: null,
       status: v.status,
       priceFrom: ore(v.price),
       priceTo: ore(v.price),
