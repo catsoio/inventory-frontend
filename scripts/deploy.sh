@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bygger och startar om live-appen (inventory.catso.io) på servern.
+# Bygger och startar om live-appen (axle.catso.io) på servern.
 # Lokalt:  ./scripts/deploy.sh      (använder ~/.ssh/catso_deploy)
 # I CI:    körs av .github/workflows/deploy.yml på push till main.
 set -euo pipefail
@@ -27,4 +27,4 @@ docker run -d --name inventory-frontend --restart unless-stopped -p 8081:80 inve
 docker image prune -f >/dev/null
 REMOTE
 
-echo "✓ Klart: https://inventory.catso.io"
+echo "✓ Klart: https://axle.catso.io"

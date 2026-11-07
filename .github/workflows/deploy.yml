@@ -1,4 +1,4 @@
-name: Deploy to inventory.catso.io
+name: Deploy to axle.catso.io
 on:
   push:
     branches: [main]
