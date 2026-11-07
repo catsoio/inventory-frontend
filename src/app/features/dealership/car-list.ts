@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
@@ -194,6 +194,15 @@ const TABS: SectionTab[] = [
         Visar bilar som {{ flagText(f) }}.
       </app-callout>
     }
+    @if (failed()) {
+      <app-callout
+        class="mb-3 shrink-0"
+        tone="warn"
+        [fixes]="[{ label: 'Försök igen', icon: 'refresh', click: reload }]"
+      >
+        Det gick inte att hämta bilarna.
+      </app-callout>
+    }
     <div class="min-h-0 flex-1">
       <app-list-page
         title=""
@@ -208,20 +217,6 @@ const TABS: SectionTab[] = [
         (search)="query.set($event)"
         (rowClick)="open($event)"
       >
-        <ng-container actions>
-          @if (stage === 'sales' && !flag()) {
-            <mat-button-toggle-group
-              hideSingleSelectionIndicator
-              [value]="status()"
-              (change)="status.set($event.value)"
-              aria-label="Visa"
-            >
-              <mat-button-toggle value="all">Alla</mat-button-toggle>
-              <mat-button-toggle value="active">Till salu</mat-button-toggle>
-              <mat-button-toggle value="reserved">Reserverade</mat-button-toggle>
-            </mat-button-toggle-group>
-          }
-        </ng-container>
         <!-- Mobil: ett fotokort per bil. -->
         <ng-template #card let-c="row">
           <div class="flex items-center gap-3">
@@ -305,9 +300,6 @@ export class CarList {
     const f = this.params().get('flag');
     return isCarFlag(f) ? f : null;
   });
-  /** `?status=reserved` i fliken Till salu (från Hem); knapparna ändrar det därefter. */
-  readonly status = signal<'all' | 'active' | 'reserved'>('all');
-
   readonly cols = computed(() =>
     this.flag()
       ? FOR_SALE
@@ -318,6 +310,7 @@ export class CarList {
           : FOR_SALE,
   );
   readonly empty = computed(() => {
+    if (this.failed()) return 'Det gick inte att hämta bilarna. Försök igen om en stund.';
     if (this.flag()) return 'Inga bilar att ta tag i. Allt är som det ska.';
     return this.stage === 'all'
       ? 'Inga bilar än. Skriv ett registreringsnummer så hämtas uppgifterna.'
@@ -330,12 +323,12 @@ export class CarList {
 
   private readonly items = signal<CarListing[]>([]);
   readonly loading = signal(true);
+  readonly failed = signal(false);
   readonly query = signal('');
 
   readonly shown = computed(() => {
     const q = this.query().toLowerCase();
     const flag = this.flag();
-    const status = this.status();
     const today = new Date();
     return this.items()
       .filter((c) => {
@@ -347,9 +340,7 @@ export class CarList {
               ? c.status === 'draft'
               : this.stage === 'sold'
                 ? c.status === 'sold'
-                : status === 'all'
-                  ? c.status === 'active' || c.status === 'reserved'
-                  : c.status === status;
+                : c.status === 'active' || c.status === 'reserved';
         return inStage && (!q || `${c.regNo} ${c.heading}`.toLowerCase().includes(q));
       })
       .sort((a, b) =>
@@ -366,18 +357,26 @@ export class CarList {
   });
 
   constructor() {
-    effect(() => {
-      const s = this.params().get('status');
-      this.status.set(s === 'active' || s === 'reserved' ? s : 'all');
-    });
+    this.load();
+  }
+
+  /** Hämtar bilarna; ett fel (t.ex. 429 vid många snabba sidbyten) visas, inte som en tom lista. */
+  load() {
+    this.failed.set(false);
+    this.loading.set(true);
     this.api.list().subscribe({
       next: (r) => {
         this.items.set(r);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.failed.set(true);
+        this.loading.set(false);
+      },
     });
   }
+
+  readonly reload = () => this.load();
 
   tone(s: ListingStatus) {
     return TONE[s];

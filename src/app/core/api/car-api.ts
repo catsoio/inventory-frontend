@@ -93,7 +93,10 @@ export class SiteApi {
 
   /** `enabled` och `slug` får bara plattformens operatör ändra (403 annars). */
   save(
-    body: Partial<Pick<SiteSettings, 'enabled' | 'slug' | 'title' | 'intro' | 'hideRegNo'>>,
+    body: Partial<Pick<SiteSettings, 'enabled' | 'slug' | 'title' | 'intro' | 'hideRegNo'>> & {
+      /** Delar av landningssidan; servern slår ihop och kontrollerar. */
+      page?: Record<string, unknown>;
+    },
   ): Observable<SiteSettings> {
     return this.http.put<SiteSettings>(this.base, body);
   }

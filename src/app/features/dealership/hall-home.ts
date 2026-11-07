@@ -61,14 +61,12 @@ class HallView {
         label: 'Till salu',
         count: s.forSale,
         link: '/dealership/cars',
-        params: { status: 'active' },
       },
       {
         key: 'reserved',
         label: 'Reserverade',
         count: s.reserved,
         link: '/dealership/cars',
-        params: { status: 'reserved' },
       },
       {
         key: 'sold',
@@ -204,7 +202,6 @@ export class HallHome {
             <li class="relative">
               <a
                 [routerLink]="s.link"
-                [queryParams]="s.params"
                 class="block rounded-xl bg-gray-50 p-4 ring-1 ring-black/5 transition hover:bg-gray-100"
               >
                 <span class="block text-3xl leading-none font-semibold tabular-nums">{{

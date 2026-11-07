@@ -2417,8 +2417,40 @@ export interface SiteDomain {
   error: string | null;
 }
 
+export interface SiteInfoPage {
+  title: string;
+  body: string;
+}
+
+/** Landningssidans utseende och text. `seo` och `analytics` sätter bara Catso. */
+export interface SitePageContent {
+  theme: 'dark' | 'light';
+  accent: string;
+  logoUrl: string | null;
+  hero: {
+    eyebrow: string | null;
+    headline: string | null;
+    emphasis: string | null;
+    text: string | null;
+    imageUrl: string | null;
+  };
+  hours: string[];
+  financing: SiteInfoPage | null;
+  tradeIn: SiteInfoPage | null;
+  about: SiteInfoPage | null;
+  faq: { q: string; a: string }[];
+  seo: {
+    title: string | null;
+    description: string | null;
+    city: string | null;
+    ogImage: string | null;
+  };
+  analytics: { gaId: string | null };
+}
+
 /** Verkstadens publika webbplats: adress, påslagen och vilka domäner som leder dit. */
 export interface SiteSettings {
+  page: SitePageContent;
   enabled: boolean;
   slug: string | null;
   title: string | null;

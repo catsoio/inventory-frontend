@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder } from '@angular/forms';
+import { FormArray, FormBuilder } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Auth } from '../../core/auth/auth';
 import { SiteApi } from '../../core/api/car-api';
@@ -29,7 +29,7 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
           mat-flat-button
           color="primary"
           (click)="save()"
-          [disabled]="busy() || form.pristine"
+          [disabled]="busy() || (form.pristine && look.pristine)"
         >
           Spara
         </button>
@@ -151,6 +151,108 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
           }
         </form>
 
+        <form [formGroup]="look" class="flex flex-col gap-5 rounded-xl bg-white p-5 shadow-sm">
+          <div>
+            <h2 class="mb-1 text-base font-semibold">Utseende</h2>
+            <p class="mb-3 text-sm text-gray-600">
+              Samma uppbyggnad för alla; ni väljer färger, rubrik och text.
+            </p>
+            <div class="flex flex-wrap items-center gap-6">
+              <mat-radio-group formControlName="theme" class="flex gap-4">
+                <mat-radio-button value="dark">Mörk</mat-radio-button>
+                <mat-radio-button value="light">Ljus</mat-radio-button>
+              </mat-radio-group>
+              <label class="flex items-center gap-2 text-sm"
+                >Accentfärg
+                <input type="color" formControlName="accent" class="h-9 w-12 cursor-pointer" />
+              </label>
+            </div>
+            <mat-form-field class="mt-3 w-full">
+              <mat-label>Logotyp (https-adress, valfri)</mat-label>
+              <input matInput formControlName="logoUrl" placeholder="https://…/logo.png" />
+            </mat-form-field>
+          </div>
+
+          <div>
+            <h2 class="mb-3 text-base font-semibold">Toppen av sidan</h2>
+            <mat-form-field class="w-full">
+              <mat-label>Liten rubrik (tom = "Vårt lager · 12 bilar")</mat-label>
+              <input matInput formControlName="eyebrow" maxlength="60" />
+            </mat-form-field>
+            <mat-form-field class="w-full">
+              <mat-label>Rubrik (tom = "Begagnade bilar i staden")</mat-label>
+              <input matInput formControlName="headline" maxlength="100" />
+            </mat-form-field>
+            <mat-form-field class="w-full">
+              <mat-label>Ord i rubriken som får accentfärg</mat-label>
+              <input matInput formControlName="emphasis" maxlength="60" placeholder="med garanti" />
+            </mat-form-field>
+            <mat-form-field class="w-full">
+              <mat-label>Text under rubriken</mat-label>
+              <textarea matInput rows="3" maxlength="400" formControlName="text"></textarea>
+            </mat-form-field>
+            <mat-form-field class="w-full">
+              <mat-label>Bakgrundsbild (https-adress, valfri)</mat-label>
+              <input matInput formControlName="imageUrl" />
+            </mat-form-field>
+          </div>
+
+          <div>
+            <h2 class="mb-3 text-base font-semibold">Öppettider och sidor</h2>
+            <mat-form-field class="w-full">
+              <mat-label>Öppettider (en rad per rad)</mat-label>
+              <textarea
+                matInput
+                rows="3"
+                formControlName="hours"
+                placeholder="Mån–fre 09–18&#10;Lör 10–14"
+              ></textarea>
+            </mat-form-field>
+            <p class="mb-2 text-xs text-gray-500">
+              En sida visas på webbplatsen bara om den har text. Tomma sidor döljs.
+            </p>
+            @for (g of pages; track g.key) {
+              <div class="mb-3 rounded-lg border border-gray-200 p-3" [formGroupName]="g.key">
+                <mat-form-field class="w-full">
+                  <mat-label>{{ g.label }}: rubrik</mat-label>
+                  <input matInput formControlName="title" maxlength="80" />
+                </mat-form-field>
+                <mat-form-field class="w-full">
+                  <mat-label>{{ g.label }}: text (blankrad = nytt stycke)</mat-label>
+                  <textarea matInput rows="4" maxlength="4000" formControlName="body"></textarea>
+                </mat-form-field>
+              </div>
+            }
+          </div>
+
+          <div>
+            <h2 class="mb-3 text-base font-semibold">Vanliga frågor</h2>
+            <div formArrayName="faq" class="flex flex-col gap-3">
+              @for (q of faq.controls; track q; let i = $index) {
+                <div [formGroupName]="i" class="rounded-lg border border-gray-200 p-3">
+                  <mat-form-field class="w-full">
+                    <mat-label>Fråga</mat-label>
+                    <input matInput formControlName="q" maxlength="160" />
+                  </mat-form-field>
+                  <mat-form-field class="w-full">
+                    <mat-label>Svar</mat-label>
+                    <textarea matInput rows="2" maxlength="1200" formControlName="a"></textarea>
+                  </mat-form-field>
+                  <button mat-button type="button" class="!text-red-700" (click)="removeFaq(i)">
+                    Ta bort
+                  </button>
+                </div>
+              }
+            </div>
+            <button mat-stroked-button type="button" class="mt-2" (click)="addFaq()">
+              <mat-icon>add</mat-icon> Lägg till fråga
+            </button>
+          </div>
+          @if (lookError(); as e) {
+            <p class="text-sm text-red-700">{{ e }}</p>
+          }
+        </form>
+
         @if (operator) {
           <section class="rounded-xl border border-dashed border-gray-300 bg-white p-5">
             <h2 class="mb-1 text-base font-semibold">Catso: adress och domäner</h2>
@@ -179,6 +281,44 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
                   [disabled]="busy() || admin.pristine"
                 >
                   Spara adress
+                </button>
+              </div>
+            </form>
+            <h3 class="sec mt-5">SEO och spårning</h3>
+            <form [formGroup]="seo" class="flex flex-col gap-1">
+              <mat-form-field class="w-full">
+                <mat-label>Sidtitel (tom = "Begagnade bilar i staden | Namn", max 70)</mat-label>
+                <input matInput formControlName="title" maxlength="70" />
+              </mat-form-field>
+              <mat-form-field class="w-full">
+                <mat-label>Beskrivning i sökresultat (max 170)</mat-label>
+                <textarea
+                  matInput
+                  rows="2"
+                  maxlength="170"
+                  formControlName="description"
+                ></textarea>
+              </mat-form-field>
+              <mat-form-field class="w-full">
+                <mat-label>Stad (tom = staden i Fakturauppgifter)</mat-label>
+                <input matInput formControlName="city" maxlength="60" />
+              </mat-form-field>
+              <mat-form-field class="w-full">
+                <mat-label>Delningsbild (https, tom = första bilen)</mat-label>
+                <input matInput formControlName="ogImage" />
+              </mat-form-field>
+              <mat-form-field class="w-full">
+                <mat-label>Google Analytics-id (G-…)</mat-label>
+                <input matInput formControlName="gaId" maxlength="20" />
+              </mat-form-field>
+              <div>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="saveSeo()"
+                  [disabled]="busy() || seo.pristine"
+                >
+                  Spara SEO
                 </button>
               </div>
             </form>
@@ -238,6 +378,49 @@ export class SitePage implements OnInit, HasUnsaved {
 
   readonly form = this.fb.nonNullable.group({ title: '', intro: '', hideRegNo: false });
   readonly admin = this.fb.nonNullable.group({ enabled: false, slug: '' });
+
+  readonly pages = [
+    { key: 'financing', label: 'Finansiering' },
+    { key: 'tradeIn', label: 'Sälj och byt in' },
+    { key: 'about', label: 'Om oss' },
+  ] as const;
+  readonly look = this.fb.nonNullable.group({
+    theme: 'dark' as 'dark' | 'light',
+    accent: '#e63b2e',
+    logoUrl: '',
+    eyebrow: '',
+    headline: '',
+    emphasis: '',
+    text: '',
+    imageUrl: '',
+    hours: '',
+    financing: this.fb.nonNullable.group({ title: '', body: '' }),
+    tradeIn: this.fb.nonNullable.group({ title: '', body: '' }),
+    about: this.fb.nonNullable.group({ title: '', body: '' }),
+    faq: this.fb.nonNullable.array([this.faqGroup()]),
+  });
+  readonly seo = this.fb.nonNullable.group({
+    title: '',
+    description: '',
+    city: '',
+    ogImage: '',
+    gaId: '',
+  });
+  readonly lookError = signal<string | null>(null);
+  get faq() {
+    return this.look.controls.faq as FormArray;
+  }
+  private faqGroup(q = '', a = '') {
+    return this.fb.nonNullable.group({ q, a });
+  }
+  addFaq() {
+    this.faq.push(this.faqGroup());
+    this.look.markAsDirty();
+  }
+  removeFaq(i: number) {
+    this.faq.removeAt(i);
+    this.look.markAsDirty();
+  }
   readonly newDomain = this.fb.nonNullable.control('');
 
   ngOnInit() {
@@ -245,7 +428,7 @@ export class SitePage implements OnInit, HasUnsaved {
   }
 
   hasUnsaved() {
-    return this.form.dirty;
+    return this.form.dirty || this.look.dirty;
   }
 
   private load(s: SiteSettings, keepText = false) {
@@ -253,17 +436,92 @@ export class SitePage implements OnInit, HasUnsaved {
     if (!keepText)
       this.form.reset({ title: s.title ?? '', intro: s.intro ?? '', hideRegNo: s.hideRegNo });
     this.admin.reset({ enabled: s.enabled, slug: s.slug ?? '' });
+    const p = s.page;
+    this.seo.reset({
+      title: p.seo.title ?? '',
+      description: p.seo.description ?? '',
+      city: p.seo.city ?? '',
+      ogImage: p.seo.ogImage ?? '',
+      gaId: p.analytics.gaId ?? '',
+    });
+    if (keepText) return;
+    this.faq.clear();
+    for (const f of p.faq.length ? p.faq : [{ q: '', a: '' }])
+      this.faq.push(this.faqGroup(f.q, f.a));
+    this.look.reset({
+      theme: p.theme,
+      accent: p.accent,
+      logoUrl: p.logoUrl ?? '',
+      eyebrow: p.hero.eyebrow ?? '',
+      headline: p.hero.headline ?? '',
+      emphasis: p.hero.emphasis ?? '',
+      text: p.hero.text ?? '',
+      imageUrl: p.hero.imageUrl ?? '',
+      hours: p.hours.join('\n'),
+      financing: { title: p.financing?.title ?? '', body: p.financing?.body ?? '' },
+      tradeIn: { title: p.tradeIn?.title ?? '', body: p.tradeIn?.body ?? '' },
+      about: { title: p.about?.title ?? '', body: p.about?.body ?? '' },
+      faq: p.faq.length ? p.faq : [{ q: '', a: '' }],
+    });
+  }
+
+  private pageBody() {
+    const v = this.look.getRawValue();
+    const t = (x: string) => x.trim() || null;
+    const info = (g: { title: string; body: string }) =>
+      g.title.trim() || g.body.trim() ? { title: g.title.trim(), body: g.body.trim() } : null;
+    return {
+      theme: v.theme,
+      accent: v.accent,
+      logoUrl: t(v.logoUrl),
+      hero: {
+        eyebrow: t(v.eyebrow),
+        headline: t(v.headline),
+        emphasis: t(v.emphasis),
+        text: t(v.text),
+        imageUrl: t(v.imageUrl),
+      },
+      hours: v.hours
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean),
+      financing: info(v.financing),
+      tradeIn: info(v.tradeIn),
+      about: info(v.about),
+      faq: v.faq.filter((f) => f.q.trim() && f.a.trim()),
+    };
+  }
+
+  /** Operatörens fält: SEO och spårning. */
+  saveSeo() {
+    const v = this.seo.getRawValue();
+    const t = (x: string) => x.trim() || null;
+    this.run(
+      this.api.save({
+        page: {
+          seo: {
+            title: t(v.title),
+            description: t(v.description),
+            city: t(v.city),
+            ogImage: t(v.ogImage),
+          },
+          analytics: { gaId: t(v.gaId) },
+        },
+      }),
+    );
   }
 
   save() {
     const v = this.form.getRawValue();
     this.busy.set(true);
     this.error.set(null);
+    this.lookError.set(null);
     this.api
       .save({
         title: v.title.trim() || null,
         intro: v.intro.trim() || null,
         hideRegNo: v.hideRegNo,
+        page: this.pageBody(),
       })
       .subscribe({
         next: (s) => {
@@ -273,7 +531,9 @@ export class SitePage implements OnInit, HasUnsaved {
         },
         error: (e: ApiError) => {
           this.busy.set(false);
-          this.error.set(e.error?.error?.message ?? 'Det gick inte att spara.');
+          const msg = e.error?.error?.message ?? 'Det gick inte att spara.';
+          this.error.set(msg);
+          this.lookError.set(msg);
         },
       });
   }
@@ -315,7 +575,7 @@ export class SitePage implements OnInit, HasUnsaved {
       next: (s) => {
         this.busy.set(false);
         // Texten ägaren skriver (och inte sparat) ska inte skrivas över av en domänkoll.
-        this.load(s, this.form.dirty);
+        this.load(s, this.form.dirty || this.look.dirty);
         done?.();
       },
       error: (e: ApiError) => {

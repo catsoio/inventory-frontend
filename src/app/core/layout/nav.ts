@@ -1,7 +1,7 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
-import { debounceTime, filter, merge } from 'rxjs';
+import { debounceTime, filter, merge, throttleTime } from 'rxjs';
 import { Auth } from '../auth/auth';
 import { Billing } from '../billing/billing';
 import { productOf, toInternal, type Product } from './products';
@@ -420,8 +420,14 @@ export class Nav {
     toObservable(computed(() => this.auth.garage()?.id))
       .pipe(takeUntilDestroyed(inject(DestroyRef)))
       .subscribe((id) => id && !this.auth.isSuperAdmin() && this.billing.refresh());
+    // Högst en omgång per 15 s (först och sist): en omgång är ett tiotal anrop, så snabba sidbyten
+    // annars körde in i backendens hastighetsgräns (429) och listorna blev tomma.
     merge(toObservable(computed(() => this.auth.garage()?.id)), done$)
-      .pipe(debounceTime(400), takeUntilDestroyed(inject(DestroyRef)))
+      .pipe(
+        debounceTime(400),
+        throttleTime(15_000, undefined, { leading: true, trailing: true }),
+        takeUntilDestroyed(inject(DestroyRef)),
+      )
       .subscribe(() => this.refresh());
   }
 
