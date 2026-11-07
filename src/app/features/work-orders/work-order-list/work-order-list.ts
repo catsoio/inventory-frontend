@@ -70,11 +70,12 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
         (change)="status.set($event.value); load()"
         aria-label="Status"
       >
-        <mat-button-toggle value="">Alla</mat-button-toggle>
+        <mat-button-toggle value="active">Aktiva</mat-button-toggle>
         <mat-button-toggle value="open">Öppna</mat-button-toggle>
         <mat-button-toggle value="in_progress">Pågår</mat-button-toggle>
         <mat-button-toggle value="waiting_parts">Väntar på del</mat-button-toggle>
         <mat-button-toggle value="done">Klara</mat-button-toggle>
+        <mat-button-toggle value="">Alla</mat-button-toggle>
         <mat-button-toggle value="action">Behöver åtgärd</mat-button-toggle>
       </mat-button-toggle-group>
       <ng-template #cell let-o="row" let-col="col" let-text="text">
@@ -148,7 +149,7 @@ export class WorkOrderList {
   readonly items = signal<WorkOrder[]>([]);
   readonly loading = signal(true);
   readonly query = signal('');
-  readonly status = signal<WorkOrderStatus | 'action' | ''>(this.initialStatus());
+  readonly status = signal<WorkOrderStatus | 'action' | 'active' | ''>(this.initialStatus());
 
   load() {
     this.loading.set(true);
@@ -156,8 +157,13 @@ export class WorkOrderList {
       .list({
         q: this.query(),
         // "Behöver åtgärd" = ej klara order med en del som måste beställas.
-        status: this.status() === 'action' ? '' : (this.status() as WorkOrderStatus | ''),
+        status:
+          this.status() === 'action' || this.status() === 'active'
+            ? ''
+            : (this.status() as WorkOrderStatus | ''),
         needsAction: this.status() === 'action' || undefined,
+        // Aktiva är förvalt; en sökning (regnr, kund, AO-nummer) letar bland alla order.
+        active: (this.status() === 'active' && !this.query().trim()) || undefined,
         limit: 100,
       })
       .subscribe((p) => {
@@ -169,11 +175,12 @@ export class WorkOrderList {
   }
 
   /** Startfilter från adressen (`?status=action`), t.ex. från Hem. */
-  private initialStatus(): WorkOrderStatus | 'action' | '' {
+  private initialStatus(): WorkOrderStatus | 'action' | 'active' | '' {
     const v = inject(ActivatedRoute).snapshot.queryParamMap.get('status');
+    if (v === 'all') return '';
     return v && ['open', 'in_progress', 'waiting_parts', 'done', 'action'].includes(v)
       ? (v as WorkOrderStatus | 'action')
-      : '';
+      : 'active';
   }
 
   private wide = () => window.matchMedia('(min-width: 1024px)').matches;

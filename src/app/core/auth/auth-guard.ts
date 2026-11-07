@@ -9,6 +9,10 @@ export const authGuard: CanActivateFn = () => {
   return inject(Auth).isLoggedIn() || inject(Router).createUrlTree(['/login']);
 };
 
+/** Inloggningssidan är bara för den som inte är inloggad: Back i webbläsaren leder inte hit. */
+export const guestGuard: CanActivateFn = () =>
+  !inject(Auth).isLoggedIn() || inject(Router).createUrlTree(['/']);
+
 /** Every inventory page needs a garage; users without one go to onboarding. */
 export const garageGuard: CanActivateFn = () => {
   const auth = inject(Auth);
@@ -17,6 +21,17 @@ export const garageGuard: CanActivateFn = () => {
   return auth.loadGarage().pipe(
     map(() => true),
     catchError(() => of(router.createUrlTree(['/onboarding']))),
+  );
+};
+
+/** Kom igång är bara för den som saknar garage: har man ett går man till Hem. */
+export const noGarageGuard: CanActivateFn = () => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+  if (auth.garage()) return router.createUrlTree(['/']);
+  return auth.loadGarage().pipe(
+    map(() => router.createUrlTree(['/'])),
+    catchError(() => of(true)),
   );
 };
 

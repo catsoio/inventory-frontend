@@ -4,8 +4,10 @@ import {
   adminGuard,
   authGuard,
   garageGuard,
+  guestGuard,
   mechanicGuard,
   moduleGuard,
+  noGarageGuard,
 } from './core/auth/auth-guard';
 import { Billing } from './core/billing/billing';
 import { Nav } from './core/layout/nav';
@@ -19,6 +21,7 @@ const routes: Routes = [
   {
     path: 'login',
     title: 'Logga in',
+    canActivate: [guestGuard],
     loadChildren: () => import('./features/auth/auth-module').then((m) => m.AuthModule),
   },
   {
@@ -56,7 +59,7 @@ const routes: Routes = [
   {
     path: 'onboarding',
     title: 'Kom igång',
-    canActivate: [authGuard],
+    canActivate: [authGuard, noGarageGuard],
     loadChildren: () =>
       import('./features/onboarding/onboarding-module').then((m) => m.OnboardingModule),
   },

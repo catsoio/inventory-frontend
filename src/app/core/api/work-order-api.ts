@@ -41,6 +41,8 @@ export class WorkOrderApi {
       unassigned?: boolean;
       /** Ej klara order med en del som måste beställas. */
       needsAction?: boolean;
+      /** Bara pågående: öppna, pågår eller väntar på del. */
+      active?: boolean;
       /** Med gamla fakturor som lagts till i efterhand (fakturalistan). */
       withImported?: boolean;
       /** Inlämnad eller hämtas från (inkl.) / till (exkl.), ISO-tid. */

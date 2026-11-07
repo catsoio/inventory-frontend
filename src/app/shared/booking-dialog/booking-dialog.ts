@@ -90,7 +90,7 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
         <div class="flex flex-col gap-5 max-md:contents">
           <section class="flex flex-col gap-3 max-md:order-1">
             <h3 class="sec">Kund och bil</h3>
-            <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" />
+            <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" [phoneFirst]="true" />
           </section>
 
           <section class="flex flex-col gap-3 max-md:order-2">

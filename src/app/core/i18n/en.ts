@@ -399,6 +399,7 @@ export const EN: Record<string, string> = {
   Lösenord: 'Password',
   'Skapa konto': 'Create account',
   'Logga in': 'Log in',
+  'Telefonnummer': 'Phone number',
   'Skicka ny kod': 'Send new code',
   'Välkommen till Axle': 'Welcome to Axle',
   'Skapa nytt garage': 'Create a new garage',
