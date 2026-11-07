@@ -93,30 +93,37 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
               @if (d.error) {
                 <p class="mb-2 text-red-800">{{ d.error }}</p>
               }
-              <p class="mb-2">
-                Skapa de här posterna hos den som har domänens DNS. Det kan ta en stund innan de
-                gäller; tryck sedan på Kontrollera.
-              </p>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                  <thead class="text-xs text-amber-800 uppercase">
-                    <tr>
-                      <th class="pr-4">Typ</th>
-                      <th class="pr-4">Namn</th>
-                      <th>Värde</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (r of d.records; track r.type + r.name) {
+              @if (d.autoDns) {
+                <p class="mb-2">
+                  DNS-posterna är skapade åt er. Det kan ta några minuter innan certifikatet är
+                  utfärdat; tryck på Kontrollera.
+                </p>
+              } @else {
+                <p class="mb-2">
+                  Skapa de här posterna hos den som har domänens DNS. Det kan ta en stund innan de
+                  gäller; tryck sedan på Kontrollera.
+                </p>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left">
+                    <thead class="text-xs text-amber-800 uppercase">
                       <tr>
-                        <td class="pr-4 font-mono">{{ r.type }}</td>
-                        <td class="pr-4 font-mono break-all">{{ r.name }}</td>
-                        <td class="font-mono break-all">{{ r.value }}</td>
+                        <th class="pr-4">Typ</th>
+                        <th class="pr-4">Namn</th>
+                        <th>Värde</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      @for (r of d.records; track r.type + r.name) {
+                        <tr>
+                          <td class="pr-4 font-mono">{{ r.type }}</td>
+                          <td class="pr-4 font-mono break-all">{{ r.name }}</td>
+                          <td class="font-mono break-all">{{ r.value }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
               <div class="mt-3 flex gap-2">
                 <button
                   mat-stroked-button

@@ -2415,6 +2415,8 @@ export interface SiteDomain {
   status: DomainStatus;
   records: DnsRecord[];
   error: string | null;
+  /** Catso har skapat DNS-posterna åt domänen (den ligger i vårt konto). */
+  autoDns?: boolean;
 }
 
 export interface SiteInfoPage {
