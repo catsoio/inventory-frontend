@@ -126,8 +126,8 @@ export class WorkOrderApi {
     /** Utan bil, till exempel en försäljning av fälgar. */
     vehicleId?: string;
     date: string;
-    performed: string;
-    price: number;
+    /** Vad som såldes: à-pris i öre inklusive moms. */
+    rows: { description: string; quantity: number; unitPrice: number }[];
     warranty?: string;
     kind?: InvoiceKind;
     /** Dagar till förfallodatum (faktura). Standard: betalningsvillkoren i Företaget. */

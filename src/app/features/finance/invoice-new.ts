@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -86,17 +86,51 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
             error="Ange datum"
             formControlName="date"
           />
-          <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-            <mat-label>Belopp (kr, inkl. moms)</mat-label>
-            <input matInput type="number" inputmode="decimal" min="0" formControlName="price" />
-            <mat-hint>{{ inclHint() }}</mat-hint>
-            <mat-error>Ange belopp över 0</mat-error>
-          </mat-form-field>
-          <mat-form-field class="mt-4 sm:col-span-6">
-            <mat-label>Utfört (står på dokumentet)</mat-label>
-            <textarea matInput rows="3" formControlName="performed"></textarea>
-            <mat-error>Obligatoriskt</mat-error>
-          </mat-form-field>
+          <div class="mt-2 sm:col-span-6">
+            <h3 class="mb-2 text-sm font-medium">Rader</h3>
+            <div class="mb-1 hidden grid-cols-[1fr_5rem_8rem_7rem_2.5rem] gap-2 text-xs text-gray-500 sm:grid">
+              <span>Text</span><span>Antal</span><span>À-pris inkl. moms</span>
+              <span class="text-right">Summa</span><span></span>
+            </div>
+            @for (r of rows.controls; track r; let i = $index) {
+              <div
+                [formGroup]="r"
+                class="mb-2 grid grid-cols-[1fr_4.5rem_6.5rem] items-start gap-2 sm:grid-cols-[1fr_5rem_8rem_7rem_2.5rem]"
+              >
+                <mat-form-field class="col-span-3 sm:col-span-1" subscriptSizing="dynamic">
+                  <mat-label class="sm:hidden">Text</mat-label>
+                  <input matInput formControlName="description" placeholder="Vad såldes eller gjordes" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label class="sm:hidden">Antal</mat-label>
+                  <input matInput type="number" inputmode="decimal" min="0" formControlName="quantity" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                  <mat-label class="sm:hidden">À-pris</mat-label>
+                  <input matInput type="number" inputmode="decimal" min="0" formControlName="unitPrice" />
+                </mat-form-field>
+                <div class="flex h-11 items-center justify-end text-sm font-medium">
+                  {{ rowTotal(r) | kr }}
+                </div>
+                <button
+                  mat-icon-button
+                  type="button"
+                  aria-label="Ta bort raden"
+                  [disabled]="rows.length < 2"
+                  (click)="removeRow(i)"
+                >
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </div>
+            }
+            <button mat-button type="button" (click)="addRow()">
+              <mat-icon>add</mat-icon> Lägg till rad
+            </button>
+            <div class="mt-2 flex flex-col items-end border-t border-gray-100 pt-3">
+              <div class="text-base font-semibold">Att betala {{ total() | kr }}</div>
+              <div class="text-xs text-gray-500">{{ inclHint() }}</div>
+            </div>
+          </div>
           <mat-form-field class="sm:col-span-3">
             <mat-label>Garanti (valfritt)</mat-label>
             <input matInput formControlName="warranty" />
@@ -144,17 +178,48 @@ export class InvoiceNew implements HasUnsaved {
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
   readonly busy = signal(false);
-  readonly form = inject(FormBuilder).nonNullable.group({
+  private readonly fb = inject(FormBuilder);
+  readonly form = this.fb.nonNullable.group({
     link: [null as PickerValue | null, Validators.required],
     kind: ['invoice' as InvoiceKind],
     date: ['', Validators.required],
-    performed: ['', Validators.required],
-    price: [0, [Validators.required, Validators.min(0.01)]],
     warranty: [''],
     terms: [30, [Validators.required, Validators.min(0), Validators.max(365)]],
     paid: [true],
     method: ['invoice' as PaymentMethod],
   });
+
+  /** Raderna: text, antal och à-pris i kronor inklusive moms. */
+  readonly rows = new FormArray<FormGroup>([]);
+  private readonly rowsChanged = toSignal(this.rows.valueChanges, { initialValue: [] });
+  readonly total = computed(() => {
+    this.rowsChanged();
+    return this.rows.controls.reduce((sum, r) => sum + this.rowTotal(r), 0);
+  });
+
+  private newRow() {
+    return this.fb.group({
+      description: ['', Validators.required],
+      quantity: [1, [Validators.required, Validators.min(0.01)]],
+      unitPrice: [0, [Validators.required, Validators.min(0)]],
+    });
+  }
+
+  addRow() {
+    this.rows.push(this.newRow());
+    this.form.markAsDirty();
+  }
+
+  removeRow(i: number) {
+    if (this.rows.length > 1) this.rows.removeAt(i);
+    this.form.markAsDirty();
+  }
+
+  /** Öre. */
+  rowTotal(r: FormGroup) {
+    const v = r.getRawValue() as { quantity: number; unitPrice: number };
+    return Math.round((Number(v.quantity) || 0) * (Number(v.unitPrice) || 0) * 100);
+  }
 
   readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'invoice' });
   readonly paid = toSignal(this.form.controls.paid.valueChanges, { initialValue: true });
@@ -223,6 +288,7 @@ export class InvoiceNew implements HasUnsaved {
     this.form.controls.kind.valueChanges.pipe(takeUntilDestroyed()).subscribe((k) => {
       this.form.controls.method.setValue(k === 'receipt' ? 'card' : 'invoice');
     });
+    this.addRow();
     this.loadSeller();
   }
 
@@ -231,14 +297,19 @@ export class InvoiceNew implements HasUnsaved {
   }
 
   inclHint() {
-    const p = this.form.controls.price.value;
+    const p = this.total() / 100;
     return p > 0
       ? `varav moms ${(p * 0.2).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} kr`
-      : '';
+      : 'Alla priser är inkl. moms';
   }
 
   save() {
     if (!ensureValid(this.form, this.snack)) return;
+    if (!ensureValid(this.rows, this.snack)) return;
+    if (this.total() <= 0) {
+      this.snack.open('Skriv ett pris på minst en rad', undefined, { duration: 3000 });
+      return;
+    }
     const v = this.form.getRawValue();
     const receipt = v.kind === 'receipt';
     this.busy.set(true);
@@ -250,8 +321,14 @@ export class InvoiceNew implements HasUnsaved {
             customerId: link.customerId,
             vehicleId: link.vehicleId || undefined,
             date: v.date,
-            performed: v.performed.trim(),
-            price: Math.round(v.price * 100),
+            rows: this.rows.controls.map((r) => {
+              const x = r.getRawValue() as { description: string; quantity: number; unitPrice: number };
+              return {
+                description: x.description.trim(),
+                quantity: Number(x.quantity),
+                unitPrice: Math.round(Number(x.unitPrice) * 100),
+              };
+            }),
             warranty: v.warranty.trim() || undefined,
             kind: v.kind,
             paymentTermsDays: receipt ? undefined : v.terms,
