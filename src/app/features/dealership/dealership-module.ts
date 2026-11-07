@@ -6,6 +6,7 @@ import { SalesList } from '../sales/sales-list';
 import { SharedModule } from '../../shared/shared-module';
 import { CarCard } from './car-card';
 import { CarList } from './car-list';
+import { CarQuick } from './car-quick';
 import { HallFinance } from './hall-finance';
 import { HallHome, HallHomeDesktop, HallHomeMobile } from './hall-home';
 import { SitePage } from './site-page';
@@ -13,6 +14,7 @@ import { SitePage } from './site-page';
 @NgModule({
   declarations: [
     CarList,
+    CarQuick,
     CarCard,
     HallFinance,
     SitePage,

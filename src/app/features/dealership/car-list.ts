@@ -175,7 +175,9 @@ const TABS: SectionTab[] = [
 ];
 
 /**
- * Bilarna i fyra vyer (Alla, Till salu, Inköpta, Sålda) (undermeny i sidomenyn, flikar på mobil): Till salu (utlagda och reserverade), Inköpta (ännu inte utlagda) och Sålda.
+ * Bilarna i fyra vyer (undermeny i sidomenyn, flikar på mobil): Alla, Till salu (utlagda och
+ * reserverade), Inköpta (ännu inte utlagda) och Sålda. På bred skärm visar ett kort bredvid listan bild,
+ * uppgifter, ekonomi och de som hört av sig (`app-car-quick`).
  * Samma bilar, olika kolumner. En länk med `?flag=` (från Hem och menyns siffror) visar i stället alla
  * bilar i lager som flaggan gäller, oavsett flik. På mobil är varje bil ett fotokort med tid i lager.
  */
@@ -215,7 +217,9 @@ const TABS: SectionTab[] = [
         searchPlaceholder="Sök regnr, märke eller modell…"
         [defaultSort]="null"
         (search)="query.set($event)"
-        (rowClick)="open($event)"
+        [highlight]="isSelected"
+        (rowClick)="pick($event)"
+        (rowDblClick)="open($event)"
       >
         <!-- Mobil: ett fotokort per bil. -->
         <ng-template #card let-c="row">
@@ -269,6 +273,22 @@ const TABS: SectionTab[] = [
             {{ text }}
           }
         </ng-template>
+        <aside
+          detail
+          class="hidden min-h-0 w-[34%] max-w-[28rem] min-w-[22rem] shrink-0 overflow-y-auto lg:mt-11 lg:block"
+        >
+          @if (selectedCar(); as c) {
+            <app-car-quick [car]="c" />
+          } @else {
+            <div
+              class="flex flex-col items-center gap-2 rounded-xl bg-white p-10 text-center text-sm text-gray-500 shadow-sm ring-1 ring-black/5"
+            >
+              <mat-icon class="!h-10 !w-10 !text-4xl text-gray-300">directions_car</mat-icon>
+              Välj en bil i listan för att se bilden, uppgifterna, ekonomin och vilka som hört av
+              sig.
+            </div>
+          }
+        </aside>
       </app-list-page>
     </div>
     @if (stage === 'sold' && sold().length > 0) {
@@ -382,7 +402,18 @@ export class CarList {
     return TONE[s];
   }
 
+  /** Bred skärm: visa bilen i panelen. Smal skärm: öppna bilens kort. */
+  pick(c: CarListing) {
+    if (window.matchMedia('(min-width: 1024px)').matches) this.selected.set(c.id);
+    else this.open(c);
+  }
+
   open(c: CarListing) {
     void this.router.navigate(['/dealership/cars', c.id]);
   }
+
+  /** Bilen som visas i panelen (bred skärm). */
+  readonly selected = signal<string | null>(null);
+  readonly isSelected = (c: CarListing) => c.id === this.selected();
+  readonly selectedCar = computed(() => this.shown().find((c) => c.id === this.selected()) ?? null);
 }
