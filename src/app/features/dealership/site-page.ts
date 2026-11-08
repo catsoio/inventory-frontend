@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Auth } from '../../core/auth/auth';
@@ -549,8 +549,34 @@ export class SitePage implements OnInit, HasUnsaved {
   }
   readonly newDomain = this.fb.nonNullable.control('');
 
+  private readonly destroyRef = inject(DestroyRef);
+  private watchTimer: ReturnType<typeof setTimeout> | null = null;
+
   ngOnInit() {
+    this.destroyRef.onDestroy(() => this.stopWatching());
     this.api.get().subscribe((s) => this.load(s));
+  }
+
+  /**
+   * En domän som väntar på DNS eller certifikat kontrolleras om var 20:e sekund medan sidan är öppen:
+   * backend har inget tidsstyrt jobb, så utan detta står "Väntar på DNS" kvar tills någon trycker.
+   */
+  private watchPending(s: SiteSettings) {
+    this.stopWatching();
+    const pending = s.domains.find((d) => d.status === 'pending');
+    if (!pending) return;
+    this.watchTimer = setTimeout(() => {
+      this.api.checkDomain(pending.hostname).subscribe({
+        next: (next) => this.load(next, this.form.dirty || this.look.dirty),
+        // Tyst: ett tillfälligt fel ska inte störa, vi försöker igen.
+        error: () => this.watchPending(s),
+      });
+    }, 20_000);
+  }
+
+  private stopWatching() {
+    if (this.watchTimer) clearTimeout(this.watchTimer);
+    this.watchTimer = null;
   }
 
   hasUnsaved() {
@@ -559,6 +585,7 @@ export class SitePage implements OnInit, HasUnsaved {
 
   private load(s: SiteSettings, keepText = false) {
     this.site.set(s);
+    this.watchPending(s);
     if (!keepText)
       this.form.reset({ title: s.title ?? '', intro: s.intro ?? '', hideRegNo: s.hideRegNo });
     this.admin.reset({ enabled: s.enabled });
