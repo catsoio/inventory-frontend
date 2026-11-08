@@ -2,17 +2,19 @@ import { netOf } from '../../../shared/vat';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, forkJoin, switchMap } from 'rxjs';
 import { CatalogApi } from '../../../core/api/catalog-api';
 import { AxleApi } from '../../../core/api/axle-api';
+import { SupplierCatalogApi } from '../../../core/api/supplier-catalog-api';
 import {
   Article,
   ArticleField,
   ArticleInput,
   ArticleType,
+  CatalogHit,
   Category,
   FieldMode,
   RIM_MATERIAL_LABELS,
@@ -89,6 +91,15 @@ const categoryOf = (t: ArticleType | undefined): Category =>
                 >
               }
             </div>
+            @if (!id) {
+              <app-catalog-picker class="mb-4 block" (picked)="fillFromCatalog($event)" />
+              @if (fromCatalog(); as from) {
+                <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+                  Uppgifterna är hämtade från Gummigrossen ({{ from }}). Kontrollera
+                  försäljningspriset och skriv hur många du har hemma.
+                </p>
+              }
+            }
             @if (types().length) {
               <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Artikeltyp">
                 @for (t of types(); track t.id) {
@@ -408,6 +419,9 @@ const categoryOf = (t: ArticleType | undefined): Category =>
 })
 export class ArticleForm {
   private readonly api = inject(AxleApi);
+  private readonly supplierCatalog = inject(SupplierCatalogApi);
+  /** Text om vad uppgifterna hämtades ur, när de kommer från grossistens katalog. */
+  readonly fromCatalog = signal<string | null>(null);
   private readonly catalog = inject(CatalogApi);
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
@@ -456,6 +470,9 @@ export class ArticleForm {
     reorderLevel: [null as number | null, [Validators.min(0), int]],
     /** Av = enstaka del som köps in till ett jobb. */
     stocked: [true],
+    /** Streckkod och id hos grossisten, satta när uppgifterna hämtas från katalogen. */
+    ean: [null as string | null],
+    externalIds: new FormControl<Record<string, string> | null>(null),
     /** Inköpspris per styck, kr inkl. moms (lagras utan). */
     cost: [null as number | null, [Validators.min(0)]],
     sellPrice: [null as number | null, [Validators.required, Validators.min(0)]],
@@ -653,6 +670,52 @@ export class ArticleForm {
     }
   }
 
+  /** Fyller kortet ur grossistens katalog: typ, märke, mönster, mått, säsong, dubb, EAN och pris. */
+  fillFromCatalog(hit: CatalogHit) {
+    this.supplierCatalog.item(hit.sourceId).subscribe((it) => {
+      const c = this.form.controls;
+      const type = this.types().find((t) => t.spec === (it.tyre ? 'tyre' : 'none'));
+      if (type) this.selectType(type.id);
+      const markup = this.settings.value().markupPercent;
+      const costNet = it.costExVat;
+      const sell =
+        markup > 0
+          ? Math.round((costNet / 100) * (1 + markup / 100) * 1.25)
+          : it.retailInclVat
+            ? Math.round(it.retailInclVat / 100)
+            : Math.round((costNet / 100) * 1.25 * 1.3);
+      this.form.patchValue({
+        brand: it.brand,
+        model: it.model || it.title,
+        sku: it.partNo ?? '',
+        supplier: 'Gummigrossen',
+        cost: this.pricing.costIncl(costNet) / 100,
+        sellPrice: sell,
+        ean: it.ean,
+        externalIds: { [it.source]: it.sourceId } as Record<string, string>,
+        ...(it.tyre
+          ? {
+              tyre: {
+                width: it.tyre.width,
+                profile: it.tyre.profile,
+                rimDiameter: it.tyre.rimDiameter,
+                loadIndex: it.tyre.loadIndex,
+                speedIndex: it.tyre.speedIndex ?? '',
+                season: it.tyre.season,
+                studded: it.tyre.studded,
+                runFlat: it.tyre.runFlat,
+              },
+            }
+          : {}),
+      });
+      c.sellPrice.markAsDirty();
+      this.form.markAsDirty();
+      this.fromCatalog.set(
+        it.ean ? `EAN ${it.ean}` : it.partNo ? `artikelnr ${it.partNo}` : 'katalogen',
+      );
+    });
+  }
+
   selectType(id: string) {
     this.form.controls.typeId.setValue(id);
     this.form.controls.typeId.markAsDirty();
@@ -677,6 +740,8 @@ export class ArticleForm {
       warehouseId: v.warehouseId,
       locationId: v.locationId,
       stocked: v.stocked ?? true,
+      ...(v.ean ? { ean: v.ean } : {}),
+      ...(v.externalIds ? { externalIds: v.externalIds } : {}),
       reorderLevel: !v.stocked ? 0 : editing ? (v.reorderLevel ?? 0) : opt(v.reorderLevel),
       sellPrice: Math.round(v.sellPrice! * 100),
       // Inköpspriset skrivs inkl. moms och lagras utan (ingående moms dras av).

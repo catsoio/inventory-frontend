@@ -5,10 +5,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { format } from 'date-fns';
-import { debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
 import { AxleApi } from '../../core/api/axle-api';
 import { PurchaseCardApi } from '../../core/api/purchase-card-api';
-import { Article, PurchaseCard, itemKind } from '../../core/models';
+import { SupplierCatalogApi } from '../../core/api/supplier-catalog-api';
+import { Article, CatalogHit, PurchaseCard, itemKind } from '../../core/models';
 import { Pricing } from '../../core/pricing';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
@@ -163,6 +164,26 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                       }}</span>
                     </span>
                   </button>
+                }
+                @if (catalogOn()) {
+                  <div
+                    class="bg-gray-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase"
+                  >
+                    Hos Gummigrossen
+                  </div>
+                  @if (catalogLoading()) {
+                    <p class="px-4 py-3 text-sm text-gray-500">Söker hos grossisten…</p>
+                  }
+                  @for (h of catalogRest(); track h.sourceId) {
+                    <button
+                      type="button"
+                      class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left"
+                      [disabled]="busy()"
+                      (click)="addHit(h)"
+                    >
+                      <app-catalog-hit [hit]="h" class="contents" />
+                    </button>
+                  }
                 }
                 <button
                   type="button"
@@ -393,6 +414,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
 export class PurchaseCardPage implements HasUnsaved {
   private readonly api = inject(AxleApi);
   private readonly cards = inject(PurchaseCardApi);
+  private readonly catalog = inject(SupplierCatalogApi);
   readonly pricing = inject(Pricing);
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
@@ -420,6 +442,15 @@ export class PurchaseCardPage implements HasUnsaved {
   readonly query = signal('');
   readonly results = signal<Article[]>([]);
 
+  /** Grossistens katalog: bara när den är ansluten; träffar som redan syns som egna artiklar döljs. */
+  readonly catalogOn = signal(false);
+  readonly catalogLoading = signal(false);
+  private readonly catalogHits = signal<CatalogHit[]>([]);
+  readonly catalogRest = computed(() => {
+    const own = new Set(this.results().map((a) => a.id));
+    return this.catalogHits().filter((h) => !h.articleId || !own.has(h.articleId));
+  });
+
   readonly units = computed(() => this.rows().reduce((n, r) => n + (r.qty || 0), 0));
   readonly totalOre = computed(() => this.rows().reduce((n, r) => n + this.lineOre(r), 0));
   readonly valid = computed(() => this.rows().every((r) => this.qtyOk(r) && r.price >= 0));
@@ -435,6 +466,29 @@ export class PurchaseCardPage implements HasUnsaved {
         takeUntilDestroyed(),
       )
       .subscribe((p) => this.results.set(p?.items ?? []));
+
+    this.catalog
+      .status()
+      .subscribe({ next: (s) => this.catalogOn.set(s.connected), error: () => {} });
+    this.search.valueChanges
+      .pipe(
+        tap((v) => {
+          this.catalogHits.set([]);
+          this.catalogLoading.set(v.trim().length >= 3);
+        }),
+        debounceTime(400),
+        distinctUntilChanged(),
+        switchMap((q) =>
+          q.trim().length >= 3 && this.catalogOn()
+            ? this.catalog.search(q.trim()).pipe(catchError(() => of([] as CatalogHit[])))
+            : of([] as CatalogHit[]),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((h) => {
+        this.catalogHits.set(h);
+        this.catalogLoading.set(false);
+      });
 
     if (this.id) {
       this.load();
@@ -506,14 +560,15 @@ export class PurchaseCardPage implements HasUnsaved {
     return Math.round((r.qty || 0) * (r.price || 0) * 100);
   }
 
-  add(a: Article, qty = 1) {
+  /** `costOre`: dagens pris från grossisten (exkl. moms), annars artikelns snittkostnad. */
+  add(a: Article, qty = 1, costOre?: number) {
     this.rows.update((rs) => {
       const i = rs.findIndex((r) => r.a.id === a.id);
       if (i >= 0) return rs.map((r, j) => (j === i ? { ...r, qty: r.qty + qty } : r));
       // Inköpspriset skrivs inkl. moms; det lagrade snittpriset är utan.
       return [
         ...rs,
-        { key: key(), a, qty, price: this.pricing.costIncl(a.averageCost ?? 0) / 100 },
+        { key: key(), a, qty, price: this.pricing.costIncl(costOre ?? a.averageCost ?? 0) / 100 },
       ];
     });
     this.touch();
@@ -537,10 +592,25 @@ export class PurchaseCardPage implements HasUnsaved {
     this.results.set([]);
   }
 
+  /** En produkt ur grossistens katalog: artikeln hittas eller skapas, och raden får dagens pris. */
+  addHit(h: CatalogHit) {
+    this.busy.set(true);
+    this.catalog.adopt(h.sourceId).subscribe({
+      next: (r) => {
+        this.busy.set(false);
+        this.add(r.article, 1, r.item.costExVat);
+        if (!this.supplierCtl.value) this.supplierCtl.setValue(r.supplierId);
+      },
+      error: () => this.busy.set(false),
+    });
+  }
+
   /** Enter tar första träffen, och finns ingen öppnas "Ny artikel" med det man skrev. */
   addFirst() {
     const [first] = this.results();
+    const [hit] = this.catalogRest();
     if (first) this.add(first);
+    else if (hit) this.addHit(hit);
     else if (this.query().trim()) this.newArticle();
   }
 

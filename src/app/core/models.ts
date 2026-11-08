@@ -118,6 +118,9 @@ export interface Article {
   reorderLevel: number;
   /** false = enstaka del som köps in till ett jobb: ingen påminnelse, döljs när den är förbrukad. */
   stocked: boolean;
+  ean: string | null;
+  /** Id hos en grossists katalog, t.ex. { gummigrossen: '371383' }. */
+  externalIds: Record<string, string> | null;
   /** null för personal: inköpspris visas bara för ägare. */
   averageCost: number | null;
   sellPrice: number;
@@ -145,6 +148,8 @@ export interface ArticleInput {
   locationId?: string | null;
   reorderLevel?: number;
   stocked?: boolean;
+  ean?: string | null;
+  externalIds?: Record<string, string> | null;
   sellPrice: number;
   /** Inköpspris per styck, öre. */
   averageCost?: number;
@@ -2449,4 +2454,68 @@ export interface PurchaseCardInput {
   note?: string | null;
   purchasedAt?: string | null;
   lines?: { id?: string; articleId: string; quantity: number; unitCost: number }[];
+}
+
+/** Grossistens katalog (Gummigrossen), läst med verkstadens egen inloggning. Pengar i öre. */
+export interface SupplierStatus {
+  connected: boolean;
+  name: string | null;
+}
+
+export interface GummigrossenStatus extends SupplierStatus {
+  customerNo: string | null;
+}
+
+export interface CatalogTyre {
+  width: number;
+  profile: number;
+  rimDiameter: number;
+  loadIndex: number | null;
+  speedIndex: string | null;
+  season: Season;
+  studded: boolean;
+  runFlat: boolean;
+}
+
+export interface CatalogItem {
+  source: 'gummigrossen';
+  sourceId: string;
+  kind: 'tyre' | 'rim' | 'other';
+  title: string;
+  brand: string;
+  model: string;
+  ean: string | null;
+  partNo: string | null;
+  tyre: CatalogTyre | null;
+  /** Vad verkstaden betalar per styck exkl. moms; med miljöavgift när costFinal. */
+  costExVat: number;
+  costFinal: boolean;
+  /** Rekommenderat konsumentpris inkl. moms. */
+  retailInclVat: number | null;
+  available: number;
+  incoming: number;
+  stock: { warehouse: string; quantity: number }[];
+  nextDelivery: string | null;
+  label: {
+    fuel: string | null;
+    wetGrip: string | null;
+    noiseClass: string | null;
+    noiseDb: number | null;
+  } | null;
+  imageId: number | null;
+}
+
+/** En träff: produkten och verkstadens egen artikel för den, om den finns. */
+export interface CatalogHit extends CatalogItem {
+  articleId: string | null;
+  inStock: number | null;
+}
+
+export interface CatalogOrder {
+  id: string;
+  date: string;
+  status: string;
+  totalExVat: number;
+  reference: string | null;
+  imported: { id: string; number: number } | null;
 }

@@ -53,6 +53,7 @@ import { SectionTabs } from './section-tabs/section-tabs';
 import { Spark } from './spark/spark';
 import { Stat } from './stat/stat';
 import { RegPlate, SvFlag } from './reg-plate/reg-plate';
+import { CatalogHitRow, CatalogPicker } from './catalog-picker/catalog-picker';
 import { QuickArticleDialog } from './quick-article-dialog/quick-article-dialog';
 import { SupplierDialog } from './supplier-dialog/supplier-dialog';
 import { SupplierSelect } from './supplier-select/supplier-select';
@@ -118,6 +119,8 @@ const MATERIAL = [
     ItemIcon,
     RegPlate,
     SvFlag,
+    CatalogHitRow,
+    CatalogPicker,
     QuickArticleDialog,
     SupplierDialog,
     SupplierSelect,
@@ -162,6 +165,8 @@ const MATERIAL = [
     RegPlate,
     SvFlag,
     SupplierDialog,
+    CatalogHitRow,
+    CatalogPicker,
     SupplierSelect,
     TradeDocumentDialog,
     TradeHistory,

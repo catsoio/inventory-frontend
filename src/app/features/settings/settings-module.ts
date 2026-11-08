@@ -13,6 +13,7 @@ import { SettingsPayments, SettingsRegister } from './sections/payment-sections'
 import {
   BlocketConnectionDialog,
   CarInfoConnectionDialog,
+  GummigrossenConnectionDialog,
   SettingsConnections,
 } from './sections/connections-section';
 import { SettingsHotel, SettingsPricing, SettingsStock } from './sections/workflow-sections';
@@ -42,6 +43,7 @@ export { SettingsPage };
     SettingsRegister,
     SettingsConnections,
     CarInfoConnectionDialog,
+    GummigrossenConnectionDialog,
     BlocketConnectionDialog,
     ResetPasswordDialog,
     FeaturesDialog,

@@ -1075,7 +1075,7 @@ export const EN: Record<string, string> = {
   'Äldre inköp': 'Older purchases',
   Bokförda: 'Booked',
   Bokfört: 'Booked',
-  'Leverantörens fakturanummer': 'Supplier\'s invoice number',
+  'Leverantörens fakturanummer': "Supplier's invoice number",
   Inköpsdatum: 'Purchase date',
   'Länk (var du köpte det)': 'Link (where you bought it)',
   'Inköpspris/st': 'Cost each',
@@ -1085,4 +1085,17 @@ export const EN: Record<string, string> = {
   Uppgifter: 'Details',
   'Däckets mått': 'Tyre size',
   'Fälgens mått': 'Rim size',
+  Gummigrossen: 'Gummigrossen',
+  'Sök däck och priser, och hämta tidigare beställningar':
+    'Search tyres and prices, and fetch earlier orders',
+  Kundnummer: 'Customer number',
+  'Hämta från Gummigrossen': 'Fetch from Gummigrossen',
+  'Beställningar hos Gummigrossen': 'Orders at Gummigrossen',
+  Hämta: 'Fetch',
+  'Hos Gummigrossen': 'At Gummigrossen',
+  'Söker hos grossisten…': 'Searching the wholesaler…',
+  'Inga träffar. Prova storleken, t.ex. 205/55 R16.': 'No results. Try the size, e.g. 205/55 R16.',
+  'Sök hos Gummigrossen: storlek eller märke, t.ex. 205/55 R16':
+    'Search Gummigrossen: size or brand, e.g. 205/55 R16',
+  'Inga beställningar hittades.': 'No orders found.',
 };
