@@ -1,11 +1,15 @@
 import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { environment } from '../../../environments/environment';
 import { ScreenApi } from '../../core/api/screen-api';
 import { ApiError, ScreenStyle, ScreenView } from '../../core/models';
 import { dayKey } from './screen-format';
 
-/** Hur ofta skärmen frågar efter nytt. Orderna ändras några gånger i timmen, så en halv minut räcker. */
-const POLL_MS = 30_000;
+/**
+ * Nytt kommer direkt: servern skickar en signal när en order ändras (`events`). Frågan med jämna
+ * mellanrum är reserven om kanalen är nere (nät, proxy, flera servrar).
+ */
+const POLL_MS = 15_000;
 /** Utan svar så här länge säger skärmen att den inte har kontakt (och visar kvar det den vet). */
 const STALE_MS = 2 * 60_000;
 /** Textstorleken följer skärmens bredd, så samma sida är läsbar på 1080p och 4K. */
@@ -16,7 +20,7 @@ const STYLES: ScreenStyle[] = ['board', 'light', 'list', 'mechanics'];
  * Skärmen i verkstadens hall (`/s/<nyckel>`): en stor display som bara visar orderna som finns i
  * huset. Ingen inloggning, ingenting att klicka på; nyckeln i länken är nyckeln. Utseendet är ägarens
  * val (`ScreenView.style`) och följer med svaret, så skärmen byter stil av sig själv; `?style=` i
- * adressen provar en annan utan att spara. Den ska kunna stå på i veckor: frågar om var halvminut,
+ * adressen provar en annan utan att spara. Den ska kunna stå på i veckor: får en signal direkt när en order ändras (och frågar om var 15:e sekund som reserv),
  * behåller sista läget om nätet försvinner, hindrar skärmen från att somna och laddar om sig vid
  * midnatt så att nya versioner når den. Själva ritandet ligger i `styles/`.
  */
@@ -91,6 +95,8 @@ export class WorkshopScreen implements OnInit, OnDestroy {
     ];
     this.destroyRef.onDestroy(() => timers.forEach(clearInterval));
 
+    this.listen();
+
     void this.keepAwake();
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
@@ -105,6 +111,16 @@ export class WorkshopScreen implements OnInit, OnDestroy {
   ngOnDestroy() {
     document.documentElement.style.fontSize = this.previousFont;
     void this.wakeLock?.release();
+  }
+
+  /** Lyssnar på servern; EventSource kopplar upp sig igen av sig själv efter avbrott. */
+  private listen() {
+    if (typeof EventSource === 'undefined') return;
+    const source = new EventSource(
+      `${environment.apiUrl}/inventory/public/screen/${this.token}/events`,
+    );
+    source.addEventListener('changed', () => this.load());
+    this.destroyRef.onDestroy(() => source.close());
   }
 
   private load() {
