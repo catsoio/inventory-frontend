@@ -2520,10 +2520,14 @@ export interface CatalogOrder {
   imported: { id: string; number: number } | null;
 }
 
-/** Skärmen i verkstaden: på eller av, och hemligheten i länken (`/s/<nyckel>`). */
+/** Så här kan väggskärmen se ut. Samma order i alla; ägaren väljer. */
+export type ScreenStyle = 'board' | 'light' | 'list' | 'mechanics';
+
+/** Skärmen i verkstaden: på eller av, hemligheten i länken (`/s/<nyckel>`) och utseendet. */
 export interface ScreenStatus {
   enabled: boolean;
   token: string | null;
+  style: ScreenStyle;
 }
 
 /** En order som väggskärmen visar: inget om kunden och inga priser. */
@@ -2546,6 +2550,7 @@ export interface ScreenOrder {
 }
 
 export interface ScreenView {
+  style: ScreenStyle;
   garageName: string;
   at: string;
   orders: ScreenOrder[];

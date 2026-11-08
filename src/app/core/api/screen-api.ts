@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ScreenStatus, ScreenView } from '../models';
+import { ScreenStatus, ScreenStyle, ScreenView } from '../models';
 
 /** Skärmen i verkstadens hall: ägarens av/på-knapp och själva väggsidan (utan inloggning). */
 @Injectable({ providedIn: 'root' })
@@ -21,6 +21,10 @@ export class ScreenApi {
   /** En ny länk; den gamla slutar fungera. */
   renew(): Observable<ScreenStatus> {
     return this.http.post<ScreenStatus>(`${this.base}/screen/renew`, {});
+  }
+
+  setStyle(style: ScreenStyle): Observable<ScreenStatus> {
+    return this.http.patch<ScreenStatus>(`${this.base}/screen`, { style });
   }
 
   disable(): Observable<ScreenStatus> {
