@@ -38,14 +38,14 @@ import { ensureValid } from '../../shared/form-guard';
           @if (admin) {
             @if (c.active) {
               <button
- mat-icon-button
- class="!text-red-700"
- aria-label="Ta bort"
- matTooltip="Ta bort"
- (click)="remove()"
- >
- <mat-icon>delete_outline</mat-icon>
- </button>
+                mat-icon-button
+                class="!text-red-700"
+                aria-label="Ta bort"
+                matTooltip="Ta bort"
+                (click)="remove()"
+              >
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             } @else {
               <button mat-stroked-button (click)="restore()">Återställ</button>
             }
@@ -73,6 +73,27 @@ import { ensureValid } from '../../shared/form-guard';
               }
             </mat-select>
             <mat-hint>Däck och fälgar har egna mått; övriga typer har inga</mat-hint>
+          </mat-form-field>
+        </section>
+
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-1 text-base font-semibold">Lagerhållning</h2>
+          <p class="mb-3 text-sm text-gray-600">
+            Det här är förvalet för nya artiklar av typen. Sätt 0 för delar som köps in till ett
+            jobb, som en dragkrok: de får ingen påminnelse och försvinner ur listan när de är
+            förbrukade. Sätt en nivå för det du alltid ska ha hemma, som olja och filter.
+          </p>
+          <mat-form-field class="max-w-xs">
+            <mat-label>Påminn när det är kvar (st)</mat-label>
+            <input
+              matInput
+              type="number"
+              inputmode="numeric"
+              min="0"
+              formControlName="reorderLevel"
+            />
+            <mat-hint>Tomt = som före, 0 = enstaka delar</mat-hint>
+            <mat-error>Heltal, 0 eller mer</mat-error>
           </mat-form-field>
         </section>
 
@@ -121,6 +142,7 @@ export class ArticleTypeCard implements OnInit {
   readonly form = inject(FormBuilder).nonNullable.group({
     name: ['', Validators.required],
     spec: ['none' as ArticleSpec],
+    reorderLevel: [null as number | null, [Validators.min(0)]],
     fields: inject(FormBuilder).nonNullable.group({
       brand: ['optional' as FieldMode],
       model: ['required' as FieldMode],
@@ -143,7 +165,12 @@ export class ArticleTypeCard implements OnInit {
         return;
       }
       this.card.set(t);
-      this.form.reset({ name: t.name, spec: t.spec, fields: t.fields });
+      this.form.reset({
+        name: t.name,
+        spec: t.spec,
+        fields: t.fields,
+        reorderLevel: t.reorderLevel ?? null,
+      });
     });
   }
 
@@ -153,7 +180,8 @@ export class ArticleTypeCard implements OnInit {
 
   save() {
     if (!ensureValid(this.form, this.snack)) return;
-    const v = this.form.getRawValue();
+    const raw = this.form.getRawValue();
+    const v = { ...raw, reorderLevel: raw.reorderLevel == null ? null : Number(raw.reorderLevel) };
     this.busy.set(true);
     const req = this.id ? this.api.updateArticleType(this.id, v) : this.api.createArticleType(v);
     req.subscribe({

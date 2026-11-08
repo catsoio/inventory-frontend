@@ -162,6 +162,27 @@ const COLS: Col[] = [
   host: { class: 'flex h-full flex-col' },
   template: `
     <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
+    <div
+      class="mb-3 flex shrink-0 gap-1.5 overflow-x-auto"
+      role="tablist"
+      aria-label="Artikelgrupp"
+    >
+      @for (g of groups_; track g[0]) {
+        <button
+          role="tab"
+          [attr.aria-selected]="group() === g[0]"
+          class="h-9 shrink-0 rounded-full px-4 text-sm font-medium"
+          [class]="
+            group() === g[0]
+              ? 'bg-brand text-white'
+              : 'bg-white text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50'
+          "
+          (click)="setGroup(g[0])"
+        >
+          {{ g[1] }}
+        </button>
+      }
+    </div>
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
       <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
         <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
@@ -276,6 +297,15 @@ const COLS: Col[] = [
             {{ s[1] }}
           </button>
         }
+
+        <button
+          class="mt-1 flex w-full justify-between rounded-lg px-2 py-2 text-left text-sm hover:bg-gray-100 lg:py-1"
+          [class]="sel()['withSpent'] ? 'bg-brand-soft font-semibold text-brand' : ''"
+          (click)="toggle('withSpent', true)"
+          title="Enstaka delar som köpts in till ett jobb och redan är använda"
+        >
+          Visa förbrukade enstaka delar
+        </button>
 
         <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Typ</div>
         @for (c of categories; track c[0]) {
@@ -517,6 +547,13 @@ export class ArticleList implements OnInit {
   readonly seasons = Object.entries(SEASON_LABELS);
   readonly kind = (a: Article) => itemKind(a.category);
   readonly categories = Object.entries(CATEGORY_LABELS) as [Category, string][];
+  /** Flikarna överst: delar är allt som inte är hjul, däck och fälgar har egna mått och filter. */
+  readonly groups_: [Category | '', string][] = [
+    ['', 'Alla'],
+    ['other', 'Delar'],
+    ['tyre', 'Däck'],
+    ['rim', 'Fälgar'],
+  ];
   readonly statuses: [Status, string][] = [
     ['', 'Alla'],
     ['in', 'I lager'],
@@ -551,6 +588,7 @@ export class ArticleList implements OnInit {
           ? 'out'
           : '';
   });
+  readonly group = computed<Category | ''>(() => (this.sel()['category'] as Category) ?? '');
   /** Säsong, bredd och profil gäller bara däck. */
   readonly showTyreFilters = computed(() => {
     const c = this.sel()['category'];
@@ -677,6 +715,19 @@ export class ArticleList implements OnInit {
     this.load$.next(0);
   }
 
+  /** Byte av flik tömmer däckfilter som inte längre passar. */
+  setGroup(c: Category | '') {
+    this.sel.update((s) => ({
+      ...s,
+      category: c || undefined,
+      season: undefined,
+      width: undefined,
+      profile: undefined,
+      rimDiameter: c === 'other' ? undefined : s['rimDiameter'],
+    }));
+    this.load$.next(0);
+  }
+
   setStatus(s: Status) {
     this.sel.update((x) => ({
       ...x,
@@ -750,6 +801,8 @@ export class ArticleList implements OnInit {
       lowStock: s['lowStock'] ? true : undefined,
       inStock: s['inStock'] as boolean | undefined,
       includeArchived: s['includeArchived'] ? true : undefined,
+      // Enstaka delar som är använda är historia, inget att leta efter i listan.
+      hideSpent: s['withSpent'] ? undefined : true,
       sort: this.sort() && SERVER_SORT.includes(this.sort()!.key) ? this.sort()!.key : undefined,
       order:
         this.sort() && SERVER_SORT.includes(this.sort()!.key)

@@ -116,6 +116,8 @@ export interface Article {
   quantity: number;
   stockLevel: StockLevel;
   reorderLevel: number;
+  /** false = enstaka del som köps in till ett jobb: ingen påminnelse, döljs när den är förbrukad. */
+  stocked: boolean;
   /** null för personal: inköpspris visas bara för ägare. */
   averageCost: number | null;
   sellPrice: number;
@@ -142,6 +144,7 @@ export interface ArticleInput {
   warehouseId?: string | null;
   locationId?: string | null;
   reorderLevel?: number;
+  stocked?: boolean;
   sellPrice: number;
   /** Inköpspris per styck, öre. */
   averageCost?: number;
@@ -163,6 +166,8 @@ export interface ArticleQuery {
   studded?: boolean;
   inStock?: boolean;
   lowStock?: boolean;
+  /** Utan enstaka delar som är förbrukade. */
+  hideSpent?: boolean;
   includeArchived?: boolean;
   sort?: string;
   order?: 'asc' | 'desc';
@@ -1842,6 +1847,8 @@ export interface ArticleType {
   name: string;
   spec: ArticleSpec;
   fields: Record<ArticleField, FieldMode>;
+  /** Vad nya artiklar av typen börjar med i "Påminn när det är kvar"; 0 = enstaka delar. */
+  reorderLevel: number | null;
   active: boolean;
 }
 
@@ -2397,4 +2404,49 @@ export interface SiteSettings {
   /** Dölj regnumret för besökare. */
   hideRegNo: boolean;
   domains: SiteDomain[];
+}
+
+/** En rad på ett inköpskort; kostnaden är öre exkl. moms, som den lagras på artikeln. */
+export interface PurchaseCardLine {
+  id: string;
+  articleId: string;
+  quantity: number;
+  unitCost: number;
+  /** Artikeln som den ser ut nu (bara när kortet öppnas, inte i listan). */
+  article: Article | null;
+}
+
+/** Inköpskortet: ett inköp som utkast tills det bokförs in i lagret. */
+export interface PurchaseCard {
+  id: string;
+  /** IK-00042 */
+  code: string;
+  number: number;
+  status: 'draft' | 'posted';
+  supplierId: string | null;
+  supplier: { id: string; code: string; name: string } | null;
+  /** Leverantörens faktura- eller ordernummer. */
+  reference: string | null;
+  url: string | null;
+  note: string | null;
+  purchasedAt: string | null;
+  lines: PurchaseCardLine[];
+  units: number;
+  /** Öre exkl. moms. */
+  total: number;
+  /** INK-00007 när kortet är bokfört. */
+  documentCode: string | null;
+  documentNumber: number | null;
+  postedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseCardInput {
+  supplierId?: string | null;
+  reference?: string | null;
+  url?: string | null;
+  note?: string | null;
+  purchasedAt?: string | null;
+  lines?: { id?: string; articleId: string; quantity: number; unitCost: number }[];
 }

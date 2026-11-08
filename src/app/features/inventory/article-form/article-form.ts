@@ -50,304 +50,360 @@ const categoryOf = (t: ArticleType | undefined): Category =>
   selector: 'app-article-form',
   standalone: false,
   template: `
-    <h1 class="mb-3 text-xl font-semibold md:mb-4 md:text-2xl">
-      {{ id ? 'Ändra artikel' : 'Ny artikel' }}
-    </h1>
-    <form [formGroup]="form" (ngSubmit)="save()" class="flex flex-col gap-4 pb-4">
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="sec">Artikel</h2>
-        <div class="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
-          <mat-form-field>
-            <mat-label>Artikeltyp</mat-label>
-            <mat-select formControlName="typeId">
-              @for (t of types(); track t.id) {
-                <mat-option [value]="t.id">{{ t.name }}</mat-option>
-              }
-            </mat-select>
-            @if (admin) {
-              <mat-hint
-                ><a routerLink="/article-types" class="text-brand">Hantera typer</a></mat-hint
-              >
-            }
-            <mat-error>Välj typ</mat-error>
-          </mat-form-field>
-          @if (show('sku')) {
-            <mat-form-field>
-              <mat-label>Artikelnummer</mat-label>
-              <input matInput formControlName="sku" autocomplete="off" />
-              <mat-error>Krävs för {{ type()?.name }}</mat-error>
-            </mat-form-field>
-          }
-          @if (show('brand')) {
-            <mat-form-field>
-              <mat-label>Märke</mat-label>
-              <input matInput formControlName="brand" list="brands" />
-              <datalist id="brands">
-                @for (b of brands(); track b) {
-                  <option [value]="b"></option>
-                }
-              </datalist>
-              <mat-error>Krävs för {{ type()?.name }}</mat-error>
-            </mat-form-field>
-          }
-          @if (show('model')) {
-            <mat-form-field class="lg:col-span-2">
-              <mat-label>{{ category() === 'tyre' ? 'Modell' : 'Benämning' }}</mat-label>
-              <input
-                matInput
-                formControlName="model"
-                [placeholder]="category() === 'tyre' ? 't.ex. Hakkapeliitta 10' : 't.ex. Sensor'"
-              />
-              <mat-error>Krävs för {{ type()?.name }}</mat-error>
-            </mat-form-field>
-          }
-          @if (show('supplier')) {
-            <mat-form-field>
-              <mat-label>Leverantör</mat-label>
-              <input matInput formControlName="supplier" />
-              <mat-error>Krävs för {{ type()?.name }}</mat-error>
-            </mat-form-field>
-          }
-          @if (show('warehouse')) {
-            <mat-form-field>
-              <mat-label>Lager</mat-label>
-              <mat-select formControlName="warehouseId">
-                @if (type()?.fields?.warehouse !== 'required') {
-                  <mat-option [value]="null">Inget</mat-option>
-                }
-                @for (w of ownWarehouses(); track w.id) {
-                  <mat-option [value]="w.id">{{ w.name }}</mat-option>
-                }
-              </mat-select>
-              @if (admin) {
-                <mat-hint
-                  ><a routerLink="/warehouses" class="text-brand">Hantera lager</a></mat-hint
-                >
-              }
-              <mat-error>Krävs för {{ type()?.name }}</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Plats</mat-label>
-              <mat-select formControlName="locationId">
-                <mat-option [value]="null">Ingen särskild</mat-option>
-                @for (l of places(); track l.id) {
-                  <mat-option [value]="l.id">{{ l.name }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          }
-        </div>
-        @if (!types().length) {
-          <p class="text-sm text-gray-500">Laddar artikeltyper…</p>
-        }
-      </section>
-
-      @if (category() === 'tyre') {
-        <section class="rounded-xl bg-white p-5 shadow-sm" formGroupName="tyre">
-          <h2 class="sec">Däck</h2>
-          <div class="grid grid-cols-3 gap-x-4 lg:grid-cols-6 2xl:grid-cols-8">
-            <mat-form-field>
-              <mat-label>Bredd</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="width" />
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Profil</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="profile" />
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Tum</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="rimDiameter" />
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Säsong</mat-label>
-              <mat-select formControlName="season">
-                @for (s of seasons; track s[0]) {
-                  <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Lastindex</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="loadIndex" />
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Hastighet</mat-label>
-              <input matInput formControlName="speedIndex" placeholder="V" />
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>DOT</mat-label>
-              <input matInput formControlName="dot" placeholder="2425" />
-            </mat-form-field>
-            <div class="col-span-3 flex items-center gap-6 pb-5 lg:col-span-6 2xl:col-span-1">
-              <mat-slide-toggle formControlName="studded">Dubb</mat-slide-toggle>
-              <mat-slide-toggle formControlName="runFlat">Runflat</mat-slide-toggle>
-            </div>
-          </div>
-        </section>
-      }
-
-      @if (category() === 'rim') {
-        <section class="rounded-xl bg-white p-5 shadow-sm" formGroupName="rim">
-          <h2 class="sec">Fälg</h2>
-          <div class="grid grid-cols-2 gap-x-4 sm:grid-cols-4 2xl:grid-cols-8">
-            <mat-form-field>
-              <mat-label>Tum</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="diameter" />
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Bredd (J)</mat-label>
-              <input
-                matInput
-                type="number"
-                inputmode="decimal"
-                step="0.5"
-                formControlName="width"
-              />
-              <mat-error>t.ex. 7 eller 7,5</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Bultar</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="boltCount" />
-              <mat-error>3–8</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>PCD (mm)</mat-label>
-              <input
-                matInput
-                type="number"
-                inputmode="decimal"
-                step="0.1"
-                formControlName="boltCircle"
-              />
-              <mat-hint>112 för 5x112</mat-hint>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>ET (mm)</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="offset" />
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Centrumhål (mm)</mat-label>
-              <input
-                matInput
-                type="number"
-                inputmode="decimal"
-                step="0.1"
-                formControlName="centerBore"
-              />
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Material</mat-label>
-              <mat-select formControlName="material">
-                @for (m of materials; track m[0]) {
-                  <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Färg</mat-label>
-              <input matInput formControlName="color" />
-            </mat-form-field>
-          </div>
-        </section>
-      }
-
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="sec">Pris och lager</h2>
-        <div class="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
-          @if (admin || !id) {
-            <mat-form-field>
-              <mat-label>Inköpspris (kr, inkl. moms)</mat-label>
-              <input
-                matInput
-                type="number"
-                inputmode="decimal"
-                step="0.01"
-                min="0"
-                formControlName="cost"
-              />
-              <mat-hint>{{ costHint() }}</mat-hint>
-              <mat-error>Krävs när du lägger in lager</mat-error>
-            </mat-form-field>
-          }
-          <mat-form-field>
-            <mat-label>Försäljningspris (kr, inkl. moms)</mat-label>
-            <input
-              matInput
-              type="number"
-              inputmode="decimal"
-              step="0.01"
-              formControlName="sellPrice"
-            />
-            <mat-hint>{{ marginHint() }}</mat-hint>
-            <mat-error>Ange pris (0 eller mer)</mat-error>
-          </mat-form-field>
-          @if (id) {
-            <mat-form-field>
-              <mat-label>I lager (st)</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="quantity" />
-              <mat-hint>En ändring sparas som inventering</mat-hint>
-              <mat-error>Heltal, 0 eller mer</mat-error>
-            </mat-form-field>
-          } @else {
-            <mat-form-field>
-              <mat-label>I lager nu (st)</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="initialQuantity" />
-              <mat-hint>Valfritt: det du har på hyllan</mat-hint>
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-          }
-        </div>
-
-        <button
-          mat-button
-          type="button"
-          class="mt-1 !px-0"
-          (click)="more.set(!more())"
-          [attr.aria-expanded]="more()"
-        >
-          <mat-icon>{{ more() ? 'expand_less' : 'expand_more' }}</mat-icon>
-          Fler val
-        </button>
-        @if (more()) {
-          <div class="mt-2 grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
-            <mat-form-field>
-              <mat-label>Påminn när det är kvar (st)</mat-label>
-              <input matInput type="number" inputmode="numeric" formControlName="reorderLevel" />
-              <mat-hint>Artikeln visas som "Lågt lager". Tomt eller 0 = ingen påminnelse.</mat-hint>
-              <mat-error>Heltal</mat-error>
-            </mat-form-field>
-            <mat-form-field class="lg:col-span-3">
-              <mat-label>Anteckningar</mat-label>
-              <input matInput formControlName="notes" />
-            </mat-form-field>
-          </div>
-        }
-      </section>
-
-      <div class="flex flex-wrap gap-2">
-        <button mat-flat-button color="primary" class="!h-12 max-md:flex-1" [disabled]="busy()">
-          Spara
-        </button>
+    <app-card-page
+      [wide]="true"
+      listLink="/inventory"
+      listLabel="Artiklar"
+      newTitle="Ny artikel"
+      [title]="id ? 'Ändra artikel' : ''"
+    >
+      <div actions class="flex items-center gap-2">
         @if (!id) {
           <button
             mat-stroked-button
             type="button"
-            class="!h-12"
+            class="max-md:!hidden"
             [disabled]="busy()"
             (click)="save(true)"
           >
             Spara och lägg till nästa
           </button>
         }
-        <a mat-button class="!h-12" [routerLink]="id ? ['/inventory', id] : '/inventory'">Avbryt</a>
+        <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="save()">
+          Spara
+        </button>
       </div>
-    </form>
+
+      <form
+        [formGroup]="form"
+        (ngSubmit)="save()"
+        class="grid items-start gap-4 pb-4 lg:grid-cols-3"
+      >
+        <div class="flex flex-col gap-4 lg:col-span-2">
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <div class="mb-3 flex items-baseline justify-between gap-3">
+              <h2 class="text-base font-semibold">Vad är det för artikel?</h2>
+              @if (admin) {
+                <a routerLink="/article-types" class="text-brand text-sm hover:underline"
+                  >Hantera typer</a
+                >
+              }
+            </div>
+            @if (types().length) {
+              <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Artikeltyp">
+                @for (t of types(); track t.id) {
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="form.controls.typeId.value === t.id"
+                    class="h-10 rounded-full px-4 text-sm font-medium"
+                    [class]="
+                      form.controls.typeId.value === t.id
+                        ? 'bg-brand text-white'
+                        : 'bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50'
+                    "
+                    (click)="selectType(t.id)"
+                  >
+                    {{ t.name }}
+                  </button>
+                }
+              </div>
+            } @else {
+              <p class="text-sm text-gray-500">Laddar artikeltyper…</p>
+            }
+          </section>
+
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <h2 class="mb-3 text-base font-semibold">Uppgifter</h2>
+            <div class="grid gap-x-4 sm:grid-cols-2">
+              @if (show('model')) {
+                <mat-form-field class="sm:col-span-2">
+                  <mat-label>{{ category() === 'tyre' ? 'Modell' : 'Benämning' }}</mat-label>
+                  <input
+                    matInput
+                    formControlName="model"
+                    autocomplete="off"
+                    [placeholder]="
+                      category() === 'tyre' ? 't.ex. Hakkapeliitta 10' : 't.ex. Dragkrok Mercedes'
+                    "
+                  />
+                  <mat-error>Krävs för {{ type()?.name }}</mat-error>
+                </mat-form-field>
+              }
+              @if (show('brand')) {
+                <mat-form-field>
+                  <mat-label>Märke</mat-label>
+                  <input matInput formControlName="brand" list="brands" autocomplete="off" />
+                  <datalist id="brands">
+                    @for (b of brands(); track b) {
+                      <option [value]="b"></option>
+                    }
+                  </datalist>
+                  <mat-error>Krävs för {{ type()?.name }}</mat-error>
+                </mat-form-field>
+              }
+              @if (show('sku')) {
+                <mat-form-field>
+                  <mat-label>Artikelnummer</mat-label>
+                  <input matInput formControlName="sku" autocomplete="off" />
+                  <mat-error>Krävs för {{ type()?.name }}</mat-error>
+                </mat-form-field>
+              }
+              @if (show('supplier')) {
+                <mat-form-field>
+                  <mat-label>Leverantör</mat-label>
+                  <input matInput formControlName="supplier" autocomplete="off" />
+                  <mat-error>Krävs för {{ type()?.name }}</mat-error>
+                </mat-form-field>
+              }
+              <mat-form-field class="sm:col-span-2">
+                <mat-label>Anteckning</mat-label>
+                <input matInput formControlName="notes" autocomplete="off" />
+              </mat-form-field>
+            </div>
+          </section>
+
+          @if (category() === 'tyre') {
+            <section class="rounded-xl bg-white p-5 shadow-sm" formGroupName="tyre">
+              <div class="mb-3 flex items-baseline justify-between gap-3">
+                <h2 class="text-base font-semibold">Däckets mått</h2>
+                @if (sizePreview(); as s) {
+                  <span class="text-brand text-lg font-semibold tabular-nums">{{ s }}</span>
+                }
+              </div>
+              <div class="grid grid-cols-3 gap-x-4">
+                <mat-form-field>
+                  <mat-label>Bredd</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="width" />
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Profil</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="profile" />
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Tum</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="rimDiameter" />
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+              </div>
+              <div class="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <mat-button-toggle-group
+                  formControlName="season"
+                  hideSingleSelectionIndicator
+                  aria-label="Säsong"
+                >
+                  @for (s of seasons; track s[0]) {
+                    <mat-button-toggle [value]="s[0]">{{ s[1] }}</mat-button-toggle>
+                  }
+                </mat-button-toggle-group>
+                <mat-slide-toggle formControlName="studded">Dubb</mat-slide-toggle>
+                <mat-slide-toggle formControlName="runFlat">Runflat</mat-slide-toggle>
+              </div>
+              <div class="grid grid-cols-3 gap-x-4">
+                <mat-form-field>
+                  <mat-label>Lastindex</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="loadIndex" />
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Hastighet</mat-label>
+                  <input matInput formControlName="speedIndex" placeholder="V" />
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>DOT</mat-label>
+                  <input matInput formControlName="dot" placeholder="2425" />
+                </mat-form-field>
+              </div>
+            </section>
+          }
+
+          @if (category() === 'rim') {
+            <section class="rounded-xl bg-white p-5 shadow-sm" formGroupName="rim">
+              <div class="mb-3 flex items-baseline justify-between gap-3">
+                <h2 class="text-base font-semibold">Fälgens mått</h2>
+                @if (sizePreview(); as s) {
+                  <span class="text-brand text-lg font-semibold tabular-nums">{{ s }}</span>
+                }
+              </div>
+              <div class="grid grid-cols-2 gap-x-4 sm:grid-cols-3">
+                <mat-form-field>
+                  <mat-label>Tum</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="diameter" />
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Bredd (J)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    step="0.5"
+                    formControlName="width"
+                  />
+                  <mat-error>t.ex. 7 eller 7,5</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>ET (mm)</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="offset" />
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Bultar</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="boltCount" />
+                  <mat-error>3–8</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>PCD (mm)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    step="0.1"
+                    formControlName="boltCircle"
+                  />
+                  <mat-hint>112 för 5x112</mat-hint>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Centrumhål (mm)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    step="0.1"
+                    formControlName="centerBore"
+                  />
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Material</mat-label>
+                  <mat-select formControlName="material">
+                    @for (m of materials; track m[0]) {
+                      <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Färg</mat-label>
+                  <input matInput formControlName="color" />
+                </mat-form-field>
+              </div>
+            </section>
+          }
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <h2 class="mb-3 text-base font-semibold">Pris</h2>
+            <div class="flex flex-col gap-3">
+              @if (admin || !id) {
+                <mat-form-field>
+                  <mat-label>Inköpspris (kr, inkl. moms)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    step="0.01"
+                    min="0"
+                    formControlName="cost"
+                  />
+                  <mat-hint>{{ costHint() }}</mat-hint>
+                  <mat-error>Krävs när du lägger in lager</mat-error>
+                </mat-form-field>
+              }
+              <mat-form-field>
+                <mat-label>Försäljningspris (kr, inkl. moms)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  inputmode="decimal"
+                  step="0.01"
+                  formControlName="sellPrice"
+                />
+                <mat-hint>{{ marginHint() }}</mat-hint>
+                <mat-error>Ange pris (0 eller mer)</mat-error>
+              </mat-form-field>
+            </div>
+          </section>
+
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <h2 class="mb-3 text-base font-semibold">Lager</h2>
+            <mat-slide-toggle formControlName="stocked">Lagerför den här artikeln</mat-slide-toggle>
+            <p class="mt-1 mb-4 text-sm text-gray-600">
+              @if (form.controls.stocked.value) {
+                Du har den hemma och köper in mer när den tar slut.
+              } @else {
+                Enstaka del som köps in till ett jobb: ingen påminnelse, och den försvinner ur
+                listan när den är förbrukad.
+              }
+            </p>
+            <div class="flex flex-col gap-3">
+              @if (id) {
+                <mat-form-field>
+                  <mat-label>I lager (st)</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="quantity" />
+                  <mat-hint>En ändring sparas som inventering</mat-hint>
+                  <mat-error>Heltal, 0 eller mer</mat-error>
+                </mat-form-field>
+              } @else {
+                <mat-form-field>
+                  <mat-label>I lager nu (st)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="numeric"
+                    formControlName="initialQuantity"
+                  />
+                  <mat-hint>Valfritt: det du har på hyllan</mat-hint>
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+              }
+              @if (form.controls.stocked.value) {
+                <mat-form-field>
+                  <mat-label>Påminn när det är kvar (st)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="numeric"
+                    formControlName="reorderLevel"
+                  />
+                  <mat-hint>Tomt eller 0 = ingen påminnelse</mat-hint>
+                  <mat-error>Heltal</mat-error>
+                </mat-form-field>
+              }
+              @if (show('warehouse')) {
+                <mat-form-field>
+                  <mat-label>Lager</mat-label>
+                  <mat-select formControlName="warehouseId">
+                    @if (type()?.fields?.warehouse !== 'required') {
+                      <mat-option [value]="null">Inget</mat-option>
+                    }
+                    @for (w of ownWarehouses(); track w.id) {
+                      <mat-option [value]="w.id">{{ w.name }}</mat-option>
+                    }
+                  </mat-select>
+                  @if (admin) {
+                    <mat-hint
+                      ><a routerLink="/warehouses" class="text-brand">Hantera lager</a></mat-hint
+                    >
+                  }
+                  <mat-error>Krävs för {{ type()?.name }}</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Plats</mat-label>
+                  <mat-select formControlName="locationId">
+                    <mat-option [value]="null">Ingen särskild</mat-option>
+                    @for (l of places(); track l.id) {
+                      <mat-option [value]="l.id">{{ l.name }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              }
+            </div>
+          </section>
+        </div>
+      </form>
+    </app-card-page>
   `,
 })
 export class ArticleForm {
@@ -367,8 +423,6 @@ export class ArticleForm {
   readonly brands = signal<string[]>([]);
   readonly types = signal<ArticleType[]>([]);
   readonly warehouses = signal<Warehouse[]>([]);
-  /** "Fler val": påminnelsenivå och anteckningar. Öppen om något redan är ifyllt. */
-  readonly more = signal(false);
   private savedQuantity = 0;
 
   readonly form = this.fb.group({
@@ -400,6 +454,8 @@ export class ArticleForm {
     warehouseId: [null as string | null],
     locationId: [null as string | null],
     reorderLevel: [null as number | null, [Validators.min(0), int]],
+    /** Av = enstaka del som köps in till ett jobb. */
+    stocked: [true],
     /** Inköpspris per styck, kr inkl. moms (lagras utan). */
     cost: [null as number | null, [Validators.min(0)]],
     sellPrice: [null as number | null, [Validators.required, Validators.min(0)]],
@@ -416,6 +472,29 @@ export class ArticleForm {
     initialValue: null as string | null,
   });
   private readonly values = toSignal(this.form.valueChanges, { initialValue: null });
+
+  /** Måtten som ett mått på etiketten (205/55 R16), medan man skriver. */
+  readonly sizePreview = computed(() => {
+    const v = this.values() as {
+      tyre?: { width?: number | null; profile?: number | null; rimDiameter?: number | null };
+      rim?: {
+        diameter?: number | null;
+        width?: number | null;
+        boltCount?: number | null;
+        boltCircle?: number | null;
+      };
+    } | null;
+    if (this.category() === 'tyre') {
+      const t = v?.tyre;
+      return t?.width && t.profile && t.rimDiameter
+        ? `${t.width}/${t.profile} R${t.rimDiameter}`
+        : '';
+    }
+    const r = v?.rim;
+    if (!r?.diameter || !r.width) return '';
+    const bolts = r.boltCount && r.boltCircle ? ` ${r.boltCount}x${r.boltCircle}` : '';
+    return `${r.diameter}x${r.width}J${bolts}`;
+  });
 
   /** Den valda artikeltypen. */
   readonly type = computed(() => this.types().find((t) => t.id === this.typeId()));
@@ -499,7 +578,6 @@ export class ArticleForm {
           locationId: a.locationId ?? null,
         } as never);
         this.applyType(this.types().find((t) => t.id === typeId));
-        this.more.set(!!a.reorderLevel || !!a.notes);
       });
       return;
     }
@@ -510,7 +588,6 @@ export class ArticleForm {
       typeId: (remembered ?? this.types().find((t) => t.spec === 'tyre') ?? this.types()[0])?.id,
       tyre: { season: d.defaultSeason },
       supplier: d.defaultSupplier,
-      reorderLevel: d.defaultReorderLevel || null,
     });
     // Föreslå försäljningspris från inköpspris + påslag så länge priset inte fyllts i.
     this.form.controls.cost.valueChanges
@@ -560,12 +637,25 @@ export class ArticleForm {
     if (cat === 'rim') c.rim.enable({ emitEvent: false });
     else c.rim.disable({ emitEvent: false });
     if (t && !this.id) {
+      // En ny artikel börjar som typen vill, tills man själv valt: dragkroken (Reservdel) är en
+      // enstaka del, olja och filter lagerförs med en påminnelse.
+      if (!c.stocked.dirty) {
+        const level =
+          t.reorderLevel ?? (t.spec === 'none' ? 0 : this.settings.value().defaultReorderLevel);
+        c.stocked.setValue(level > 0, { emitEvent: false });
+        c.reorderLevel.setValue(level > 0 ? level : null, { emitEvent: false });
+      }
       try {
         localStorage.setItem(TYPE_KEY, t.id);
       } catch {
         // Utan lagring börjar nästa artikel på standardtypen; inget mer händer.
       }
     }
+  }
+
+  selectType(id: string) {
+    this.form.controls.typeId.setValue(id);
+    this.form.controls.typeId.markAsDirty();
   }
 
   save(addNext = false) {
@@ -586,7 +676,8 @@ export class ArticleForm {
       sku: text(v.sku),
       warehouseId: v.warehouseId,
       locationId: v.locationId,
-      reorderLevel: editing ? (v.reorderLevel ?? 0) : opt(v.reorderLevel),
+      stocked: v.stocked ?? true,
+      reorderLevel: !v.stocked ? 0 : editing ? (v.reorderLevel ?? 0) : opt(v.reorderLevel),
       sellPrice: Math.round(v.sellPrice! * 100),
       // Inköpspriset skrivs inkl. moms och lagras utan (ingående moms dras av).
       averageCost:

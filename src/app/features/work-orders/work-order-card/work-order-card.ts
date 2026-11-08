@@ -50,7 +50,7 @@ import {
   type PriceGroup,
   type PricedRow,
 } from '../../../shared/vat';
-import { QuickArticleDialog } from '../quick-article-dialog/quick-article-dialog';
+import { QuickArticleDialog } from '../../../shared/quick-article-dialog/quick-article-dialog';
 
 const ore = (kr: number | null | undefined) =>
   kr == null || (kr as unknown) === '' || Number.isNaN(kr) ? null : Math.round(Number(kr) * 100);
@@ -91,6 +91,9 @@ interface JobValue {
  * delsummor, förbrukningsmaterial och kostnadsförslag (bilverkstad). Arbetsbladet till
  * mekanikern har aldrig priser, och kunden ser aldrig timmar: arbete har ett pris per åtgärd.
  */
+/** En söktext som låter som däck eller fälg: dimension (205/55, R16), säsong eller ordet själv. */
+const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar|dubb|\d+x\d{3}/i;
+
 @Component({
   selector: 'app-work-order-card',
   standalone: false,
@@ -813,7 +816,7 @@ interface JobValue {
                     }}, ordern behöver {{ needs(row.value.articleId) }}. Resten måste beställas.
                   }
                 </span>
-                <button mat-stroked-button type="button" (click)="orderPart()">
+                <button mat-stroked-button type="button" (click)="orderPart(row)">
                   <mat-icon>shopping_cart_checkout</mat-icon> Beställ
                 </button>
               </div>
@@ -1044,7 +1047,15 @@ export class WorkOrderCard implements OnInit {
     this.partSearch
       .pipe(
         debounceTime(200),
-        switchMap((q) => this.inventory.articles({ q, limit: 8 })),
+        // Delar på ett jobb är inte däck: hjul kommer med först när man söker efter dem.
+        switchMap((q) =>
+          this.inventory.articles({
+            q,
+            limit: 8,
+            category: WHEEL_SEARCH.test(q) ? undefined : 'other',
+            hideSpent: true,
+          }),
+        ),
       )
       .subscribe((p) => this.partResults.set(p.items));
   }
@@ -1474,8 +1485,17 @@ export class WorkOrderCard implements OnInit {
     return this.needs(v.articleId) > available ? Math.max(available, 0) : null;
   }
 
-  orderPart() {
-    this.router.navigate(['/purchases', 'new']);
+  /** Öppnar ett inköp med delen och det som saknas, och ordern som anteckning. */
+  orderPart(row: FormGroup) {
+    const articleId = (row.getRawValue() as { articleId: string | null }).articleId;
+    const missing = articleId ? this.needs(articleId) - (this.shortage(row) ?? 0) : 0;
+    this.router.navigate(['/purchases', 'new'], {
+      queryParams: {
+        articleId: articleId ?? undefined,
+        qty: missing > 0 ? missing : undefined,
+        order: this.card()?.code ?? undefined,
+      },
+    });
   }
 
   /** Slår på/av en av radens markeringar (klar, saknas, debiteras ej). */
