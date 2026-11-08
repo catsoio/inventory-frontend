@@ -24,7 +24,7 @@ import { HasUnsaved } from '../../core/unsaved-guard';
         <p class="mt-1 text-sm text-gray-600">
           Låt kunderna boka själva. De skriver regnumret, ser vad åtgärderna kostar för deras bil
           och skickar en förfrågan. Den dyker upp i kalendern som <b>Förfrågan</b> (lila) och ni
-          bekräftar en tid. Länka till sidan från er hemsida, era annonser och Instagram.
+          bekräftar en tid. Sidan finns som <b>Boka tid</b> på er webbplats.
         </p>
       </header>
 
@@ -34,31 +34,16 @@ import { HasUnsaved } from '../../core/unsaved-guard';
           @if (saved(); as s) {
             <span
               class="rounded-full px-2.5 py-0.5 text-xs font-medium"
-              [class]="
-                s.enabled && s.path ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-              "
+              [class]="s.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
             >
-              {{ s.enabled && s.path ? 'Påslagen' : 'Inte påslagen' }}
+              {{ s.enabled ? 'Påslagen' : 'Inte påslagen' }}
             </span>
           }
         </div>
         @if (saved(); as s) {
-          @if (s.enabled && s.path) {
-            <div class="mb-3 flex flex-wrap items-center gap-2">
-              <span class="text-sm text-gray-600"
-                >Länk att dela: <b>{{ origin }}{{ s.path }}</b></span
-              >
-              <a mat-stroked-button [href]="s.path" target="_blank" rel="noopener">
-                <mat-icon>open_in_new</mat-icon> Öppna sidan
-              </a>
-              <button mat-stroked-button type="button" (click)="copy(origin + s.path)">
-                <mat-icon>content_copy</mat-icon> Kopiera länken
-              </button>
-            </div>
-          } @else {
+          @if (!s.enabled) {
             <p class="mb-3 text-sm text-gray-600">
-              Sidan är inte påslagen än. Hör av dig till Catso, så sätter vi upp adressen och slår
-              på den åt er.
+              Sidan är inte påslagen än. Hör av dig till Catso, så slår vi på den åt er.
             </p>
           }
         }
@@ -387,12 +372,5 @@ export class OnlineBookingPage implements OnInit, HasUnsaved {
   clearImage(row: FormGroup) {
     row.controls['image'].setValue(null);
     this.rowsForm.markAsDirty();
-  }
-
-  copy(text: string) {
-    navigator.clipboard
-      ?.writeText(text)
-      .then(() => this.snack.open('Länken är kopierad', undefined, { duration: 2000 }))
-      .catch(() => undefined);
   }
 }

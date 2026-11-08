@@ -3,12 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-  CarInquiryBody,
   CarListing,
   CarListingInput,
   ListingStatus,
-  PublicCar,
-  PublicSiteProfile,
   SiteSettings,
 } from '../models';
 
@@ -91,9 +88,9 @@ export class SiteApi {
     return this.http.get<SiteSettings>(this.base);
   }
 
-  /** `enabled` och `slug` får bara plattformens operatör ändra (403 annars). */
+  /** `enabled` får bara plattformens operatör ändra (403 annars). */
   save(
-    body: Partial<Pick<SiteSettings, 'enabled' | 'slug' | 'title' | 'intro' | 'hideRegNo'>> & {
+    body: Partial<Pick<SiteSettings, 'enabled' | 'title' | 'intro' | 'hideRegNo'>> & {
       /** Delar av landningssidan; servern slår ihop och kontrollerar. */
       page?: Record<string, unknown>;
     },
@@ -121,31 +118,5 @@ export class SiteApi {
 
   removeDomain(hostname: string): Observable<SiteSettings> {
     return this.http.delete<SiteSettings>(`${this.base}/domains/${encodeURIComponent(hostname)}`);
-  }
-}
-
-/** Besökarens sida. `site` är adressen på plattformen (en slug) eller domänen (har en punkt). */
-@Injectable({ providedIn: 'root' })
-export class PublicSiteApi {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/inventory/public/site`;
-
-  profile(site: string): Observable<PublicSiteProfile> {
-    return this.http.get<PublicSiteProfile>(`${this.base}/${encodeURIComponent(site)}`);
-  }
-
-  cars(site: string): Observable<PublicCar[]> {
-    return this.http.get<PublicCar[]>(`${this.base}/${encodeURIComponent(site)}/cars`);
-  }
-
-  car(site: string, id: string): Observable<PublicCar> {
-    return this.http.get<PublicCar>(`${this.base}/${encodeURIComponent(site)}/cars/${id}`);
-  }
-
-  inquire(site: string, id: string, body: CarInquiryBody): Observable<{ saved: boolean }> {
-    return this.http.post<{ saved: boolean }>(
-      `${this.base}/${encodeURIComponent(site)}/cars/${id}/inquiry`,
-      body,
-    );
   }
 }

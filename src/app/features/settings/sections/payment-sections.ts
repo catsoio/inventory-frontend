@@ -15,79 +15,67 @@ import { Confirm } from '../../../shared/confirm';
   selector: 'app-settings-payments',
   standalone: false,
   template: `
-    <h2 class="text-lg font-semibold">Betalningar via Stripe</h2>
-    <p class="mt-1 mb-5 text-sm text-gray-600">
-      Kunden kan betala fakturan med kort eller Swish från länken, och kort kan tas på en kortläsare
-      vid disken. Pengarna går direkt till ert eget Stripe-konto; fakturan markeras betald av sig
-      själv.
-    </p>
-
     @if (account(); as a) {
-      <section class="mb-6">
-        <div class="sec">Stripe-konto</div>
-        <div class="flex flex-wrap items-center gap-3">
+      <app-setting-group
+        title="Kortbetalning via Stripe"
+        text="Kunden kan betala fakturan med kort från länken, och kort kan tas på en läsare vid disken. Pengarna går direkt till ert eget Stripe-konto och fakturan markeras betald av sig själv."
+      >
+        <app-setting-row
+          label="Stripe-konto"
+          [hint]="
+            a.connected && !a.ready
+              ? 'Stripe behöver några uppgifter om företaget innan kontot kan ta emot betalningar.'
+              : a.feePercent > 0
+                ? 'Avgift till Axle: ' + a.feePercent + ' % av varje betalning.'
+                : ''
+          "
+        >
           @if (a.ready) {
             <app-pill tone="green">Klart att ta betalt</app-pill>
           } @else if (a.connected) {
-            <app-pill tone="amber">Registreringen hos Stripe är inte klar</app-pill>
+            <app-pill tone="amber">Inte klart</app-pill>
           } @else {
             <app-pill tone="gray">Inte kopplat</app-pill>
           }
-          <button
-            mat-flat-button
-            color="primary"
-            type="button"
-            [disabled]="busy()"
-            (click)="connect()"
-          >
-            {{ a.connected ? 'Fortsätt registreringen hos Stripe' : 'Koppla till Stripe' }}
-          </button>
           @if (a.connected) {
-            <button mat-button type="button" (click)="reload()">Uppdatera status</button>
+            <button mat-button type="button" (click)="reload()">Uppdatera</button>
           }
-        </div>
-        @if (a.connected && !a.ready) {
-          <p class="mt-2 text-sm text-gray-600">
-            Stripe behöver några uppgifter om företaget innan kontot kan ta emot betalningar.
-          </p>
+          <button mat-stroked-button type="button" [disabled]="busy()" (click)="connect()">
+            {{ a.connected ? 'Fortsätt hos Stripe' : 'Koppla till Stripe' }}
+          </button>
+        </app-setting-row>
+        @if (a.ready) {
+          <app-setting-row
+            label="Swish på betalsidan"
+            hint="Stripe måste ha aktiverat Swish för kontot först. Slå på det här när det är gjort, så att kunden aldrig får en betalmetod som inte fungerar. Gäller privatkunder."
+          >
+            <mat-slide-toggle
+              [checked]="a.swish"
+              (change)="swish($event.checked)"
+              aria-label="Swish på betalsidan"
+            />
+          </app-setting-row>
         }
-        @if (a.feePercent > 0) {
-          <p class="mt-2 text-xs text-gray-500">
-            Avgift till Axle: {{ a.feePercent }} % av varje betalning.
-          </p>
-        }
-      </section>
+      </app-setting-group>
 
       @if (a.ready) {
-        <section class="mb-6">
-          <div class="sec">Swish</div>
-          <mat-slide-toggle [checked]="a.swish" (change)="swish($event.checked)">
-            Erbjud Swish på betalsidan
-          </mat-slide-toggle>
-          <p class="mt-1 text-sm text-gray-600">
-            Stripe måste ha aktiverat Swish för kontot först (det begärs hos Stripe). Slå på det här
-            först när det är gjort, så att kunden aldrig får en betalmetod som inte fungerar. Swish
-            gäller privatkunder.
-          </p>
-        </section>
-
-        <section class="mb-6">
-          <div class="sec">Kortläsare</div>
+        <app-setting-group title="Kortläsare" text="Stripe Reader S700/S710 eller BBPOS WisePOS E.">
           @for (r of readers(); track r.id) {
-            <div class="mb-2 flex items-center gap-3">
-              <mat-icon class="text-gray-500">contactless</mat-icon>
-              <span class="font-medium">{{ r.label }}</span>
+            <app-setting-row [label]="r.label" [hint]="r.busy ? 'Upptagen' : ''">
               <app-pill [tone]="r.status === 'online' ? 'green' : 'gray'">{{
                 r.status === 'online' ? 'Online' : 'Offline'
               }}</app-pill>
-              @if (r.busy) {
-                <span class="text-sm text-gray-500">upptagen</span>
-              }
-            </div>
+            </app-setting-row>
           } @empty {
-            <p class="mb-3 text-sm text-gray-600">Ingen läsare är registrerad än.</p>
+            <p class="py-3.5 text-sm text-gray-500">Ingen läsare är registrerad än.</p>
           }
-          <div class="mt-3 flex flex-wrap items-start gap-3">
+        </app-setting-group>
+        <app-setting-group
+          title="Lägg till läsare"
+          text="Koden visas på läsaren när du startar registreringen i dess inställningar. Läsaren behöver vara på nätet."
+          [form]="true"
+        >
+          <div class="flex flex-wrap items-start gap-3">
             <mat-form-field subscriptSizing="dynamic" class="w-56">
               <mat-label>Kod från läsaren</mat-label>
               <input matInput [formControl]="code" autocomplete="off" />
@@ -103,14 +91,10 @@ import { Confirm } from '../../../shared/confirm';
               [disabled]="busy() || code.invalid || label.invalid"
               (click)="addReader()"
             >
-              Lägg till läsare
+              Lägg till
             </button>
           </div>
-          <p class="mt-2 text-xs text-gray-500">
-            Stripe Reader S700/S710 eller BBPOS WisePOS E. Koden visas på läsaren när du startar
-            registreringen i dess inställningar. Läsaren behöver vara på nätet.
-          </p>
-        </section>
+        </app-setting-group>
       }
     } @else {
       <p class="text-gray-500">Läser in…</p>
@@ -177,88 +161,91 @@ export class SettingsPayments implements OnInit {
   selector: 'app-settings-register',
   standalone: false,
   template: `
-    <h2 class="text-lg font-semibold">Kassaregister</h2>
-    <p class="mt-1 mb-5 text-sm text-gray-600">
-      Skatteverket kräver kassaregister när ni säljer för mer än fyra prisbasbelopp per år med kort,
-      Swish eller kontant (fakturor räknas inte). Kvitton som utfärdas här registreras i en journal
-      som inte går att ändra, och varje kvitto får en kontrollkod.
-    </p>
-
     @if (status(); as s) {
-      @if (!s.configured) {
-        <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="setup()">
-          Skapa kassaregister
-        </button>
-        <p class="mt-2 text-sm text-gray-600">
-          Företagsuppgifterna hämtas från Företaget. Kvittonumren fortsätter efter det senaste
-          kvittot.
-        </p>
-      } @else if (s.unit; as u) {
-        @if (!u.control.certified) {
-          <p class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-900">
-            <b>Utvecklingsläge.</b> Kontrollsystemet är inte certifierat, så kvitton som utfärdas nu
-            är inte giltiga och får inte användas i den riktiga verksamheten.
-          </p>
+      <app-setting-group
+        title="Kassaregister"
+        text="Skatteverket kräver kassaregister när ni säljer för mer än fyra prisbasbelopp per år med kort, Swish eller kontant (fakturor räknas inte). Kvitton som utfärdas här registreras i en journal som inte går att ändra, och varje kvitto får en kontrollkod."
+      >
+        @if (!s.configured) {
+          <app-setting-row
+            label="Kassaregistret är inte skapat"
+            hint="Företagsuppgifterna hämtas från Företagsuppgifter. Kvittonumren fortsätter efter det senaste kvittot."
+          >
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="busy()"
+              (click)="setup()"
+            >
+              Skapa kassaregister
+            </button>
+          </app-setting-row>
+        } @else if (s.unit; as u) {
+          @if (!u.control.certified) {
+            <p class="my-3 rounded-lg bg-red-50 p-3 text-sm text-red-900">
+              <b>Utvecklingsläge.</b> Kontrollsystemet är inte certifierat, så kvitton som utfärdas
+              nu är inte giltiga och får inte användas i den riktiga verksamheten.
+            </p>
+          }
+          <app-setting-row
+            label="Kassaregistret är på"
+            [hint]="
+              s.control && !s.control.reachable ? 'Kontrollsystemet svarar inte just nu.' : ''
+            "
+          >
+            <mat-slide-toggle
+              [checked]="u.status === 'active'"
+              [disabled]="busy()"
+              (change)="toggle($event.checked)"
+              aria-label="Kassaregistret är på"
+            />
+          </app-setting-row>
+          <app-setting-row
+            label="Rapporter och journal"
+            hint="X- och Z-rapport, journal och export."
+          >
+            <a mat-stroked-button routerLink="/finance/register">Öppna</a>
+          </app-setting-row>
+          <app-setting-row label="Kontrollera journalen" [hint]="chainText()">
+            <button mat-stroked-button type="button" [disabled]="busy()" (click)="verify()">
+              Kontrollera
+            </button>
+          </app-setting-row>
+          <app-setting-row label="Företagsuppgifter i registret">
+            <button mat-stroked-button type="button" [disabled]="busy()" (click)="refreshCompany()">
+              Hämta igen
+            </button>
+          </app-setting-row>
         }
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-          <app-pill [tone]="u.status === 'active' ? 'green' : 'gray'">{{
-            u.status === 'active' ? 'På' : 'Av'
-          }}</app-pill>
-          @if (s.control && !s.control.reachable) {
-            <app-pill tone="red">Kontrollsystemet svarar inte</app-pill>
-          }
-          <button
-            mat-stroked-button
-            type="button"
-            [disabled]="busy()"
-            (click)="toggle(u.status !== 'active')"
-          >
-            {{ u.status === 'active' ? 'Stäng av' : 'Slå på' }}
-          </button>
-          <button mat-button type="button" [disabled]="busy()" (click)="refreshCompany()">
-            Hämta företagsuppgifterna igen
-          </button>
-        </div>
-        <dl class="grid max-w-2xl grid-cols-[11rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt class="text-gray-500">Kassabeteckning</dt>
-          <dd>{{ u.label }}</dd>
-          <dt class="text-gray-500">Kassaregisternummer</dt>
-          <dd class="font-mono">{{ s.registerNumber }}</dd>
-          <dt class="text-gray-500">Modell och version</dt>
-          <dd>{{ s.model }} · {{ s.program }} {{ s.version }}</dd>
-          <dt class="text-gray-500">Kontrollsystem</dt>
-          <dd>
-            {{ u.control.provider }} · <span class="font-mono">{{ u.control.serial }}</span>
-          </dd>
-          <dt class="text-gray-500">Företag</dt>
-          <dd>{{ u.company.name }}, {{ u.company.orgNo }}</dd>
-          <dt class="text-gray-500">Försäljningsställe</dt>
-          <dd>{{ u.company.address }}</dd>
-          @if (s.counters; as c) {
-            <dt class="text-gray-500">Senaste kvittonummer</dt>
-            <dd>{{ c.receipt }}</dd>
-            <dt class="text-gray-500">Z-rapporter</dt>
-            <dd>{{ c.z }}</dd>
-          }
-        </dl>
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <a mat-stroked-button routerLink="/finance/register"
-            ><mat-icon>point_of_sale</mat-icon> Rapporter och journal</a
-          >
-          <button mat-button type="button" [disabled]="busy()" (click)="verify()">
-            Kontrollera journalen
-          </button>
-          @if (chain(); as ch) {
-            @if (ch.ok) {
-              <span class="text-sm text-teal-800">Journalen är hel ({{ ch.entries }} rader).</span>
-            } @else {
-              <span class="text-sm font-medium text-red-700"
-                >Journalen stämmer inte vid rad {{ ch.brokenAtSeq }}: {{ ch.reason }}</span
-              >
+      </app-setting-group>
+
+      @if (s.configured && s.unit; as u) {
+        <app-setting-group title="Registrets uppgifter">
+          <dl class="m-0 grid grid-cols-[11rem_1fr] gap-x-4 gap-y-1.5 py-3.5 text-sm">
+            <dt class="text-gray-500">Kassabeteckning</dt>
+            <dd class="m-0">{{ u.label }}</dd>
+            <dt class="text-gray-500">Kassaregisternummer</dt>
+            <dd class="m-0 font-mono">{{ s.registerNumber }}</dd>
+            <dt class="text-gray-500">Modell och version</dt>
+            <dd class="m-0">{{ s.model }} · {{ s.program }} {{ s.version }}</dd>
+            <dt class="text-gray-500">Kontrollsystem</dt>
+            <dd class="m-0">
+              {{ u.control.provider }} · <span class="font-mono">{{ u.control.serial }}</span>
+            </dd>
+            <dt class="text-gray-500">Företag</dt>
+            <dd class="m-0">{{ u.company.name }}, {{ u.company.orgNo }}</dd>
+            <dt class="text-gray-500">Försäljningsställe</dt>
+            <dd class="m-0">{{ u.company.address }}</dd>
+            @if (s.counters; as c) {
+              <dt class="text-gray-500">Senaste kvittonummer</dt>
+              <dd class="m-0">{{ c.receipt }}</dd>
+              <dt class="text-gray-500">Z-rapporter</dt>
+              <dd class="m-0">{{ c.z }}</dd>
             }
-          }
-        </div>
-        <p class="mt-4 max-w-2xl text-xs text-gray-500">
+          </dl>
+        </app-setting-group>
+        <p class="text-xs text-gray-500">
           Registret är inte tillverkardeklarerat hos Skatteverket än. Ett kvitto i registret kan
           inte återöppnas: det tas tillbaka med en retur. Priser måste vara inkl. moms och utan
           avrundning till hela kronor.
@@ -303,6 +290,15 @@ export class SettingsRegister implements OnInit {
 
   refreshCompany() {
     this.run(this.api.refreshCompany(), 'Företagsuppgifterna är uppdaterade');
+  }
+
+  /** Resultatet av senaste kontrollen av journalen. */
+  chainText(): string {
+    const ch = this.chain();
+    if (!ch) return 'Kontrollerar att ingen rad ändrats.';
+    return ch.ok
+      ? `Journalen är hel (${ch.entries} rader).`
+      : `Journalen stämmer inte vid rad ${ch.brokenAtSeq}: ${ch.reason}`;
   }
 
   verify() {

@@ -12,10 +12,6 @@ import {
 import { Billing } from './core/billing/billing';
 import { Nav } from './core/layout/nav';
 import { Shell } from './core/layout/shell/shell';
-import { onCustomDomain } from './features/public-site/site-context';
-
-const loadPublicSite = () =>
-  import('./features/public-site/public-site-module').then((m) => m.PublicSiteModule);
 
 const routes: Routes = [
   {
@@ -37,24 +33,6 @@ const routes: Routes = [
       import('./features/public-document/public-document-module').then(
         (m) => m.PublicDocumentModule,
       ),
-  },
-  {
-    // Verkstadens bokningssida för kunder: utan inloggning, adressen i länken är nyckeln.
-    path: 'boka/:slug',
-    loadChildren: () =>
-      import('./features/public-booking/public-booking-module').then((m) => m.PublicBookingModule),
-  },
-  {
-    // Verkstadens webbplats på plattformen: utan inloggning, adressen är nyckeln.
-    path: 'bilhandel/:slug',
-    loadChildren: loadPublicSite,
-  },
-  {
-    // På en kunds egen domän (däckmaster.se) är webbplatsen startsidan. Går inte adressen att
-    // matcha här faller routern vidare till övriga rutter (t.ex. /boka/<adress>).
-    path: '',
-    canMatch: [() => onCustomDomain()],
-    loadChildren: loadPublicSite,
   },
   {
     path: 'onboarding',

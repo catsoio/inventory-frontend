@@ -5,7 +5,7 @@ import { Auth } from '../../core/auth/auth';
 import { environment } from '../../../environments/environment';
 import { shrinkImage } from '../../core/image-resize';
 import { SiteApi } from '../../core/api/car-api';
-import { SiteDomain, SiteSettings } from '../../core/models';
+import { SiteDomain, SiteSettings, SiteTemplate } from '../../core/models';
 import { HasUnsaved } from '../../core/unsaved-guard';
 
 type ApiError = { status?: number; error?: { error?: { message?: string } } };
@@ -72,14 +72,6 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
                 <app-pill
                   [tone]="d.status === 'active' ? 'green' : d.status === 'error' ? 'red' : 'amber'"
                   >{{ statusText[d.status] }}</app-pill
-                >
-              </li>
-            }
-            @if (s.path) {
-              <li class="flex flex-wrap items-center gap-2">
-                <mat-icon class="!h-5 !w-5 !text-xl text-gray-500">link</mat-icon>
-                <a class="underline" [href]="s.path" target="_blank" rel="noopener"
-                  >{{ origin }}{{ s.path }}</a
                 >
               </li>
             }
@@ -164,8 +156,28 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
           <div>
             <h2 class="mb-1 text-base font-semibold">Utseende</h2>
             <p class="mb-3 text-sm text-gray-600">
-              Samma uppbyggnad för alla; ni väljer färger, rubrik och text.
+              Välj en mall. Innehållet är detsamma i alla, så ni kan byta när ni vill.
             </p>
+            <mat-radio-group
+              formControlName="template"
+              class="mb-5 grid gap-3 sm:grid-cols-2"
+              aria-label="Mall"
+            >
+              @for (t of templates; track t.key) {
+                <label class="choice" [class.is-on]="look.controls.template.value === t.key">
+                  <app-template-preview
+                    class="mx-2 mb-2 mt-1"
+                    [template]="t.key"
+                    [theme]="look.controls.theme.value"
+                    [accent]="look.controls.accent.value"
+                  />
+                  <mat-radio-button [value]="t.key" class="font-medium">{{
+                    t.label
+                  }}</mat-radio-button>
+                  <span class="choice-text">{{ t.hint }}</span>
+                </label>
+              }
+            </mat-radio-group>
             <div class="flex flex-wrap items-center gap-6">
               <mat-radio-group formControlName="theme" class="flex gap-4">
                 <mat-radio-button value="dark">Mörk</mat-radio-button>
@@ -280,24 +292,12 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
 
         @if (operator) {
           <section class="rounded-xl border border-dashed border-gray-300 bg-white p-5">
-            <h2 class="mb-1 text-base font-semibold">Catso: adress och domäner</h2>
+            <h2 class="mb-1 text-base font-semibold">Catso: på/av och domäner</h2>
             <p class="mb-3 text-sm text-gray-600">
               Syns bara för plattformens operatörer och gäller bolaget du är i.
             </p>
             <form [formGroup]="admin" class="flex flex-col gap-3">
               <mat-slide-toggle formControlName="enabled">Påslagen</mat-slide-toggle>
-              <label class="flex flex-col gap-0.5 text-xs text-gray-500"
-                >Adress på catso.io
-                <span class="flex items-center gap-2">
-                  <span class="text-sm text-gray-500">{{ origin }}/bilhandel/</span>
-                  <input
-                    formControlName="slug"
-                    maxlength="60"
-                    placeholder="dackmaster"
-                    class="h-10 min-w-0 flex-1 px-2 text-sm text-gray-900 field"
-                  />
-                </span>
-              </label>
               <div>
                 <button
                   mat-stroked-button
@@ -305,7 +305,7 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
                   (click)="saveAdmin()"
                   [disabled]="busy() || admin.pristine"
                 >
-                  Spara adress
+                  Spara
                 </button>
               </div>
             </form>
@@ -446,14 +446,21 @@ export class SitePage implements OnInit, HasUnsaved {
   readonly adminError = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({ title: '', intro: '', hideRegNo: false });
-  readonly admin = this.fb.nonNullable.group({ enabled: false, slug: '' });
+  readonly admin = this.fb.nonNullable.group({ enabled: false });
 
   readonly pages = [
     { key: 'financing', label: 'Finansiering' },
     { key: 'tradeIn', label: 'Sälj och byt in' },
     { key: 'about', label: 'Om oss' },
   ] as const;
+  readonly templates: { key: SiteTemplate; label: string; hint: string }[] = [
+    { key: 'editorial', label: 'Redaktionell', hint: 'Elegant och lugn, med serifrubrik. Passar de flesta.' },
+    { key: 'showroom', label: 'Showroom', hint: 'Bildstor med stora bilkort. För få bilar och högre pris.' },
+    { key: 'market', label: 'Marknad', hint: 'Tät och funktionell, filter vid sidan. För många bilar.' },
+    { key: 'local', label: 'Lokal', hint: 'Varm och personlig, öppettider och adress högt upp.' },
+  ];
   readonly look = this.fb.nonNullable.group({
+    template: 'editorial' as SiteTemplate,
     theme: 'dark' as 'dark' | 'light',
     accent: '#e63b2e',
     logoUrl: '',
@@ -537,7 +544,7 @@ export class SitePage implements OnInit, HasUnsaved {
     this.site.set(s);
     if (!keepText)
       this.form.reset({ title: s.title ?? '', intro: s.intro ?? '', hideRegNo: s.hideRegNo });
-    this.admin.reset({ enabled: s.enabled, slug: s.slug ?? '' });
+    this.admin.reset({ enabled: s.enabled });
     const p = s.page;
     this.seo.reset({
       title: p.seo.title ?? '',
@@ -551,6 +558,7 @@ export class SitePage implements OnInit, HasUnsaved {
     for (const f of p.faq.length ? p.faq : [{ q: '', a: '' }])
       this.faq.push(this.faqGroup(f.q, f.a));
     this.look.reset({
+      template: p.template ?? 'editorial',
       theme: p.theme,
       accent: p.accent,
       logoUrl: p.logoUrl ?? '',
@@ -573,6 +581,7 @@ export class SitePage implements OnInit, HasUnsaved {
     const info = (g: { title: string; body: string }) =>
       g.title.trim() || g.body.trim() ? { title: g.title.trim(), body: g.body.trim() } : null;
     return {
+      template: v.template,
       theme: v.theme,
       accent: v.accent,
       logoUrl: t(v.logoUrl),
@@ -640,12 +649,9 @@ export class SitePage implements OnInit, HasUnsaved {
       });
   }
 
-  /** Körs av operatören: adress och på/av. */
+  /** Körs av operatören: på/av. */
   saveAdmin() {
-    const v = this.admin.getRawValue();
-    this.run(this.api.save({ enabled: v.enabled, slug: v.slug.trim() || null }), (e) =>
-      e.status === 409 ? 'Den adressen används redan. Välj en annan.' : null,
-    );
+    this.run(this.api.save({ enabled: this.admin.getRawValue().enabled }));
   }
 
   addDomain() {

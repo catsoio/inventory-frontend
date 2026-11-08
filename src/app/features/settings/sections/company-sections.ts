@@ -13,85 +13,89 @@ import { SettingsStore } from '../settings-store';
   standalone: false,
   template: `
     <app-settings-section
-      title="Företagsuppgifter"
-      text="Skrivs ut på faktura (företagskunder) och kvitto (privatkunder). En faktura måste ha säljarens momsregistreringsnummer, namn och adress, så uppgifterna krävs innan du kan fakturera. De kopieras in på varje faktura när den utfärdas och ändras inte i efterhand."
       [dirty]="s.sellerForm.dirty"
       [valid]="s.sellerForm.valid"
       [busy]="s.sellerBusy()"
       (save)="s.saveSeller()"
       (discard)="s.discard(s.sellerForm)"
     >
-      <form
-        [formGroup]="s.sellerForm"
-        (ngSubmit)="s.saveSeller()"
-        class="grid gap-x-4 gap-y-3 sm:grid-cols-6"
-      >
-        <h3 class="sec sm:col-span-6">Företaget</h3>
-        <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-          <mat-label>Företagsnamn</mat-label>
-          <input matInput formControlName="name" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-          <mat-label>Organisationsnummer</mat-label>
-          <input matInput formControlName="orgNo" placeholder="556123-4567" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-          <mat-label>Momsregistreringsnummer</mat-label>
-          <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
-          <mat-hint>SE + organisationsnumret utan bindestreck + 01</mat-hint>
-        </mat-form-field>
-        <div class="flex items-center sm:col-span-3">
-          <mat-checkbox formControlName="fTax">Godkänd för F-skatt</mat-checkbox>
-        </div>
+      <form [formGroup]="s.sellerForm" (ngSubmit)="s.saveSeller()">
+        <app-setting-group title="Företaget" [form]="true">
+          <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Företagsnamn</mat-label>
+              <input matInput formControlName="name" />
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Organisationsnummer</mat-label>
+              <input matInput formControlName="orgNo" placeholder="556123-4567" />
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Momsregistreringsnummer</mat-label>
+              <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
+              <mat-hint>SE + organisationsnumret utan bindestreck + 01</mat-hint>
+            </mat-form-field>
+          </div>
+          <div class="mt-3 flex items-center justify-between gap-4 border-t border-gray-100 pt-3">
+            <span class="text-[15px] font-medium">Godkänd för F-skatt</span>
+            <mat-slide-toggle formControlName="fTax" aria-label="Godkänd för F-skatt" />
+          </div>
+        </app-setting-group>
 
-        <h3 class="sec mt-3 sm:col-span-6">Adress och kontakt</h3>
-        <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-          <mat-label>Adress</mat-label>
-          <input matInput formControlName="address" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-1" subscriptSizing="dynamic">
-          <mat-label>Postnr</mat-label>
-          <input matInput formControlName="postalCode" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
-          <mat-label>Ort</mat-label>
-          <input matInput formControlName="city" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-          <mat-label>Telefon</mat-label>
-          <input matInput formControlName="phone" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-          <mat-label>E-post</mat-label>
-          <input matInput formControlName="email" />
-        </mat-form-field>
+        <app-setting-group title="Adress och kontakt" [form]="true">
+          <div class="grid gap-x-4 gap-y-3 sm:grid-cols-6">
+            <mat-form-field class="sm:col-span-6" subscriptSizing="dynamic">
+              <mat-label>Adress</mat-label>
+              <input matInput formControlName="address" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+              <mat-label>Postnummer</mat-label>
+              <input matInput formControlName="postalCode" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-4" subscriptSizing="dynamic">
+              <mat-label>Ort</mat-label>
+              <input matInput formControlName="city" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+              <mat-label>Telefon</mat-label>
+              <input matInput formControlName="phone" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+              <mat-label>E-post</mat-label>
+              <input matInput formControlName="email" />
+            </mat-form-field>
+          </div>
+        </app-setting-group>
 
-        <h3 class="sec mt-3 sm:col-span-6">Betalning</h3>
-        <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
-          <mat-label>Bankgiro</mat-label>
-          <input matInput formControlName="bankgiro" placeholder="123-4567" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
-          <mat-label>Bankkonto</mat-label>
-          <input matInput formControlName="bankAccount" placeholder="Bank, clearing, kontonr" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
-          <mat-label>Betala med Swish (nummer)</mat-label>
-          <input matInput formControlName="swish" placeholder="123 456 78 90" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-4" subscriptSizing="dynamic">
-          <mat-label>Övrig betalningsinfo (valfritt)</mat-label>
-          <input matInput formControlName="paymentDetails" />
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
-          <mat-label>Betalningsvillkor (dagar)</mat-label>
-          <input matInput type="number" min="0" max="365" formControlName="paymentTermsDays" />
-          <mat-hint>Gäller företagsfaktura</mat-hint>
-        </mat-form-field>
-        <mat-form-field class="sm:col-span-6" subscriptSizing="dynamic">
-          <mat-label>Text längst ned (valfritt)</mat-label>
-          <input matInput formControlName="footer" />
-        </mat-form-field>
+        <app-setting-group title="Betalning på fakturan" [form]="true">
+          <div class="grid gap-x-4 gap-y-3 sm:grid-cols-6">
+            <mat-form-field class="sm:col-span-2" subscriptSizing="dynamic">
+              <mat-label>Bankgiro</mat-label>
+              <input matInput formControlName="bankgiro" placeholder="123-4567" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-4" subscriptSizing="dynamic">
+              <mat-label>Bankkonto</mat-label>
+              <input matInput formControlName="bankAccount" placeholder="Bank, clearing, kontonr" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+              <mat-label>Swish-nummer</mat-label>
+              <input matInput formControlName="swish" placeholder="123 456 78 90" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
+              <mat-label>Betalningsvillkor (dagar)</mat-label>
+              <input matInput type="number" min="0" max="365" formControlName="paymentTermsDays" />
+              <mat-hint>Gäller företagsfaktura</mat-hint>
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-6" subscriptSizing="dynamic">
+              <mat-label>Övrig betalningsinfo (valfritt)</mat-label>
+              <input matInput formControlName="paymentDetails" />
+            </mat-form-field>
+            <mat-form-field class="sm:col-span-6" subscriptSizing="dynamic">
+              <mat-label>Text längst ned på dokumentet (valfritt)</mat-label>
+              <input matInput formControlName="footer" />
+            </mat-form-field>
+          </div>
+        </app-setting-group>
       </form>
     </app-settings-section>
   `,
@@ -105,82 +109,74 @@ export class SettingsCompany {
   selector: 'app-settings-staff',
   standalone: false,
   template: `
-    <app-settings-section
-      [title]="'Personal i ' + (s.auth.garage()?.name ?? '')"
-      text="Ägaren ser allt. Personal når allt utom ekonomi och inställningar; mekaniker ser bara sina arbetsorder."
-    >
-      <div class="flex flex-col divide-y divide-gray-100">
-        @for (m of s.members(); track m.userId) {
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="truncate font-medium">{{ s.label(m) }}</span>
-                <app-pill
-                  [tone]="m.role === 'owner' ? 'blue' : m.role === 'mechanic' ? 'amber' : 'gray'"
-                  >{{ s.roleLabels[m.role] }}</app-pill
-                >
-                @if (m.status === 'blocked') {
-                  <app-pill tone="red">Spärrad</app-pill>
-                }
-              </div>
-              <div class="truncate text-xs text-gray-500">{{ s.detail(m) }}</div>
-            </div>
-            @if (s.auth.isSuperAdmin()) {
-              <button mat-button type="button" (click)="s.resetPassword(m)">
-                <mat-icon>key</mat-icon> Byt lösenord
-              </button>
-              @if (m.userId !== s.auth.user()?.id) {
-                <button
-                  mat-button
-                  type="button"
-                  [color]="m.status === 'blocked' ? 'primary' : 'warn'"
-                  (click)="s.toggleBlocked(m)"
-                >
-                  <mat-icon>{{ m.status === 'blocked' ? 'lock_open' : 'block' }}</mat-icon>
-                  {{ m.status === 'blocked' ? 'Aktivera' : 'Spärra' }}
-                </button>
+    <app-setting-group title="Medlemmar">
+      @for (m of s.members(); track m.userId) {
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="truncate text-[15px] font-medium">{{ s.label(m) }}</span>
+              @if (m.role === 'owner') {
+                <app-pill tone="blue">{{ s.roleLabels[m.role] }}</app-pill>
               }
-            }
-            @if (m.role !== 'owner') {
-              <mat-button-toggle-group
-                hideSingleSelectionIndicator
-                [value]="m.role"
-                (change)="s.setRole(m, $event.value)"
-                aria-label="Roll"
-              >
-                <mat-button-toggle value="staff">Personal</mat-button-toggle>
-                <mat-button-toggle value="mechanic">Mekaniker</mat-button-toggle>
-              </mat-button-toggle-group>
-              <button mat-button type="button" (click)="s.remove(m)">Ta bort</button>
-            }
+              @if (m.status === 'blocked') {
+                <app-pill tone="red">Spärrad</app-pill>
+              }
+            </div>
+            <div class="truncate text-sm text-gray-500">{{ s.detail(m) }}</div>
           </div>
-        }
-      </div>
-      @if (s.billing.status(); as b) {
-        <p class="mt-3 text-sm text-gray-600">
-          {{ b.users.current }} av {{ b.users.limit }} användare används.
-          @if (b.users.current >= b.users.limit) {
-            Ni har nått taket för er plan. Kontakta oss om ni behöver fler användare ({{
-              b.users.extraUserPriceMinor | kr
-            }}
-            per användare och månad exkl. moms).
+          @if (m.role !== 'owner') {
+            <mat-button-toggle-group
+              hideSingleSelectionIndicator
+              [value]="m.role"
+              (change)="s.setRole(m, $event.value)"
+              aria-label="Roll"
+            >
+              <mat-button-toggle value="staff">Personal</mat-button-toggle>
+              <mat-button-toggle value="mechanic">Mekaniker</mat-button-toggle>
+            </mat-button-toggle-group>
+            <button mat-button type="button" color="warn" (click)="s.remove(m)">Ta bort</button>
           }
-        </p>
+          @if (s.auth.isSuperAdmin()) {
+            <button mat-button type="button" (click)="s.resetPassword(m)">Byt lösenord</button>
+            @if (m.userId !== s.auth.user()?.id) {
+              <button
+                mat-button
+                type="button"
+                [color]="m.status === 'blocked' ? 'primary' : 'warn'"
+                (click)="s.toggleBlocked(m)"
+              >
+                {{ m.status === 'blocked' ? 'Aktivera' : 'Spärra' }}
+              </button>
+            }
+          }
+        </div>
       }
-      <div class="mt-4 flex flex-wrap items-center gap-3">
-        <button mat-stroked-button type="button" [disabled]="s.seatsFull()" (click)="s.invite()">
-          <mat-icon>person_add</mat-icon> Skapa inbjudningskod
-        </button>
+    </app-setting-group>
+
+    <app-setting-group title="Bjud in" [text]="seats()">
+      <app-setting-row label="Inbjudningskod" hint="Gäller 7 dagar och kan användas en gång.">
         @if (s.inviteCode()) {
           <code class="rounded-lg bg-gray-100 px-2 py-1 select-all">{{ s.inviteCode() }}</code>
-          <span class="text-xs text-gray-500">Gäller 7 dagar, kan användas en gång</span>
         }
-      </div>
-    </app-settings-section>
+        <button mat-stroked-button type="button" [disabled]="s.seatsFull()" (click)="s.invite()">
+          {{ s.inviteCode() ? 'Skapa ny kod' : 'Skapa kod' }}
+        </button>
+      </app-setting-row>
+    </app-setting-group>
   `,
 })
 export class SettingsStaff {
   readonly s = inject(SettingsStore);
+
+  /** Hur många platser planen har och hur många som används. */
+  seats(): string {
+    const b = this.s.billing.status();
+    if (!b) return '';
+    const used = `${b.users.current} av ${b.users.limit} användare används.`;
+    return b.users.current >= b.users.limit
+      ? `${used} Ni har nått taket för er plan. Kontakta oss om ni behöver fler.`
+      : used;
+  }
 }
 
 /** Bolag: växla mellan bolagen i organisationen; superadmin lägger till nya. */
@@ -188,29 +184,25 @@ export class SettingsStaff {
   selector: 'app-settings-companies',
   standalone: false,
   template: `
-    <app-settings-section
-      title="Bolag"
-      text="Varje bolag har egna fakturauppgifter, lager och nummerserier."
-    >
-      <div class="flex flex-col divide-y divide-gray-100">
-        @for (c of s.auth.isSuperAdmin() ? s.auth.garages() : s.auth.companies(); track c.id) {
-          <div class="flex items-center gap-3 py-3">
-            <span class="min-w-0 flex-1 truncate font-medium">{{ c.name }}</span>
-            @if (c.id === s.auth.garage()?.id) {
-              <span class="text-xs text-gray-500">Du är här</span>
-            } @else {
-              <button mat-stroked-button type="button" (click)="s.auth.switchGarage(c.id)">
-                Växla
-              </button>
-            }
-            @if (s.auth.isSuperAdmin()) {
-              <button mat-stroked-button type="button" (click)="features(c)">Funktioner</button>
-            }
-          </div>
-        }
-      </div>
-      @if (s.auth.isSuperAdmin()) {
-        <h3 class="sec mt-6">Lägg till bolag i {{ s.auth.garage()?.name }}s organisation</h3>
+    <app-setting-group title="Bolag i organisationen">
+      @for (c of s.auth.isSuperAdmin() ? s.auth.garages() : s.auth.companies(); track c.id) {
+        <app-setting-row [label]="c.name" [hint]="c.id === s.auth.garage()?.id ? 'Du är här' : ''">
+          @if (s.auth.isSuperAdmin()) {
+            <button mat-button type="button" (click)="features(c)">Funktioner</button>
+          }
+          @if (c.id !== s.auth.garage()?.id) {
+            <button mat-stroked-button type="button" (click)="s.auth.switchGarage(c.id)">
+              Växla till
+            </button>
+          }
+        </app-setting-row>
+      }
+    </app-setting-group>
+    @if (s.auth.isSuperAdmin()) {
+      <app-setting-group
+        [title]="'Lägg till bolag i ' + (s.auth.garage()?.name ?? '') + 's organisation'"
+        [form]="true"
+      >
         <div class="flex items-start gap-3">
           <mat-form-field class="flex-1" subscriptSizing="dynamic">
             <mat-label>Bolagets namn</mat-label>
@@ -220,14 +212,15 @@ export class SettingsStaff {
             mat-flat-button
             color="primary"
             type="button"
+            class="!mt-1"
             [disabled]="s.companyName.invalid || s.companyBusy()"
             (click)="s.addCompany()"
           >
             Lägg till
           </button>
         </div>
-      }
-    </app-settings-section>
+      </app-setting-group>
+    }
   `,
 })
 export class SettingsCompanies {
@@ -245,46 +238,29 @@ export class SettingsCompanies {
 }
 
 /**
- * Onlinebokning (bara superadmin): vi sätter upp verkstadens bokningsadress och slår på sidan åt dem.
- * Verkstaden formar sidan själv under Onlinebokning i menyn (text, åtgärder, bilder), men kan inte ändra adressen.
+ * Onlinebokning (bara superadmin): vi slår på bokningssidan åt verkstaden. Den ligger på verkstadens
+ * webbplats (`/boka` på dess domän). Verkstaden formar sidan själv under Onlinebokning i menyn
+ * (text, åtgärder, bilder), men kan inte slå på eller av den.
  */
 @Component({
   selector: 'app-settings-website',
   standalone: false,
   template: `
     <app-settings-section
-      title="Onlinebokning"
-      text="Adressen kunderna bokar på och om sidan är påslagen. Gäller bolaget du är i just nu; verkstaden ändrar inte adressen själv."
       [dirty]="form.dirty"
       [valid]="form.valid"
       [busy]="busy()"
       (save)="save()"
       (discard)="reset()"
     >
-      <form [formGroup]="form" (ngSubmit)="save()" class="flex max-w-xl flex-col gap-4">
-        <mat-slide-toggle formControlName="enabled">Påslagen</mat-slide-toggle>
-        <label class="flex flex-col gap-0.5 text-xs text-gray-500"
-          >Adress
-          <span class="flex items-center gap-2">
-            <span class="text-sm text-gray-500">{{ origin }}/boka/</span>
-            <input
-              formControlName="slug"
-              maxlength="60"
-              placeholder="dackmasterab"
-              class="h-10 min-w-0 flex-1 px-2 text-sm text-gray-900 field"
-            />
-          </span>
-        </label>
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <app-setting-group>
+          <app-setting-row label="Bokningssidan är påslagen">
+            <mat-slide-toggle formControlName="enabled" aria-label="Påslagen" />
+          </app-setting-row>
+        </app-setting-group>
         @if (error(); as e) {
           <p class="text-sm text-red-700">{{ e }}</p>
-        }
-        @if (saved()?.path; as path) {
-          <p class="text-sm text-gray-600">
-            Länk:
-            <a class="underline" [href]="path" target="_blank" rel="noopener"
-              >{{ origin }}{{ path }}</a
-            >
-          </p>
         }
       </form>
     </app-settings-section>
@@ -293,11 +269,10 @@ export class SettingsCompanies {
 export class SettingsWebsite implements OnInit {
   private readonly api = inject(OnlineBookingApi);
   private readonly snack = inject(MatSnackBar);
-  readonly origin = globalThis.location?.origin ?? '';
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly saved = signal<OnlineBookingSettings | null>(null);
-  readonly form = inject(FormBuilder).nonNullable.group({ enabled: false, slug: '' });
+  readonly form = inject(FormBuilder).nonNullable.group({ enabled: false });
 
   ngOnInit() {
     this.api.settings().subscribe((s) => this.load(s));
@@ -305,7 +280,7 @@ export class SettingsWebsite implements OnInit {
 
   private load(s: OnlineBookingSettings) {
     this.saved.set(s);
-    this.form.reset({ enabled: s.enabled, slug: s.slug ?? '' });
+    this.form.reset({ enabled: s.enabled });
   }
 
   reset() {
@@ -318,19 +293,15 @@ export class SettingsWebsite implements OnInit {
     const v = this.form.getRawValue();
     this.busy.set(true);
     this.error.set(null);
-    this.api.saveSettings({ enabled: v.enabled, slug: v.slug.trim() || null }).subscribe({
+    this.api.saveSettings({ enabled: v.enabled }).subscribe({
       next: (s) => {
         this.busy.set(false);
         this.load(s);
         this.snack.open('Sparat', undefined, { duration: 2000 });
       },
-      error: (e: { status?: number; error?: { error?: { message?: string } } }) => {
+      error: (e: { error?: { error?: { message?: string } } }) => {
         this.busy.set(false);
-        this.error.set(
-          e.status === 409
-            ? 'Den adressen används redan. Välj en annan.'
-            : (e.error?.error?.message ?? 'Det gick inte att spara.'),
-        );
+        this.error.set(e.error?.error?.message ?? 'Det gick inte att spara.');
       },
     });
   }

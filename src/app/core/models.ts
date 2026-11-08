@@ -1144,78 +1144,11 @@ export interface ServiceOnline {
 /** Den publika bokningssidans inställningar (Webbsida). */
 export interface OnlineBookingSettings {
   enabled: boolean;
-  slug: string | null;
   intro: string | null;
   leadDays: number;
   horizonDays: number;
-  /** Sidans adress i appen, t.ex. /boka/dackmasterab; null tills en adress valts. */
-  path: string | null;
   /** Där verkstadens bilder ligger (lägg till `/<filnamn>`; ligger under `environment.apiUrl`). */
   mediaPath: string;
-}
-
-/** En åtgärd som kunden ser på bokningssidan. */
-export interface PublicBookingService {
-  id: string;
-  /** Sökväg till bilden under `environment.apiUrl`, eller null. */
-  image: string | null;
-  title: string;
-  description: string | null;
-  durationMinutes: number;
-  /** Det lägsta priset, eller null när åtgärden saknar pris. */
-  from: ServicePrice | null;
-}
-
-export interface PublicBookingProfile {
-  name: string;
-  phone: string | null;
-  address: string | null;
-  intro: string | null;
-  /** Första och sista dagen kunden kan be om (YYYY-MM-DD). */
-  window: { from: string; to: string };
-  services: PublicBookingService[];
-}
-
-/** Bilen som kunden slagit upp, utan chassinummer och utan något om ägaren. */
-export interface PublicBookingVehicle {
-  regNo: string;
-  title: string;
-  color: string | null;
-  tyreSize: string | null;
-  rimSize: string | null;
-  tyreSizeRear: string | null;
-  rimSizeRear: string | null;
-  vehicleClass: VehicleClass | null;
-}
-
-export interface PublicBookingVehicleAnswer {
-  status: 'found' | 'not_found' | 'unavailable';
-  vehicle: PublicBookingVehicle | null;
-  /** Pris per åtgärd för bilen; null = verkstaden har inget pris för den här bilen. */
-  prices: Record<string, ServicePrice | null>;
-}
-
-export type DayPart = 'morning' | 'afternoon';
-
-export const DAY_PART_LABELS: Record<DayPart, string> = {
-  morning: 'Förmiddag',
-  afternoon: 'Eftermiddag',
-};
-
-/** Kundens förfrågan från bokningssidan. */
-export interface PublicBookingRequest {
-  serviceTypeId: string;
-  regNo?: string | null;
-  vehicleClass?: VehicleClass | null;
-  name: string;
-  phone: string;
-  email?: string | null;
-  day: string;
-  part: DayPart;
-  note?: string | null;
-  consent: boolean;
-  /** Dolt fält; riktiga kunder lämnar det tomt. */
-  website?: string | null;
 }
 
 /** `vehicle` = ett pris för bilen, `wheel` = ett pris per hjul (punktering, husvagn). */
@@ -2427,7 +2360,10 @@ export interface SiteInfoPage {
 }
 
 /** Landningssidans utseende och text. `seo` och `analytics` sätter bara Catso. */
+export type SiteTemplate = 'editorial' | 'showroom' | 'market' | 'local';
+
 export interface SitePageContent {
+  template: SiteTemplate;
   theme: 'dark' | 'light';
   accent: string;
   logoUrl: string | null;
@@ -2452,62 +2388,13 @@ export interface SitePageContent {
   analytics: { gaId: string | null };
 }
 
-/** Verkstadens publika webbplats: adress, påslagen och vilka domäner som leder dit. */
+/** Verkstadens publika webbplats: påslagen och vilka domäner som leder dit. */
 export interface SiteSettings {
   page: SitePageContent;
   enabled: boolean;
-  slug: string | null;
   title: string | null;
   intro: string | null;
   /** Dölj regnumret för besökare. */
   hideRegNo: boolean;
   domains: SiteDomain[];
-  /** Adressen på plattformen, t.ex. /bilhandel/dackmaster. */
-  path: string | null;
-}
-
-export interface PublicSiteProfile {
-  name: string;
-  title: string;
-  intro: string | null;
-  phone: string | null;
-  address: string | null;
-  /** Bokningssidans adress om verkstaden har en påslagen, för länken "Boka tid". */
-  bookingSlug: string | null;
-  carCount: number;
-}
-
-/** En bil som besökaren ser: inget om ägare eller intern data. */
-export interface PublicCar {
-  id: string;
-  /** Null när verkstaden döljer regnumret. */
-  regNo: string | null;
-  heading: string;
-  make: string | null;
-  model: string | null;
-  variant: string | null;
-  year: number | null;
-  price: number | null;
-  mileageKm: number | null;
-  color: string | null;
-  fuel: string | null;
-  gearbox: string | null;
-  powerHp: number | null;
-  bodyText: string | null;
-  fourWheelDrive: boolean | null;
-  inspectionDue: string | null;
-  description: string | null;
-  equipment: string[];
-  reserved: boolean;
-  /** Adresser till bilderna under `environment.apiUrl`. */
-  images: (string | null)[];
-}
-
-export interface CarInquiryBody {
-  name: string;
-  phone: string;
-  email?: string | null;
-  message?: string | null;
-  consent: boolean;
-  website?: string | null;
 }

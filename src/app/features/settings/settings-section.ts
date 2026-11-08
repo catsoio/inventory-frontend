@@ -1,22 +1,16 @@
 import { Component, input, output } from '@angular/core';
 
 /**
- * En flik i inställningspopupen: förklaring och innehåll. Har avsnittet något att
- * spara visas en stapel längst ned så fort något ändrats ("osparade ändringar" med Ångra och
- * Spara), i stället för en Spara-knapp som alltid står där.
+ * Innehållet på en inställningssida. Har sidan något att spara visas en stapel längst ned så fort
+ * något ändrats ("osparade ändringar" med Ångra och Spara), i stället för en Spara-knapp som alltid
+ * står där. Sidans rubrik och förklaring kommer från popupen (`settings.ts`).
  */
 @Component({
   selector: 'app-settings-section',
   standalone: false,
   host: { class: 'block' },
   template: `
-    <section>
-      <h2 class="sr-only">{{ title() }}</h2>
-      @if (text()) {
-        <p class="mb-5 max-w-2xl text-sm text-gray-600">{{ text() }}</p>
-      }
-      <ng-content />
-    </section>
+    <ng-content />
     @if (dirty()) {
       <div
         class="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-gray-800 py-2.5 pr-2.5 pl-4 text-white shadow-lg"
@@ -45,8 +39,6 @@ import { Component, input, output } from '@angular/core';
   `,
 })
 export class SettingsSection {
-  readonly title = input.required<string>();
-  readonly text = input('');
   readonly dirty = input(false);
   readonly valid = input(true);
   readonly busy = input(false);

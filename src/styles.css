@@ -430,3 +430,10 @@ sx-calendar > div {
   display: flex;
   flex-direction: column;
 }
+/* Formulären i inställningarna styr sin egen layout (grid med kolumner), inte dialogernas kolumn med fast knapprad. */
+.settings-dialog .mat-mdc-dialog-surface form {
+  display: revert-layer;
+  flex-direction: revert-layer;
+  flex: revert-layer;
+  min-height: revert-layer;
+}

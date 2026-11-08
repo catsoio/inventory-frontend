@@ -1,300 +1,296 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { SettingsStore } from '../settings-store';
 
-/** Prissättning: hur en order prissätts, vad som skrivs ut och hur lagret påverkas. */
+/** Arbetsorder och offert: hur en order prissätts, vad som skrivs ut och hur förslaget ser ut. */
 @Component({
   selector: 'app-settings-pricing',
   standalone: false,
-  styles: `
-    .subtab.is-active {
-      border-color: var(--mat-sys-primary);
-      color: var(--mat-sys-primary);
-      font-weight: 600;
-    }
-  `,
   template: `
     <app-settings-section
-      title="Prissättning och dokument"
       [dirty]="s.pricingForm.dirty"
       [valid]="s.pricingForm.valid"
       [busy]="s.pricingBusy()"
-      saveText="Spara prissättning"
+      saveText="Spara"
       (save)="s.savePricing()"
       (discard)="s.discard(s.pricingForm)"
     >
-      <div class="mb-5">
-        <div class="sec">Arbetssätt</div>
-        <mat-radio-group
-          [formControl]="s.pricingForm.controls.profile"
-          (change)="s.applyProfile($event.value)"
-          class="grid gap-3 sm:grid-cols-2"
-          aria-label="Arbetssätt"
-        >
-          <label class="choice" [class.is-on]="s.pricingForm.controls.profile.value === 'service'">
-            <mat-radio-button value="service" class="font-medium"
-              >Däck och service</mat-radio-button
-            >
-            <span class="choice-text">Ett pris per order. Snabbt i kassan, inga prisrader.</span>
-          </label>
-          <label class="choice" [class.is-on]="s.pricingForm.controls.profile.value === 'workshop'">
-            <mat-radio-button value="workshop" class="font-medium">Bilverkstad</mat-radio-button>
-            <span class="choice-text"
-              >Jobb med egna priser, offerter och förbrukningsmaterial.</span
-            >
-          </label>
-        </mat-radio-group>
-        <p class="mt-2 text-xs text-gray-500">
-          Välj det som liknar ert arbetssätt och justera sedan under flikarna. Ändrar du något blir
-          det Anpassat.
-        </p>
-      </div>
-
-      <nav class="mb-5 flex gap-5 border-b border-gray-200" aria-label="Prissättning">
-        @for (t of subtabs; track t[0]) {
-          <button
-            type="button"
-            (click)="sub.set(t[0])"
-            [class.is-active]="sub() === t[0]"
-            class="subtab -mb-px border-b-2 border-transparent py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-          >
-            {{ t[1] }}
-          </button>
-        }
-      </nav>
-
       <form [formGroup]="s.pricingForm" (ngSubmit)="s.savePricing()">
-        @switch (sub()) {
-          @case ('order') {
-            <mat-radio-group
-              formControlName="priceEntry"
-              class="mb-6 grid gap-3 sm:grid-cols-2"
-              aria-label="Så prissätts en order"
+        <app-setting-group>
+          <app-setting-row
+            label="Arbetssätt"
+            [hint]="
+              s.pricingForm.controls.profile.value === 'custom'
+                ? 'Anpassat: ni har ändrat något nedan.'
+                : 'Ett förval som fyller i resten. Justera sedan nedan.'
+            "
+          >
+            <mat-button-toggle-group
+              [formControl]="s.pricingForm.controls.profile"
+              (change)="s.applyProfile($event.value)"
+              aria-label="Arbetssätt"
+              hideSingleSelectionIndicator
             >
-              <label
-                class="choice"
-                [class.is-on]="s.pricingForm.controls.priceEntry.value === 'order'"
-              >
-                <mat-radio-button value="order" class="font-medium"
-                  >Ett pris per order</mat-radio-button
-                >
-                <span class="choice-text">Raderna är en checklista för mekanikern, utan pris.</span>
-              </label>
-              <label
-                class="choice"
-                [class.is-on]="s.pricingForm.controls.priceEntry.value === 'lines'"
-              >
-                <mat-radio-button value="lines" class="font-medium"
-                  >Jobb med priser</mat-radio-button
-                >
-                <span class="choice-text">Varje jobb har eget pris, med delar under sig.</span>
-              </label>
-            </mat-radio-group>
-            <h3 class="sec">På utskrifterna</h3>
-            <div class="mb-6 flex flex-col gap-1">
-              <mat-checkbox formControlName="showVin">Chassinummer</mat-checkbox>
-              <mat-checkbox formControlName="showMileage">Mätarställning</mat-checkbox>
-              <mat-checkbox formControlName="requireMileage">
-                Kräv mätarställning innan ordern blir klar
-              </mat-checkbox>
-            </div>
-            <h3 class="sec">Avrundning</h3>
-            <mat-checkbox formControlName="roundToKrona">
-              Öresutjämning: avrunda att betala till hela kronor
-            </mat-checkbox>
-          }
-          @case ('quote') {
-            <div class="mb-4 grid gap-x-4 gap-y-3 sm:grid-cols-2">
-              <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Giltigt (dagar)</mat-label>
-                <input matInput type="number" min="1" max="365" formControlName="quoteValidDays" />
-              </mat-form-field>
-              <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Får avvika (%)</mat-label>
-                <input
-                  matInput
-                  type="number"
-                  min="0"
-                  max="100"
-                  formControlName="quoteTolerancePercent"
-                />
-                <mat-hint>Konsumenttjänstlagen: högst 15 % om inget annat avtalats</mat-hint>
-              </mat-form-field>
-            </div>
+              <mat-button-toggle value="service">Däck och service</mat-button-toggle>
+              <mat-button-toggle value="workshop">Bilverkstad</mat-button-toggle>
+            </mat-button-toggle-group>
+          </app-setting-row>
+        </app-setting-group>
+
+        <app-setting-group title="Utskrift och klarmarkering">
+          <app-setting-row label="Visa chassinummer på utskrifter">
+            <mat-slide-toggle formControlName="showVin" aria-label="Visa chassinummer" />
+          </app-setting-row>
+          <app-setting-row label="Visa mätarställning på utskrifter">
+            <mat-slide-toggle formControlName="showMileage" aria-label="Visa mätarställning" />
+          </app-setting-row>
+          <app-setting-row
+            label="Kräv mätarställning för att markera Klar"
+            hint="Ordern kan inte bli klar utan den."
+          >
+            <mat-slide-toggle formControlName="requireMileage" aria-label="Kräv mätarställning" />
+          </app-setting-row>
+        </app-setting-group>
+
+        <app-setting-group title="Priser och avrundning">
+          <app-setting-row
+            label="Avrunda till hela kronor"
+            hint="Öresutjämning på beloppet att betala."
+          >
+            <mat-slide-toggle
+              formControlName="roundToKrona"
+              aria-label="Avrunda till hela kronor"
+            />
+          </app-setting-row>
+          <app-setting-row
+            label="Förbrukningsmaterial"
+            hint="Läggs på ordern som en rad, en andel av arbetet. Tomt = av."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                formControlName="consumablesPercent"
+                aria-label="Procent av arbetet"
+              />
+              <span matTextSuffix>%</span>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Tak för förbrukningsmaterial" hint="Tomt = inget tak.">
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="0"
+                formControlName="consumablesMax"
+                aria-label="Högst i kronor"
+              />
+              <span matTextSuffix>kr</span>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Text på raden">
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <input matInput formControlName="consumablesText" aria-label="Text på raden" />
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row
+            label="Intern kostnad per timme"
+            hint="Bara internt: visar vad ett jobb tjänade."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="0"
+                formControlName="internalHourlyCost"
+                aria-label="Intern kostnad per timme"
+              />
+              <span matTextSuffix>kr</span>
+            </mat-form-field>
+          </app-setting-row>
+        </app-setting-group>
+
+        <app-setting-group title="Offert">
+          <app-setting-row label="Giltig i">
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="1"
+                max="365"
+                formControlName="quoteValidDays"
+                aria-label="Giltig i dagar"
+              />
+              <span matTextSuffix>dagar</span>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row
+            label="Slutpriset får avvika"
+            hint="Konsumenttjänstlagen: högst 15 % om inget annat avtalats."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="0"
+                max="100"
+                formControlName="quoteTolerancePercent"
+                aria-label="Avvikelse i procent"
+              />
+              <span matTextSuffix>%</span>
+            </mat-form-field>
+          </app-setting-row>
+          <div class="py-3.5">
+            <div class="mb-1 text-[15px] font-medium">Villkor under förslaget</div>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
-              <mat-label>Villkor under förslaget</mat-label>
               <textarea
                 matInput
                 rows="3"
                 formControlName="quoteTerms"
                 [placeholder]="s.defaultTerms()"
+                aria-label="Villkor under förslaget"
               ></textarea>
               <mat-hint>Tomt = standardtexten</mat-hint>
             </mat-form-field>
-          }
-          @case ('material') {
-            <h3 class="sec">Förbrukningsmaterial</h3>
-            <p class="mb-3 max-w-xl text-sm text-gray-600">
-              Läggs på ordern som en rad, räknad som en andel av arbetet.
-            </p>
-            <div class="mb-6 grid gap-x-4 gap-y-3 sm:grid-cols-3">
-              <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Procent av arbetet</mat-label>
-                <input
-                  matInput
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.5"
-                  formControlName="consumablesPercent"
-                />
-                <mat-hint>Tomt = av</mat-hint>
-              </mat-form-field>
-              <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Högst (kr)</mat-label>
-                <input matInput type="number" min="0" formControlName="consumablesMax" />
-                <mat-hint>Tomt = inget tak</mat-hint>
-              </mat-form-field>
-              <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Text på raden</mat-label>
-                <input matInput formControlName="consumablesText" />
-              </mat-form-field>
-            </div>
-            <h3 class="sec">Efterkalkyl (bara internt)</h3>
-            <mat-form-field class="w-full sm:w-1/2" subscriptSizing="dynamic">
-              <mat-label>Intern kostnad per timme (kr)</mat-label>
-              <input matInput type="number" min="0" formControlName="internalHourlyCost" />
-              <mat-hint>Visar vad jobbet tjänade.</mat-hint>
-            </mat-form-field>
-          }
-          @case ('stock') {
-            <h3 class="sec">Delar tas ur lagret</h3>
-            <mat-radio-group
-              formControlName="stockOut"
-              class="mb-6 grid gap-3 sm:grid-cols-2"
-              aria-label="När delar tas ur lagret"
-            >
-              <label
-                class="choice"
-                [class.is-on]="s.pricingForm.controls.stockOut.value === 'work_order_done'"
-              >
-                <mat-radio-button value="work_order_done" class="font-medium"
-                  >När ordern är klar</mat-radio-button
-                >
-              </label>
-              <label
-                class="choice"
-                [class.is-on]="s.pricingForm.controls.stockOut.value === 'sales_card_posted'"
-              >
-                <mat-radio-button value="sales_card_posted" class="font-medium"
-                  >När säljkortet bokförs</mat-radio-button
-                >
-              </label>
-            </mat-radio-group>
-            <h3 class="sec">Inköp</h3>
-            <mat-form-field class="w-full sm:w-1/2" subscriptSizing="dynamic">
-              <mat-label>Moms på inköp</mat-label>
-              <mat-select formControlName="purchaseVatRate">
-                @for (r of [25, 12, 6, 0]; track r) {
-                  <mat-option [value]="r">{{ r }} %</mat-option>
-                }
-              </mat-select>
-              <mat-hint>Inköpspriser skrivs inkl. moms; lager och marginal räknas utan</mat-hint>
-            </mat-form-field>
-          }
-        }
+          </div>
+        </app-setting-group>
       </form>
     </app-settings-section>
   `,
 })
 export class SettingsPricing {
   readonly s = inject(SettingsStore);
-  readonly sub = signal('order');
-  readonly subtabs = [
-    ['order', 'Arbetsorder'],
-    ['quote', 'Offert'],
-    ['material', 'Material och kalkyl'],
-    ['stock', 'Lager och inköp'],
-  ] as const;
 }
 
-/** Artiklar och lager: vad en ny artikel börjar med. */
+/** Lager och kunder: förval för nya artiklar, lagerregler och kundlistans knappar. */
 @Component({
   selector: 'app-settings-stock',
   standalone: false,
   template: `
     <app-settings-section
-      title="Artiklar och lager"
-      text="Det här fylls i när ni lägger upp en ny artikel, så att den som skriver bara ändrar det som avviker. Gäller hela företaget."
-      [dirty]="s.defaultsForm.dirty"
-      [valid]="s.defaultsForm.valid"
-      (save)="s.saveDefaults()"
-      (discard)="s.discard(s.defaultsForm)"
+      [dirty]="s.defaultsForm.dirty || s.pricingForm.dirty"
+      [valid]="s.defaultsForm.valid && s.pricingForm.valid"
+      [busy]="s.pricingBusy()"
+      (save)="saveAll()"
+      (discard)="discardAll()"
     >
-      <form
-        [formGroup]="s.defaultsForm"
-        (ngSubmit)="s.saveDefaults()"
-        class="grid gap-x-4 gap-y-3 sm:grid-cols-2"
-      >
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Säsong</mat-label>
-          <mat-select formControlName="defaultSeason">
-            @for (x of s.seasons; track x[0]) {
-              <mat-option [value]="x[0]">{{ x[1] }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Leverantör</mat-label>
-          <input matInput formControlName="defaultSupplier" />
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Beställningspunkt (st)</mat-label>
-          <input matInput type="number" min="0" step="1" formControlName="defaultReorderLevel" />
-          <mat-hint>Under det här antalet hamnar artikeln i Att beställa</mat-hint>
-          <mat-error>Heltal, 0 eller mer</mat-error>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Påslag på inköpspris (%)</mat-label>
-          <input matInput type="number" min="0" step="1" formControlName="markupPercent" />
-          <mat-hint>Föreslår försäljningspris vid ingångslager</mat-hint>
-        </mat-form-field>
+      <form [formGroup]="s.defaultsForm" (ngSubmit)="saveAll()">
+        <app-setting-group
+          title="Ny artikel"
+          text="Det här fylls i när ni lägger upp en artikel, så att den som skriver bara ändrar det som avviker."
+        >
+          <app-setting-row label="Säsong">
+            <mat-form-field subscriptSizing="dynamic" class="w-48">
+              <mat-select formControlName="defaultSeason" aria-label="Säsong">
+                @for (x of s.seasons; track x[0]) {
+                  <mat-option [value]="x[0]">{{ x[1] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Leverantör">
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <input matInput formControlName="defaultSupplier" aria-label="Leverantör" />
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row
+            label="Påminn när det är kvar"
+            hint="Under det här antalet hamnar artikeln i Att beställa."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="0"
+                step="1"
+                formControlName="defaultReorderLevel"
+                aria-label="Beställningspunkt"
+              />
+              <span matTextSuffix>st</span>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row
+            label="Påslag på inköpspris"
+            hint="Föreslår försäljningspris vid ingångslager."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="0"
+                step="1"
+                formControlName="markupPercent"
+                aria-label="Påslag i procent"
+              />
+              <span matTextSuffix>%</span>
+            </mat-form-field>
+          </app-setting-row>
+        </app-setting-group>
+      </form>
+
+      <form [formGroup]="s.pricingForm" (ngSubmit)="saveAll()">
+        <app-setting-group title="Lager och inköp">
+          <app-setting-row label="Delar tas ur lagret">
+            <mat-button-toggle-group
+              formControlName="stockOut"
+              aria-label="När delar tas ur lagret"
+              hideSingleSelectionIndicator
+            >
+              <mat-button-toggle value="work_order_done">När ordern är klar</mat-button-toggle>
+              <mat-button-toggle value="sales_card_posted"
+                >När säljkortet bokförs</mat-button-toggle
+              >
+            </mat-button-toggle-group>
+          </app-setting-row>
+          <app-setting-row
+            label="Moms på inköp"
+            hint="Inköpspriser skrivs inkl. moms; lager och marginal räknas utan."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <mat-select formControlName="purchaseVatRate" aria-label="Moms på inköp">
+                @for (r of [25, 12, 6, 0]; track r) {
+                  <mat-option [value]="r">{{ r }} %</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+        </app-setting-group>
+      </form>
+
+      <form [formGroup]="s.defaultsForm" (ngSubmit)="saveAll()">
+        <app-setting-group title="Kundlistan på mobil">
+          <app-setting-row
+            label="Knappar på varje kund"
+            hint="Välj det ni använder mest. Kartan öppnar kundens adress i Google Maps."
+          >
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <mat-select formControlName="customerButtons" multiple aria-label="Knappar">
+                @for (b of s.customerButtonOptions; track b[0]) {
+                  <mat-option [value]="b[0]">{{ b[1] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+        </app-setting-group>
       </form>
     </app-settings-section>
   `,
 })
 export class SettingsStock {
   readonly s = inject(SettingsStore);
-}
 
-/** Kunder: vilka snabbknappar en kund har i listan. */
-@Component({
-  selector: 'app-settings-customers',
-  standalone: false,
-  template: `
-    <app-settings-section
-      title="Kunder"
-      text="Knapparna som ligger på varje kund i kundlistan på mobilen. Välj det ni använder mest; resten tar bara plats. Gäller hela företaget."
-      [dirty]="s.defaultsForm.dirty"
-      [valid]="s.defaultsForm.valid"
-      (save)="s.saveDefaults()"
-      (discard)="s.discard(s.defaultsForm)"
-    >
-      <form [formGroup]="s.defaultsForm" (ngSubmit)="s.saveDefaults()" class="max-w-md">
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
-          <mat-label>Knappar i kundlistan</mat-label>
-          <mat-select formControlName="customerButtons" multiple>
-            @for (b of s.customerButtonOptions; track b[0]) {
-              <mat-option [value]="b[0]">{{ b[1] }}</mat-option>
-            }
-          </mat-select>
-          <mat-hint>Kartan öppnar kundens adress i Google Maps.</mat-hint>
-        </mat-form-field>
-      </form>
-    </app-settings-section>
-  `,
-})
-export class SettingsCustomers {
-  readonly s = inject(SettingsStore);
+  /** Förvalen och lagerreglerna ligger i olika formulär: båda sparas. */
+  saveAll(): void {
+    if (this.s.defaultsForm.dirty) this.s.saveDefaults();
+    if (this.s.pricingForm.dirty) this.s.savePricing();
+  }
+
+  discardAll(): void {
+    this.s.discard(this.s.defaultsForm);
+    this.s.discard(this.s.pricingForm);
+  }
 }
 
 /** Däckhotell: avgift och vad en ny inlämning börjar med. */
@@ -303,116 +299,128 @@ export class SettingsCustomers {
   standalone: false,
   template: `
     <app-settings-section
-      title="Däckhotell"
-      text="Det här fylls i när ni tar emot ett set, så att den som står i kassan bara ändrar det som avviker."
       [dirty]="s.defaultsForm.dirty || s.storageForm.dirty"
       [valid]="s.defaultsForm.valid && s.storageForm.valid"
       [busy]="s.storageBusy()"
-      saveText="Spara förval"
       (save)="saveAll()"
       (discard)="discardAll()"
     >
-      <h3 class="sec">Avgift</h3>
-      <form
-        [formGroup]="s.defaultsForm"
-        (ngSubmit)="saveAll()"
-        class="mb-6 grid gap-x-4 gap-y-3 sm:grid-cols-2"
-      >
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Standardavgift per inlämning (kr, inkl. moms)</mat-label>
-          <input matInput type="number" min="0" step="1" formControlName="defaultStorageFee" />
-          <mat-error>0 eller mer</mat-error>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Månader mellan avgifter</mat-label>
-          <input
-            matInput
-            type="number"
-            min="1"
-            max="60"
-            [formControl]="s.storageForm.controls.paymentCycleMonths"
-          />
-          <mat-hint>12 = en avgift per år</mat-hint>
-          <mat-error>1–60</mat-error>
-        </mat-form-field>
-      </form>
+      <app-setting-group title="Avgift">
+        <app-setting-row label="Avgift per inlämning" hint="Kronor, inkl. moms.">
+          <mat-form-field subscriptSizing="dynamic" class="w-32" [formGroup]="s.defaultsForm">
+            <input
+              matInput
+              type="number"
+              min="0"
+              step="1"
+              formControlName="defaultStorageFee"
+              aria-label="Standardavgift"
+            />
+            <span matTextSuffix>kr</span>
+          </mat-form-field>
+        </app-setting-row>
+        <app-setting-row label="Tid mellan avgifter" hint="12 månader = en avgift per år.">
+          <mat-form-field subscriptSizing="dynamic" class="w-36">
+            <input
+              matInput
+              type="number"
+              min="1"
+              max="60"
+              [formControl]="s.storageForm.controls.paymentCycleMonths"
+              aria-label="Månader mellan avgifter"
+            />
+            <span matTextSuffix>månader</span>
+          </mat-form-field>
+        </app-setting-row>
+      </app-setting-group>
 
-      <form
-        [formGroup]="s.storageForm"
-        (ngSubmit)="saveAll()"
-        class="grid gap-x-4 gap-y-3 sm:grid-cols-2"
-      >
-        <h3 class="sec sm:col-span-2">Vad som lämnas in</h3>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Brukar lämnas in</mat-label>
-          <mat-select formControlName="contents">
-            @for (c of s.storageContents; track c[0]) {
-              <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Antal hjul i ett set</mat-label>
-          <input matInput type="number" min="1" max="12" formControlName="quantity" />
-          <mat-error>1–12</mat-error>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Skick vid inlämning</mat-label>
-          <mat-select formControlName="condition">
-            @for (c of s.storageConditions; track c[0]) {
-              <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <div class="field flex h-11 items-center px-3">
-          <mat-slide-toggle formControlName="studded">Vinterdäcken är dubbade</mat-slide-toggle>
-        </div>
-        <mat-form-field subscriptSizing="dynamic" class="sm:col-span-2">
-          <mat-label>Följer oftast med</mat-label>
-          <mat-select formControlName="accessories" multiple>
-            @for (a of s.storageAccessories; track a[0]) {
-              <mat-option [value]="a[0]">{{ a[1] }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+      <form [formGroup]="s.storageForm" (ngSubmit)="saveAll()">
+        <app-setting-group title="Vad som lämnas in">
+          <app-setting-row label="Brukar lämnas in">
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <mat-select formControlName="contents" aria-label="Brukar lämnas in">
+                @for (c of s.storageContents; track c[0]) {
+                  <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Antal hjul i ett set">
+            <mat-form-field subscriptSizing="dynamic" class="w-32">
+              <input
+                matInput
+                type="number"
+                min="1"
+                max="12"
+                formControlName="quantity"
+                aria-label="Antal hjul"
+              />
+              <span matTextSuffix>st</span>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Skick vid inlämning">
+            <mat-form-field subscriptSizing="dynamic" class="w-48">
+              <mat-select formControlName="condition" aria-label="Skick vid inlämning">
+                @for (c of s.storageConditions; track c[0]) {
+                  <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Vinterdäcken är dubbade">
+            <mat-slide-toggle formControlName="studded" aria-label="Dubbade" />
+          </app-setting-row>
+          <app-setting-row label="Följer oftast med">
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <mat-select formControlName="accessories" multiple aria-label="Följer med">
+                @for (a of s.storageAccessories; track a[0]) {
+                  <mat-option [value]="a[0]">{{ a[1] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+        </app-setting-group>
 
-        <h3 class="sec mt-3 sm:col-span-2">Var det förvaras</h3>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Lager</mat-label>
-          <mat-select formControlName="warehouseId">
-            <mat-option [value]="null">Ingen vald</mat-option>
-            @for (w of s.storageWarehouses(); track w.id) {
-              <mat-option [value]="w.id">{{ w.name }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Plats</mat-label>
-          <mat-select formControlName="locationId">
-            <mat-option [value]="null">Ingen vald</mat-option>
-            @for (l of s.storagePlaces(); track l.id) {
-              <mat-option [value]="l.id">{{ l.name }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-
-        <h3 class="sec mt-3 sm:col-span-2">När det hämtas</h3>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Vinterhjul hämtas i</mat-label>
-          <mat-select formControlName="winterPickupMonth">
-            @for (m of s.months; track $index) {
-              <mat-option [value]="$index + 1">{{ m }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field subscriptSizing="dynamic">
-          <mat-label>Sommarhjul hämtas i</mat-label>
-          <mat-select formControlName="summerPickupMonth">
-            @for (m of s.months; track $index) {
-              <mat-option [value]="$index + 1">{{ m }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+        <app-setting-group title="Förvaring och hämtning">
+          <app-setting-row label="Lager">
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <mat-select formControlName="warehouseId" aria-label="Lager">
+                <mat-option [value]="null">Ingen vald</mat-option>
+                @for (w of s.storageWarehouses(); track w.id) {
+                  <mat-option [value]="w.id">{{ w.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Plats">
+            <mat-form-field subscriptSizing="dynamic" class="w-60">
+              <mat-select formControlName="locationId" aria-label="Plats">
+                <mat-option [value]="null">Ingen vald</mat-option>
+                @for (l of s.storagePlaces(); track l.id) {
+                  <mat-option [value]="l.id">{{ l.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Vinterhjul hämtas i">
+            <mat-form-field subscriptSizing="dynamic" class="w-48">
+              <mat-select formControlName="winterPickupMonth" aria-label="Vinterhjul hämtas i">
+                @for (m of s.months; track $index) {
+                  <mat-option [value]="$index + 1">{{ m }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+          <app-setting-row label="Sommarhjul hämtas i">
+            <mat-form-field subscriptSizing="dynamic" class="w-48">
+              <mat-select formControlName="summerPickupMonth" aria-label="Sommarhjul hämtas i">
+                @for (m of s.months; track $index) {
+                  <mat-option [value]="$index + 1">{{ m }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </app-setting-row>
+        </app-setting-group>
       </form>
     </app-settings-section>
   `,

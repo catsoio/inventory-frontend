@@ -2,32 +2,26 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import {
-  OnlineBookingSettings,
-  PublicBookingProfile,
-  PublicBookingRequest,
-  PublicBookingVehicleAnswer,
-} from '../models';
+import { OnlineBookingSettings } from '../models';
 
 /**
- * Verkstadens publika bokningssida. Adress och på/av sätter plattformens operatör (Inställningar →
- * Webbsida), ägaren formar sidan under Webbsida i menyn; kunden
- * använder de publika anropen utan inloggning, och adressen i länken är nyckeln.
+ * Verkstadens publika bokningssida. På/av sätter plattformens operatör (Inställningar →
+ * Onlinebokning), ägaren formar sidan under Onlinebokning i menyn. Kunden bokar på verkstadens
+ * webbplats (`/boka`), som `catso-sites` renderar.
  */
 @Injectable({ providedIn: 'root' })
 export class OnlineBookingApi {
   private readonly http = inject(HttpClient);
   private readonly settingsUrl = `${environment.apiUrl}/inventory/settings/online-booking`;
-  private readonly publicUrl = `${environment.apiUrl}/inventory/public/booking`;
 
   settings(): Observable<OnlineBookingSettings> {
     return this.http.get<OnlineBookingSettings>(this.settingsUrl);
   }
 
-  /** Ändrar det som skickas med; resten behålls. Adressen måste vara ledig (409). */
+  /** Ändrar det som skickas med; resten behålls. */
   saveSettings(
     body: Partial<
-      Pick<OnlineBookingSettings, 'enabled' | 'slug' | 'intro' | 'leadDays' | 'horizonDays'>
+      Pick<OnlineBookingSettings, 'enabled' | 'intro' | 'leadDays' | 'horizonDays'>
     >,
   ): Observable<OnlineBookingSettings> {
     return this.http.put<OnlineBookingSettings>(this.settingsUrl, body);
@@ -38,25 +32,5 @@ export class OnlineBookingApi {
     const body = new FormData();
     body.append('file', file);
     return this.http.post<{ image: string }>(`${this.settingsUrl}/images`, body);
-  }
-
-  profile(slug: string): Observable<PublicBookingProfile> {
-    return this.http.get<PublicBookingProfile>(`${this.publicUrl}/${encodeURIComponent(slug)}`);
-  }
-
-  vehicle(slug: string, regNo: string): Observable<PublicBookingVehicleAnswer> {
-    return this.http.get<PublicBookingVehicleAnswer>(
-      `${this.publicUrl}/${encodeURIComponent(slug)}/vehicle/${encodeURIComponent(regNo)}`,
-    );
-  }
-
-  request(
-    slug: string,
-    body: PublicBookingRequest,
-  ): Observable<{ code: string | null; saved: boolean }> {
-    return this.http.post<{ code: string | null; saved: boolean }>(
-      `${this.publicUrl}/${encodeURIComponent(slug)}/request`,
-      body,
-    );
   }
 }

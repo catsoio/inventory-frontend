@@ -12,7 +12,6 @@ import { Confirm } from '../../../shared/confirm';
   selector: 'app-settings-connections',
   standalone: false,
   template: `
-    <h2 class="mb-4 text-lg font-semibold">Anslutningar</h2>
     <div class="grid gap-4 sm:grid-cols-2">
       <button
         type="button"
@@ -26,11 +25,13 @@ import { Confirm } from '../../../shared/confirm';
         </span>
         <span class="min-w-0 flex-1">
           <span class="block font-semibold">car.info</span>
-          @if (status(); as s) {
-            @if (s.connected) {
-              <span class="block truncate text-sm text-gray-500">{{ s.email }}</span>
-            }
-          }
+          <span class="block text-sm text-gray-500">
+            {{
+              status()?.connected
+                ? (status()?.email ?? '')
+                : 'Hämtar fordonsuppgifter från regnumret'
+            }}
+          </span>
         </span>
         @if (status()?.connected) {
           <app-pill tone="green">Ansluten</app-pill>
@@ -51,14 +52,15 @@ import { Confirm } from '../../../shared/confirm';
           </span>
           <span class="min-w-0 flex-1">
             <span class="block font-semibold">Blocket</span>
-            <span class="block text-sm text-gray-500">Lägg ut bilarna på Blocket och Bytbil</span>
-            @if (blocket(); as b) {
-              @if (b.connected) {
-                <span class="block truncate text-sm text-gray-500">
-                  {{ b.live ? 'Annonserna publiceras' : 'Annonserna skickas dolda' }}
-                </span>
-              }
-            }
+            <span class="block text-sm text-gray-500">
+              {{
+                blocket()?.connected
+                  ? blocket()?.live
+                    ? 'Annonserna publiceras'
+                    : 'Annonserna skickas dolda'
+                  : 'Lägg ut bilarna på Blocket och Bytbil'
+              }}
+            </span>
           </span>
           @if (blocket()?.connected) {
             <app-pill [tone]="blocket()?.live ? 'green' : 'amber'">{{

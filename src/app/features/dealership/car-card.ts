@@ -675,14 +675,13 @@ export class CarCard implements OnInit {
     [...(this.card()?.inquiries ?? [])].sort((a, b) => b.at.localeCompare(a.at)),
   );
 
-  /** Annonsens adress för den som vill se den: plattformens adress, annars en aktiv egen domän. */
+  /** Annonsens adress för den som vill se den: på webbplatsens aktiva domän. */
   readonly publicUrl = computed(() => {
     const c = this.card();
     const s = this.site();
     if (!c || !s?.enabled) return null;
     const domain = s.domains.find((d) => d.status === 'active');
-    if (domain) return `https://${domain.hostname}/bil/${c.id}`;
-    return s.slug ? `${globalThis.location?.origin ?? ''}/bilhandel/${s.slug}/bil/${c.id}` : null;
+    return domain ? `https://${domain.hostname}/bilar/${c.id}` : null;
   });
 
   ngOnInit() {

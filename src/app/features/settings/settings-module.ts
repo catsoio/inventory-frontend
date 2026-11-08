@@ -15,14 +15,10 @@ import {
   CarInfoConnectionDialog,
   SettingsConnections,
 } from './sections/connections-section';
-import {
-  SettingsCustomers,
-  SettingsHotel,
-  SettingsPricing,
-  SettingsStock,
-} from './sections/workflow-sections';
+import { SettingsHotel, SettingsPricing, SettingsStock } from './sections/workflow-sections';
 import { SettingsPage } from './settings';
 import { SettingsSection } from './settings-section';
+import { SettingGroup, SettingRow } from './settings-ui';
 
 export { SettingsPage };
 
@@ -31,6 +27,8 @@ export { SettingsPage };
   declarations: [
     SettingsPage,
     SettingsSection,
+    SettingGroup,
+    SettingRow,
     SettingsView,
     SettingsPassword,
     SettingsCompany,
@@ -39,7 +37,6 @@ export { SettingsPage };
     SettingsWebsite,
     SettingsPricing,
     SettingsStock,
-    SettingsCustomers,
     SettingsHotel,
     SettingsPayments,
     SettingsRegister,

@@ -10,6 +10,7 @@ import { CarQuick } from './car-quick';
 import { HallFinance } from './hall-finance';
 import { HallHome, HallHomeDesktop, HallHomeMobile } from './hall-home';
 import { SitePage } from './site-page';
+import { TemplatePreview } from './template-preview';
 
 @NgModule({
   declarations: [
@@ -18,6 +19,7 @@ import { SitePage } from './site-page';
     CarCard,
     HallFinance,
     SitePage,
+    TemplatePreview,
     HallHome,
     HallHomeDesktop,
     HallHomeMobile,
