@@ -17,6 +17,7 @@ import {
   SettingsConnections,
 } from './sections/connections-section';
 import { SettingsHotel, SettingsPricing, SettingsStock } from './sections/workflow-sections';
+import { SettingsScreen } from './sections/screen-setting';
 import { SettingsPage } from './settings';
 import { SettingsSection } from './settings-section';
 import { SettingGroup, SettingRow } from './settings-ui';
@@ -37,6 +38,7 @@ export { SettingsPage };
     SettingsCompanies,
     SettingsWebsite,
     SettingsPricing,
+    SettingsScreen,
     SettingsStock,
     SettingsHotel,
     SettingsPayments,

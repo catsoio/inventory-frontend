@@ -157,6 +157,7 @@ import { SettingsStore } from '../settings-store';
           </div>
         </app-setting-group>
       </form>
+      <app-settings-screen />
     </app-settings-section>
   `,
 })

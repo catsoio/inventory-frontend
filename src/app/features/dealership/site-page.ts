@@ -175,6 +175,15 @@ const STATUS_TEXT: Record<SiteDomain['status'], string> = {
                     t.label
                   }}</mat-radio-button>
                   <span class="choice-text">{{ t.hint }}</span>
+                  @if (previewUrl(t.key); as url) {
+                    <a
+                      class="pb-1 pl-[42px] text-[13px] text-gray-600 underline"
+                      [href]="url"
+                      target="_blank"
+                      rel="noopener"
+                      >Förhandsgranska med era bilar</a
+                    >
+                  }
                 </label>
               }
             </mat-radio-group>
@@ -454,11 +463,19 @@ export class SitePage implements OnInit, HasUnsaved {
     { key: 'about', label: 'Om oss' },
   ] as const;
   readonly templates: { key: SiteTemplate; label: string; hint: string }[] = [
-    { key: 'editorial', label: 'Redaktionell', hint: 'Elegant och lugn, med serifrubrik. Passar de flesta.' },
-    { key: 'showroom', label: 'Showroom', hint: 'Bildstor med stora bilkort. För få bilar och högre pris.' },
-    { key: 'market', label: 'Marknad', hint: 'Tät och funktionell, filter vid sidan. För många bilar.' },
-    { key: 'local', label: 'Lokal', hint: 'Varm och personlig, öppettider och adress högt upp.' },
+    { key: 'editorial', label: 'Tidning', hint: 'Som en tidningssida: senaste bilen som artikel och lagret som innehållsförteckning. Passar de flesta.' },
+    { key: 'showroom', label: 'Galleri', hint: 'Helskärmsbild och en bred bild per bil. För få bilar och högre pris.' },
+    { key: 'market', label: 'Annonslista', hint: 'Sökfält överst och bilarna som rader med pris. För många bilar.' },
+    { key: 'local', label: 'Företagssida', hint: 'En hel sida om er: öppettider, bilar, hjälp med finansiering, om oss och frågor.' },
   ];
+  /** The live site in this template with the colours as chosen now; null until a domain is active. */
+  previewUrl(template: SiteTemplate): string | null {
+    const host = this.site()?.domains.find((d) => d.status === 'active')?.hostname;
+    if (!host) return null;
+    const { theme, accent } = this.look.getRawValue();
+    const q = new URLSearchParams({ preview: template, theme, accent });
+    return `https://${host}/?${q}`;
+  }
   readonly look = this.fb.nonNullable.group({
     template: 'editorial' as SiteTemplate,
     theme: 'dark' as 'dark' | 'light',

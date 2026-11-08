@@ -2519,3 +2519,35 @@ export interface CatalogOrder {
   reference: string | null;
   imported: { id: string; number: number } | null;
 }
+
+/** Skärmen i verkstaden: på eller av, och hemligheten i länken (`/s/<nyckel>`). */
+export interface ScreenStatus {
+  enabled: boolean;
+  token: string | null;
+}
+
+/** En order som väggskärmen visar: inget om kunden och inga priser. */
+export interface ScreenOrder {
+  id: string;
+  code: string;
+  status: 'open' | 'in_progress' | 'waiting_parts';
+  regNo: string;
+  vehicle: string | null;
+  vehicleColor: string | null;
+  mechanic: string | null;
+  place: string | null;
+  startAt: string;
+  dueAt: string | null;
+  overdue: boolean;
+  remarks: string | null;
+  jobs: { id: string; title: string; instruction: string | null }[];
+  progress: { done: number; total: number };
+  missingParts: boolean;
+}
+
+export interface ScreenView {
+  garageName: string;
+  at: string;
+  orders: ScreenOrder[];
+  hidden: number;
+}

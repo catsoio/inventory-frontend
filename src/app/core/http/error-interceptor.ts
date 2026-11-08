@@ -68,7 +68,12 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           snack.open(message, 'Stäng', { duration: 6000 });
           billing.openPlans();
         }
-      } else if (err.status !== 401 && code !== 'NO_GARAGE') {
+      } else if (
+        err.status !== 401 &&
+        code !== 'NO_GARAGE' &&
+        !req.url.includes('/public/screen/')
+      ) {
+        // Väggskärmen visar själv att den saknar kontakt; en ruta var halvminut vore bara i vägen.
         snack.open(message, 'Stäng', { duration: 6000 });
       }
       const apiError: ApiError = { code, message, status: err.status, details: e?.details };

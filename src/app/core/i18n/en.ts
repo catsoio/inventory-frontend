@@ -625,6 +625,7 @@ export const EN: Record<string, string> = {
   'Text och anteckning': 'Text and note',
   'Text under raderna på kvittot': 'Text under the rows on the receipt',
   'Förhandsgranska utkast': 'Preview draft',
+  'Förhandsgranska med era bilar': 'Preview with your cars',
   'Hör ihop med': 'Belongs with',
   'Skapa säljkort': 'Create sales card',
   'Öppna säljkort': 'Open sales card',

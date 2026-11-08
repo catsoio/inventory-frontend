@@ -27,6 +27,12 @@ const routes: Routes = [
       import('./features/public-quote/public-quote-module').then((m) => m.PublicQuoteModule),
   },
   {
+    // Skärmen i verkstadens hall: utan inloggning, nyckeln i länken är nyckeln.
+    path: 's/:token',
+    loadChildren: () =>
+      import('./features/screen/workshop-screen-module').then((m) => m.WorkshopScreenModule),
+  },
+  {
     // Kundens sida för en faktura eller ett kvitto: utan inloggning, nyckeln i länken är nyckeln.
     path: 'i/:token',
     loadChildren: () =>
