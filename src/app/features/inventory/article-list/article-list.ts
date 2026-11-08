@@ -576,7 +576,7 @@ export class ArticleList implements OnInit {
           ? 'table'
           : 'cards'),
   );
-  readonly sort = signal<{ key: string; dir: 1 | -1 } | null>(null);
+  readonly sort = signal<{ key: string; dir: 1 | -1 } | null>({ key: 'number', dir: -1 });
 
   readonly status = computed<Status>(() => {
     const s = this.sel();

@@ -15,14 +15,14 @@ import { Pricing } from '../../core/pricing';
   standalone: false,
   host: { class: 'block' },
   template: `
-    <span class="flex min-w-0 items-center gap-3">
+    <span class="flex min-w-0 items-center gap-3 md:flex-1">
       <app-item-icon [kind]="hit.kind === 'tyre' ? 'tyre' : hit.kind === 'rim' ? 'rim' : 'other'" />
       <span class="min-w-0">
-        <span class="block truncate font-medium">{{ title() }}</span>
-        <span class="block truncate text-sm text-gray-500">{{ detail() }}</span>
+        <span class="block font-medium break-words md:truncate">{{ title() }}</span>
+        <span class="block text-sm break-words text-gray-500 md:truncate">{{ detail() }}</span>
       </span>
     </span>
-    <span class="flex shrink-0 flex-col items-end text-sm">
+    <span class="hidden shrink-0 flex-col items-end text-sm md:flex">
       <span class="font-medium tabular-nums">
         {{ hit.costFinal ? '' : 'ca ' }}{{ pricing.costIncl(hit.costExVat) | kr }}
       </span>
