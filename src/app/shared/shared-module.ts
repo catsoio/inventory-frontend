@@ -34,6 +34,8 @@ import { CustomerDialog } from './customer-dialog/customer-dialog';
 import { VehicleDialog } from './vehicle-dialog/vehicle-dialog';
 import { DateField } from './date-field/date-field';
 import { TimeField } from './time-field/time-field';
+import { WhenFields } from './when/when';
+import { DayPlan } from './day-plan/day-plan';
 import { DataTable } from './data-table/data-table';
 import { ItemIcon } from './item-icon/item-icon';
 import { KrPipe } from './kr-pipe';
@@ -91,6 +93,8 @@ const MATERIAL = [
     DataTable,
     DateField,
     TimeField,
+    WhenFields,
+    DayPlan,
     CustomerDialog,
     CustomerVehiclePicker,
     RegNoInput,
@@ -136,6 +140,8 @@ const MATERIAL = [
     DataTable,
     DateField,
     TimeField,
+    WhenFields,
+    DayPlan,
     CustomerDialog,
     CustomerVehiclePicker,
     RegNoInput,

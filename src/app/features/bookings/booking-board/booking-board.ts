@@ -1,10 +1,9 @@
 import { Component, EventEmitter, Input, OnChanges, Output, inject, signal } from '@angular/core';
-import { catchError, forkJoin, of } from 'rxjs';
-import { environment } from '../../../../environments/environment';
+import { forkJoin } from 'rxjs';
 import { BookingApi } from '../../../core/api/booking-api';
-import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
-import { Booking, BookingStatus, Resource, WorkOrder } from '../../../core/models';
+import { Booking, BookingOrder, BookingStatus, Resource } from '../../../core/models';
+import { ORDER_DRAG_TYPE } from '../booking-inbox/booking-inbox';
 
 const FIRST_HOUR = 6;
 const LAST_HOUR = 19;
@@ -31,7 +30,7 @@ export interface BoardColumn {
 
 interface Block {
   booking: Booking;
-  order: WorkOrder | undefined;
+  order: BookingOrder | null;
   /** Kopia i lyftets kolumn: samma bokning, men mekanikern äger den. */
   ghost: boolean;
   top: number;
@@ -52,25 +51,6 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
   standalone: false,
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    @if (orderChips().length) {
-      <div class="mb-2 flex shrink-0 flex-wrap items-center gap-2 text-sm">
-        <span class="text-gray-500">Arbetsorder utan tid:</span>
-        @for (c of orderChips(); track c.order.id) {
-          <button
-            type="button"
-            class="flex items-center gap-1 rounded-full px-3 py-1 text-white"
-            [style.background]="c.color"
-            (click)="openOrder.emit(c.order)"
-          >
-            {{ mark(c.order) }}{{ c.order.code }} · {{ c.order.regNo }}
-            @if (c.order.resourceName) {
-              <span class="opacity-80">· {{ c.order.resourceName }}</span>
-            }
-          </button>
-        }
-      </div>
-    }
-
     <div class="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200">
       <div class="flex min-w-max">
         <div class="sticky left-0 z-20 w-12 shrink-0 border-r border-gray-200 bg-white">
@@ -94,7 +74,7 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
               <div class="min-w-0">
                 <div class="truncate text-sm font-semibold">{{ col.name }}</div>
                 <div class="text-xs text-gray-500">
-                  {{ kindLabel[col.kind] }}
+                  {{ kindLabel[col.kind] }}{{ countText(col) }}
                 </div>
               </div>
             </div>
@@ -103,7 +83,21 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
               [style.height.px]="hours.length * hourPx"
               [style.background]="columnBg()"
               (click)="clickColumn(col, $event)"
+              (dragover)="dragOver(col, $event)"
+              (dragleave)="ghost.set(null)"
+              (drop)="drop(col, $event)"
             >
+              @if (ghost(); as g) {
+                @if (g.col === col.id) {
+                  <div
+                    class="pointer-events-none absolute right-1 left-1 z-20 rounded-md border-2 border-dashed border-teal-600 bg-teal-500/20 px-2 text-xs font-semibold text-teal-900"
+                    [style.top.px]="g.top"
+                    [style.height.px]="hourPx"
+                  >
+                    {{ g.label }}
+                  </div>
+                }
+              }
               @if (nowTop() !== null) {
                 <div
                   class="pointer-events-none absolute right-0 left-0 z-10 border-t-2 border-red-500"
@@ -126,6 +120,9 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
                 >
                   <div class="font-semibold">
                     {{ mark(b.order) }}{{ time(b.booking.start) }}–{{ time(b.booking.end) }}
+                    @if (b.order) {
+                      <span class="ml-1 font-normal opacity-90">{{ b.order.code }}</span>
+                    }
                   </div>
                   <div class="truncate">{{ b.booking.title }}</div>
                   @if (b.height > 44) {
@@ -156,7 +153,6 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 })
 export class BookingBoard implements OnChanges {
   private readonly bookingApi = inject(BookingApi);
-  private readonly orderApi = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
 
   /** Dagen som visas. */
@@ -165,19 +161,22 @@ export class BookingBoard implements OnChanges {
   @Input() filter = '';
   /** Ökas av föräldern när något sparats, så att dagen läses om. */
   @Input() refresh = 0;
+  /** Det som dras från "Att planera" just nu; då tar kolumnerna emot det. */
+  @Input() dragged: { id: string } | null = null;
   @Output() openBooking = new EventEmitter<Booking>();
-  @Output() openOrder = new EventEmitter<WorkOrder>();
   /** Klick på en ledig tid i en kolumn. */
   @Output() slot = new EventEmitter<{ start: Date; end: Date; column: BoardColumn }>();
+  /** En arbetsorder släppt på en mekaniker eller plats och en tid. */
+  @Output() dropOrder = new EventEmitter<{ start: Date; column: BoardColumn }>();
 
   readonly hours = HOURS;
   readonly hourPx = HOUR_PX;
   readonly kindLabel = { mechanic: 'Mekaniker', lift: 'Lyft', bay: 'Plats', none: 'Ingen vald' };
   readonly loading = signal(true);
   readonly columns = signal<BoardColumn[]>([]);
-  readonly orderChips = signal<{ order: WorkOrder; color: string }[]>([]);
+  /** Rutan som visar var en dragen order hamnar. */
+  readonly ghost = signal<{ col: string; top: number; label: string } | null>(null);
   private bookings: Booking[] = [];
-  private orders = new Map<string, WorkOrder>();
   private resources: Resource[] = [];
 
   ngOnChanges() {
@@ -190,26 +189,19 @@ export class BookingBoard implements OnChanges {
     const to = new Date(from);
     to.setDate(to.getDate() + 1);
     this.loading.set(true);
-    forkJoin([
-      this.workshop.resources(),
-      this.bookingApi.between(from, to),
-      environment.workOrders
-        ? this.orderApi
-            .list({ from: from.toISOString(), to: to.toISOString(), limit: 100 })
-            .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
-        : of({ items: [] as WorkOrder[] }),
-    ]).subscribe(([resources, bookings, orders]) => {
-      this.resources = resources.filter((r) => r.active);
-      this.bookings = bookings.filter(
-        (b) => !this.filter || b.resourceId === this.filter || b.placeId === this.filter,
-      );
-      this.orders = new Map(orders.items.filter((o) => o.bookingId).map((o) => [o.bookingId!, o]));
-      this.build(orders.items);
-      this.loading.set(false);
-    });
+    forkJoin([this.workshop.resources(), this.bookingApi.between(from, to)]).subscribe(
+      ([resources, bookings]) => {
+        this.resources = resources.filter((r) => r.active);
+        this.bookings = bookings.filter(
+          (b) => !this.filter || b.resourceId === this.filter || b.placeId === this.filter,
+        );
+        this.build();
+        this.loading.set(false);
+      },
+    );
   }
 
-  private build(allOrders: WorkOrder[]) {
+  private build() {
     const order = { mechanic: 0, lift: 1, bay: 2 };
     let cols: BoardColumn[] = this.resources
       .filter((r) => !this.filter || r.id === this.filter)
@@ -219,19 +211,6 @@ export class BookingBoard implements OnChanges {
       cols = [...cols, { id: '', name: 'Ej tilldelad', kind: 'none', color: '#6b7280' }];
     }
     this.columns.set(cols);
-    this.orderChips.set(
-      allOrders
-        .filter(
-          (o) =>
-            !o.bookingId &&
-            o.status !== 'cancelled' &&
-            (!this.filter || o.resourceId === this.filter || o.placeId === this.filter),
-        )
-        .map((o) => ({
-          order: o,
-          color: this.resources.find((r) => r.id === o.resourceId)?.color ?? '#475569',
-        })),
-    );
   }
 
   blocksOf(col: BoardColumn): Block[] {
@@ -257,7 +236,7 @@ export class BookingBoard implements OnChanges {
       laneEnds[lane] = e;
       return {
         booking: b,
-        order: this.orders.get(b.id),
+        order: b.workOrder ?? null,
         ghost: col.kind !== 'mechanic' && col.kind !== 'none' && b.resourceId !== col.id,
         top: ((s - FIRST_HOUR * 60) / 60) * HOUR_PX,
         height: Math.max(((e - s) / 60) * HOUR_PX - 2, 22),
@@ -269,13 +248,47 @@ export class BookingBoard implements OnChanges {
     return blocks;
   }
 
-  clickColumn(col: BoardColumn, ev: MouseEvent) {
+  /** Klockslaget under muspekaren, avrundat till en halvtimme. */
+  private startAt(ev: MouseEvent): Date {
     const el = ev.currentTarget as HTMLElement;
     const y = ev.clientY - el.getBoundingClientRect().top;
     const mins = Math.floor(((y / HOUR_PX) * 60) / 30) * 30 + FIRST_HOUR * 60;
     const start = new Date(this.day);
-    start.setHours(0, mins, 0, 0);
+    start.setHours(0, Math.min(mins, (LAST_HOUR - 1) * 60), 0, 0);
+    return start;
+  }
+
+  clickColumn(col: BoardColumn, ev: MouseEvent) {
+    const start = this.startAt(ev);
     this.slot.emit({ start, end: new Date(start.getTime() + 3600_000), column: col });
+  }
+
+  private accepts(ev: DragEvent) {
+    return !!this.dragged && !!ev.dataTransfer?.types.includes(ORDER_DRAG_TYPE);
+  }
+
+  dragOver(col: BoardColumn, ev: DragEvent) {
+    if (!this.accepts(ev)) return;
+    ev.preventDefault();
+    const start = this.startAt(ev);
+    this.ghost.set({
+      col: col.id,
+      top: ((minutes(start) - FIRST_HOUR * 60) / 60) * HOUR_PX,
+      label: `${this.time(start.toISOString())} · ${col.name}`,
+    });
+  }
+
+  drop(col: BoardColumn, ev: DragEvent) {
+    if (!this.accepts(ev)) return;
+    ev.preventDefault();
+    this.ghost.set(null);
+    this.dropOrder.emit({ start: this.startAt(ev), column: col });
+  }
+
+  /** "· 3 jobb" under kolumnrubriken. */
+  countText(col: BoardColumn) {
+    const n = this.blocksOf(col).filter((b) => !b.ghost).length;
+    return n ? ` · ${n} jobb` : '';
   }
 
   /** Timlinjer; dagens kolumner är dessutom randiga. */
@@ -304,7 +317,7 @@ export class BookingBoard implements OnChanges {
   }
 
   /** Arbetsordern: ⚠ del saknas, ⏳ väntar på del, ▣ klar. */
-  mark(o: WorkOrder | undefined) {
+  mark(o: BookingOrder | null) {
     if (!o) return '';
     if (o.status === 'done') return '▣ ';
     if (o.status === 'waiting_parts') return '⏳ ';

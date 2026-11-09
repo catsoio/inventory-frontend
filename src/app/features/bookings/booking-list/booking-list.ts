@@ -21,6 +21,12 @@ const COLS: DtCol<Booking>[] = [
   { key: 'start', label: 'Tid', value: (b) => b.start, fmt: (b) => when(b.start) },
   { key: 'title', label: 'Vad', value: (b) => b.title },
   { key: 'regNo', label: 'Regnr', value: (b) => b.regNo ?? '', fmt: (b) => b.regNo || '–' },
+  {
+    key: 'order',
+    label: 'Arbetsorder',
+    value: (b) => b.workOrder?.code ?? '',
+    fmt: (b) => b.workOrder?.code ?? '–',
+  },
   { key: 'customer', label: 'Kund', value: (b) => b.customerName },
   {
     key: 'resource',

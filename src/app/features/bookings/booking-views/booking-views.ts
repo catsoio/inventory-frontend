@@ -36,12 +36,15 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 })
 export class BookingViews {
   @Input() value = 'board';
+  /** Mobil: dagen är en enda kolumn; dator: dagen delas upp per mekaniker och lyft. */
+  @Input() mobile = false;
   @Output() pick = new EventEmitter<string>();
-  readonly views = [
-    { id: 'board', label: 'Resurser' },
-    { id: 'day', label: 'Dag' },
-    { id: 'week', label: 'Vecka' },
-    { id: 'month-grid', label: 'Månad' },
-    { id: 'list', label: 'Lista' },
-  ];
+  get views() {
+    return [
+      { id: this.mobile ? 'day' : 'board', label: 'Dag' },
+      { id: 'week', label: 'Vecka' },
+      { id: 'month-grid', label: 'Månad' },
+      { id: 'list', label: 'Lista' },
+    ];
+  }
 }

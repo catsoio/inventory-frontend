@@ -12,6 +12,7 @@ import { WorkshopApi } from '../../core/api/workshop-api';
 import {
   BOOKING_STATUS_LABELS,
   Booking,
+  BookingOrder,
   BookingStatus,
   Customer,
   Resource,
@@ -26,6 +27,7 @@ import type { PickerValue } from '../customer-vehicle-picker/customer-vehicle-pi
 import { LinkResolver, type ResolvedLink } from '../customer-vehicle-picker/link-resolver';
 import { Auth } from '../../core/auth/auth';
 import { Confirm } from '../confirm';
+import { at, hm, linkWhen, whenOrder, whenRange, whenValue, ymd } from '../when/when';
 
 export interface BookingDialogData {
   /** Befintlig bokning, eller null för en ny. */
@@ -36,15 +38,15 @@ export interface BookingDialogData {
   /** Förvald mekaniker eller lyft/plats för en ny bokning (från resursvyn). */
   resourceId?: string;
   placeId?: string;
+  /** En arbetsorder som ska planeras: väljs som "Koppla befintlig" och fyller i kund, bil och text. */
+  workOrder?: WorkOrder;
 }
+
+/** Hur bokningen och arbetsordern hör ihop när man sparar. */
+type OrderMode = 'new' | 'existing' | 'none';
 
 /** Resultat: den sparade bokningen, 'deleted' eller inget (avbrutet). */
 export type BookingDialogResult = Booking | 'deleted';
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const hm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
 
 @Component({
   selector: 'app-booking-dialog',
@@ -87,13 +89,90 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             </div>
           </div>
         }
+        @if (workOrdersOn && !legacy) {
+          <section class="flex flex-col gap-3 max-md:order-1 md:col-span-2">
+            <h3 class="sec">Arbetsorder</h3>
+            @if (order(); as o) {
+              <div class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-3">
+                <app-pill [tone]="o.status === 'done' ? 'green' : 'blue'">
+                  {{ o.code }} · {{ orderStatuses[o.status] }}
+                </app-pill>
+                @if (o.hasMissing && o.status !== 'done') {
+                  <app-pill tone="amber">Del saknas</app-pill>
+                }
+                <span class="text-sm text-gray-600">
+                  Bokningen är planeringen för ordern: tid, mekaniker och plats gäller båda.
+                </span>
+                <span class="flex-1"></span>
+                @if (o.status !== 'done') {
+                  <button mat-button type="button" [disabled]="busy()" (click)="detach()">
+                    Koppla loss
+                  </button>
+                }
+              </div>
+            } @else {
+              <mat-button-toggle-group
+                formControlName="orderMode"
+                hideSingleSelectionIndicator
+                aria-label="Arbetsorder"
+                class="self-start max-md:w-full"
+              >
+                <mat-button-toggle value="new" class="max-md:flex-1"
+                  >Ny arbetsorder</mat-button-toggle
+                >
+                <mat-button-toggle value="existing" class="max-md:flex-1"
+                  >Koppla befintlig</mat-button-toggle
+                >
+                <mat-button-toggle value="none" class="max-md:flex-1">Ingen</mat-button-toggle>
+              </mat-button-toggle-group>
+              @switch (form.controls.orderMode.value) {
+                @case ('new') {
+                  <p class="text-xs text-gray-500">
+                    En arbetsorder skapas när du sparar, med raderna under "Vad ska göras".
+                  </p>
+                }
+                @case ('existing') {
+                  <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Arbetsorder</mat-label>
+                    <mat-select
+                      formControlName="workOrderId"
+                      (selectionChange)="pickOrder($event.value)"
+                    >
+                      @for (c of candidates(); track c.id) {
+                        <mat-option [value]="c.id">
+                          <b>{{ c.code }}</b> · {{ c.regNo }} · {{ c.customerName }} ·
+                          {{ jobText(c) }}
+                          <span class="text-xs text-gray-500">({{ orderStatuses[c.status] }})</span>
+                        </mat-option>
+                      } @empty {
+                        <mat-option disabled value="">
+                          {{
+                            candidatesLoaded() ? 'Inga öppna arbetsorder att planera' : 'Hämtar…'
+                          }}
+                        </mat-option>
+                      }
+                    </mat-select>
+                    <mat-hint>
+                      Öppna, pågående och väntande order som inte har någon tid i kalendern.
+                    </mat-hint>
+                    <mat-error>Välj arbetsorder</mat-error>
+                  </mat-form-field>
+                }
+              }
+            }
+          </section>
+        }
         <div class="flex flex-col gap-5 max-md:contents">
-          <section class="flex flex-col gap-3 max-md:order-1">
+          <section class="flex flex-col gap-3 max-md:order-2">
             <h3 class="sec">Kund och bil</h3>
-            <app-customer-vehicle-picker formControlName="link" [legacy]="legacy" [phoneFirst]="true" />
+            <app-customer-vehicle-picker
+              formControlName="link"
+              [legacy]="legacy"
+              [phoneFirst]="true"
+            />
           </section>
 
-          <section class="flex flex-col gap-3 max-md:order-2">
+          <section class="flex flex-col gap-3 max-md:order-3">
             <h3 class="sec">Vad ska göras</h3>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
               <mat-label>Åtgärd</mat-label>
@@ -138,35 +217,12 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
           </section>
         </div>
         <div class="flex flex-col gap-5 max-md:contents">
-          <section class="flex flex-col gap-3 max-md:order-3">
+          <section class="flex flex-col gap-3 max-md:order-4">
             <h3 class="sec">När</h3>
-            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
-              <app-date-field
-                class="col-span-1"
-                label="Startdatum"
-                icon="event"
-                error="Ange datum"
-                formControlName="day"
-              />
-              <app-time-field class="col-span-1" label="Starttid" formControlName="startTime" />
-              <app-date-field
-                class="col-span-1"
-                label="Slutdatum"
-                icon="event_available"
-                error="Ange datum"
-                formControlName="endDay"
-              />
-              <app-time-field
-                class="col-span-1"
-                label="Sluttid"
-                formControlName="endTime"
-                [error]="form.errors?.['order'] ? 'Efter starten' : ''"
-              />
-              <p class="col-span-2 -mt-1 text-xs text-gray-500">
-                Tar jobbet flera dagar sätter du ett senare slutdatum. Slutet blir arbetsordernas
-                "Klar senast".
-              </p>
-            </div>
+            <app-when-fields [group]="form" />
+            <p class="-mt-1 text-xs text-gray-500">
+              Tar jobbet flera dagar sätter du ett senare slutdatum.
+            </p>
           </section>
 
           <section class="flex flex-col gap-3 max-md:order-7" [class]="moreCls()">
@@ -204,26 +260,6 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
             </div>
           </section>
         </div>
-        @if (workOrdersOn && !legacy) {
-          <section class="rounded-xl bg-gray-50 p-3 max-md:order-4 md:col-span-2">
-            @if (data.booking) {
-              @if (order(); as o) {
-                <app-pill [tone]="o.status === 'done' ? 'green' : 'blue'">
-                  {{ o.code }} · {{ orderStatuses[o.status] }}
-                </app-pill>
-                @if (o.hasMissing && o.status !== 'done') {
-                  <app-pill tone="amber">Del saknas</app-pill>
-                }
-              } @else if (orderLoaded()) {
-                <span class="text-sm text-gray-600">Ingen arbetsorder än.</span>
-              }
-            } @else {
-              <mat-checkbox formControlName="createOrder">
-                Skapa arbetsorder när jag sparar
-              </mat-checkbox>
-            }
-          </section>
-        }
         <!-- Mobil: det mesta man behöver vid ett snabbt samtal syns direkt, resten ligger här. -->
         <div class="flex flex-col gap-1 pb-1 max-md:order-5 md:hidden">
           <button
@@ -245,15 +281,10 @@ const at = (day: string, time: string) => new Date(`${day}T${time}:00`);
         @if (data.booking && admin) {
           <button mat-button type="button" class="!text-red-700" (click)="remove()">Ta bort</button>
         }
-        @if (data.booking && workOrdersOn && !legacy) {
-          <button
-            mat-button
-            type="button"
-            [disabled]="busy() || !orderLoaded()"
-            (click)="openWorkOrder()"
-          >
+        @if (order(); as o) {
+          <button mat-button type="button" [disabled]="busy()" (click)="openWorkOrder(o)">
             <mat-icon>handyman</mat-icon>
-            {{ order() ? 'Öppna arbetsorder' : 'Skapa arbetsorder' }}
+            Öppna arbetsorder
           </button>
         }
         <span class="flex-1"></span>
@@ -313,10 +344,14 @@ export class BookingDialog {
       })
       .subscribe((ok) => ok && this.ref.close());
   }
-  /** Bokningens arbetsorder, om den har en. */
-  readonly order = signal<WorkOrder | null>(null);
-  readonly orderLoaded = signal(false);
+  /** Arbetsordern bokningen planerar, om den har en. */
+  readonly order = signal<BookingOrder | null>(null);
   readonly orderStatuses = WORK_ORDER_STATUS_LABELS;
+  /** Order att koppla: öppna, pågående och väntande utan tid i kalendern. */
+  readonly candidates = signal<WorkOrder[]>([]);
+  readonly candidatesLoaded = signal(false);
+  /** Rubriken som sattes av en vald arbetsorder, så att ett byte av order byter den med. */
+  private titleFromOrder = '';
   /** "Förfrågan" väljs aldrig för hand: den kommer från bokningssidan och bekräftas till "Bokad". */
   get statuses() {
     return Object.entries(BOOKING_STATUS_LABELS).filter(
@@ -349,6 +384,8 @@ export class BookingDialog {
     // En äldre bokning med "Klar senast" efter slutet visar den dagen som slutdatum.
     const due = b?.dueAt ? new Date(b.dueAt) : null;
     const endShown = due && ymd(due) > ymd(end) ? at(ymd(due), hm(end)) : end;
+    const planned = data.workOrder ?? null;
+    this.order.set(b?.workOrder ?? null);
     const kr = (ore: number | null | undefined) => (ore == null ? null : ore / 100);
     this.legacy =
       b && !(b.customerId && b.vehicleId)
@@ -367,57 +404,36 @@ export class BookingDialog {
         title: [b?.title ?? '', Validators.required],
         resourceId: [b?.resourceId ?? data.resourceId ?? ''],
         placeId: [b?.placeId ?? data.placeId ?? ''],
-        day: [ymd(start), Validators.required],
-        endDay: [ymd(endShown), Validators.required],
-        startTime: [hm(start), Validators.required],
-        endTime: [hm(end), Validators.required],
+        ...whenValue(start, endShown),
         price: [kr(b?.priceTo ?? b?.priceFrom) as number | null, Validators.min(0)],
-        createOrder: [environment.workOrders],
+        // En ny bokning gör en arbetsorder som standard; en befintlig ändras utan att röra ordern.
+        orderMode: [
+          (planned ? 'existing' : !b && environment.workOrders ? 'new' : 'none') as OrderMode,
+        ],
+        workOrderId: [planned?.id ?? ''],
         status: [(b?.status ?? 'booked') as BookingStatus],
         notes: [b?.notes ?? ''],
       },
-      {
-        validators: (g) => {
-          const v = g.getRawValue();
-          const errors: Record<string, boolean> = {};
-          if (v.day && v.endDay && v.startTime && v.endTime) {
-            if (at(v.endDay, v.endTime) <= at(v.day, v.startTime)) errors['order'] = true;
-          }
-          return Object.keys(errors).length ? errors : null;
-        },
-      },
+      { validators: whenOrder },
     );
-    if (b && environment.workOrders) {
-      this.workOrders.list({ bookingId: b.id, limit: 1 }).subscribe({
-        next: (p) => {
-          this.order.set(p.items[0] ?? null);
-          this.orderLoaded.set(true);
-        },
-        error: () => this.orderLoaded.set(true),
-      });
-    }
-    // Ändrar man dag eller starttid följer sluttiden med, så att tiden inte blir ogiltig.
-    let duration = endShown.getTime() - start.getTime();
     const f = this.form.controls;
+    linkWhen(this.form, { start, end: endShown });
+    // Det som skrivs i datum- och tidsfälten är strängar; whenValue ger dem rätt namn.
     f.link.valueChanges.subscribe((v) => this.loadVehicle(v?.vehicleId, v?.vehicle));
     this.loadVehicle(b?.vehicleId ?? undefined);
-    const keepDuration = () => {
-      const ms =
-        at(f.endDay.value, f.endTime.value).getTime() -
-        at(f.day.value, f.startTime.value).getTime();
-      if (ms > 0) duration = ms;
-    };
-    f.endTime.valueChanges.subscribe(keepDuration);
-    f.endDay.valueChanges.subscribe(keepDuration);
-    // Flyttar man starten följer slutet med (dag och tid), så att längden på jobbet är kvar.
-    const followStart = () => {
-      if (!f.day.value || !f.startTime.value) return;
-      const next = new Date(at(f.day.value, f.startTime.value).getTime() + duration);
-      f.endDay.setValue(ymd(next), { emitEvent: false });
-      f.endTime.setValue(hm(next), { emitEvent: false });
-    };
-    f.startTime.valueChanges.subscribe(followStart);
-    f.day.valueChanges.subscribe(followStart);
+    // Kund och bil följer ordern så länge en är kopplad.
+    if (this.order()) f.link.disable({ emitEvent: false });
+    f.orderMode.valueChanges.subscribe((m) => {
+      if (m === 'existing') f.workOrderId.addValidators(Validators.required);
+      else {
+        f.workOrderId.clearValidators();
+        f.workOrderId.setValue('', { emitEvent: false });
+        if (f.link.disabled) f.link.enable({ emitEvent: false });
+      }
+      f.workOrderId.updateValueAndValidity({ emitEvent: false });
+    });
+    if (planned) f.workOrderId.addValidators(Validators.required);
+    if (environment.workOrders && !this.legacy && !this.order()) this.loadCandidates(planned);
     forkJoin([this.workshop.resources(true), this.workshop.serviceTypes(true)]).subscribe(
       ([r, s]) => {
         // Arkiverade val syns bara om just den här bokningen använder dem.
@@ -469,6 +485,64 @@ export class BookingDialog {
     if (f.price.value == null && price !== null) f.price.setValue(price / 100);
   }
 
+  /** Order som går att planera; en order som kommer från planeringspanelen finns alltid med. */
+  private loadCandidates(planned: WorkOrder | null) {
+    this.workOrders.list({ active: true, unbooked: true, limit: 100 }).subscribe({
+      next: (p) => {
+        const items = p.items.filter((o) => !o.locked);
+        if (planned && !items.some((o) => o.id === planned.id)) items.unshift(planned);
+        this.candidates.set(items);
+        this.candidatesLoaded.set(true);
+        if (planned) this.pickOrder(planned.id, true);
+      },
+      error: () => this.candidatesLoaded.set(true),
+    });
+  }
+
+  /** Jobben på ordern som en rad text. */
+  jobText(o: WorkOrder) {
+    return (o.jobs ?? [])
+      .map((j) => j.title.trim())
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  /**
+   * En vald arbetsorder bestämmer kund och bil, och fyller i vad som ska göras, mekaniker och
+   * plats där det inte redan är ifyllt. Tiden är bokningens: ordern får den när man sparar.
+   */
+  pickOrder(id: string, initial = false) {
+    const o = this.candidates().find((x) => x.id === id);
+    const f = this.form.controls;
+    if (!o) return;
+    f.link.enable({ emitEvent: false });
+    f.link.setValue({ customerId: o.customerId, vehicleId: o.vehicleId });
+    f.link.disable({ emitEvent: false });
+    const jobs = (o.jobs ?? [])
+      .map((j) => j.title.trim())
+      .filter(Boolean)
+      .join('\n');
+    const text = jobs || o.remarks?.trim() || o.code;
+    if (!f.title.value || f.title.value === this.titleFromOrder) {
+      f.title.setValue(text);
+      this.titleFromOrder = text;
+    }
+    if (!f.resourceId.value && o.resourceId) f.resourceId.setValue(o.resourceId);
+    if (!f.placeId.value && o.placeId) f.placeId.setValue(o.placeId);
+    if (!initial) f.workOrderId.setValue(id);
+  }
+
+  /** Släpper ordern: bokningen blir fristående och kund och bil kan ändras igen. */
+  detach() {
+    this.order.set(null);
+    this.form.controls.link.enable({ emitEvent: false });
+    this.form.controls.orderMode.setValue('none');
+    this.form.markAsDirty();
+    this.detached = true;
+    if (!this.candidatesLoaded()) this.loadCandidates(null);
+  }
+  private detached = false;
+
   save() {
     // Ett fel i ett dolt fält ska synas: öppna "Fler val" då.
     if (this.form.controls.price.invalid) this.more.set(true);
@@ -476,19 +550,27 @@ export class BookingDialog {
 
     const v = this.form.getRawValue();
     const ore = (kr: number | null) => (kr == null ? null : Math.round(kr * 100));
+    const range = whenRange(v)!;
+    const mode = this.order() ? 'none' : v.orderMode;
     const body = {
       resourceId: v.resourceId || null,
       placeId: v.placeId || null,
       serviceTypeId: v.serviceTypeId || null,
       title: v.title,
-      start: at(v.day, v.startTime).toISOString(),
-      end: at(v.endDay, v.endTime).toISOString(),
-      // Slutdatumet är "Klar senast"; ett gammalt särskilt datum tas bort.
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+      // Slutdatumet är arbetsordernas slut; ett gammalt särskilt "klar senast" tas bort.
       dueAt: null,
       status: v.status,
       priceFrom: ore(v.price),
       priceTo: ore(v.price),
       notes: v.notes || null,
+      // Befintlig order: kopplas här. Annars släpps en tidigare order bara om man kopplat loss den.
+      ...(mode === 'existing'
+        ? { workOrderId: v.workOrderId }
+        : this.detached
+          ? { workOrderId: null }
+          : {}),
     };
     this.busy.set(true);
     // Nyskriven kund och bil skapas först. Gamla bokningar utan länk skickas utan kund/bil.
@@ -506,9 +588,9 @@ export class BookingDialog {
         }),
       )
       .pipe(
-        // Ny bokning med kryssrutan i: arbetsordern skapas direkt från bokningen.
+        // "Ny arbetsorder": den skapas direkt från bokningen.
         switchMap((b) =>
-          !this.data.booking && this.workOrdersOn && v.createOrder
+          this.workOrdersOn && !this.legacy && mode === 'new'
             ? this.workOrders.fromBooking(b.id).pipe(
                 map((o) => {
                   this.snack.open(`${o.code} skapad`, undefined, { duration: 2500 });
@@ -593,16 +675,10 @@ export class BookingDialog {
       });
   }
 
-  /** Öppnar bokningens arbetsorder, och skapar den första gången. */
-  openWorkOrder() {
-    this.busy.set(true);
-    this.workOrders.fromBooking(this.data.booking!.id).subscribe({
-      next: (o) => {
-        this.ref.close();
-        this.router.navigate(['/workorders', o.id]);
-      },
-      error: () => this.busy.set(false),
-    });
+  /** Öppnar bokningens arbetsorder. */
+  openWorkOrder(o: BookingOrder) {
+    this.ref.close();
+    this.router.navigate(['/workorders', o.id]);
   }
 
   remove() {

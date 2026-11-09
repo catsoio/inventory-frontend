@@ -11,14 +11,13 @@ import { createResizePlugin } from '@schedule-x/resize';
 // övriga får polyfillen. Importera aldrig Temporal från paketet: då blir det en annan klass och
 // kalenderns `instanceof`-kontroller misslyckas.
 import 'temporal-polyfill/global';
-import { catchError, firstValueFrom, forkJoin, of } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { Auth } from '../../../core/auth/auth';
 import type { BoardColumn } from '../booking-board/booking-board';
 import { BookingApi } from '../../../core/api/booking-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
-import { Booking, BookingStatus, Resource, WorkOrder } from '../../../core/models';
-import { WorkOrderApi } from '../../../core/api/work-order-api';
-import { environment } from '../../../../environments/environment';
+import { Booking, BookingOrder, BookingStatus, Resource, WorkOrder } from '../../../core/models';
+import { nextHour } from '../../../shared/when/when';
 import {
   BookingDialog,
   BookingDialogData,
@@ -65,7 +64,7 @@ const dayKey = (d: Date) =>
   host: { class: 'flex h-full flex-col' },
   template: `
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <app-booking-views [value]="mode()" (pick)="setMode($event)" />
+      <app-booking-views [value]="mode()" [mobile]="mobile" (pick)="setMode($event)" />
 
       @if (mode() !== 'list') {
         <div class="flex items-center gap-1">
@@ -83,7 +82,10 @@ const dayKey = (d: Date) =>
       <span class="flex-1"></span>
 
       @if (mode() !== 'list') {
-        <mat-form-field class="w-44 max-md:min-w-40 max-md:flex-1 max-md:basis-40" subscriptSizing="dynamic">
+        <mat-form-field
+          class="w-40 max-md:min-w-40 max-md:flex-1 max-md:basis-40"
+          subscriptSizing="dynamic"
+        >
           <mat-label>Visa</mat-label>
           <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
             <mat-option value="">Alla</mat-option>
@@ -92,6 +94,20 @@ const dayKey = (d: Date) =>
             }
           </mat-select>
         </mat-form-field>
+
+        <button
+          mat-stroked-button
+          class="whitespace-nowrap"
+          [class.!bg-teal-50]="inboxOpen()"
+          [attr.aria-pressed]="inboxOpen()"
+          (click)="toggleInbox()"
+        >
+          <mat-icon>inbox</mat-icon>
+          <span class="max-2xl:hidden">Att planera</span>
+          <span class="ml-1 rounded-full bg-gray-200 px-2 text-xs font-semibold">{{
+            toPlan()
+          }}</span>
+        </button>
       }
 
       <button
@@ -104,39 +120,50 @@ const dayKey = (d: Date) =>
       </button>
     </div>
 
-    <div class="flex min-h-0 flex-1 flex-col rounded-xl bg-white p-3 shadow-sm">
-      @if (mode() === 'list') {
-        <app-booking-list class="min-h-0 flex-1" [embedded]="true" />
-      } @else if (mode() === 'board') {
-        <app-booking-board
-          [day]="date()"
-          [filter]="filter()"
-          [refresh]="refresh()"
-          (openBooking)="open($event)"
-          (openOrder)="router.navigate(['/workorders', $event.id])"
-          (slot)="createAt($event)"
-        />
-      } @else if (app(); as a) {
-        <sx-calendar class="min-h-0 flex-1" [calendarApp]="a">
-          <!-- Vår egen verktygsrad ovanför ersätter kalenderns. -->
-          <ng-template #headerContent></ng-template>
-        </sx-calendar>
-      }
+    <div class="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl bg-white p-3 shadow-sm">
+        @if (mode() === 'list') {
+          <app-booking-list class="min-h-0 flex-1" [embedded]="true" />
+        } @else if (mode() === 'board') {
+          <app-booking-board
+            [day]="date()"
+            [filter]="filter()"
+            [refresh]="refresh()"
+            [dragged]="dragged()"
+            (openBooking)="open($event)"
+            (slot)="createAt($event)"
+            (dropOrder)="dropOrder($event)"
+          />
+        } @else if (app(); as a) {
+          <sx-calendar class="min-h-0 flex-1" [calendarApp]="a">
+            <!-- Vår egen verktygsrad ovanför ersätter kalenderns. -->
+            <ng-template #headerContent></ng-template>
+          </sx-calendar>
+        }
+      </div>
+
+      <app-booking-inbox
+        class="rounded-xl bg-white shadow-sm max-lg:order-first max-lg:max-h-72 lg:w-72 lg:shrink-0"
+        [class.hidden]="!inboxOpen() || mode() === 'list'"
+        [refresh]="refresh()"
+        (plan)="planOrder($event)"
+        (openBooking)="open($event)"
+        (dragging)="dragged.set($event)"
+        (counted)="toPlan.set($event)"
+      />
     </div>
   `,
 })
 export class BookingCalendar implements OnInit {
   private readonly api = inject(BookingApi);
   private readonly workshop = inject(WorkshopApi);
-  private readonly workOrders = inject(WorkOrderApi);
   private readonly auth = inject(Auth);
   private readonly myId = this.auth.user()?.id;
   private readonly dialog = inject(MatDialog);
   readonly router = inject(Router);
 
-  /** Bokningar och arbetsorder för perioden som visas, för klick och dra-och-släpp. */
+  /** Bokningar för perioden som visas, för klick och dra-och-släpp. */
   private bookings = new Map<string, Booking>();
-  private orders = new Map<string, WorkOrder>();
   private range: { start: Date; end: Date } | null = null;
   /** Kalenderns interna tillstånd, för att byta vy och dag utifrån. */
   private $app: any = null;
@@ -151,16 +178,22 @@ export class BookingCalendar implements OnInit {
   private resourcesLoaded = false;
 
   /** Mobil startar på dag. */
-  private readonly mobile = window.innerWidth < 768;
+  readonly mobile = window.innerWidth < 768;
+  private readonly query = inject(ActivatedRoute).snapshot.queryParamMap;
   readonly mode = signal<Mode>(this.startMode());
-  readonly date = signal(new Date());
+  readonly date = signal(this.startDate());
+  /** "Att planera": förfrågningar och arbetsorder som väntar på en tid. */
+  readonly inboxOpen = signal(this.startInbox());
+  readonly toPlan = signal(0);
+  /** Arbetsordern som dras från "Att planera" just nu. */
+  readonly dragged = signal<WorkOrder | null>(null);
   readonly title = signal('');
   readonly refresh = signal(0);
   readonly app = signal<CalendarApp | null>(null);
 
   /** Vy från adressen (?view=), annars den senast använda, annars dator = resurser, mobil = dag. */
   private startMode(): Mode {
-    const fromUrl = inject(ActivatedRoute).snapshot.queryParamMap.get('view');
+    const fromUrl = this.query.get('view');
     const saved = (() => {
       try {
         return localStorage.getItem('garagestock.bookingView');
@@ -169,12 +202,43 @@ export class BookingCalendar implements OnInit {
       }
     })();
     const v = [fromUrl, saved].find((x) => VIEWS.includes(x as Mode)) as Mode | undefined;
-    return v ?? (this.mobile ? 'day' : 'board');
+    return this.forDevice(v ?? 'day');
+  }
+
+  /** Dagen är en kolumn på mobil och en kolumn per mekaniker och lyft på dator. */
+  private forDevice(m: Mode): Mode {
+    if (m === 'day' || m === 'board') return this.mobile ? 'day' : 'board';
+    return m;
+  }
+
+  /** Dag från adressen (?date=ÅÅÅÅ-MM-DD), annars i dag. */
+  private startDate(): Date {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(this.query.get('date') ?? '');
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date();
+  }
+
+  private startInbox(): boolean {
+    try {
+      const saved = localStorage.getItem('garagestock.bookingInbox');
+      if (saved) return saved === '1';
+    } catch {
+      /* sparas bara som bekvämlighet */
+    }
+    return window.innerWidth >= 1280;
+  }
+
+  toggleInbox() {
+    this.inboxOpen.update((v) => !v);
+    try {
+      localStorage.setItem('garagestock.bookingInbox', this.inboxOpen() ? '1' : '0');
+    } catch {
+      /* sparas bara som bekvämlighet */
+    }
   }
 
   /** Byt vy utan att tappa dag eller filter. */
   setMode(pick: string) {
-    const m = pick as Mode;
+    const m = this.forDevice(pick as Mode);
     if (!VIEWS.includes(m) || m === this.mode()) return;
     try {
       localStorage.setItem('garagestock.bookingView', m);
@@ -312,7 +376,8 @@ export class BookingCalendar implements OnInit {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
-      year: 'numeric',
+      // Året står bara när det inte är det här året.
+      ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' as const }),
     });
   }
 
@@ -342,25 +407,14 @@ export class BookingCalendar implements OnInit {
     return new Date(this.newStart().getTime() + 3600_000);
   }
 
-  /** Hämtar bokningar och arbetsorder för perioden och gör dem till kalenderhändelser. */
+  /** Hämtar bokningarna för perioden och gör dem till kalenderhändelser. */
   private async load(r: { start: Date; end: Date }): Promise<CalendarEvent[]> {
-    const [list, orders] = await firstValueFrom(
-      forkJoin([
-        this.api.between(r.start, r.end),
-        // Arbetsorder för samma period, så att kalendern kan visa hur långt de kommit.
-        environment.workOrders
-          ? this.workOrders
-              .list({ from: r.start.toISOString(), to: r.end.toISOString(), limit: 100 })
-              .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
-          : of({ items: [] as WorkOrder[] }),
-      ]),
-    );
-    this.orders = new Map(orders.items.filter((o) => o.bookingId).map((o) => [o.bookingId!, o]));
+    const list = await firstValueFrom(this.api.between(r.start, r.end));
     const shown = list.filter(
       (b) => !this.filter() || b.resourceId === this.filter() || b.placeId === this.filter(),
     );
     this.bookings = new Map(shown.map((b) => [b.id, b]));
-    return [...shown.map((b) => this.toEvent(b))];
+    return shown.map((b) => this.toEvent(b));
   }
 
   /** Läser om händelserna efter en ändring. */
@@ -382,7 +436,7 @@ export class BookingCalendar implements OnInit {
       booked: '',
     }[b.status];
     // Arbetsordern: ⚠ del saknas, ⏳ väntar på del, ▣ klar.
-    const o = this.orders.get(b.id);
+    const o: BookingOrder | null = b.workOrder;
     const ao = !o
       ? ''
       : o.status === 'done'
@@ -395,7 +449,11 @@ export class BookingCalendar implements OnInit {
     return {
       id: b.id,
       title:
-        ao + mark + [b.title, b.regNo, b.customerName, b.resourceName].filter(Boolean).join(' · '),
+        ao +
+        mark +
+        [o?.code, b.title.split('\n')[0], b.regNo, b.customerName, b.resourceName]
+          .filter(Boolean)
+          .join(' · '),
       start: zoned(b.start),
       end: zoned(b.end),
       calendarId: off || !resource ? 's-' + b.status : 'r' + resource.id,
@@ -404,11 +462,44 @@ export class BookingCalendar implements OnInit {
   }
 
   private clicked(id: string) {
-    if (id.startsWith('ao:')) this.router.navigate(['/workorders', id.slice(3)]);
-    else {
-      const b = this.bookings.get(id);
-      if (b) this.open(b);
-    }
+    const b = this.bookings.get(id);
+    if (b) this.open(b);
+  }
+
+  /** En arbetsorder planeras med knappen: bokningen öppnas med ordern vald. */
+  planOrder(o: WorkOrder, drop?: { start: Date; column: BoardColumn }) {
+    const start = drop?.start ?? this.suggestedStart(o);
+    const asked = o.pickupAt
+      ? new Date(o.pickupAt).getTime() - new Date(o.receivedAt).getTime()
+      : 0;
+    // Ordern har ofta en egen längd; annars en timme.
+    const length = asked >= 15 * 60_000 && asked <= 12 * 3600_000 ? asked : 3600_000;
+    const col = drop?.column;
+    this.show({
+      booking: null,
+      start,
+      end: new Date(start.getTime() + length),
+      workOrder: o,
+      ...(col?.id ? (col.kind === 'mechanic' ? { resourceId: col.id } : { placeId: col.id }) : {}),
+    });
+  }
+
+  /** En order släppt på en tid i dagsvyn. */
+  dropOrder(e: { start: Date; column: BoardColumn }) {
+    const o = this.dragged();
+    this.dragged.set(null);
+    if (o) this.planOrder(o, e);
+  }
+
+  /** Ordern egen önskade tid om den ligger framåt, annars kl. 08 på dagen som visas. */
+  private suggestedStart(o: WorkOrder): Date {
+    const wish = new Date(o.receivedAt);
+    if (wish.getTime() > Date.now()) return wish;
+    const d = new Date(this.date());
+    d.setHours(8, 0, 0, 0);
+    return d.getTime() > Date.now() || d.toDateString() !== new Date().toDateString()
+      ? d
+      : nextHour();
   }
 
   create(start: Date, end: Date) {
@@ -438,7 +529,7 @@ export class BookingCalendar implements OnInit {
   /** Dra eller dra i kanten: spara den nya tiden, annars läs om så att händelsen hoppar tillbaka. */
   private move(e: CalendarEvent) {
     const id = String(e.id);
-    if (id.startsWith('ao:') || e.start instanceof Temporal.PlainDate) return;
+    if (e.start instanceof Temporal.PlainDate) return;
     this.api
       .update(id, {
         start: toDate(e.start).toISOString(),

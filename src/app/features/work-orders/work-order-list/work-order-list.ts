@@ -7,7 +7,10 @@ import { WORK_ORDER_STATUS_LABELS, WorkOrder, WorkOrderStatus } from '../../../c
 import { carColorHex } from '../../../shared/car-color';
 import { DtCol } from '../../../shared/data-table/data-table';
 
-const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(appLocale()) : '–');
+const date = (iso: string | null) =>
+  iso
+    ? `${new Date(iso).toLocaleDateString(appLocale())} ${new Date(iso).toLocaleTimeString(appLocale(), { hour: '2-digit', minute: '2-digit' })}`
+    : '–';
 
 const COLS: DtCol<WorkOrder>[] = [
   { key: 'code', label: 'Nr', value: (o) => o.number, fmt: (o) => o.code },
@@ -28,7 +31,7 @@ const COLS: DtCol<WorkOrder>[] = [
   },
   {
     key: 'pickup',
-    label: 'Klar senast',
+    label: 'Slutar',
     value: (o) => o.pickupAt ?? '',
     fmt: (o) => date(o.pickupAt),
   },

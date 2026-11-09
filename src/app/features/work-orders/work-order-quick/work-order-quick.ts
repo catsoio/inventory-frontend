@@ -14,7 +14,6 @@ import {
   WorkOrderStatus,
 } from '../../../core/models';
 import { Confirm } from '../../../shared/confirm';
-import { dateInput, dateIso } from '../../storage/storage-format';
 
 const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
   id: l.id,
@@ -166,17 +165,28 @@ const asInput = (l: WorkOrderLine, done = l.done): WorkOrderLineInput => ({
                 }
               </select>
             </label>
-            <label class="block sm:col-span-2">
-              <span class="sec !mb-1 block">Klar senast</span>
+            <label class="block">
+              <span class="sec !mb-1 block">Startar</span>
               <input
-                type="date"
+                type="datetime-local"
                 class="h-11 w-full px-3 text-sm text-gray-900 field"
-                [value]="day(o.pickupAt)"
+                [value]="local(o.receivedAt)"
                 [disabled]="busy() || o.locked"
                 (change)="
-                  patch({
-                    pickupAt: $any($event.target).value ? iso($any($event.target).value) : null,
-                  })
+                  $any($event.target).value && patch({ receivedAt: iso($any($event.target).value) })
+                "
+              />
+            </label>
+            <label class="block">
+              <span class="sec !mb-1 block">Slutar</span>
+              <input
+                type="datetime-local"
+                class="h-11 w-full px-3 text-sm text-gray-900 field"
+                [value]="local(o.pickupAt)"
+                [min]="local(o.receivedAt)"
+                [disabled]="busy() || o.locked"
+                (change)="
+                  $any($event.target).value && patch({ pickupAt: iso($any($event.target).value) })
                 "
               />
             </label>
@@ -371,8 +381,14 @@ export class WorkOrderQuick implements OnInit {
     return out;
   }
 
-  day = (iso: string | null) => dateInput(iso);
-  iso = (ymd: string) => dateIso(ymd);
+  /** "YYYY-MM-DDTHH:mm" i lokal tid för <input type="datetime-local">. */
+  local = (iso: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  iso = (local: string) => new Date(local).toISOString();
 
   patch(body: Partial<WorkOrderInput>) {
     const o = this.order();

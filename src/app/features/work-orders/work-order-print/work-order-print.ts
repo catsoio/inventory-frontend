@@ -56,8 +56,8 @@ import { Pricing } from '../../../core/pricing';
             <div><span class="text-gray-600">Telefon:</span> {{ o.phone || '–' }}</div>
           }
           <div><span class="text-gray-600">Mekaniker:</span> {{ o.resourceName || '–' }}</div>
-          <div><span class="text-gray-600">Start:</span> {{ day(o.receivedAt) }}</div>
-          <div><span class="text-gray-600">Klar senast:</span> {{ day(o.pickupAt) }}</div>
+          <div><span class="text-gray-600">Start:</span> {{ when(o.receivedAt) }}</div>
+          <div><span class="text-gray-600">Slut:</span> {{ when(o.pickupAt) }}</div>
           @if (pricing.value().showMileage) {
             <div>
               <span class="text-gray-600">Mätarställning:</span>
@@ -235,8 +235,11 @@ export class WorkOrderPrint implements OnInit {
     ];
   }
 
-  day(iso: string | null) {
-    return iso ? new Date(iso).toLocaleDateString('sv-SE') : '–';
+  /** Datum och klockslag: "2026-11-09 08:30". */
+  when(iso: string | null) {
+    if (!iso) return '–';
+    const d = new Date(iso);
+    return `${d.toLocaleDateString('sv-SE')} ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   print() {

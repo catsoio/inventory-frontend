@@ -6,14 +6,15 @@ import { BookingCalendar } from './booking-calendar/booking-calendar';
 import { BookingBoard } from './booking-board/booking-board';
 import { BookingList } from './booking-list/booking-list';
 import { BookingViews } from './booking-views/booking-views';
+import { BookingInbox } from './booking-inbox/booking-inbox';
 
 @NgModule({
-  declarations: [BookingCalendar, BookingBoard, BookingList, BookingViews],
+  declarations: [BookingCalendar, BookingBoard, BookingList, BookingViews, BookingInbox],
   imports: [
     SharedModule,
     CalendarComponent,
     RouterModule.forChild([
-      // Vyn (Resurser/Dag/Vecka/Månad) väljs i kalenderns verktygsfält via ?view=.
+      // Vyn (Dag/Vecka/Månad/Lista) väljs i kalenderns verktygsfält via ?view=.
       { path: '', title: 'Tidsbokning', component: BookingCalendar },
       // Gamla adressen: listan är nu en vy i kalendern (?view=list).
       { path: 'list', redirectTo: '', pathMatch: 'full' },

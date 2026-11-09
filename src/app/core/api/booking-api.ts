@@ -23,6 +23,11 @@ export class BookingApi {
     return this.http.patch<Booking>(`${this.base}/${id}`, body);
   }
 
+  /** Lägger en arbetsorder i kalendern (idempotent: har den en bokning får man den). */
+  fromWorkOrder(workOrderId: string): Observable<Booking> {
+    return this.http.post<Booking>(`${this.base}/from-work-order/${workOrderId}`, {});
+  }
+
   remove(id: string): Observable<unknown> {
     return this.http.delete(`${this.base}/${id}`);
   }

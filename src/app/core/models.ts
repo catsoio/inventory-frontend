@@ -793,6 +793,17 @@ export interface Booking {
   priceFrom: number | null;
   priceTo: number | null;
   notes: string | null;
+  /** Arbetsordern bokningen är planeringen för, om den har en. */
+  workOrder: BookingOrder | null;
+}
+
+/** Det kalendern behöver veta om bokningens arbetsorder. */
+export interface BookingOrder {
+  id: string;
+  /** AO-00042 */
+  code: string;
+  status: WorkOrderStatus;
+  hasMissing: boolean;
 }
 
 export interface BookingInput {
@@ -810,6 +821,8 @@ export interface BookingInput {
   priceFrom: number | null;
   priceTo: number | null;
   notes: string | null;
+  /** Arbetsordern bokningen planerar (tiden, mekanikern och platsen följer bokningen); null släpper den. */
+  workOrderId?: string | null;
 }
 
 // --- Kunder, bilar och verkstadens resurser ---

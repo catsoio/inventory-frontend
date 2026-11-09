@@ -33,7 +33,8 @@ import { Confirm } from '../../../shared/confirm';
 import { LinkResolver } from '../../../shared/customer-vehicle-picker/link-resolver';
 import { Subject, debounceTime, filter, switchMap } from 'rxjs';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
-import { dateInput, dateIso } from '../../storage/storage-format';
+import { linkWhen, nextHour, whenOrder, whenRange, whenValue } from '../../../shared/when/when';
+import { BookingApi } from '../../../core/api/booking-api';
 import { Auth } from '../../../core/auth/auth';
 import { Pricing } from '../../../core/pricing';
 import type { CalloutFix } from '../../../shared/callout/callout-fix';
@@ -244,60 +245,111 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
             ></textarea>
             <mat-hint>Skrivs ut på arbetsbladet till mekanikern.</mat-hint>
           </mat-form-field>
+          <div class="mt-3 grid gap-x-3 sm:grid-cols-3">
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Mätarställning (km)</mat-label>
+              <input matInput type="number" inputmode="numeric" min="0" formControlName="mileage" />
+              @if (pricing.value().requireMileage) {
+                <mat-hint>Krävs innan ordern blir klar</mat-hint>
+              }
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Er referens</mat-label>
+              <input matInput formControlName="yourReference" />
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Vår referens</mat-label>
+              <input matInput formControlName="ourReference" />
+            </mat-form-field>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">Referenserna syns bara på kostnadsförslaget.</p>
         </section>
 
-        <section class="grid gap-x-4 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-6">
-          <h2 class="text-base font-semibold sm:col-span-6">Arbetsblad (till mekanikern)</h2>
-          <p class="mb-2 text-xs text-gray-500 sm:col-span-6">
-            Internt. Er och vår referens syns bara på kostnadsförslaget.
-          </p>
-          <app-date-field
-            class="sm:col-span-3"
-            label="Start"
-            icon="event"
-            error="Ange datum"
-            formControlName="receivedAt"
-          />
-          <app-date-field
-            class="sm:col-span-3"
-            label="Klar senast"
-            icon="event_available"
-            [error]="form.errors?.['pickup'] ? 'Före startdatumet' : ''"
-            formControlName="pickupAt"
-          />
-          <mat-form-field class="sm:col-span-3">
-            <mat-label>Mekaniker</mat-label>
-            <mat-select formControlName="resourceId">
-              <mat-option value="">Ingen vald</mat-option>
-              @for (r of mechanics(); track r.id) {
-                <mat-option [value]="r.id">{{ r.name }}</mat-option>
+        <section class="flex flex-col gap-3 rounded-xl bg-white p-5 shadow-sm">
+          <div>
+            <h2 class="text-base font-semibold">Tid och plats</h2>
+            <p class="text-xs text-gray-500">
+              Samma tid som en bokning: start och slut med klockslag. Internt, skrivs ut på
+              arbetsbladet till mekanikern.
+            </p>
+          </div>
+          <app-when-fields [group]="form" />
+          <div class="grid gap-x-3 sm:grid-cols-2">
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Mekaniker</mat-label>
+              <mat-select formControlName="resourceId">
+                <mat-option value="">Ingen vald</mat-option>
+                @for (r of mechanics(); track r.id) {
+                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Lyft / plats</mat-label>
+              <mat-select formControlName="placeId">
+                <mat-option value="">Ingen vald</mat-option>
+                @for (r of places(); track r.id) {
+                  <mat-option [value]="r.id">{{ r.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </section>
+
+        <section class="flex flex-col gap-3 rounded-xl bg-white p-5 shadow-sm xl:col-span-2">
+          <div>
+            <h2 class="text-base font-semibold">Planering</h2>
+            <p class="text-xs text-gray-500">
+              Vad som redan är bokat den dagen. Klicka på en rad för att flytta starttiden dit.
+            </p>
+          </div>
+          @if (plan().range; as r) {
+            <app-day-plan
+              [day]="plan().day"
+              [start]="r.start"
+              [end]="r.end"
+              [resourceId]="plan().resourceId"
+              [placeId]="plan().placeId"
+              [excludeBookingId]="card()?.bookingId ?? null"
+              [refresh]="planVersion()"
+              (pick)="pickStart($event)"
+            />
+          }
+
+          @if (card()) {
+            <div class="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-3 text-sm">
+              @if (card()?.bookingId) {
+                <mat-icon class="text-teal-700">event_available</mat-icon>
+                <span>
+                  <b>Ligger i kalendern.</b> Ändrar du tid, mekaniker eller plats här följer
+                  bokningen med.
+                </span>
+                <span class="flex-1"></span>
+                <a
+                  mat-stroked-button
+                  [routerLink]="['/bookings']"
+                  [queryParams]="{ view: 'board', date: plan().day }"
+                  >Visa i kalendern</a
+                >
+              } @else {
+                <mat-icon class="text-gray-500">event_busy</mat-icon>
+                <span>
+                  <b>Inte i kalendern.</b> Lägg in ordern så syns den för mekanikern och på
+                  tidsbokningen.
+                </span>
+                <span class="flex-1"></span>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="busy() || locked() || form.dirty || card()?.status === 'done'"
+                  (click)="putInCalendar()"
+                >
+                  <mat-icon>event</mat-icon> Lägg i kalendern
+                </button>
               }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field class="sm:col-span-3">
-            <mat-label>Lyft / plats</mat-label>
-            <mat-select formControlName="placeId">
-              <mat-option value="">Ingen vald</mat-option>
-              @for (r of places(); track r.id) {
-                <mat-option [value]="r.id">{{ r.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Mätarställning (km)</mat-label>
-            <input matInput type="number" inputmode="numeric" min="0" formControlName="mileage" />
-            @if (pricing.value().requireMileage) {
-              <mat-hint>Krävs innan ordern blir klar</mat-hint>
-            }
-          </mat-form-field>
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Er referens</mat-label>
-            <input matInput formControlName="yourReference" />
-          </mat-form-field>
-          <mat-form-field class="sm:col-span-2">
-            <mat-label>Vår referens</mat-label>
-            <input matInput formControlName="ourReference" />
-          </mat-form-field>
+            </div>
+          }
         </section>
 
         <section class="rounded-xl bg-white p-5 shadow-sm xl:col-span-2">
@@ -838,6 +890,7 @@ export class WorkOrderCard implements OnInit {
   readonly pricing = inject(Pricing);
   private readonly api = inject(WorkOrderApi);
   private readonly salesApi = inject(SalesCardApi);
+  private readonly bookingApi = inject(BookingApi);
   private readonly quotes = inject(QuoteApi);
   private readonly links = inject(LinkResolver);
   private readonly workshop = inject(WorkshopApi);
@@ -924,8 +977,7 @@ export class WorkOrderCard implements OnInit {
       resourceId: [''],
       placeId: [''],
       status: ['open' as WorkOrderStatus],
-      receivedAt: [dateInput(new Date().toISOString()), Validators.required],
-      pickupAt: [''],
+      ...whenValue(nextHour(), new Date(nextHour().getTime() + 3600_000)),
       price: [null as number | null, Validators.min(0)],
       priceNote: [''],
       performed: [''],
@@ -938,18 +990,22 @@ export class WorkOrderCard implements OnInit {
       jobs: this.jobs,
       lines: this.lines,
     },
-    {
-      validators: (g) => {
-        const v = g.getRawValue() as {
-          receivedAt: string;
-          pickupAt: string;
-        };
-        const errors: Record<string, boolean> = {};
-        if (v.receivedAt && v.pickupAt && v.pickupAt < v.receivedAt) errors['pickup'] = true;
-        return Object.keys(errors).length ? errors : null;
-      },
-    },
+    { validators: whenOrder },
   );
+
+  /** Dagen, tiden och platsen som den ser ut i formuläret; räknas om när något ändras. */
+  readonly plan = computed(() => {
+    this.version();
+    const v = this.form.getRawValue();
+    return {
+      day: v.day,
+      range: whenRange(v),
+      resourceId: v.resourceId,
+      placeId: v.placeId,
+    };
+  });
+  /** Ökas när ordern sparats eller lästs in, så att dagsvyn läser om vad som är bokat. */
+  readonly planVersion = signal(0);
 
   /** Ett fast pris för hela ordern, öre, eller null. */
   readonly orderPrice = computed(() => {
@@ -1028,6 +1084,8 @@ export class WorkOrderCard implements OnInit {
   });
 
   constructor() {
+    const first = nextHour();
+    linkWhen(this.form, { start: first, end: new Date(first.getTime() + 3600_000) });
     this.form.valueChanges.subscribe(() => {
       this.version.update((n) => n + 1);
       if (this.form.dirty) this.edits++;
@@ -1537,6 +1595,7 @@ export class WorkOrderCard implements OnInit {
   private load() {
     this.api.get(this.id!).subscribe((o) => {
       this.card.set(o);
+      this.planVersion.update((n) => n + 1);
       this.incl.set(o.pricesIncludeVat ?? true);
       this.jobs.clear();
       for (const j of o.jobs ?? []) this.jobs.push(this.newJob(j));
@@ -1587,8 +1646,11 @@ export class WorkOrderCard implements OnInit {
         resourceId: o.resourceId ?? '',
         placeId: o.placeId ?? '',
         status: o.status,
-        receivedAt: dateInput(o.receivedAt),
-        pickupAt: dateInput(o.pickupAt),
+        ...whenValue(
+          new Date(o.receivedAt),
+          // En äldre order utan slut får en timme, så att den går att planera.
+          o.pickupAt ? new Date(o.pickupAt) : new Date(new Date(o.receivedAt).getTime() + 3600_000),
+        ),
         price: kr(o.price),
         priceNote: o.priceNote ?? '',
         performed: o.performed ?? '',
@@ -1640,8 +1702,8 @@ export class WorkOrderCard implements OnInit {
       resourceId: v.resourceId || null,
       placeId: v.placeId || null,
       status: v.status,
-      receivedAt: dateIso(v.receivedAt),
-      pickupAt: v.pickupAt ? dateIso(v.pickupAt) : null,
+      receivedAt: whenRange(v)!.start.toISOString(),
+      pickupAt: whenRange(v)!.end.toISOString(),
       price: ore(v.price),
       priceNote: v.priceNote || null,
       performed: v.performed || null,
@@ -1708,6 +1770,7 @@ export class WorkOrderCard implements OnInit {
           if (opts.silent) {
             // Formuläret byggs inte om under tiden man skriver; bara sammanfattningen läses in.
             this.card.set(o);
+            this.planVersion.update((n) => n + 1);
             if (this.edits === editsAtStart) this.form.markAsPristine();
             return;
           }
@@ -1721,6 +1784,30 @@ export class WorkOrderCard implements OnInit {
           this.saveState.set('idle');
         },
       });
+  }
+
+  /** Ett klick i dagsvyn: starttiden blir klockslaget (och slutet följer med, längden är kvar). */
+  pickStart(d: Date) {
+    if (this.locked()) return;
+    const f = this.form.controls;
+    f.startTime.setValue(
+      `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+    );
+    this.form.markAsDirty();
+  }
+
+  /** Lägger ordern i kalendern: en bokning med ordens kund, bil, tid, mekaniker och plats. */
+  putInCalendar() {
+    if (!this.id) return;
+    this.busy.set(true);
+    this.bookingApi.fromWorkOrder(this.id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.snack.open('Lagd i kalendern', undefined, { duration: 2500 });
+        this.load();
+      },
+      error: () => this.busy.set(false),
+    });
   }
 
   /** Öppnar kostnadsförslaget; en äldre order flyttar först sitt förslag till ett eget dokument. */

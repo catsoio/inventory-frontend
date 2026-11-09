@@ -17,6 +17,7 @@ import {
 import { KrPipe } from '../../../shared/kr-pipe';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { StockActionDialog } from '../stock-action-dialog/stock-action-dialog';
+import { printTyres } from '../../../shared/tyre-print';
 
 type Field = [label: string, value: string | number];
 
@@ -64,6 +65,9 @@ type Field = [label: string, value: string | number];
             <mat-icon>fact_check</mat-icon> Räkna om
           </button>
           <span class="mx-1 hidden h-6 border-l sm:block"></span>
+        }
+        @if (a.tyre) {
+          <button mat-button (click)="printLabel(a)"><mat-icon>print</mat-icon> Skriv ut etikett</button>
         }
         <a mat-button routerLink="edit"><mat-icon>edit</mat-icon> Ändra</a>
         @if (admin && a.active) {
@@ -176,6 +180,10 @@ export class ArticleDetail {
       this.a.set(x);
       this.pageTitle.page.set(x.label);
     });
+  }
+
+  printLabel(a: Article) {
+    printTyres([a], 'labels');
   }
 
   fill(a: Article) {

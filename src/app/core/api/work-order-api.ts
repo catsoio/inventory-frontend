@@ -36,6 +36,8 @@ export class WorkOrderApi {
       customerId?: string;
       vehicleId?: string;
       bookingId?: string;
+      /** Bara order som ingen bokning i kalendern planerar än. */
+      unbooked?: boolean;
       resourceId?: string;
       /** Order som ingen fått än. För mekaniker: dessa i stället för sina egna. */
       unassigned?: boolean;

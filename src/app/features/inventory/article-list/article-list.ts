@@ -30,6 +30,7 @@ import {
 import { KrPipe } from '../../../shared/kr-pipe';
 import { Settings } from '../../../core/settings';
 import { STOCK_TABS } from '../../../shared/section-tabs/tabs';
+import { TyrePrintLayout, printTyres } from '../../../shared/tyre-print';
 
 type Sel = Record<string, string | number | boolean | undefined>;
 type Status = '' | 'in' | 'low' | 'out';
@@ -160,6 +161,34 @@ const COLS: Col[] = [
   selector: 'app-article-list',
   standalone: false,
   host: { class: 'flex h-full flex-col' },
+  styles: `
+    /* Första kolumnen (nr) står kvar när tabellen rullas i sidled; lagernivån är en färgad kant. */
+    td:first-child,
+    th:first-child {
+      position: sticky;
+      left: 0;
+      background-color: inherit;
+    }
+    thead th:first-child {
+      z-index: 2;
+      background-color: #fff;
+    }
+    tbody td:first-child {
+      z-index: 1;
+      box-shadow:
+        inset 4px 0 0 var(--level, transparent),
+        1px 0 0 rgb(0 0 0 / 6%);
+    }
+    tr.lvl-out {
+      --level: #ef4444;
+    }
+    tr.lvl-low {
+      --level: #fbbf24;
+    }
+    tr.lvl-in {
+      --level: #22c55e;
+    }
+  `,
   template: `
     <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
     <div
@@ -211,6 +240,30 @@ const COLS: Col[] = [
           >
         }
       </button>
+      @if (printable().length) {
+        <button
+          class="max-md:!hidden"
+          mat-stroked-button
+          [matMenuTriggerFor]="printMenu"
+          title="Skriv ut däck på A4"
+        >
+          <mat-icon>print</mat-icon>
+          {{ pickedCount() ? 'Skriv ut valda (' + pickedCount() + ')' : 'Skriv ut däck' }}
+        </button>
+        <mat-menu #printMenu="matMenu">
+          <button mat-menu-item (click)="print('labels')">
+            <mat-icon>label</mat-icon> Etiketter, {{ printable().length }} st
+          </button>
+          <button mat-menu-item (click)="print('list')">
+            <mat-icon>list</mat-icon> Lista, {{ printable().length }} rader
+          </button>
+          @if (pickedCount()) {
+            <button mat-menu-item (click)="pickAll(false)">
+              <mat-icon>deselect</mat-icon> Rensa valda
+            </button>
+          }
+        </mat-menu>
+      }
       @if (view() === 'table') {
         <button
           class="max-md:!hidden"
@@ -420,12 +473,22 @@ const COLS: Col[] = [
                 class="sticky top-0 z-10 border-b border-gray-100 bg-white text-xs font-medium tracking-wide text-gray-500 uppercase"
               >
                 <tr>
-                  @for (c of visibleCols(); track c.key) {
+                  @for (c of visibleCols(); track c.key; let first = $first) {
                     <th
                       class="cursor-pointer px-3 py-2 whitespace-nowrap select-none hover:text-gray-900"
                       [class]="(c.right ? 'text-right ' : '') + (c.hide ?? '')"
                       (click)="sortBy(c.key)"
                     >
+                      @if (first && tyreRows().length) {
+                        <input
+                          type="checkbox"
+                          class="mr-3 align-middle"
+                          title="Välj alla däck i listan"
+                          [checked]="allPicked()"
+                          (click)="$event.stopPropagation()"
+                          (change)="pickAll($any($event.target).checked)"
+                        />
+                      }
                       {{ c.label }}{{ arrow(c.key) }}
                     </th>
                   }
@@ -451,8 +514,11 @@ const COLS: Col[] = [
               <tbody class="divide-y divide-gray-100">
                 @for (a of rows(); track a.id) {
                   <tr
-                    class="h-11 cursor-pointer hover:bg-brand-soft"
+                    class="h-11 cursor-pointer bg-white hover:bg-brand-soft"
                     [class.opacity-60]="!a.active"
+                    [class.lvl-out]="a.stockLevel === 'out'"
+                    [class.lvl-low]="a.stockLevel === 'low'"
+                    [class.lvl-in]="a.stockLevel === 'in_stock'"
                     (click)="open(a)"
                   >
                     @for (c of visibleCols(); track c.key; let first = $first) {
@@ -463,12 +529,18 @@ const COLS: Col[] = [
                           (c.hide ?? '') +
                           (c.key === 'quantity' ? ' font-semibold' : '')
                         "
-                        [class.border-l-4]="first"
-                        [class.border-red-500]="first && a.stockLevel === 'out'"
-                        [class.border-amber-400]="first && a.stockLevel === 'low'"
-                        [class.border-green-500]="first && a.stockLevel === 'in_stock'"
                       >
                         @if (first) {
+                          @if (a.tyre) {
+                            <input
+                              type="checkbox"
+                              class="mr-3 align-middle"
+                              title="Välj för utskrift"
+                              [checked]="picked().has(a.id)"
+                              (click)="$event.stopPropagation()"
+                              (change)="pick(a.id, $any($event.target).checked)"
+                            />
+                          }
                           <app-item-icon class="mr-3" [kind]="kind(a)" />
                         }
                         {{ c.fmt(a) }}
@@ -637,6 +709,18 @@ export class ArticleList implements OnInit {
     });
   });
 
+  /** Däck som visas i listan, och vilka av dem som är valda för utskrift. */
+  readonly tyreRows = computed(() => this.rows().filter((a) => a.tyre));
+  readonly picked = signal<Set<string>>(new Set());
+  readonly pickedCount = computed(() => this.tyreRows().filter((a) => this.picked().has(a.id)).length);
+  readonly allPicked = computed(
+    () => this.tyreRows().length > 0 && this.pickedCount() === this.tyreRows().length,
+  );
+  /** Utskriften är de valda däcken, eller alla däck i listan när inget är valt. */
+  readonly printable = computed(() =>
+    this.pickedCount() ? this.tyreRows().filter((a) => this.picked().has(a.id)) : this.tyreRows(),
+  );
+
   constructor() {
     afterNextRender(() => {
       // Dator: sökfältet är redo direkt. Mobil: bara när man kom för att söka (`?focus=1`, från Hem).
@@ -747,6 +831,23 @@ export class ArticleList implements OnInit {
   setView(v: 'table' | 'cards') {
     this.view.set(v);
     localStorage.setItem(VIEW_KEY, v);
+  }
+
+  pick(id: string, on: boolean) {
+    this.picked.update((p) => {
+      const n = new Set(p);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  }
+
+  pickAll(on: boolean) {
+    this.picked.set(on ? new Set(this.tyreRows().map((a) => a.id)) : new Set());
+  }
+
+  print(layout: TyrePrintLayout) {
+    printTyres(this.printable(), layout);
   }
 
   toggleCol(key: string) {

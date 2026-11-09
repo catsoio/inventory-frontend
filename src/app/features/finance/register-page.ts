@@ -107,12 +107,12 @@ const MEANS: Record<string, string> = { card: 'Kort', swish: 'Swish', cash: 'Kon
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
               <thead class="border-b text-xs text-gray-500 uppercase">
-                <tr><th class="py-2 pr-3">Nr</th><th class="pr-3">Typ</th><th class="pr-3">Tid</th><th class="pr-3 text-right">Belopp</th><th class="pr-3">Betalning</th><th></th></tr>
+                <tr><th class="sticky left-0 bg-white py-2 pr-3">Nr</th><th class="pr-3">Typ</th><th class="pr-3">Tid</th><th class="pr-3 text-right">Belopp</th><th class="pr-3">Betalning</th><th></th></tr>
               </thead>
               <tbody>
                 @for (e of entries(); track e.seq) {
                   <tr class="border-b border-gray-100">
-                    <td class="py-2 pr-3 tabular-nums">{{ e.code ?? e.seq }}</td>
+                    <td class="sticky left-0 bg-white py-2 pr-3 tabular-nums">{{ e.code ?? e.seq }}</td>
                     <td class="pr-3">{{ kind(e) }}@if (e.returnOf) { <span class="text-gray-500"> av {{ e.returnOf }}</span> }</td>
                     <td class="pr-3 whitespace-nowrap">{{ time(e.occurredAt) }}</td>
                     <td class="pr-3 text-right tabular-nums">
