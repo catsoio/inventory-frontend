@@ -1128,4 +1128,6 @@ export const EN: Record<string, string> = {
   'Startar': 'Starts',
   'Slutar': 'Ends',
   'Slut:': 'End:',
+  'Skriv ut etiketter': 'Print labels',
+  'Skriv ut etiketter på A4, tre per ark': 'Print labels on A4, three per sheet',
 };

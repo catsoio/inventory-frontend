@@ -19,6 +19,7 @@ import {
 } from '../../../core/models';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { KrPipe } from '../../../shared/kr-pipe';
+import { printStorageLabels } from '../../../shared/storage-print';
 import { StorageActionDialog } from '../storage-action-dialog/storage-action-dialog';
 import { contentsText, dateText } from '../storage-format';
 
@@ -253,77 +254,9 @@ export class StorageDetail {
       );
   }
 
-  /**
-   * Skriver ut etiketten i ett eget dolt dokument, så att resten av sidan inte
-   * påverkar utskriften (annars blir det en extra tom sida).
-   */
+  /** Etiketten på A4; ett ark rymmer tre, så fler skrivs ut från listan. */
   print() {
     const d = this.d();
-    if (!d) return;
-    const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-    const place = (d.location || '').split(' · ');
-    const spot = place.length > 1 ? place[place.length - 1] : (d.location ?? '');
-    const where = place.length > 1 ? place.slice(0, -1).join(' · ') : 'Plats';
-    const t = d.tyres;
-    const season = t ? SEASON_LABELS[t.season].toUpperCase() + (t.studded ? ' · DUBB' : '') : '';
-    const what = [
-      `${d.quantity} st ${STORAGE_CONTENTS_LABELS[d.contents].toLowerCase()}`,
-      t
-        ? [[t.brand, t.model].filter(Boolean).join(' '), t.sizeLabel].filter(Boolean).join(' ')
-        : '',
-      d.rims ? [d.rims.brand, RIM_MATERIAL_LABELS[d.rims.material]].filter(Boolean).join(' ') : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    const damaged = d.conditionGrade === 'damaged' || d.conditionGrade === 'worn';
-    const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><title>${esc(d.code)}</title>
-<style>
-  @page { size: A6 landscape; margin: 7mm; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; font-family: Roboto, Arial, sans-serif; color: #111; }
-  .label { height: 100%; display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 2.5mm; }
-  .top { display: flex; justify-content: space-between; align-items: center; }
-  .code { font-size: 15pt; font-weight: 700; color: #444; letter-spacing: 1px; }
-  .season { font-size: 13pt; font-weight: 700; border: 2px solid #111; border-radius: 4px; padding: 1px 8px; }
-  .plate { display: inline-flex; align-self: flex-start; border: 2px solid #111; border-radius: 6px; overflow: hidden; }
-  .plate i { background: #003399; width: 12mm; }
-  .plate b { font-size: 34pt; letter-spacing: 3px; padding: 0 12px; }
-  .who { display: flex; justify-content: space-between; align-items: baseline; }
-  .name { font-size: 16pt; font-weight: 700; }
-  .phone { font-size: 12pt; color: #444; }
-  .what { font-size: 12pt; color: #333; }
-  .spot { border-top: 2px solid #111; padding-top: 2mm; display: flex; align-items: baseline; gap: 4mm; }
-  .spot small { font-size: 10pt; color: #555; text-transform: uppercase; letter-spacing: 1px; }
-  .spot b { font-size: 34pt; line-height: 1; }
-  .foot { font-size: 10pt; color: #444; display: flex; justify-content: space-between; gap: 6mm; }
-  .warn { font-weight: 700; color: #111; border: 1.5px solid #111; border-radius: 3px; padding: 0 5px; }
-</style></head><body><div class="label">
-  <div class="top"><div class="code">${esc(d.code)}</div>${season ? `<div class="season">${esc(season)}</div>` : ''}</div>
-  <div class="plate"><i></i><b>${esc(d.vehicle.regNo)}</b></div>
-  <div>
-    <div class="who"><span class="name">${esc(d.customer.name)}</span><span class="phone">${esc(d.customer.phone || '')}</span></div>
-    <div class="what">${esc(what)}</div>
-  </div>
-  <div class="spot"><small>${esc(where)}</small><b>${esc(spot || 'Ej angiven')}</b></div>
-  <div class="foot">
-    <span>Inlämnad ${esc(dateText(d.depositedAt))}${d.expectedPickupAt ? ` · Hämtas ca ${esc(dateText(d.expectedPickupAt))}` : ''}</span>
-    ${damaged ? `<span class="warn">${esc(d.conditionGrade === 'damaged' ? 'SKADAT' : 'SLITET')}${d.condition ? ': ' + esc(d.condition) : ''}</span>` : ''}
-  </div>
-</div></body></html>`;
-
-    const frame = document.createElement('iframe');
-    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-    document.body.appendChild(frame);
-    const win = frame.contentWindow!;
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    win.onafterprint = () => frame.remove();
-    // Ge dokumentet en tick att lägga ut sig innan utskriften startar.
-    setTimeout(() => {
-      win.focus();
-      win.print();
-      setTimeout(() => frame.remove(), 60_000);
-    }, 100);
+    if (d) printStorageLabels([d]);
   }
 }

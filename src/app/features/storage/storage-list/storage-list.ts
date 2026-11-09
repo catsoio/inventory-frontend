@@ -21,6 +21,7 @@ import { Settings } from '../../../core/settings';
 import { DtCol } from '../../../shared/data-table/data-table';
 import type { ItemKind } from '../../../shared/item-icon/item-icon';
 import { KrPipe } from '../../../shared/kr-pipe';
+import { printStorageLabels } from '../../../shared/storage-print';
 import { HOTEL_TABS } from '../../../shared/section-tabs/tabs';
 import { contentsText, dateText } from '../storage-format';
 
@@ -109,6 +110,16 @@ type PaymentFilter = PaymentStatus | '';
       <span class="hidden flex-1 md:block"></span>
       <button mat-stroked-button type="button" class="max-md:!hidden" (click)="openRecall()">
         <mat-icon>sms</mat-icon> Kalla in
+      </button>
+      <button
+        mat-stroked-button
+        type="button"
+        class="max-md:!hidden"
+        [disabled]="!items().length"
+        title="Skriv ut etiketter på A4, tre per ark"
+        (click)="printLabels()"
+      >
+        <mat-icon>print</mat-icon> Skriv ut etiketter ({{ items().length }})
       </button>
       <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
         ><mat-icon>add</mat-icon> Ny inlämning</a
@@ -317,6 +328,12 @@ export class StorageList implements OnInit {
   readonly activeExtra = () =>
     (this.payment() ? 1 : 0) + (this.contentsFilter() ? 1 : 0) + (this.overdue() ? 1 : 0);
   readonly items = signal<StorageDeposit[]>([]);
+
+  /** Etiketter för det listan visar just nu, tre per A4. */
+  printLabels() {
+    printStorageLabels(this.items());
+  }
+
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly summary = signal<StorageSummary | null>(null);
