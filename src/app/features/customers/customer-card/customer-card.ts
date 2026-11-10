@@ -82,7 +82,7 @@ import { Auth } from '../../../core/auth/auth';
             <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
             <mat-hint>Valfritt för svenska företag</mat-hint>
           </mat-form-field>
-          <mat-form-field class="sm:col-span-2">
+          <mat-form-field class="mt-3 sm:col-span-2">
             <mat-label>Kontaktperson</mat-label>
             <input matInput formControlName="contactPerson" autocomplete="off" />
           </mat-form-field>
@@ -155,6 +155,18 @@ import { Auth } from '../../../core/auth/auth';
           <mat-hint>Förifylls på nya delar</mat-hint>
           <mat-error>0–100</mat-error>
         </mat-form-field>
+        <mat-form-field class="mt-3">
+          <mat-label>Betalningsvillkor (dagar)</mat-label>
+          <input matInput type="number" min="0" max="120" formControlName="paymentTermsDays" />
+          <mat-hint>Tomt = företagets villkor</mat-hint>
+          <mat-error>0–120 dagar</mat-error>
+        </mat-form-field>
+        <div class="mt-3 flex flex-col justify-center gap-1 pb-4">
+          <mat-slide-toggle formControlName="collectiveInvoice">Samlingsfaktura</mat-slide-toggle>
+          <span class="text-xs text-gray-600">
+            Klara arbetsorder lämnas ut med följesedel och faktureras en gång i månaden.
+          </span>
+        </div>
       </form>
 
       @if (card(); as c) {
@@ -297,6 +309,8 @@ export class CustomerCard implements OnInit {
     notes: [''],
     labourDiscount: [null as number | null, [Validators.min(0), Validators.max(100)]],
     partsDiscount: [null as number | null, [Validators.min(0), Validators.max(100)]],
+    paymentTermsDays: [null as number | null, [Validators.min(0), Validators.max(120)]],
+    collectiveInvoice: [false],
   });
 
   ngOnInit() {
@@ -335,6 +349,8 @@ export class CustomerCard implements OnInit {
         notes: c.notes ?? '',
         labourDiscount: c.labourDiscount ?? null,
         partsDiscount: c.partsDiscount ?? null,
+        paymentTermsDays: c.paymentTermsDays ?? null,
+        collectiveInvoice: c.collectiveInvoice ?? false,
       });
       if (this.focusField && /^\w+$/.test(this.focusField)) {
         // Fälten ritas först efter att kortet laddats; markören hamnar på det som saknas.
@@ -371,6 +387,12 @@ export class CustomerCard implements OnInit {
       notes: v.notes || null,
       labourDiscount: v.labourDiscount ? Number(v.labourDiscount) : null,
       partsDiscount: v.partsDiscount ? Number(v.partsDiscount) : null,
+      // 0 dagar är ett villkor (betalas direkt); tomt fält = företagets villkor.
+      paymentTermsDays:
+        v.paymentTermsDays == null || String(v.paymentTermsDays) === ''
+          ? null
+          : Math.round(Number(v.paymentTermsDays)),
+      collectiveInvoice: v.collectiveInvoice,
     };
     this.busy.set(true);
     const req = this.id ? this.api.updateCustomer(this.id, body) : this.api.createCustomer(body);

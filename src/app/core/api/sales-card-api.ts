@@ -10,6 +10,7 @@ import {
   SalesCardDetail,
   SalesCardInput,
   SalesCardItem,
+  UnbilledCustomer,
   WorkOrderInvoice,
 } from '../models';
 
@@ -72,6 +73,39 @@ export class SalesCardApi {
 
   get(id: string): Observable<SalesCardDetail> {
     return this.http.get<SalesCardDetail>(`${this.base}/${id}`);
+  }
+
+  /**
+   * Levererat ej fakturerat: klara arbetsorder som inget bokfört kort fakturerar, per kund, med
+   * belopp och utkastet de kanske redan ligger på. Äldst först.
+   */
+  toInvoice(customerId?: string): Observable<{ customers: UnbilledCustomer[] }> {
+    return this.http.get<{ customers: UnbilledCustomer[] }>(`${this.base}/to-invoice`, {
+      params: toParams({ customerId }),
+    });
+  }
+
+  /**
+   * Samlingsfakturering: ett utkast per kund med samlingsfaktura (eller per kund som anges) med de
+   * klara order som gjordes före `before` och inte ligger på något kort. Inget bokförs.
+   */
+  collective(body: {
+    before?: string;
+    customerIds?: string[];
+  }): Observable<{ cards: { id: string; code: string; customerName: string; orders: number }[] }> {
+    return this.http.post<{
+      cards: { id: string; code: string; customerName: string; orders: number }[];
+    }>(`${this.base}/collective`, body);
+  }
+
+  /** Lägger fler klara arbetsorder för kortets kund på utkastet (en samlingsfaktura). */
+  addWorkOrders(id: string, workOrderIds: string[]): Observable<SalesCardDetail> {
+    return this.http.post<SalesCardDetail>(`${this.base}/${id}/work-orders`, { workOrderIds });
+  }
+
+  /** Tar bort en arbetsorder med dess rader från utkastet; den väntar då på faktura igen. */
+  removeWorkOrder(id: string, workOrderId: string): Observable<SalesCardDetail> {
+    return this.http.delete<SalesCardDetail>(`${this.base}/${id}/work-orders/${workOrderId}`);
   }
 
   create(body: SalesCardInput): Observable<SalesCardDetail> {

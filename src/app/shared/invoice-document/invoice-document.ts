@@ -1,7 +1,13 @@
 import { appLocale } from '../../core/i18n/locale';
 import { Component, Input } from '@angular/core';
 import { differenceInCalendarDays } from 'date-fns';
-import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
+import {
+  InvoiceDocRow,
+  InvoiceDocSection,
+  InvoiceSeller,
+  WorkOrderInvoice,
+  paidWith,
+} from '../../core/models';
 
 /**
  * Fakturan eller kvittot som A4. Allt på sidan är det som frystes när dokumentet utfärdades
@@ -62,9 +68,17 @@ import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
           <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
             <dt class="text-gray-600">{{ inv.kind === 'invoice' ? 'Fakturadatum' : 'Datum' }}</dt>
             <dd class="tabular-nums">{{ day(inv.issuedAt) }}</dd>
-            @if (day(inv.supplyDate) !== day(inv.issuedAt)) {
+            @if (period(inv); as p) {
+              <!-- Samlingsfaktura: varje order har sitt datum i sitt block; här står perioden. -->
+              <dt class="text-gray-600">Period</dt>
+              <dd class="tabular-nums">{{ p }}</dd>
+            } @else if (day(inv.supplyDate) !== day(inv.issuedAt)) {
               <dt class="text-gray-600">Utfört</dt>
               <dd class="tabular-nums">{{ day(inv.supplyDate) }}</dd>
+            }
+            @if (inv.reference) {
+              <dt class="text-gray-600">Er referens</dt>
+              <dd>{{ inv.reference }}</dd>
             }
             @if (inv.kind === 'invoice' && inv.dueAt) {
               <dt class="text-gray-600">Förfallodatum</dt>
@@ -95,39 +109,78 @@ import { InvoiceSeller, WorkOrderInvoice, paidWith } from '../../core/models';
               </tr>
             </thead>
             <tbody>
-              @for (g of groups(inv); track $index) {
-                @if (g.section; as sec) {
-                  <tr>
-                    <td class="pt-3 pb-1 font-bold" [attr.colspan]="cols(inv)">{{ sec.title }}</td>
-                  </tr>
-                }
-                @for (r of g.rows; track $index) {
-                  <tr class="border-b border-gray-300 align-top">
-                    @if (hasCodes(inv)) {
-                      <td class="py-2 tabular-nums">{{ r.code }}</td>
-                    }
-                    <td class="py-2">{{ r.description }}</td>
-                    <td class="py-2 text-right tabular-nums">{{ r.quantity }}</td>
-                    @if (r.hidePrice) {
-                      <td colspan="4"></td>
-                    } @else {
-                      <td class="py-2 text-right tabular-nums">{{ r.unitPrice | kr }}</td>
-                      <td class="py-2 text-right tabular-nums">
-                        {{ r.discountPercent ? r.discountPercent + ' %' : '' }}
-                      </td>
-                      <td class="py-2 text-right tabular-nums">
-                        {{ r.vmb ? '' : r.vatRate + ' %' }}
-                      </td>
-                      <td class="py-2 text-right tabular-nums">{{ r.total | kr }}</td>
-                    }
-                  </tr>
-                }
-                @if (g.section; as sec) {
-                  <tr class="border-b border-gray-300">
-                    <td class="py-1 text-right text-gray-600" [attr.colspan]="cols(inv) - 1">
-                      {{ sec.fixed ? 'Fast pris' : 'Summa' }}
+              @for (b of blocks(inv); track $index) {
+                @if (b.order; as o) {
+                  <!-- En arbetsorder på en samlingsfaktura: bil, referens och dagen arbetet gjordes. -->
+                  <tr class="border-b border-[#4b5563] align-top">
+                    <td class="pt-5 pb-1" [attr.colspan]="cols(inv)">
+                      <span class="font-bold">{{ o.code }}</span>
+                      @if (o.regNo) {
+                        · <span class="font-bold">{{ o.regNo }}</span>
+                      }
+                      @if (o.vehicle) {
+                        {{ o.vehicle }}
+                      }
+                      · Utfört {{ day(o.date) }}
+                      @if (o.reference) {
+                        · Er referens: {{ o.reference }}
+                      }
+                      @if (o.performed) {
+                        <div class="whitespace-pre-line">{{ o.performed }}</div>
+                      }
                     </td>
-                    <td class="py-1 text-right font-bold tabular-nums">{{ sec.total | kr }}</td>
+                  </tr>
+                } @else if (b.other) {
+                  <tr>
+                    <td class="pt-5 pb-1 font-bold" [attr.colspan]="cols(inv)">Övrigt</td>
+                  </tr>
+                }
+                @for (g of b.groups; track $index) {
+                  @if (g.section; as sec) {
+                    <tr>
+                      <td class="pt-3 pb-1 font-bold" [attr.colspan]="cols(inv)">
+                        {{ sec.title }}
+                      </td>
+                    </tr>
+                  }
+                  @for (r of g.rows; track $index) {
+                    <tr class="border-b border-gray-300 align-top">
+                      @if (hasCodes(inv)) {
+                        <td class="py-2 tabular-nums">{{ r.code }}</td>
+                      }
+                      <td class="py-2">{{ r.description }}</td>
+                      <td class="py-2 text-right tabular-nums">{{ r.quantity }}</td>
+                      @if (r.hidePrice) {
+                        <td colspan="4"></td>
+                      } @else {
+                        <td class="py-2 text-right tabular-nums">{{ r.unitPrice | kr }}</td>
+                        <td class="py-2 text-right tabular-nums">
+                          {{ r.discountPercent ? r.discountPercent + ' %' : '' }}
+                        </td>
+                        <td class="py-2 text-right tabular-nums">
+                          {{ r.vmb ? '' : r.vatRate + ' %' }}
+                        </td>
+                        <td class="py-2 text-right tabular-nums">{{ r.total | kr }}</td>
+                      }
+                    </tr>
+                  }
+                  @if (g.section; as sec) {
+                    <tr class="border-b border-gray-300">
+                      <td class="py-1 text-right text-gray-600" [attr.colspan]="cols(inv) - 1">
+                        {{ sec.fixed ? 'Fast pris' : 'Summa' }}
+                      </td>
+                      <td class="py-1 text-right font-bold tabular-nums">{{ sec.total | kr }}</td>
+                    </tr>
+                  }
+                }
+                @if (b.order && b.groups.length > 1) {
+                  <tr class="border-b border-gray-300">
+                    <td class="py-1 text-right" [attr.colspan]="cols(inv) - 1">
+                      Summa {{ b.order.code }}
+                    </td>
+                    <td class="py-1 text-right font-bold tabular-nums">
+                      {{ b.order.total | kr }}
+                    </td>
                   </tr>
                 }
               }
@@ -349,10 +402,32 @@ export class InvoiceDocument {
     return this.hasCodes(inv) ? 7 : 6;
   }
 
-  /** Raderna under sina jobb (i jobbens ordning), sedan raderna utan jobb. */
-  groups(inv: WorkOrderInvoice) {
+  /**
+   * Dokumentets block. En vanlig faktura är ett block. En samlingsfaktura har ett block per
+   * arbetsorder (i orderns ordning) och sist "Övrigt" för rader som lagts till på kortet.
+   */
+  blocks(inv: WorkOrderInvoice) {
     const rows = inv.rows ?? [];
     const sections = inv.sections ?? [];
+    const orders = inv.orders ?? [];
+    if (!orders.length) return [{ order: null, other: false, groups: this.groups(rows, sections) }];
+    const ids = new Set(orders.map((o) => o.id));
+    const loose = (x: { orderId?: string | null }) => !x.orderId || !ids.has(x.orderId);
+    return [
+      ...orders.map((order) => ({
+        order,
+        other: false,
+        groups: this.groups(
+          rows.filter((r) => r.orderId === order.id),
+          sections.filter((x) => x.orderId === order.id),
+        ),
+      })),
+      { order: null, other: true, groups: this.groups(rows.filter(loose), sections.filter(loose)) },
+    ].filter((b) => b.order || b.groups.length);
+  }
+
+  /** Raderna under sina jobb (i jobbens ordning), sedan raderna utan jobb. */
+  groups(rows: InvoiceDocRow[], sections: InvoiceDocSection[]) {
     const ids = new Set(sections.map((x) => x.id));
     return [
       ...sections.map((section) => ({
@@ -361,6 +436,15 @@ export class InvoiceDocument {
       })),
       { section: null, rows: rows.filter((r) => !r.sectionId || !ids.has(r.sectionId)) },
     ].filter((g) => g.rows.length);
+  }
+
+  /** En samlingsfakturas period: första och sista dagen ett arbete utfördes. Null för andra dokument. */
+  period(inv: WorkOrderInvoice): string | null {
+    const dates = (inv.orders ?? []).map((o) => new Date(o.date).getTime());
+    if (!dates.length) return null;
+    const first = this.day(new Date(Math.min(...dates)).toISOString());
+    const last = this.day(new Date(Math.max(...dates)).toISOString());
+    return first === last ? first : `${first} – ${last}`;
   }
 
   /**

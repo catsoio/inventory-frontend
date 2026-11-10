@@ -73,7 +73,10 @@ export class SalesInvoicePage implements OnInit {
     const c = this.card();
     if (!c) return [];
     const m: [string, string][] = [['Säljkort', c.code]];
-    if (c.links.workOrder) m.push(['Arbetsorder', c.links.workOrder.code]);
+    const orders = c.orders ?? [];
+    // En samlingsfaktura visar varje order i sitt eget block.
+    if (orders.length > 1) m.push(['Arbetsorder', `${orders.length} st, se nedan`]);
+    else if (c.links.workOrder) m.push(['Arbetsorder', c.links.workOrder.code]);
     if (c.regNo) m.push(['Bil', `${c.regNo} ${c.vehicle ?? ''}`.trim()]);
     return m;
   }

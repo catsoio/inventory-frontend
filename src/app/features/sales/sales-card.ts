@@ -48,8 +48,10 @@ import {
   paymentOptions,
   SalesCardDetail,
   SalesCardInput,
+  SalesCardOrder,
   SalesLineType,
   SalesSection,
+  UnbilledOrder,
   SellerDetails,
   ServiceType,
   StorageDeposit,
@@ -58,6 +60,7 @@ import {
   VehicleClass,
 } from '../../core/models';
 import { Pricing } from '../../core/pricing';
+import { appLocale } from '../../core/i18n/locale';
 import { priceContextOf, priceOfService, today } from '../../core/service-pricing';
 import { KrPipe } from '../../shared/kr-pipe';
 import { HasUnsaved } from '../../core/unsaved-guard';
@@ -99,6 +102,23 @@ interface Row {
   vatRate: number;
   /** Mest man kan sälja av en artikel (lagersaldot). */
   maxQty?: number;
+  /** Arbetsordern raden kommer från; servern håller kopplingen, rader som läggs till här har ingen. */
+  workOrderId?: string | null;
+}
+
+/**
+ * En post i radtabellen: ett jobb med sina rader (som förut), eller på en samlingsfaktura en
+ * arbetsorders rubrik (`head`) och delsumma (`foot`), och rubriken Övrigt för rader utan order.
+ */
+interface DisplayGroup {
+  key: string;
+  section: SalesSection | null;
+  items: { r: Row; i: number }[];
+  head?: SalesCardOrder;
+  foot?: SalesCardOrder;
+  other?: boolean;
+  /** Hör till en arbetsorders block på en samlingsfaktura: ritas med orderns kantlinje. */
+  inOrder?: boolean;
 }
 
 let seq = 0;
@@ -527,7 +547,8 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
       } @else {
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-base font-semibold">Kund och bil</h2>
-          @if (readOnly()) {
+          <!-- Ett kort som fakturerar arbetsorder har orderns kund; den byts inte här. -->
+          @if (readOnly() || billsOrders()) {
             <div class="text-sm">
               @if (card()?.links?.customer; as cu) {
                 <a class="text-brand" [routerLink]="['/customers', cu.id]">{{ cu.name }}</a>
@@ -538,6 +559,9 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               @if (card()?.links?.vehicle; as v) {
                 · <a class="text-brand" [routerLink]="['/vehicles', v.id]">{{ v.regNo }}</a>
                 {{ v.label }}
+              }
+              @if (orders().length > 1) {
+                · Samlingsfaktura för {{ orders().length }} arbetsorder
               }
             </div>
           } @else {
@@ -609,6 +633,14 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               <button
                 mat-stroked-button
                 type="button"
+                [matMenuTriggerFor]="orderMenu"
+                (menuOpened)="loadOrders()"
+              >
+                <mat-icon>handyman</mat-icon> Arbetsorder
+              </button>
+              <button
+                mat-stroked-button
+                type="button"
                 [matMenuTriggerFor]="hotelMenu"
                 (menuOpened)="loadDeposits()"
               >
@@ -653,6 +685,20 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 <span class="px-4 py-2 text-sm text-gray-500">Inga bilar att sälja</span>
               }
             </mat-menu>
+            <mat-menu #orderMenu="matMenu">
+              @for (o of unbilled(); track o.id) {
+                <button mat-menu-item type="button" (click)="addOrder(o)">
+                  {{ o.code }} · {{ o.regNo }} · klar {{ dayOf(o.doneAt) }} · {{ o.total | kr }}
+                  @if (o.card) {
+                    <span class="ml-2 text-gray-500">(på {{ o.card.code }})</span>
+                  }
+                </button>
+              } @empty {
+                <span class="px-4 py-2 text-sm text-gray-500">
+                  {{ ordersHint() }}
+                </span>
+              }
+            </mat-menu>
             <mat-menu #hotelMenu="matMenu">
               @for (d of deposits(); track d.id) {
                 <button mat-menu-item type="button" (click)="addDeposit(d)">
@@ -683,11 +729,60 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                   @for (g of display(); track g.key) {
+                    @if (g.head; as o) {
+                      @if (!$first) {
+                        <tr aria-hidden="true">
+                          <td colspan="6" class="h-4 !border-0 p-0"></td>
+                        </tr>
+                      }
+                      <tr class="bg-teal-50">
+                        <td class="border-l-4 border-teal-700 py-3 pl-3" colspan="5">
+                          <a
+                            class="text-brand font-semibold"
+                            [routerLink]="['/workorders', o.id]"
+                            >{{ o.code }}</a
+                          >
+                          @if (o.regNo) {
+                            · <span class="font-semibold">{{ o.regNo }}</span>
+                          }
+                          <span class="text-gray-600">
+                            @if (o.vehicle) {
+                              {{ o.vehicle }}
+                            }
+                            · klar {{ dayOf(o.doneAt) }}
+                            @if (o.yourReference) {
+                              · Er ref: {{ o.yourReference }}
+                            }
+                          </span>
+                        </td>
+                        <td class="py-2 text-right">
+                          @if (!readOnly()) {
+                            <button
+                              mat-icon-button
+                              type="button"
+                              matTooltip="Ta bort ordern från kortet"
+                              [attr.aria-label]="'Ta bort ' + o.code + ' från kortet'"
+                              (click)="removeOrder(o)"
+                            >
+                              <mat-icon>link_off</mat-icon>
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                    @if (g.other) {
+                      <tr>
+                        <td class="pt-4 pb-1 pl-2 font-semibold" colspan="6">Övrigt</td>
+                      </tr>
+                    }
                     @for (it of g.items; track it.r.key) {
                       @let r = it.r;
                       @let i = it.i;
                       <tr class="align-top">
-                        <td class="py-2 pr-2">
+                        <td
+                          class="py-2 pr-2"
+                          [class]="g.inOrder ? 'border-l-4 border-teal-700/30 pl-3' : ''"
+                        >
                           @if (readOnly() || r.type === 'storage' || r.type === 'car') {
                             <div class="py-2">{{ r.description }}</div>
                           } @else {
@@ -770,7 +865,11 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                     }
                     @if (g.section; as sec) {
                       <tr class="bg-gray-50">
-                        <td class="py-2 pl-2 font-semibold" colspan="3">
+                        <td
+                          class="py-2 pl-2 font-semibold"
+                          [class]="g.inOrder ? 'border-l-4 border-teal-700/30 pl-3' : ''"
+                          colspan="3"
+                        >
                           Delsumma {{ sec.title }}
                         </td>
                         <td class="py-2 pr-2 text-right text-xs text-gray-500" colspan="1">
@@ -790,6 +889,20 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                         </td>
                         <td class="py-2 text-right font-semibold tabular-nums">
                           {{ sectionTotals()[sec.id] ?? 0 | kr }}
+                        </td>
+                        <td></td>
+                      </tr>
+                    }
+                    @if (g.foot; as o) {
+                      <tr class="border-b-2 border-teal-700/30">
+                        <td
+                          class="border-l-4 border-teal-700/30 py-2 pl-2 text-right text-gray-600"
+                          colspan="4"
+                        >
+                          Summa {{ o.code }}
+                        </td>
+                        <td class="py-2 text-right font-semibold tabular-nums">
+                          {{ orderTotals()[o.id] ?? 0 | kr }}
                         </td>
                         <td></td>
                       </tr>
@@ -1148,7 +1261,10 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 <mat-icon>directions_car</mat-icon> {{ v.regNo }}
               </a>
             }
-            @if (c.links.workOrder; as w) {
+            @for (
+              w of c.links.workOrders ?? (c.links.workOrder ? [c.links.workOrder] : []);
+              track w.id
+            ) {
               <a mat-stroked-button [routerLink]="['/workorders', w.id]">
                 <mat-icon>handyman</mat-icon> {{ w.code }}
               </a>
@@ -1299,7 +1415,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     const t = this.termsDays();
     return t != null && Number.isFinite(t) && t >= 0
       ? Math.min(Math.round(t), 365)
-      : this.defaultTerms();
+      : (this.customer()?.paymentTermsDays ?? this.defaultTerms());
   });
   readonly dueDate = computed(() => ymd(addDays(new Date(), this.terms())));
   readonly receiptMethod = signal<PaymentMethod>('card');
@@ -1373,6 +1489,9 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly serviceTypes = signal<ServiceType[]>([]);
   readonly deposits = signal<StorageDeposit[]>([]);
   readonly depositsHint = signal('Välj en kund först för att se kundens däckhotell.');
+  /** Kundens klara arbetsorder som inte är fakturerade och inte redan på kortet. */
+  readonly unbilled = signal<UnbilledOrder[]>([]);
+  readonly ordersHint = signal('Välj en kund först för att se kundens klara arbetsorder.');
 
   readonly readOnly = computed(() => this.card()?.status === 'posted');
   readonly title = computed(() => {
@@ -1396,23 +1515,70 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       .filter((x) => x.fixedPrice != null)
       .map((x) => ({ id: x.id, fixedPrice: x.fixedPrice })),
   );
-  /** Raderna under sina jobb, sedan raderna utan jobb; med radens index. */
-  readonly display = computed(() => {
+  /**
+   * Raderna under sina jobb, sedan raderna utan jobb; med radens index. På en samlingsfaktura (två
+   * arbetsorder eller fler) står varje orders jobb och rader under orderns rubrik med delsumma.
+   */
+  readonly display = computed<DisplayGroup[]>(() => {
     const items = this.rows().map((r, i) => ({ r, i }));
-    const ids = new Set(this.sections().map((x) => x.id));
-    return [
-      ...this.sections().map((section) => ({
-        key: section.id,
-        section,
-        items: items.filter((x) => x.r.sectionId === section.id),
-      })),
-      {
-        key: '_',
-        section: null,
-        items: items.filter((x) => !x.r.sectionId || !ids.has(x.r.sectionId)),
-      },
-    ].filter((g) => g.items.length || g.section);
+    const groupsOf = (its: typeof items, secs: SalesSection[], prefix = ''): DisplayGroup[] => {
+      const ids = new Set(secs.map((x) => x.id));
+      return [
+        ...secs.map((section) => ({
+          key: prefix + section.id,
+          section,
+          items: its.filter((x) => x.r.sectionId === section.id),
+        })),
+        {
+          key: prefix + '_',
+          section: null,
+          items: its.filter((x) => !x.r.sectionId || !ids.has(x.r.sectionId)),
+        },
+      ].filter((g) => g.items.length || g.section);
+    };
+    const orders = this.orders();
+    if (orders.length < 2) return groupsOf(items, this.sections());
+    const ids = new Set(orders.map((o) => o.id));
+    const loose = (x: { workOrderId?: string | null }) => !x.workOrderId || !ids.has(x.workOrderId);
+    const out: DisplayGroup[] = [];
+    for (const o of orders) {
+      const mine = groupsOf(
+        items.filter((x) => x.r.workOrderId === o.id),
+        this.sections().filter((x) => x.workOrderId === o.id),
+        `${o.id}-`,
+      );
+      out.push(
+        { key: `head-${o.id}`, section: null, items: [], head: o, inOrder: true },
+        ...mine.map((g) => ({ ...g, inOrder: true })),
+      );
+      // Med ett enda jobb är jobbets delsumma redan orderns.
+      if (mine.length > 1) {
+        out.push({ key: `foot-${o.id}`, section: null, items: [], foot: o, inOrder: true });
+      }
+    }
+    const rest = groupsOf(
+      items.filter((x) => loose(x.r)),
+      this.sections().filter(loose),
+      'rest-',
+    );
+    if (rest.length) out.push({ key: 'other', section: null, items: [], other: true }, ...rest);
+    return out;
   });
+  /** Arbetsorderna kortet fakturerar (servern håller listan). */
+  readonly orders = computed(() => this.card()?.orders ?? []);
+  /** Kortet fakturerar arbetsorder (även ett äldre kort som bara känner sin order till id). */
+  readonly billsOrders = computed(() => this.orders().length > 0 || !!this.card()?.links.workOrder);
+  /** Varje arbetsorders delsumma medan man skriver, före kortrabatt. */
+  readonly orderTotals = computed(() => {
+    const amounts = rowAmounts(this.priced(), null, this.groups());
+    const out: Record<string, number> = {};
+    this.rows().forEach((r, i) => {
+      if (r.workOrderId) out[r.workOrderId] = (out[r.workOrderId] ?? 0) + amounts[i];
+    });
+    return out;
+  });
+  readonly dayOf = (iso: string) =>
+    new Date(iso).toLocaleDateString(appLocale(), { day: 'numeric', month: 'short' });
   readonly sectionTotals = computed(() =>
     groupAmounts(this.priced(), rowAmounts(this.priced(), null, this.groups())),
   );
@@ -1661,6 +1827,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         price: l.unitPrice / 100,
         discountPercent: l.discountPercent,
         vatRate: l.vatRate,
+        workOrderId: l.workOrderId ?? null,
       })),
     );
     this.linkCtl.setValue(
@@ -1842,6 +2009,86 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         const list = p.items.filter((d) => d.customerId === customerId && !taken.has(d.id));
         this.deposits.set(list);
         this.depositsHint.set('Kunden har inga obetalda däckhotell att lägga till.');
+      });
+  }
+
+  /** Kundens klara arbetsorder som väntar på faktura (inte de som redan ligger på kortet). */
+  loadOrders() {
+    const customerId = this.link()?.customerId || this.card()?.customerId;
+    if (!customerId) {
+      this.unbilled.set([]);
+      this.ordersHint.set('Välj en kund först för att se kundens klara arbetsorder.');
+      return;
+    }
+    const mine = new Set(this.orders().map((o) => o.id));
+    const own = this.card()?.links.workOrder?.id;
+    this.api.toInvoice(customerId).subscribe((x) => {
+      this.unbilled.set(
+        (x.customers[0]?.orders ?? []).filter((o) => !mine.has(o.id) && o.id !== own),
+      );
+      this.ordersHint.set('Kunden har inga fler klara arbetsorder att fakturera.');
+    });
+  }
+
+  /**
+   * Lägger en klar arbetsorder på kortet med dess jobb och rader; med två eller fler blir kortet en
+   * samlingsfaktura. Osparade ändringar sparas först, eftersom servern bygger om kortet.
+   */
+  async addOrder(o: UnbilledOrder) {
+    if (!this.card()) {
+      // Ett nytt kort skapas med ordern direkt: att spara först byter sida innan ordern hunnit läggas till.
+      if (this.rows().length) {
+        this.snack.open('Spara kortet först, lägg sedan till arbetsordern.', 'OK', {
+          duration: 4000,
+        });
+        return;
+      }
+      this.busy.set(true);
+      try {
+        const made = await firstValueFrom(this.api.create({ workOrderId: o.id }));
+        // Kortet är sparat med ordern: att välja kund var det enda som ändrats, så ingen varning.
+        this.dirty.set(false);
+        await this.router.navigate(['/sales', made.id], { replaceUrl: true });
+      } finally {
+        this.busy.set(false);
+      }
+      return;
+    }
+    if (this.dirty() && !(await this.save())) return;
+    const c = this.card()!;
+    this.busy.set(true);
+    try {
+      this.apply(await firstValueFrom(this.api.addWorkOrders(c.id, [o.id])));
+      this.snack.open(
+        o.card ? `${o.code} flyttades hit från ${o.card.code}` : `${o.code} lades till`,
+        undefined,
+        { duration: 3000 },
+      );
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Tar bort en arbetsorder med dess rader från kortet; den väntar då på faktura igen. */
+  removeOrder(o: SalesCardOrder) {
+    const c = this.card();
+    if (!c) return;
+    this.confirm
+      .ask({
+        title: `Ta bort ${o.code} från kortet?`,
+        message:
+          'Orderns jobb och rader tas bort från säljkortet. Ordern finns kvar och väntar på faktura igen.',
+        confirmText: 'Ta bort från kortet',
+      })
+      .subscribe(async (ok) => {
+        if (!ok) return;
+        if (this.dirty() && !(await this.save())) return;
+        this.busy.set(true);
+        try {
+          this.apply(await firstValueFrom(this.api.removeWorkOrder(c.id, o.id)));
+        } finally {
+          this.busy.set(false);
+        }
       });
   }
 

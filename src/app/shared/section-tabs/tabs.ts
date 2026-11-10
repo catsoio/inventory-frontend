@@ -12,3 +12,9 @@ export const HOTEL_TABS: SectionTab[] = [
   { path: '/storage', label: 'Inlämningar', exact: true },
   { path: '/storage/overview', label: 'Översikt' },
 ];
+
+/** Försäljning (Axle): säljkorten och det som är klart men inte fakturerat (levererat ej fakturerat). */
+export const SALES_TABS: SectionTab[] = [
+  { path: '/sales', label: 'Säljkort', exact: true },
+  { path: '/sales/to-invoice', label: 'Att fakturera' },
+];

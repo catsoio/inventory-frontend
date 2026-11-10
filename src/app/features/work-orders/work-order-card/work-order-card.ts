@@ -163,8 +163,20 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
               "
               (click)="createSalesCard()"
             >
-              <mat-icon>receipt_long</mat-icon> Skapa säljkort
+              <mat-icon>receipt_long</mat-icon>
+              {{ collective() ? 'Fakturera nu' : 'Skapa säljkort' }}
             </button>
+          }
+          @if (c.status === 'done') {
+            <!-- Följesedeln: det som lämnas med bilen när den hämtas och betalas senare. -->
+            <a
+              mat-stroked-button
+              [routerLink]="['/workorders', c.id, 'delivery-note']"
+              [disabled]="form.dirty"
+              [matTooltip]="form.dirty ? 'Spara först' : 'Följesedel att lämna med bilen'"
+            >
+              <mat-icon>assignment_turned_in</mat-icon> Följesedel
+            </a>
           }
           <a
             mat-stroked-button
@@ -202,6 +214,13 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
       @if (card()?.hasMissing && card()!.status !== 'done') {
         <app-callout class="mb-4" [fixes]="missingFixes()">
           <b>Del saknas.</b> Någon rad måste beställas innan jobbet kan bli klart.
+        </app-callout>
+      }
+
+      @if (collective() && card()?.status === 'done' && !locked() && !salesCard()) {
+        <app-callout class="mb-4" tone="info" [fixes]="collectiveFixes()">
+          <b>Samlingsfaktura.</b> {{ card()!.customerName }} faktureras en gång i månaden. Lämna
+          följesedeln med bilen; ordern kommer med på nästa samlingsfaktura.
         </app-callout>
       }
 
@@ -262,7 +281,9 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
               <input matInput formControlName="ourReference" />
             </mat-form-field>
           </div>
-          <p class="mt-1 text-xs text-gray-500">Referenserna syns bara på kostnadsförslaget.</p>
+          <p class="mt-1 text-xs text-gray-500">
+            Referenserna skrivs ut på kostnadsförslaget, följesedeln och fakturan.
+          </p>
         </section>
 
         <section class="flex flex-col gap-3 rounded-xl bg-white p-5 shadow-sm">
@@ -954,6 +975,21 @@ export class WorkOrderCard implements OnInit {
     return fixes;
   });
   /** Över förslaget: öppna förslaget som kunden sa ja till. */
+  /** Kunden faktureras med samlingsfaktura en gång i månaden (kundkortet). */
+  readonly collective = computed(() => !!this.customer()?.collectiveInvoice);
+  readonly collectiveFixes = computed<CalloutFix[]>(() => {
+    const id = this.card()?.id;
+    return id
+      ? [
+          {
+            label: 'Följesedel',
+            icon: 'assignment_turned_in',
+            link: ['/workorders', id, 'delivery-note'],
+          },
+          { label: 'Att fakturera', icon: 'receipt_long', link: ['/sales', 'to-invoice'] },
+        ]
+      : [];
+  });
   readonly quoteFixes = computed<CalloutFix[]>(() => {
     const id = this.card()?.quoteId;
     return id ? [{ label: 'Öppna offerten', icon: 'request_quote', link: ['/quotes', id] }] : [];

@@ -212,3 +212,24 @@ describe('Att göra på Hem', () => {
     expect(by('unpaid-sets').params).toEqual({ status: '', paymentStatus: 'unpaid' });
   });
 });
+
+describe('att fakturera (levererat ej fakturerat)', () => {
+  it('gult "2 att fakturera" på Försäljning, och länken går till listan', () => {
+    const items = buildTodo(input({ toInvoice: { due: 2, late: 0, amount: 500000 } }));
+    const b = todoBadges(items);
+    expect(b['/sales']).toMatchObject({ text: '2 att fakturera', dot: 'bg-amber-500' });
+    expect(items.find((i) => i.key === 'to-invoice')?.link).toBe('/sales/to-invoice');
+  });
+
+  it('rött när en order borde ha fakturerats, och det väger tyngre än ett utkast', () => {
+    const b = todoBadges(
+      buildTodo(input({ drafts: 1, toInvoice: { due: 3, late: 1, amount: 0 } })),
+    );
+    expect(b['/sales']).toMatchObject({ text: '3 att fakturera', dot: 'bg-red-500' });
+    expect(b['/sales'].hint).toContain('1 säljkort väntar på att bokföras');
+  });
+
+  it('inget när allt som är klart antingen är fakturerat eller väntar på månadens samlingsfaktura', () => {
+    expect(todoBadges(buildTodo(input({ toInvoice: { due: 0, late: 0, amount: 0 } })))).toEqual({});
+  });
+});

@@ -3,6 +3,7 @@ import { catchError, of } from 'rxjs';
 import { kronor } from '../shared/chart/chart-kit';
 import { CarTodo, carTodo } from '../shared/car-stock';
 import { invoiceStatus } from '../shared/invoice-status';
+import { type ToInvoiceSummary, toInvoiceSummary } from '../shared/to-invoice';
 import { AxleApi } from './api/axle-api';
 import { BookingApi } from './api/booking-api';
 import { CarApi } from './api/car-api';
@@ -68,6 +69,8 @@ export interface TodoInput {
   hotel: StorageSummary | null;
   /** Säljkort som väntar på att bokföras (verkstadens, utan bil). */
   drafts: number;
+  /** Klara arbetsorder att fakturera (ingen faktura påbörjad), och hur många som är sena. */
+  toInvoice?: ToInvoiceSummary | null;
   /** Verkstadens obetalda fakturor. */
   invoices: UnpaidInvoices | null;
   /** Arbetsorder där en del saknas. */
@@ -296,6 +299,23 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       params: { status: 'approved' },
     });
   }
+  if (i.toInvoice && i.toInvoice.due > 0) {
+    const n = i.toInvoice.due;
+    const late = i.toInvoice.late;
+    out.push({
+      key: 'to-invoice',
+      product: 'axle',
+      urgency: late > 0 ? 'urgent' : 'wait',
+      menus: ['/sales'],
+      badgeCount: n,
+      badgeNoun: ['att fakturera', 'att fakturera'],
+      text: late
+        ? `${n} ${plural(n, 'klar arbetsorder', 'klara arbetsorder')} att fakturera, ${late} borde redan ha fakturerats`
+        : `${n} ${plural(n, 'klar arbetsorder', 'klara arbetsorder')} att fakturera`,
+      icon: 'receipt_long',
+      link: '/sales/to-invoice',
+    });
+  }
   if (i.drafts > 0) {
     out.push({
       key: 'drafts',
@@ -397,6 +417,7 @@ export class Todo {
   private readonly stock = signal<Summary | null>(null);
   private readonly hotel = signal<StorageSummary | null>(null);
   private readonly drafts = signal(0);
+  private readonly toInvoice = signal<ToInvoiceSummary | null>(null);
   private readonly partsOrders = signal(0);
   private readonly approved = signal(0);
   private readonly waiting = signal(0);
@@ -411,6 +432,7 @@ export class Todo {
       stock: this.stock(),
       hotel: this.hotel(),
       drafts: this.drafts(),
+      toInvoice: this.toInvoice(),
       invoices: this.invoices(),
       partsOrders: this.partsOrders(),
       quotes: { approved: this.approved(), waiting: this.waiting() },
@@ -482,6 +504,11 @@ export class Todo {
         .subscribe((x) => this.hallDrafts.set(x?.pagination.total ?? 0));
     }
     if (environment.workOrders) {
+      // Levererat ej fakturerat: klara order som ingen faktura är påbörjad för.
+      this.cards
+        .toInvoice()
+        .pipe(catchError(() => of(null)))
+        .subscribe((x) => this.toInvoice.set(x ? toInvoiceSummary(x.customers) : null));
       this.orders
         .list({ needsAction: true, limit: 1 })
         .pipe(catchError(() => of(null)))

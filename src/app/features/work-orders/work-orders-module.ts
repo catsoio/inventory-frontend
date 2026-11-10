@@ -7,6 +7,7 @@ import { WorkOrderQuick } from './work-order-quick/work-order-quick';
 import { WorkOrderMine } from './work-order-mine/work-order-mine';
 import { WorkOrderList } from './work-order-list/work-order-list';
 import { WorkOrderPrint } from './work-order-print/work-order-print';
+import { WorkOrderDeliveryNote } from './work-order-delivery-note/work-order-delivery-note';
 import { WorkOrderInvoicePage } from './work-order-invoice/work-order-invoice';
 import { WorkOrderQuote } from './work-order-quote/work-order-quote';
 
@@ -15,6 +16,7 @@ import { WorkOrderQuote } from './work-order-quote/work-order-quote';
     WorkOrderList,
     WorkOrderCard,
     WorkOrderPrint,
+    WorkOrderDeliveryNote,
     WorkOrderMine,
     WorkOrderQuick,
     WorkOrderInvoicePage,
@@ -38,6 +40,7 @@ import { WorkOrderQuote } from './work-order-quote/work-order-quote';
         canDeactivate: [unsavedGuard],
       },
       { path: ':id/print', title: 'Arbetsorder', component: WorkOrderPrint },
+      { path: ':id/delivery-note', title: 'Följesedel', component: WorkOrderDeliveryNote },
       { path: ':id/invoice', title: 'Faktura', component: WorkOrderInvoicePage },
       { path: ':id/quote', title: 'Kostnadsförslag', component: WorkOrderQuote },
     ]),

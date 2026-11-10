@@ -5,7 +5,16 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Observable, forkJoin, switchMap } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  forkJoin,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
 import { CatalogApi } from '../../../core/api/catalog-api';
 import { AxleApi } from '../../../core/api/axle-api';
 import { SupplierCatalogApi } from '../../../core/api/supplier-catalog-api';
@@ -91,14 +100,11 @@ const categoryOf = (t: ArticleType | undefined): Category =>
                 >
               }
             </div>
-            @if (!id) {
-              <app-catalog-picker class="mb-4 block" (picked)="fillFromCatalog($event)" />
-              @if (fromCatalog(); as from) {
-                <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
-                  Uppgifterna är hämtade från Gummigrossen ({{ from }}). Kontrollera
-                  försäljningspriset och skriv hur många du har hemma.
-                </p>
-              }
+            @if (!id && fromCatalog(); as from) {
+              <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+                Uppgifterna är hämtade ur däckkatalogen ({{ from }}). Kontrollera
+                försäljningspriset och skriv hur många du har hemma.
+              </p>
             }
             @if (types().length) {
               <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Artikeltyp">
@@ -134,17 +140,48 @@ const categoryOf = (t: ArticleType | undefined): Category =>
                     matInput
                     formControlName="model"
                     autocomplete="off"
+                    [matAutocomplete]="autoModel"
+                    [matAutocompleteDisabled]="!suggest()"
                     [placeholder]="
                       category() === 'tyre' ? 't.ex. Hakkapeliitta 10' : 't.ex. Dragkrok Mercedes'
                     "
                   />
+                  <mat-autocomplete #autoModel="matAutocomplete" class="!max-h-96">
+                    @for (h of suggestions(); track h.sourceId) {
+                      <mat-option
+                        class="!h-auto !min-h-14 !py-1"
+                        [value]="form.controls.model.value"
+                        (onSelectionChange)="$event.isUserInput && fillFromCatalog(h)"
+                      >
+                        <app-catalog-hit [hit]="h" />
+                      </mat-option>
+                    }
+                  </mat-autocomplete>
                   <mat-error>Krävs för {{ type()?.name }}</mat-error>
                 </mat-form-field>
               }
               @if (show('brand')) {
                 <mat-form-field>
                   <mat-label>Märke</mat-label>
-                  <input matInput formControlName="brand" list="brands" autocomplete="off" />
+                  <input
+                    matInput
+                    formControlName="brand"
+                    [attr.list]="suggest() ? null : 'brands'"
+                    autocomplete="off"
+                    [matAutocomplete]="autoBrand"
+                    [matAutocompleteDisabled]="!suggest()"
+                  />
+                  <mat-autocomplete #autoBrand="matAutocomplete" class="!max-h-96">
+                    @for (h of suggestions(); track h.sourceId) {
+                      <mat-option
+                        class="!h-auto !min-h-14 !py-1"
+                        [value]="form.controls.brand.value"
+                        (onSelectionChange)="$event.isUserInput && fillFromCatalog(h)"
+                      >
+                        <app-catalog-hit [hit]="h" />
+                      </mat-option>
+                    }
+                  </mat-autocomplete>
                   <datalist id="brands">
                     @for (b of brands(); track b) {
                       <option [value]="b"></option>
@@ -422,6 +459,8 @@ export class ArticleForm {
   private readonly supplierCatalog = inject(SupplierCatalogApi);
   /** Text om vad uppgifterna hämtades ur, när de kommer från grossistens katalog. */
   readonly fromCatalog = signal<string | null>(null);
+  /** Däck ur katalogen som passar det som skrivits hittills (storlek, säsong, märke, modell). */
+  readonly suggestions = signal<CatalogHit[]>([]);
   private readonly catalog = inject(CatalogApi);
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
@@ -516,6 +555,8 @@ export class ArticleForm {
   /** Den valda artikeltypen. */
   readonly type = computed(() => this.types().find((t) => t.id === this.typeId()));
   readonly category = computed(() => categoryOf(this.type()));
+  /** Förslag ur däckkatalogen visas för ett nytt däck. */
+  readonly suggest = computed(() => !this.id && this.category() === 'tyre');
   readonly ownWarehouses = computed(() => this.warehouses().filter((w) => w.kind === 'own'));
   /** Platserna i det valda lagret. */
   readonly places = computed(
@@ -552,6 +593,20 @@ export class ArticleForm {
   });
 
   constructor() {
+    // Fälten är själva sökningen: storlek, säsong, märke och modell smalnar av förslagen ur katalogen.
+    this.form.valueChanges
+      .pipe(
+        map(() => this.suggestionQuery()),
+        distinctUntilChanged(),
+        debounceTime(250),
+        switchMap((q) =>
+          q
+            ? this.supplierCatalog.search(q).pipe(catchError(() => of([] as CatalogHit[])))
+            : of([] as CatalogHit[]),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((hits) => this.suggestions.set(hits.slice(0, 30)));
     // Typen styr kortet: kategori (mått) och vilka fält som krävs.
     this.form.controls.typeId.valueChanges
       .pipe(takeUntilDestroyed())
@@ -670,7 +725,34 @@ export class ArticleForm {
     }
   }
 
-  /** Fyller kortet ur grossistens katalog: typ, märke, mönster, mått, säsong, dubb, EAN och pris. */
+  private suggestionQuery(): string {
+    if (!this.suggest()) return '';
+    const v = this.form.getRawValue();
+    const t = v.tyre;
+    const words = [v.brand, v.model]
+      .map((x) => (x ?? '').trim())
+      .filter(Boolean)
+      .join(' ');
+    // Det som är ifyllt av måttet räcker: bara bredd, bredd och profil, eller bara tum.
+    const size = [
+      t.width ? String(t.width) : '',
+      t.width && t.profile ? `/${t.profile}` : '',
+      t.rimDiameter ? ` R${t.rimDiameter}` : '',
+    ].join('');
+    if (size.trim()) {
+      const season = t.studded
+        ? 'dubb'
+        : t.season === 'winter'
+          ? 'vinter'
+          : t.season === 'summer'
+            ? 'sommar'
+            : 'helår';
+      return `${size} ${season} ${words}`.trim();
+    }
+    return words.length >= 3 ? words : '';
+  }
+
+  /** Fyller kortet ur däckkatalogen: typ, märke, mönster, mått, säsong, dubb, EAN och pris. */
   fillFromCatalog(hit: CatalogHit) {
     this.supplierCatalog.item(hit.sourceId).subscribe((it) => {
       const c = this.form.controls;
@@ -678,8 +760,10 @@ export class ArticleForm {
       if (type) this.selectType(type.id);
       const markup = this.settings.value().markupPercent;
       const costNet = it.costExVat;
-      const sell =
-        markup > 0
+      const priced = costNet > 0;
+      const sell = !priced
+        ? null
+        : markup > 0
           ? Math.round((costNet / 100) * (1 + markup / 100) * 1.25)
           : it.retailInclVat
             ? Math.round(it.retailInclVat / 100)
@@ -689,8 +773,7 @@ export class ArticleForm {
         model: it.model || it.title,
         sku: it.partNo ?? '',
         supplier: 'Gummigrossen',
-        cost: this.pricing.costIncl(costNet) / 100,
-        sellPrice: sell,
+        ...(priced ? { cost: this.pricing.costIncl(costNet) / 100, sellPrice: sell } : {}),
         ean: it.ean,
         externalIds: { [it.source]: it.sourceId } as Record<string, string>,
         ...(it.tyre
@@ -708,7 +791,7 @@ export class ArticleForm {
             }
           : {}),
       });
-      c.sellPrice.markAsDirty();
+      if (priced) c.sellPrice.markAsDirty();
       this.form.markAsDirty();
       this.fromCatalog.set(
         it.ean ? `EAN ${it.ean}` : it.partNo ? `artikelnr ${it.partNo}` : 'katalogen',

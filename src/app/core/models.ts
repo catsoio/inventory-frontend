@@ -858,6 +858,13 @@ export interface Customer {
   labourDiscount?: number | null;
   /** Kundrabatt i % på delar. */
   partsDiscount?: number | null;
+  /**
+   * Samlingsfaktura: klara arbetsorder lämnas ut med följesedel och faktureras tillsammans, en
+   * faktura i månaden, med bil, referens och datum för varje order.
+   */
+  collectiveInvoice?: boolean;
+  /** Kundens egna betalningsvillkor i dagar; null = företagets (Inställningar → Företaget). */
+  paymentTermsDays?: number | null;
   active: boolean;
 }
 
@@ -877,6 +884,8 @@ export type CustomerInput = Partial<
     | 'notes'
     | 'labourDiscount'
     | 'partsDiscount'
+    | 'collectiveInvoice'
+    | 'paymentTermsDays'
     | 'active'
   >
 >;
@@ -1345,6 +1354,8 @@ export interface WorkOrderInvoice {
   kind: InvoiceKind;
   issuedAt: string;
   supplyDate: string;
+  /** Er referens från arbetsordern dokumentet fakturerar (en samlingsfaktura har en per order). */
+  reference?: string | null;
   /** Förfallodatum. Bara en faktura har ett. */
   dueAt: string | null;
   seller: InvoiceSeller;
@@ -1357,6 +1368,11 @@ export interface WorkOrderInvoice {
   rows?: InvoiceDocRow[];
   /** Jobben raderna är grupperade under, med delsumma. */
   sections?: InvoiceDocSection[];
+  /**
+   * En samlingsfaktura (två arbetsorder eller fler): orderna den gäller, var och en som ett eget
+   * block med bil, referens och datum då arbetet utfördes (varje leverans ska dateras).
+   */
+  orders?: InvoiceDocOrder[];
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
   /** Satt när kvittot är registrerat i kassaregistret: dess nummer, kontrollkod och kassa. */
@@ -1389,12 +1405,32 @@ export interface InvoiceDocSection {
   total: number;
   /** Fast pris: raderna skrivs ut utan pris. */
   fixed: boolean;
+  /** Arbetsordern jobbet hör till, på en samlingsfaktura. */
+  orderId?: string | null;
+}
+
+/** En arbetsorder på en samlingsfaktura, så som den skrivs ut. */
+export interface InvoiceDocOrder {
+  id: string;
+  /** AO-00042. */
+  code: string;
+  regNo: string | null;
+  vehicle: string | null;
+  /** När arbetet utfördes: leveransens datum. */
+  date: string;
+  /** Er referens: den som lämnade bilen, eller kundens eget ordernummer. */
+  reference: string | null;
+  performed: string | null;
+  /** Orderns rader efter sina rabatter, före en rabatt på hela kortet (öre). */
+  total: number;
 }
 
 /** En rad på ett utfärdat dokument. Belopp i öre, i dokumentets prisläge (`totals.pricesIncludeVat`). */
 export interface InvoiceDocRow {
   code?: string | null;
   sectionId?: string | null;
+  /** Arbetsordern raden fakturerar, på en samlingsfaktura. */
+  orderId?: string | null;
   hidePrice?: boolean;
   description: string;
   quantity: number;
@@ -1553,6 +1589,8 @@ export interface WorkOrder {
   receivedAt: string;
   /** Klar senast / hämtas, ISO-tid. */
   pickupAt: string | null;
+  /** När ordern blev Klar (leveransens datum på fakturan); null medan den inte är klar. */
+  doneAt?: string | null;
   /** Ett överenskommet pris för hela ordern, öre i orderns prisläge. Syns aldrig på arbetsbladet. */
   price: number | null;
   priceNote: string | null;
@@ -1708,6 +1746,8 @@ export interface SalesLine {
   stockBooked: boolean;
   /** Vad raden kostar efter radens och kortets rabatt, öre i kortets prisläge. */
   amount: number;
+  /** Arbetsordern raden kommer från (servern håller den); rader som lagts till på kortet har ingen. */
+  workOrderId?: string | null;
 }
 
 /** En rubrik (jobb) på säljkortet. Med fast pris skrivs raderna ut utan pris. */
@@ -1715,6 +1755,52 @@ export interface SalesSection {
   id: string;
   title: string;
   fixedPrice: number | null;
+  /** Arbetsordern jobbet kommer från (servern håller den). */
+  workOrderId?: string | null;
+}
+
+/** En arbetsorder som säljkortet fakturerar, så som den var när den lades på kortet. */
+export interface SalesCardOrder {
+  id: string;
+  number: number;
+  /** AO-00042. */
+  code: string;
+  regNo: string | null;
+  vehicle: string | null;
+  /** När arbetet blev klart. */
+  doneAt: string;
+  yourReference: string | null;
+  performed: string | null;
+  /** Orderns delsumma på kortet (öre, före kortrabatt). */
+  total: number;
+}
+
+/** En klar arbetsorder som väntar på att faktureras (levererat ej fakturerat). */
+export interface UnbilledOrder {
+  id: string;
+  code: string;
+  regNo: string;
+  vehicle: string | null;
+  doneAt: string;
+  yourReference: string | null;
+  /** Vad kunden betalar för den, öre inkl. moms. */
+  total: number;
+  /** Ett utkast till säljkort den redan ligger på; null = ingen faktura påbörjad. */
+  card: { id: string; code: string } | null;
+}
+
+/** En kunds klara, ofakturerade arbetsorder. */
+export interface UnbilledCustomer {
+  customer: {
+    id: string;
+    code: string;
+    name: string;
+    type: CustomerType;
+    collectiveInvoice: boolean;
+    paymentTermsDays: number | null;
+  };
+  orders: UnbilledOrder[];
+  total: number;
 }
 
 export interface SalesDiscount {
@@ -1738,6 +1824,8 @@ export interface SalesCardItem {
   workOrderId: string | null;
   status: SalesCardStatus;
   lineCount: number;
+  /** Hur många arbetsorder kortet fakturerar; två eller fler = en samlingsfaktura. */
+  orderCount?: number;
   /** Att betala, öre inkl. moms. */
   total: number;
   /** Numret på det kortet bokfördes som: FAK-00042 för en faktura, KV-00042 för ett kvitto. */
@@ -1763,13 +1851,17 @@ export interface SalesCardItem {
 export interface SalesCardLinks {
   customer: { id: string; code: string; name: string; type: CustomerType } | null;
   vehicle: { id: string; regNo: string; label: string | null } | null;
-  workOrder: { id: string; code: string } | null;
+  workOrder: { id: string; code: string; regNo?: string | null } | null;
+  /** Alla arbetsorder kortet fakturerar. */
+  workOrders?: { id: string; code: string; regNo: string | null }[];
   deposits: { id: string; code: string; regNo: string }[];
 }
 
 export interface SalesCardDetail extends SalesCardItem {
   lines: SalesLine[];
   sections?: SalesSection[];
+  /** Arbetsorderna kortet fakturerar; två eller fler = en samlingsfaktura med ett block per order. */
+  orders?: SalesCardOrder[];
   sectionTotals?: Record<string, number>;
   pricesIncludeVat?: boolean;
   roundToKrona?: boolean;
@@ -1821,6 +1913,8 @@ export interface SalesCardInput {
   customerId?: string | null;
   vehicleId?: string | null;
   workOrderId?: string;
+  /** Flera klara arbetsorder för samma kund på ett kort: en samlingsfaktura. */
+  workOrderIds?: string[];
   lines?: SalesLineInput[];
   discount?: { type: 'percent' | 'amount'; value: number; reason?: string } | null;
   note?: string;
@@ -2522,6 +2616,8 @@ export interface CatalogItem {
 export interface CatalogHit extends CatalogItem {
   articleId: string | null;
   inStock: number | null;
+  /** Från Axles egen katalog: inget pris eller lager än, det hämtas när däcket väljs. */
+  fromCatalog?: boolean;
 }
 
 export interface CatalogOrder {

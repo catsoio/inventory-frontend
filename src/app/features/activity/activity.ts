@@ -43,6 +43,8 @@ const ACTION_LABELS: Record<string, string> = {
   unblock: 'avblockerade',
   password: 'bytte lösenord för',
   'from-booking': 'skapade från bokning',
+  collective: 'samlingsfakturerade',
+  'work-orders': 'ändrade arbetsorderna på',
 };
 
 @Component({

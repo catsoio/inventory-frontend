@@ -8,6 +8,7 @@ import { SalesCardPage } from './sales-card';
 import { SalesSendDialog } from './sales-send-dialog';
 import { SalesInvoicePage } from './sales-invoice';
 import { SalesList } from './sales-list';
+import { ToInvoicePage } from './to-invoice';
 
 @NgModule({
   declarations: [SalesCardPage, SalesInvoicePage, SalesSendDialog, ReaderPayment, ReturnDialog],
@@ -15,6 +16,7 @@ import { SalesList } from './sales-list';
     SharedModule,
     RouterModule.forChild([
       { path: '', component: SalesList },
+      { path: 'to-invoice', title: 'Att fakturera', component: ToInvoicePage },
       {
         path: 'new',
         title: 'Ny försäljning',

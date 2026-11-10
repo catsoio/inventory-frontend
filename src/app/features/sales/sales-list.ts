@@ -7,6 +7,7 @@ import { SalesCardItem } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
 import { STATUS_TEXT, STATUS_TONE, invoiceStatus } from '../../shared/invoice-status';
+import { SALES_TABS } from '../../shared/section-tabs/tabs';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
@@ -36,7 +37,12 @@ const COLS: DtCol<SalesCardItem>[] = [
     fmt: (c) => day(c.invoicedAt ?? c.createdAt),
   },
   { key: 'customer', label: 'Kund', value: (c) => c.customerName ?? 'Kontant' },
-  { key: 'regNo', label: 'Regnr', value: (c) => c.regNo ?? '' },
+  {
+    key: 'regNo',
+    label: 'Regnr',
+    // En samlingsfaktura har ingen enskild bil: den säger hur många arbetsorder den gäller.
+    value: (c) => c.regNo ?? ((c.orderCount ?? 0) > 1 ? `${c.orderCount} arbetsorder` : ''),
+  },
   { key: 'lines', label: 'Rader', right: true, value: (c) => c.lineCount },
   {
     key: 'total',
@@ -68,8 +74,12 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
   imports: [SharedModule],
   host: { class: 'flex h-full flex-col' },
   template: `
+    @if (!hall) {
+      <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Försäljning" />
+    }
     <app-list-page
-      [title]="hall ? 'Affärer' : 'Försäljning'"
+      class="min-h-0 flex-1"
+      [title]="hall ? 'Affärer' : ''"
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
@@ -107,6 +117,10 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
               <div class="truncate text-sm font-medium">{{ c.carLabel }}</div>
             } @else if (c.regNo) {
               <app-reg-plate class="mt-1" [value]="c.regNo" size="sm" />
+            } @else if ((c.orderCount ?? 0) > 1) {
+              <div class="text-sm text-gray-600">
+                Samlingsfaktura · {{ c.orderCount }} arbetsorder
+              </div>
             }
           </div>
           <div class="shrink-0 text-right">
@@ -133,6 +147,7 @@ export class SalesList {
   /** Bilhandelns affärer (`/dealership/deals`) eller verkstadens försäljning (`/sales`). */
   readonly hall = inject(ActivatedRoute).snapshot.data['product'] === 'hall';
   readonly cols = this.hall ? HALL_COLS : COLS;
+  readonly tabs = SALES_TABS;
   readonly empty = this.hall
     ? 'Inga affärer än. Öppna en bil och välj Starta affär.'
     : 'Inga säljkort än. Skapa ett med knappen, eller från en arbetsorder eller ett däckhotell.';

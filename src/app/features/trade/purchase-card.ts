@@ -169,10 +169,10 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   <div
                     class="bg-gray-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase"
                   >
-                    Hos Gummigrossen
+                    Däck i katalogen
                   </div>
                   @if (catalogLoading()) {
-                    <p class="px-4 py-3 text-sm text-gray-500">Söker hos grossisten…</p>
+                    <p class="px-4 py-3 text-sm text-gray-500">Söker däck…</p>
                   }
                   @for (h of catalogRest(); track h.sourceId) {
                     <button
