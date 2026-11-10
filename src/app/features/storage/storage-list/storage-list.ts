@@ -21,7 +21,12 @@ import { Settings } from '../../../core/settings';
 import { DtCol } from '../../../shared/data-table/data-table';
 import type { ItemKind } from '../../../shared/item-icon/item-icon';
 import { KrPipe } from '../../../shared/kr-pipe';
-import { printStorageLabels } from '../../../shared/storage-print';
+import {
+  LabelFormat,
+  labelFormat,
+  printStorageLabels,
+  setLabelFormat,
+} from '../../../shared/storage-print';
 import { HOTEL_TABS } from '../../../shared/section-tabs/tabs';
 import { contentsText, dateText } from '../storage-format';
 
@@ -116,11 +121,33 @@ type PaymentFilter = PaymentStatus | '';
         type="button"
         class="max-md:!hidden"
         [disabled]="!items().length"
-        title="Skriv ut etiketter på A4, tre per ark"
+        [title]="
+          format() === 'roll'
+            ? 'Skriv ut etiketter för rullskrivare, en per sida'
+            : 'Skriv ut etiketter på A4, tre per ark'
+        "
         (click)="printLabels()"
       >
         <mat-icon>print</mat-icon> Skriv ut etiketter ({{ items().length }})
       </button>
+      <button
+        mat-icon-button
+        type="button"
+        class="max-md:!hidden"
+        aria-label="Etikettformat"
+        title="Etikettformat"
+        [matMenuTriggerFor]="formatMenu"
+      >
+        <mat-icon>tune</mat-icon>
+      </button>
+      <mat-menu #formatMenu="matMenu">
+        <button mat-menu-item type="button" (click)="setFormat('a4')">
+          <mat-icon>{{ format() === 'a4' ? 'check' : '' }}</mat-icon> A4, tre per ark
+        </button>
+        <button mat-menu-item type="button" (click)="setFormat('roll')">
+          <mat-icon>{{ format() === 'roll' ? 'check' : '' }}</mat-icon> Rullskrivare, 100 × 50 mm
+        </button>
+      </mat-menu>
       <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
         ><mat-icon>add</mat-icon> Ny inlämning</a
       >
@@ -329,9 +356,17 @@ export class StorageList implements OnInit {
     (this.payment() ? 1 : 0) + (this.contentsFilter() ? 1 : 0) + (this.overdue() ? 1 : 0);
   readonly items = signal<StorageDeposit[]>([]);
 
-  /** Etiketter för det listan visar just nu, tre per A4. */
+  /** Etikettformatet som valts i den här webbläsaren. */
+  readonly format = signal<LabelFormat>(labelFormat());
+
+  setFormat(f: LabelFormat) {
+    setLabelFormat(f);
+    this.format.set(f);
+  }
+
+  /** Etiketter för det listan visar just nu, i det valda formatet. */
   printLabels() {
-    printStorageLabels(this.items());
+    void printStorageLabels(this.items(), this.format());
   }
 
   readonly total = signal(0);

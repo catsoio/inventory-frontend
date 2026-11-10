@@ -9,9 +9,17 @@ import { SalesSendDialog } from './sales-send-dialog';
 import { SalesInvoicePage } from './sales-invoice';
 import { SalesList } from './sales-list';
 import { ToInvoicePage } from './to-invoice';
+import { TyreFinderDialog } from './tyre-finder';
 
 @NgModule({
-  declarations: [SalesCardPage, SalesInvoicePage, SalesSendDialog, ReaderPayment, ReturnDialog],
+  declarations: [
+    SalesCardPage,
+    SalesInvoicePage,
+    SalesSendDialog,
+    ReaderPayment,
+    ReturnDialog,
+    TyreFinderDialog,
+  ],
   imports: [
     SharedModule,
     RouterModule.forChild([

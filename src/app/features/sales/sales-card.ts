@@ -8,6 +8,7 @@ import {
   OnInit,
   signal,
   untracked,
+  ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup } from '@angular/forms';
@@ -30,6 +31,7 @@ import { carEconomy } from '../../shared/car-economy';
 import { environment } from '../../../environments/environment';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { SalesSendDialog } from './sales-send-dialog';
+import { TyreFinderDialog } from './tyre-finder';
 import { Auth } from '../../core/auth/auth';
 import { StorageApi } from '../../core/api/storage-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
@@ -68,7 +70,11 @@ import { Confirm } from '../../shared/confirm';
 import { Gap, invoiceGap, sellerGap } from '../../shared/invoice-gap';
 import { openSettings } from '../settings/settings';
 import { dueNote } from '../../shared/invoice-status';
-import { type PickerValue } from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
+import {
+  CustomerVehiclePicker,
+  type PickerValue,
+} from '../../shared/customer-vehicle-picker/customer-vehicle-picker';
+import type { ItemKind } from '../../shared/item-icon/item-icon';
 import { LinkResolver } from '../../shared/customer-vehicle-picker/link-resolver';
 import {
   groupAmounts,
@@ -576,143 +582,153 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-3 text-base font-semibold">Rader</h2>
 
-          @if (!readOnly()) {
-            <div class="mb-3 flex flex-wrap items-center gap-2">
-              <div class="relative min-w-60 flex-1">
-                <mat-icon class="pointer-events-none absolute top-2.5 left-3 text-gray-400"
-                  >search</mat-icon
-                >
-                <input
-                  type="search"
-                  [formControl]="search"
-                  (keydown.enter)="addFirst()"
-                  placeholder="Lägg till artikel: storlek, märke, artikelnummer…"
-                  class="h-11 w-full pr-3 pl-11 field"
-                />
-                @if (results().length) {
-                  <div
-                    class="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-xl bg-white shadow-lg"
-                  >
-                    @for (a of results(); track a.id) {
-                      <button
-                        type="button"
-                        class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left last:border-b-0"
-                        (click)="addArticle(a)"
-                      >
-                        <span class="truncate">
-                          <span class="font-medium">{{ a.sizeLabel }}</span> · {{ a.brand }}
-                          {{ a.model }}
-                        </span>
-                        <span class="flex shrink-0 items-center gap-3 text-sm">
-                          <span class="text-gray-600">{{ a.quantity }} st</span>
-                          <span class="font-medium">{{ a.sellPrice | kr }}</span>
-                        </span>
-                      </button>
-                    }
-                  </div>
+          <mat-menu #addMenu="matMenu">
+            <button mat-menu-item type="button" [matMenuTriggerFor]="serviceMenu">
+              <mat-icon>build</mat-icon> Åtgärd
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              [matMenuTriggerFor]="orderMenu"
+              (menuOpened)="loadOrders()"
+            >
+              <mat-icon>handyman</mat-icon> Arbetsorder
+            </button>
+            <button mat-menu-item type="button" (click)="addLabour()">
+              <mat-icon>schedule</mat-icon> Arbete
+            </button>
+            <button mat-menu-item type="button" (click)="addFree()">
+              <mat-icon>edit_note</mat-icon> Fri rad
+            </button>
+          </mat-menu>
+          <mat-menu #serviceMenu="matMenu">
+            @for (s of serviceTypes(); track s.id) {
+              <button mat-menu-item type="button" (click)="addService(s)">
+                {{ s.name }}
+                @if (priceHint(s); as hint) {
+                  <span class="ml-2 text-gray-500">{{ hint }}</span>
                 }
-              </div>
-              <button mat-stroked-button type="button" [matMenuTriggerFor]="serviceMenu">
-                <mat-icon>build</mat-icon> Åtgärd
               </button>
-              @if (!vehicle()) {
-                <!-- Utan vald bil: välj fordon, så får åtgärderna sitt pris (punktering per däck, husvagn per hjul). -->
-                <select
-                  class="h-10 px-2 text-sm text-gray-700 field"
-                  aria-label="Fordon, för åtgärdernas pris"
-                  (change)="manualClass.set($any($event.target).value || null)"
-                >
-                  <option value="" [selected]="!manualClass()">Fordon: ej valt</option>
-                  @for (c of classOptions; track c.value) {
-                    <option [value]="c.value" [selected]="manualClass() === c.value">
-                      {{ c.label }}
-                    </option>
-                  }
-                </select>
-              }
-              <button
-                mat-stroked-button
-                type="button"
-                [matMenuTriggerFor]="orderMenu"
-                (menuOpened)="loadOrders()"
-              >
-                <mat-icon>handyman</mat-icon> Arbetsorder
+            } @empty {
+              <span class="px-4 py-2 text-sm text-gray-500">Inga åtgärder inlagda</span>
+            }
+          </mat-menu>
+          <mat-menu #orderMenu="matMenu">
+            @for (o of unbilled(); track o.id) {
+              <button mat-menu-item type="button" (click)="addOrder(o)">
+                {{ o.code }} · {{ o.regNo }} · klar {{ dayOf(o.doneAt) }} · {{ o.total | kr }}
+                @if (o.card) {
+                  <span class="ml-2 text-gray-500">(på {{ o.card.code }})</span>
+                }
               </button>
-              <button
-                mat-stroked-button
-                type="button"
-                [matMenuTriggerFor]="hotelMenu"
-                (menuOpened)="loadDeposits()"
-              >
-                <mat-icon>warehouse</mat-icon> Däckhotell
-              </button>
-              @if (cars.enabled()) {
-                <button
-                  mat-stroked-button
-                  type="button"
-                  [matMenuTriggerFor]="carMenu"
-                  (menuOpened)="loadCars()"
-                >
-                  <mat-icon>directions_car</mat-icon> Bil
-                </button>
-              }
-              <button mat-stroked-button type="button" (click)="addLabour()">
-                <mat-icon>schedule</mat-icon> Arbete
-              </button>
-              <button mat-stroked-button type="button" (click)="addFree()">
-                <mat-icon>add</mat-icon> Fri rad
-              </button>
-            </div>
-            <mat-menu #serviceMenu="matMenu">
-              @for (s of serviceTypes(); track s.id) {
-                <button mat-menu-item type="button" (click)="addService(s)">
-                  {{ s.name }}
-                  @if (priceHint(s); as hint) {
-                    <span class="ml-2 text-gray-500">{{ hint }}</span>
-                  }
-                </button>
-              } @empty {
-                <span class="px-4 py-2 text-sm text-gray-500">Inga åtgärder inlagda</span>
-              }
-            </mat-menu>
-            <mat-menu #carMenu="matMenu">
-              @for (c of carsForSale(); track c.id) {
-                <button mat-menu-item type="button" (click)="addCar(c)">
-                  {{ c.regNo }} · {{ c.heading }} ·
-                  {{ c.price == null ? 'Pris saknas' : (c.price | kr) }}
-                </button>
-              } @empty {
-                <span class="px-4 py-2 text-sm text-gray-500">Inga bilar att sälja</span>
-              }
-            </mat-menu>
-            <mat-menu #orderMenu="matMenu">
-              @for (o of unbilled(); track o.id) {
-                <button mat-menu-item type="button" (click)="addOrder(o)">
-                  {{ o.code }} · {{ o.regNo }} · klar {{ dayOf(o.doneAt) }} · {{ o.total | kr }}
-                  @if (o.card) {
-                    <span class="ml-2 text-gray-500">(på {{ o.card.code }})</span>
-                  }
-                </button>
-              } @empty {
-                <span class="px-4 py-2 text-sm text-gray-500">
-                  {{ ordersHint() }}
-                </span>
-              }
-            </mat-menu>
-            <mat-menu #hotelMenu="matMenu">
-              @for (d of deposits(); track d.id) {
-                <button mat-menu-item type="button" (click)="addDeposit(d)">
-                  {{ d.code }} · {{ d.vehicle.regNo }} · {{ d.fee | kr }}
-                </button>
-              } @empty {
-                <span class="px-4 py-2 text-sm text-gray-500">
-                  {{ depositsHint() }}
-                </span>
-              }
-            </mat-menu>
-          }
+            } @empty {
+              <span class="px-4 py-2 text-sm text-gray-500">
+                {{ ordersHint() }}
+              </span>
+            }
+          </mat-menu>
 
-          @if (rows().length) {
+          @if (cardsMode()) {
+            <!-- Som jobben på en arbetsorder: varje rad är ett eget kort med kant och rubrik. -->
+            @for (g of display(); track g.key) {
+              @for (it of g.items; track it.r.key) {
+                @let r = it.r;
+                @let i = it.i;
+                <div
+                  class="mb-3 overflow-hidden rounded-xl border border-l-4 border-gray-200 border-l-teal-700 bg-white"
+                >
+                  <div class="flex items-center justify-between bg-gray-50 px-4 py-2.5">
+                    <span class="text-xs font-semibold tracking-wide text-teal-800 uppercase"
+                      >Rad {{ i + 1 }}</span
+                    >
+                    <span class="text-sm">
+                      <span class="text-gray-500">Summa raden</span>
+                      <b class="ml-2 tabular-nums">{{ amounts()[i] | kr }}</b>
+                    </span>
+                  </div>
+                  <div
+                    class="grid items-end gap-3 p-4 md:grid-cols-[minmax(0,1fr)_6rem_8rem_6rem_2.5rem]"
+                  >
+                    @if (r.type === 'article') {
+                      <div class="flex items-center gap-3 self-center">
+                        <app-item-icon [kind]="itemKind(r)" />
+                        <div class="min-w-0">
+                          <div class="font-medium">{{ r.description }}</div>
+                          <div
+                            class="truncate text-xs"
+                            [class]="
+                              r.maxQty !== undefined && r.quantity > r.maxQty
+                                ? 'text-red-600'
+                                : 'text-gray-500'
+                            "
+                          >
+                            {{ rowSub(r) }}
+                          </div>
+                        </div>
+                      </div>
+                    } @else {
+                      <label class="flex flex-col gap-0.5 text-xs text-gray-500">
+                        Vad ska säljas
+                        <input
+                          class="h-11 px-3 text-base text-gray-900 field"
+                          placeholder="Vad ska säljas"
+                          [value]="r.description"
+                          (input)="edit(i, { description: $any($event.target).value })"
+                        />
+                      </label>
+                    }
+                    <label class="flex flex-col gap-0.5 text-xs text-gray-500">
+                      Antal
+                      <input
+                        type="number"
+                        min="0"
+                        [step]="r.type === 'article' ? 1 : 0.25"
+                        class="h-11 px-2 text-right text-gray-900 field"
+                        [value]="r.quantity"
+                        (focus)="$any($event.target).select()"
+                        (input)="edit(i, { quantity: $any($event.target).valueAsNumber })"
+                      />
+                    </label>
+                    <label class="flex flex-col gap-0.5 text-xs text-gray-500">
+                      À-pris (kr)
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        class="h-11 px-2 text-right text-gray-900 field"
+                        [value]="r.price || ''"
+                        (focus)="$any($event.target).select()"
+                        (input)="edit(i, { price: $any($event.target).valueAsNumber || 0 })"
+                      />
+                    </label>
+                    <label class="flex flex-col gap-0.5 text-xs text-gray-500">
+                      Rabatt %
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        class="h-11 px-2 text-right text-gray-900 field"
+                        [value]="r.discountPercent || ''"
+                        (focus)="$any($event.target).select()"
+                        (input)="
+                          edit(i, { discountPercent: $any($event.target).valueAsNumber || 0 })
+                        "
+                      />
+                    </label>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="justify-self-end"
+                      (click)="removeRow(i)"
+                      aria-label="Ta bort raden"
+                    >
+                      <mat-icon>delete_outline</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          } @else if (rows().length) {
             <div class="overflow-x-auto">
               <table class="w-full min-w-[640px] text-left text-sm">
                 <thead
@@ -783,7 +799,25 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                           class="py-2 pr-2"
                           [class]="g.inOrder ? 'border-l-4 border-teal-700/30 pl-3' : ''"
                         >
-                          @if (readOnly() || r.type === 'storage' || r.type === 'car') {
+                          @if (r.type === 'article') {
+                            <!-- Som på inköpskortet: ikon, namn och en rad med nummer och lagersaldo. -->
+                            <div class="flex items-center gap-3 py-1">
+                              <app-item-icon [kind]="itemKind(r)" />
+                              <div class="min-w-0">
+                                <div class="font-medium">{{ r.description }}</div>
+                                <div
+                                  class="truncate text-xs"
+                                  [class]="
+                                    r.maxQty !== undefined && r.quantity > r.maxQty
+                                      ? 'text-red-600'
+                                      : 'text-gray-500'
+                                  "
+                                >
+                                  {{ rowSub(r) }}
+                                </div>
+                              </div>
+                            </div>
+                          } @else if (readOnly() || r.type === 'storage' || r.type === 'car') {
                             <div class="py-2">{{ r.description }}</div>
                           } @else {
                             <input
@@ -791,11 +825,6 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                               [value]="r.description"
                               (input)="edit(i, { description: $any($event.target).value })"
                             />
-                          }
-                          @if (
-                            r.type === 'article' && r.maxQty !== undefined && r.quantity > r.maxQty
-                          ) {
-                            <div class="text-xs text-red-600">Bara {{ r.maxQty }} st i lager.</div>
                           }
                         </td>
                         <td class="py-2 pr-2 text-right">
@@ -912,10 +941,86 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               </table>
             </div>
           } @else {
-            <p class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-              Inga rader än. Sök en artikel ovan, eller lägg till en åtgärd, ett däckhotell eller en
-              fri rad.
-            </p>
+            <p class="mb-3 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">Inga rader än.</p>
+          }
+
+          @if (!readOnly()) {
+            @if (pickingArticle()) {
+              <!-- Artikelkortet: sökfältet står här tills en artikel är vald. -->
+              <div
+                class="mb-3 rounded-xl border border-l-4 border-gray-200 border-l-teal-700 bg-white"
+              >
+                <div class="flex items-center justify-between bg-gray-50 px-4 py-2.5">
+                  <span class="text-xs font-semibold tracking-wide text-teal-800 uppercase"
+                    >Artikel</span
+                  >
+                  <button
+                    mat-icon-button
+                    type="button"
+                    aria-label="Avbryt"
+                    (click)="pickingArticle.set(false)"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 p-4">
+                  <div class="relative min-w-60 flex-1">
+                    <mat-icon class="pointer-events-none absolute top-3 left-3 text-gray-400"
+                      >search</mat-icon
+                    >
+                    <input
+                      #articleSearch
+                      type="search"
+                      [formControl]="search"
+                      (keydown.enter)="addFirst()"
+                      placeholder="Storlek, märke eller artikelnummer…"
+                      class="h-12 w-full pr-3 pl-11 field"
+                    />
+                    @if (results().length) {
+                      <div
+                        class="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-xl bg-white shadow-lg"
+                      >
+                        @for (a of results(); track a.id) {
+                          <button
+                            type="button"
+                            class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left last:border-b-0"
+                            (click)="addArticle(a)"
+                          >
+                            <span class="truncate">
+                              <span class="font-medium">{{ a.sizeLabel }}</span> · {{ a.brand }}
+                              {{ a.model }}
+                            </span>
+                            <span class="flex shrink-0 items-center gap-3 text-sm">
+                              <span class="text-gray-600">{{ a.quantity }} st</span>
+                              <span class="font-medium">{{ a.sellPrice | kr }}</span>
+                            </span>
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <button mat-stroked-button type="button" (click)="openTyres()">
+                    <mat-icon>tire_repair</mat-icon> Däck till bilen
+                  </button>
+                </div>
+              </div>
+            }
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                class="text-brand hover:bg-brand-soft rounded-xl border border-dashed border-gray-300 py-4 font-medium"
+                (click)="startArticle()"
+              >
+                <mat-icon class="align-middle">inventory_2</mat-icon> Lägg till artikel
+              </button>
+              <button
+                type="button"
+                class="text-brand hover:bg-brand-soft rounded-xl border border-dashed border-gray-300 py-4 font-medium"
+                [matMenuTriggerFor]="addMenu"
+              >
+                <mat-icon class="align-middle">add</mat-icon> Lägg till ny rad
+              </button>
+            </div>
           }
         </section>
       }
@@ -1602,6 +1707,20 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         }),
   );
 
+  /** Artikelkortet med sökfältet visas när man valt Lägg till artikel. */
+  protected readonly pickingArticle = signal(false);
+
+  protected startArticle() {
+    this.pickingArticle.set(true);
+    setTimeout(() => document.querySelector<HTMLInputElement>('input[type=search]')?.focus(), 50);
+  }
+
+  /** Raderna visas som kort när kortet är öppet och inte har order, jobb eller grupper. */
+  protected readonly cardsMode = computed(
+    () =>
+      !this.readOnly() && this.display().every((g) => !g.head && !g.section && !g.foot && !g.other),
+  );
+
   constructor() {
     this.search.valueChanges
       .pipe(
@@ -1673,6 +1792,21 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       });
     }
     if (this.hall()) this.loadCars();
+    // Ett nytt kort startar med en tom rad att skriva i, som en ny arbetsorder startar med ett jobb.
+    const prefilled = ['articleId', 'carId', 'depositId', 'workOrderId'].some((k) => q.get(k));
+    if (!this.hall() && !prefilled) {
+      this.rows.set([
+        {
+          key: key(),
+          type: 'service',
+          description: '',
+          quantity: 1,
+          price: 0,
+          discountPercent: 0,
+          vatRate: STANDARD_VAT,
+        },
+      ]);
+    }
     this.dirty.set(false);
   }
 
@@ -1868,16 +2002,56 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     this.touch();
   }
 
-  addArticle(a: Article) {
+  /** Kund- och bilfältet högst upp, så att ett regnummer från Däck till bilen kan skrivas dit. */
+  @ViewChild(CustomerVehiclePicker) private picker?: CustomerVehiclePicker;
+
+  /**
+   * Däck till bilen: bilens storlekar ur registret, passande däck i lager och hos grossisten.
+   * Har kortet ingen bil skriver man regnumret i dialogen, och det hamnar då också i kortets
+   * regnummerfält.
+   */
+  openTyres() {
+    this.dialog.open(TyreFinderDialog, {
+      width: '920px',
+      maxWidth: '96vw',
+      data: {
+        vehicle: this.vehicle(),
+        add: (a: Article, quantity: number) => this.addArticle(a, quantity),
+        setVehicle: (regNo: string, existing: Vehicle | null) =>
+          this.setVehicleFromRegNo(regNo, existing),
+      },
+    });
+  }
+
+  /** En bil som finns i registret väljs på kortet (med sin kund); annars skrivs numret i fältet. */
+  private setVehicleFromRegNo(regNo: string, existing: Vehicle | null) {
+    if (this.vehicle()?.regNo === regNo) return;
+    this.picker?.fillRegNo(regNo, existing);
+  }
+
+  /** Ikonen på en artikelrad: däck om beskrivningen börjar med en dimension, annars övrigt. */
+  protected itemKind(r: Row): ItemKind {
+    return /\d{3}\s*\/\s*\d{2}/.test(r.description) ? 'tyre' : 'other';
+  }
+
+  /** Raden under namnet: artikelnummer och lagersaldo, eller varningen när det inte räcker. */
+  protected rowSub(r: Row): string {
+    if (r.maxQty !== undefined && r.quantity > r.maxQty) return `Bara ${r.maxQty} st i lager`;
+    return [r.code, r.maxQty !== undefined ? `${r.maxQty} st i lager` : '']
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  addArticle(a: Article, quantity = 1) {
     const i = this.rows().findIndex((r) => r.articleId === a.id);
     if (i >= 0) {
-      this.edit(i, { quantity: this.rows()[i].quantity + 1 });
+      this.edit(i, { quantity: this.rows()[i].quantity + quantity });
     } else {
       this.push({
         type: 'article',
         description: `${a.sizeLabel} ${a.brand ?? ''} ${a.model ?? ''}`.replace(/\s+/g, ' ').trim(),
         articleId: a.id,
-        quantity: 1,
+        quantity,
         code: a.sku,
         price: inMode(a.sellPrice, this.incl()) / 100,
         discountPercent: this.customer()?.partsDiscount ?? 0,
@@ -1887,6 +2061,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     }
     this.search.setValue('', { emitEvent: false });
     this.results.set([]);
+    this.pickingArticle.set(false);
   }
 
   addFirst() {
@@ -2112,20 +2287,23 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       vehicleId: resolved?.vehicleId || null,
       pricesIncludeVat: this.incl(),
       sections: this.sections(),
-      lines: this.rows().map((r) => ({
-        id: r.id,
-        type: r.type,
-        code: r.code || null,
-        sectionId: r.sectionId ?? null,
-        description: r.description || undefined,
-        articleId: r.articleId,
-        depositId: r.depositId,
-        carId: r.carId,
-        quantity: r.quantity,
-        unitPrice: ore(r.price),
-        discountPercent: r.discountPercent || 0,
-        vatRate: r.vatRate,
-      })),
+      // En tom fri rad (den som ett nytt kort startar med) sparas inte.
+      lines: this.rows()
+        .filter((r) => r.type !== 'service' || r.description.trim() || r.price)
+        .map((r) => ({
+          id: r.id,
+          type: r.type,
+          code: r.code || null,
+          sectionId: r.sectionId ?? null,
+          description: r.description || undefined,
+          articleId: r.articleId,
+          depositId: r.depositId,
+          carId: r.carId,
+          quantity: r.quantity,
+          unitPrice: ore(r.price),
+          discountPercent: r.discountPercent || 0,
+          vatRate: r.vatRate,
+        })),
       discount: this.discount()
         ? { ...this.discount()!, reason: this.discReason().trim() || undefined }
         : null,

@@ -254,9 +254,9 @@ export class StorageDetail {
       );
   }
 
-  /** Etiketten på A4; ett ark rymmer tre, så fler skrivs ut från listan. */
+  /** Etiketten i det format som valts (på listan): A4 eller rullskrivare. */
   print() {
     const d = this.d();
-    if (d) printStorageLabels([d]);
+    if (d) void printStorageLabels([d]);
   }
 }

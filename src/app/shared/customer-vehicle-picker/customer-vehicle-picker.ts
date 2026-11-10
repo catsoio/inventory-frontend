@@ -117,7 +117,9 @@ const filled = (min: number) => (c: AbstractControl) => {
 
       @if (withVehicle) {
         <mat-form-field>
-          <mat-label>{{ carOptional ? 'Registreringsnummer (valfritt)' : 'Registreringsnummer' }}</mat-label>
+          <mat-label>{{
+            carOptional ? 'Registreringsnummer (valfritt)' : 'Registreringsnummer'
+          }}</mat-label>
           <app-sv-flag matPrefix class="mr-2" />
           <input
             matInput
@@ -365,6 +367,16 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     this.setCustomer(value);
   }
 
+  /**
+   * Fyller i ett regnummer utifrån, t.ex. från Däck till bilen: en bil som finns i registret väljs
+   * (och dess kund hamnar i kundfältet), annars skrivs numret i fältet som om man skrivit det själv.
+   */
+  fillRegNo(regNo: string, existing: Vehicle | null) {
+    if (existing) return this.setVehicle(existing);
+    this.vehicle.setValue(regNo.trim().toUpperCase());
+    this.emit();
+  }
+
   pickVehicle(value: Vehicle) {
     this.setVehicle(value);
   }
@@ -411,7 +423,9 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
     const customerName = (typeof c === 'string' ? c.trim() : '') || phoneTyped;
     const regNo = typeof v === 'string' ? v.trim().toUpperCase() : '';
     const customerPhone =
-      phoneTyped || (!customer && isPhoneText(customerName) ? customerName : undefined) || undefined;
+      phoneTyped ||
+      (!customer && isPhoneText(customerName) ? customerName : undefined) ||
+      undefined;
     if (regNo.length >= 2 && (customer || customerName)) {
       return this.onChange({
         customerId: '',
