@@ -35,7 +35,7 @@ import {
           </div>
           <div class="text-right">
             <h1 class="text-3xl font-bold">
-              {{ inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }}
+              {{ inv.credit ? 'Kreditfaktura' : inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }}
             </h1>
             @if (inv.draft) {
               <div class="mt-1 inline-block border-2 border-[#4b5563] px-2 font-bold uppercase">
@@ -265,7 +265,9 @@ import {
         }
 
         <section class="mt-10 text-xs">
-          @if (inv.kind === 'invoice') {
+          @if (inv.credit) {
+            <p>Kreditfakturan upphäver {{ inv.credit.credits }} i sin helhet.</p>
+          } @else if (inv.kind === 'invoice') {
             @if (payTo(inv.seller)) {
               <p>
                 Betalning till
@@ -369,7 +371,7 @@ export class InvoiceDocument {
 
   /** Summaraden: en faktura ber om pengar, ett kvitto visar vad som betalats. */
   totalLabel(inv: WorkOrderInvoice) {
-    const label = inv.kind === 'invoice' ? 'Att betala' : 'Totalt';
+    const label = inv.credit ? 'Att krediteras' : inv.kind === 'invoice' ? 'Att betala' : 'Totalt';
     return inv.draft ? `${label} (utkast)` : label;
   }
 

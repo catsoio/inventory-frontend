@@ -1,3 +1,4 @@
+import { CreditDialog, type CreditResult } from './credit-dialog';
 import { ReturnDialog } from './return-dialog';
 import {
   Component,
@@ -166,7 +167,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
             </button>
           }
           @if (c.status === 'posted') {
-            @if (isOwner && !c.document?.register) {
+            @if (isOwner && !c.document?.register && !c.credit) {
               <button
                 mat-stroked-button
                 type="button"
@@ -188,6 +189,23 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               >
                 <mat-icon>undo</mat-icon> Retur
               </button>
+            }
+            @if (isOwner && !c.document?.register && !c.credit && !hasCar(c)) {
+              <button
+                mat-stroked-button
+                color="warn"
+                type="button"
+                [disabled]="busy()"
+                matTooltip="Utfärdar en kreditfaktura som upphäver hela dokumentet"
+                (click)="credit()"
+              >
+                <mat-icon>receipt_long</mat-icon> Kreditera
+              </button>
+            }
+            @if (c.credit) {
+              <a mat-stroked-button [routerLink]="['/sales', c.id, 'credit']">
+                <mat-icon>print</mat-icon> Kreditfaktura
+              </a>
             }
             <a mat-stroked-button [routerLink]="['/sales', c.id, 'invoice']">
               <mat-icon>print</mat-icon> Visa / skriv ut
@@ -1297,6 +1315,14 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                   Tillbakatagen med returkvitto {{ ret.receiptNumber }}: {{ ret.reason }}.
                 </p>
               }
+            } @else if (c.credit; as cr) {
+              <p class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                Krediterad med <b>{{ cr.code }}</b> {{ cr.issuedAt | date: 'yyyy-MM-dd' }}:
+                {{ cr.reason }}. {{ cr.restocked ? 'Delarna är tillbaka i lagret.' : '' }}
+                @if (inv.paidAt) {
+                  Fakturan var markerad betald: betala tillbaka kunden själv.
+                }
+              </p>
             } @else {
               @if (inv.dueAt) {
                 <p class="mb-3 text-sm text-gray-600">
@@ -2434,6 +2460,10 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       });
   }
 
+  hasCar(c: SalesCardDetail) {
+    return c.lines.some((l) => l.type === 'car');
+  }
+
   /** Skälet till att kortet inte kan återöppnas just nu, annars tomt. */
   reopenBlocked(c: SalesCardDetail) {
     if (c.sends?.length) {
@@ -2459,7 +2489,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
           `Kortet blir ett utkast igen${receipt ? ' och betalningen på kvittot tas bort' : ''}. ` +
           `Delar som lämnade lagret läggs tillbaka, och numret ${c.documentCode} sparas så att det ` +
           `används igen när du bokför som ${receipt ? 'kvitto' : 'faktura'}. Har dokumentet redan ` +
-          'gått till kunden ska det i stället krediteras (kreditfaktura finns inte än).',
+          'gått till kunden ska det i stället krediteras.',
         confirmText: 'Återöppna',
         danger: true,
       })
@@ -2471,6 +2501,38 @@ export class SalesCardPage implements OnInit, HasUnsaved {
             this.busy.set(false);
             this.apply(r);
             this.snack.open('Kortet är återöppnat', 'OK', { duration: 4000 });
+          },
+          error: () => {
+            this.busy.set(false);
+            this.load(c.id);
+          },
+        });
+      });
+  }
+
+  /** Krediterar hela fakturan eller kvittot: originalet står kvar, en kreditfaktura upphäver det. */
+  credit() {
+    const c = this.card();
+    if (!c?.document) return;
+    this.dialog
+      .open(CreditDialog, {
+        data: {
+          code: c.documentCode,
+          total: c.totals.total,
+          paid: !!c.document.paidAt && c.document.kind === 'invoice',
+          hasParts: c.lines.some((l) => l.stockBooked),
+        },
+        width: '440px',
+      })
+      .afterClosed()
+      .subscribe((res?: CreditResult) => {
+        if (!res) return;
+        this.busy.set(true);
+        this.api.credit(c.id, res.reason, res.restock).subscribe({
+          next: (r) => {
+            this.busy.set(false);
+            this.apply(r);
+            this.snack.open(`Krediterad med ${r.credit?.code}`, 'OK', { duration: 4000 });
           },
           error: () => {
             this.busy.set(false);

@@ -1348,6 +1348,8 @@ export interface InvoiceBuyer {
 export interface WorkOrderInvoice {
   /** FAK-00042. Null på ett utkast som inte är bokfört. */
   code: string | null;
+  /** Satt på en kreditfaktura (KRE-…): vilket dokument den upphäver. Alla belopp är negativa. */
+  credit?: { credits: string; reason: string };
   number?: number;
   /** Sant för förhandsvisningen: inget nummer, inget sparat, ordern går att ändra. */
   draft?: boolean;
@@ -1838,6 +1840,9 @@ export interface SalesCardItem {
   dueAt: string | null;
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+  /** Kreditfakturans nummer (KRE-…) och datum när dokumentet har krediterats. */
+  creditCode?: string | null;
+  creditedAt?: string | null;
   kind: InvoiceKind | null;
   /** Bilhandelns (Hall) om kortet har en bilrad, annars verkstadens (Axle). */
   product: 'axle' | 'hall';
@@ -1884,6 +1889,17 @@ export interface SalesCardDetail extends SalesCardItem {
     receiptNumber: number;
     reason: string;
     total: number;
+  } | null;
+  /** Satt när hela fakturan eller kvittot har krediterats: kreditfakturan, med minusbelopp. */
+  credit?: {
+    code: string;
+    number: number;
+    issuedAt: string;
+    reason: string;
+    /** FAK-… eller KV-… som kreditfakturan upphäver. */
+    creditsCode: string;
+    restocked: boolean;
+    document: WorkOrderInvoice;
   } | null;
   /** Vid retur: hur återbetalningen av en kortbetalning gick. */
   refunds?: { paymentId: string; status: 'done' | 'failed'; error?: string }[];

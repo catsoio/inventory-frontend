@@ -22,7 +22,7 @@ const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
 
 /** Det som kräver något av ägaren först: förfallet, sedan obetalt, sist betalt. */
-const STATUS_ORDER: Record<InvoiceStatus, number> = { overdue: 0, open: 1, paid: 2 };
+const STATUS_ORDER: Record<InvoiceStatus, number> = { overdue: 0, open: 1, paid: 2, credited: 3 };
 
 const COLS: DtCol<InvoiceItem>[] = [
   { key: 'code', label: 'Nr', value: (o) => o.code },
@@ -245,7 +245,7 @@ export class InvoiceList {
       return (
         (s === 'all' ||
           (s === 'paid' && st === 'paid') ||
-          (s === 'unpaid' && st !== 'paid') ||
+          (s === 'unpaid' && st !== 'paid' && st !== 'credited') ||
           (s === 'overdue' && st === 'overdue')) &&
         (!q || `${o.code} ${o.customerName} ${o.regNo} ${o.ref}`.toLowerCase().includes(q))
       );

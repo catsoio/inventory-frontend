@@ -39,7 +39,7 @@ export class SalesCardHistory implements OnChanges {
   private state(c: SalesCardItem) {
     return c.status === 'draft'
       ? null
-      : invoiceStatus({ kind: c.kind ?? 'receipt', dueAt: c.dueAt, paidAt: c.paidAt });
+      : invoiceStatus({ kind: c.kind ?? 'receipt', dueAt: c.dueAt, paidAt: c.paidAt, creditedAt: c.creditedAt });
   }
   text(c: SalesCardItem) {
     const s = this.state(c);

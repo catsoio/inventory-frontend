@@ -3,6 +3,7 @@ import { RouterModule } from '@angular/router';
 import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
 import { ReaderPayment } from './reader-payment';
+import { CreditDialog } from './credit-dialog';
 import { ReturnDialog } from './return-dialog';
 import { SalesCardPage } from './sales-card';
 import { SalesSendDialog } from './sales-send-dialog';
@@ -18,6 +19,7 @@ import { TyreFinderDialog } from './tyre-finder';
     SalesSendDialog,
     ReaderPayment,
     ReturnDialog,
+    CreditDialog,
     TyreFinderDialog,
   ],
   imports: [
@@ -32,6 +34,12 @@ import { TyreFinderDialog } from './tyre-finder';
         canDeactivate: [unsavedGuard],
       },
       { path: ':id/invoice', title: 'Faktura', component: SalesInvoicePage },
+      {
+        path: ':id/credit',
+        title: 'Kreditfaktura',
+        component: SalesInvoicePage,
+        data: { credit: true },
+      },
       { path: ':id', title: 'Säljkort', component: SalesCardPage, canDeactivate: [unsavedGuard] },
     ]),
   ],

@@ -41,6 +41,15 @@ export class SalesInvoicePage implements OnInit {
   ngOnInit() {
     this.api.get(this.id).subscribe((c) => {
       this.card.set(c);
+      if (this.route.snapshot.data['credit']) {
+        const cr = c.credit;
+        if (!cr) return this.error.set('Dokumentet är inte krediterat.');
+        return this.show({
+          ...cr.document,
+          code: cr.code,
+          credit: { credits: cr.creditsCode, reason: cr.reason },
+        });
+      }
       if (c.document) return this.show(c.document);
       this.api.preview(this.id, this.choice()).subscribe({
         next: (d) => this.show(d),
@@ -52,7 +61,7 @@ export class SalesInvoicePage implements OnInit {
   private show(d: WorkOrderInvoice) {
     this.document.set(d);
     this.pageTitle.page.set(
-      `${d.kind === 'invoice' ? 'Faktura' : 'Kvitto'} ${d.code ?? '(utkast)'}`,
+      `${d.credit ? 'Kreditfaktura' : d.kind === 'invoice' ? 'Faktura' : 'Kvitto'} ${d.code ?? '(utkast)'}`,
     );
   }
 
@@ -73,6 +82,7 @@ export class SalesInvoicePage implements OnInit {
     const c = this.card();
     if (!c) return [];
     const m: [string, string][] = [['Säljkort', c.code]];
+    if (c.credit) m.push(['Avser', c.credit.creditsCode], ['Orsak', c.credit.reason]);
     const orders = c.orders ?? [];
     // En samlingsfaktura visar varje order i sitt eget block.
     if (orders.length > 1) m.push(['Arbetsorder', `${orders.length} st, se nedan`]);

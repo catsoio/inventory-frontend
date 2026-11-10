@@ -22,6 +22,8 @@ export interface InvoiceItem {
   /** Förfallodatum. Bara en faktura har ett. */
   dueAt: string | null;
   paidAt: string | null;
+  /** Kreditfakturans datum när fakturan krediterats: den väntar då på ingen betalning. */
+  creditedAt?: string | null;
   paymentMethod: PaymentMethod | null;
   customerName: string;
   regNo: string;
@@ -56,6 +58,7 @@ export function invoiceFigures(
   };
   for (const o of onlyInvoices(items)) {
     const status = invoiceStatus(o, today);
+    if (status === 'credited') continue;
     if (status === 'paid') {
       if (o.paidAt && differenceInCalendarDays(today, new Date(o.paidAt)) < days) {
         out.paidRecently.count++;
@@ -124,6 +127,7 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
         invoicedAt: c.invoicedAt,
         dueAt: c.dueAt ?? null,
         paidAt: c.paidAt,
+        creditedAt: c.creditedAt ?? null,
         paymentMethod: c.paymentMethod ?? null,
         customerName: c.customerName ?? 'Kontantkund',
         regNo: c.regNo ?? '',

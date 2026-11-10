@@ -8,10 +8,12 @@ export interface Billable {
   /** Förfallodatum. Bara en faktura har ett. */
   dueAt: string | null;
   paidAt: string | null;
+  /** Satt när dokumentet krediterats med en kreditfaktura: då väntar det på ingen betalning. */
+  creditedAt?: string | null;
 }
 
 /** Betald; förfallen (en faktura som inte betalats i tid); eller obetald och inom tiden. */
-export type InvoiceStatus = 'paid' | 'overdue' | 'open';
+export type InvoiceStatus = 'paid' | 'overdue' | 'open' | 'credited';
 
 /**
  * Dagar efter förfallodatumet (negativt = dagar kvar), räknat i kalenderdagar. Null när dokumentet
@@ -22,6 +24,7 @@ export function daysPastDue(o: Pick<Billable, 'dueAt'>, today = new Date()): num
 }
 
 export function invoiceStatus(o: Billable, today = new Date()): InvoiceStatus {
+  if (o.creditedAt) return 'credited';
   if (o.paidAt) return 'paid';
   const late = o.kind === 'invoice' ? daysPastDue(o, today) : null;
   return late !== null && late > 0 ? 'overdue' : 'open';
@@ -29,7 +32,7 @@ export function invoiceStatus(o: Billable, today = new Date()): InvoiceStatus {
 
 /** "5 dagar sen", "idag", "om 12 dagar". Tomt för det som är betalt och för kvitton. */
 export function dueNote(o: Billable, today = new Date()): string {
-  if (o.paidAt || o.kind !== 'invoice') return '';
+  if (o.paidAt || o.creditedAt || o.kind !== 'invoice') return '';
   const late = daysPastDue(o, today);
   if (late === null) return '';
   const n = Math.abs(late);
@@ -42,6 +45,7 @@ export const STATUS_TEXT: Record<InvoiceStatus, string> = {
   paid: 'Betald',
   overdue: 'Förfallen',
   open: 'Obetald',
+  credited: 'Krediterad',
 };
 
 /** Förfallet är rött, obetalt gult och betalt grönt; färgen följs alltid av ordet ovan. */
@@ -49,4 +53,5 @@ export const STATUS_TONE: Record<InvoiceStatus, PillTone> = {
   paid: 'green',
   overdue: 'red',
   open: 'amber',
+  credited: 'gray',
 };

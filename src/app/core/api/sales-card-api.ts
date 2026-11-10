@@ -71,6 +71,11 @@ export class SalesCardApi {
     return this.http.post<SalesCardDetail>(`${this.base}/${id}/return`, { reason });
   }
 
+  /** Krediterar hela fakturan eller kvittot med en kreditfaktura (ägaren). Originalet ändras aldrig. */
+  credit(id: string, reason: string, restock: boolean): Observable<SalesCardDetail> {
+    return this.http.post<SalesCardDetail>(`${this.base}/${id}/credit`, { reason, restock });
+  }
+
   get(id: string): Observable<SalesCardDetail> {
     return this.http.get<SalesCardDetail>(`${this.base}/${id}`);
   }
