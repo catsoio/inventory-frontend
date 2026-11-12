@@ -89,17 +89,13 @@ import { Confirm } from '../../../shared/confirm';
             <span class="block text-sm text-gray-500">
               {{
                 blocket()?.connected
-                  ? blocket()?.live
-                    ? 'Annonserna publiceras'
-                    : 'Annonserna skickas dolda'
+                  ? 'Bilarna skickas som utkast och publiceras från bilkortet'
                   : 'Lägg ut bilarna på Blocket och Bytbil'
               }}
             </span>
           </span>
           @if (blocket()?.connected) {
-            <app-pill [tone]="blocket()?.live ? 'green' : 'amber'">{{
-              blocket()?.live ? 'Ansluten' : 'Provläge'
-            }}</app-pill>
+            <app-pill tone="green">Ansluten</app-pill>
           } @else {
             <mat-icon class="text-gray-500">add</mat-icon>
           }
@@ -271,24 +267,10 @@ export class CarInfoConnectionDialog {
           <input matInput [formControl]="dealerCode" autocomplete="off" />
           <mat-hint>Behövs bara om nyckeln gäller flera handlare.</mat-hint>
         </mat-form-field>
-        <mat-radio-group
-          [formControl]="live"
-          class="mt-3 grid gap-3"
-          aria-label="Hur annonserna skickas"
-        >
-          <label class="choice" [class.is-on]="live.value === false">
-            <mat-radio-button [value]="false" class="font-medium">Provläge</mat-radio-button>
-            <span class="choice-text"
-              >Annonserna skickas dolda. De syns bara i Blockets adminpanel och kostar ingenting.
-              Ligger bilen redan ute på Blocket tar annonsen över den, så prova med en bil som inte
-              gör det.</span
-            >
-          </label>
-          <label class="choice" [class.is-on]="live.value === true">
-            <mat-radio-button [value]="true" class="font-medium">Publicera</mat-radio-button>
-            <span class="choice-text">Annonserna syns på Blocket och Bytbil.</span>
-          </label>
-        </mat-radio-group>
+        <p class="mt-1 text-sm text-gray-600">
+          Bilarna skickas alltid först som utkast, dolda hos Blocket. Du publicerar varje bil från
+          bilkortet när du är redo.
+        </p>
         <div class="mt-4 border-t border-gray-200 pt-4">
           <div class="mb-1 flex items-center gap-2">
             <h3 class="flex-1 text-sm font-semibold">Läs in bilar som redan ligger ute</h3>
@@ -379,7 +361,6 @@ export class BlocketConnectionDialog implements OnInit {
   readonly busy = signal(false);
   readonly token = new FormControl('', { nonNullable: true });
   readonly dealerCode = new FormControl(this.current?.dealerCode ?? '', { nonNullable: true });
-  readonly live = new FormControl(this.current?.live ?? false, { nonNullable: true });
 
   /** Nyckeln för att läsa in bilar som redan ligger ute; en annan än den som skickar annonser. */
   readonly read = signal<BlocketAccessStatus | null>(null);
@@ -425,7 +406,6 @@ export class BlocketConnectionDialog implements OnInit {
         ? this.api.saveBlocket({
             ...(token ? { token } : {}),
             dealerCode: this.dealerCode.value.trim() || null,
-            live: this.live.value,
           })
         : of(null);
     sending$

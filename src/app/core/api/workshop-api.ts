@@ -136,11 +136,7 @@ export class WorkshopApi {
   }
 
   /** Kontrollerar en ny nyckel hos Blocket och sparar den; utan nyckel ändras bara resten (ägare). */
-  saveBlocket(body: {
-    token?: string;
-    dealerCode?: string | null;
-    live?: boolean;
-  }): Observable<BlocketStatus> {
+  saveBlocket(body: { token?: string; dealerCode?: string | null }): Observable<BlocketStatus> {
     return this.http.put<BlocketStatus>(`${this.base}/settings/blocket`, body);
   }
 

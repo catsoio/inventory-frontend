@@ -242,9 +242,7 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
                     </div>
                   </div>
                 } @empty {
-                  <p class="col-span-full text-sm text-gray-500">
-                    Inga bilder än.
-                  </p>
+                  <p class="col-span-full text-sm text-gray-500">Inga bilder än.</p>
                 }
               </div>
               <div class="grid gap-x-4 sm:grid-cols-2">
@@ -332,16 +330,39 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
                   <button
                     mat-stroked-button
                     type="button"
-                    (click)="setBlocket(true)"
+                    (click)="putOnBlocket()"
                     [disabled]="busy() || form.dirty"
                   >
-                    <mat-icon>campaign</mat-icon> Lägg ut på Blocket
+                    <mat-icon>campaign</mat-icon>
+                    {{
+                      takesOver() ? 'Ta över annonsen på Blocket' : 'Skicka som utkast till Blocket'
+                    }}
                   </button>
                 } @else {
+                  @if (isPublished()) {
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="setBlocket({ published: false })"
+                      [disabled]="busy() || form.dirty"
+                    >
+                      Avpublicera (tillbaka till utkast)
+                    </button>
+                  } @else {
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      (click)="publishOnBlocket()"
+                      [disabled]="busy() || form.dirty || !canPublish()"
+                    >
+                      <mat-icon>campaign</mat-icon> Publicera på Blocket
+                    </button>
+                  }
                   <button
                     mat-stroked-button
                     type="button"
-                    (click)="setBlocket(false)"
+                    (click)="setBlocket({ enabled: false })"
                     [disabled]="busy() || form.dirty"
                   >
                     Ta bort från Blocket
@@ -350,7 +371,7 @@ type ApiError = { status?: number; error?: { error?: { message?: string } } };
                     <button
                       mat-stroked-button
                       type="button"
-                      (click)="setBlocket(true)"
+                      (click)="setBlocket({ enabled: true })"
                       [disabled]="busy() || form.dirty"
                     >
                       Försök igen
@@ -761,24 +782,77 @@ export class CarCard implements OnInit {
     if (!c) return '';
     const b = c.blocket;
     if (!b.enabled) {
-      return 'Bilen läggs ut på Blocket och Bytbil medan den är till salu och tas ner när den är såld.';
+      return this.takesOver()
+        ? 'Annonsen finns redan på Blocket. Tar Axle över den uppdateras den därifrån och förblir publicerad.'
+        : 'Bilen skickas först som utkast, dold hos Blocket, så du kan granska annonsen i Blockets adminpanel. Sedan publicerar du den här. Den tas ner när bilen är såld.';
     }
     if (c.status === 'draft') return 'Bilen skickas till Blocket när den har status Till salu.';
     if (c.status === 'sold') return 'Annonsen är nedtagen från Blocket eftersom bilen är såld.';
-    if (this.blocketConnection()?.connected && this.blocketConnection()?.live === false) {
-      return 'Provläge: annonsen skickas dold och syns bara i Blockets adminpanel. Slå på publicering under Inställningar, Anslutningar.';
-    }
-    return b.blocketAdId
-      ? `Annonsen ändras på Blocket när du sparar bilen. Annons-id ${b.blocketAdId}.`
-      : 'Annonsen ändras på Blocket när du sparar bilen.';
+    const id = b.blocketAdId ? ` Annons-id ${b.blocketAdId}.` : '';
+    return this.isPublished()
+      ? `Annonsen är publicerad på Blocket och Bytbil och ändras när du sparar bilen.${id}`
+      : `Utkast: annonsen är dold hos Blocket och syns bara i Blockets adminpanel. Publicera den här när du är redo.${id}`;
   });
 
-  setBlocket(enabled: boolean) {
+  /** Annonsen finns redan ute hos Blocket (inläst därifrån) och tas över när bilen läggs ut. */
+  readonly takesOver = computed(() => {
+    const b = this.card()?.blocket;
+    return !!b?.blocketAdId && !b.enabled;
+  });
+
+  /** Publicerad hos Blocket; en äldre bil utan val räknas som publicerad när annonsen är uppe. */
+  readonly isPublished = computed(() => {
+    const b = this.card()?.blocket;
+    return !!b && (b.published ?? b.state === 'live');
+  });
+
+  /** Bara en bil som är till salu eller reserverad skickas, så bara den går att publicera. */
+  readonly canPublish = computed(() => {
+    const s = this.card()?.status;
+    return s === 'active' || s === 'reserved';
+  });
+
+  putOnBlocket() {
+    if (!this.takesOver()) return this.setBlocket({ enabled: true });
+    this.confirmThen(
+      {
+        title: 'Ta över annonsen på Blocket?',
+        message:
+          'Annonsen ligger redan ute på Blocket. Tar Axle över den skrivs uppgifter, pris, text och bilder över från bilen, och den förblir publicerad.',
+        confirmText: 'Ta över',
+      },
+      () => this.setBlocket({ enabled: true }),
+    );
+  }
+
+  publishOnBlocket() {
+    this.confirmThen(
+      {
+        title: 'Publicera på Blocket?',
+        message:
+          'Annonsen blir synlig för alla på Blocket och Bytbil och kan kosta enligt ert avtal med Blocket. Du kan avpublicera den igen.',
+        confirmText: 'Publicera',
+      },
+      () => this.setBlocket({ published: true }),
+    );
+  }
+
+  private confirmThen(
+    data: { title: string; message: string; confirmText: string },
+    then: () => void,
+  ) {
+    this.dialog
+      .open(ConfirmDialog, { data })
+      .afterClosed()
+      .subscribe((ok) => ok && then());
+  }
+
+  setBlocket(body: { enabled?: boolean; published?: boolean }) {
     const c = this.card();
     if (!c) return;
     this.busy.set(true);
     this.error.set(null);
-    this.api.setBlocket(c.id, enabled).subscribe({
+    this.api.setBlocket(c.id, body).subscribe({
       next: (r) => {
         this.busy.set(false);
         this.takeBlocket(r);

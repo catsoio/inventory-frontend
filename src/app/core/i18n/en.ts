@@ -1096,36 +1096,44 @@ export const EN: Record<string, string> = {
   'Däck i katalogen': 'Tyres in the catalogue',
   'Söker däck…': 'Searching tyres…',
   'Inga träffar. Prova storleken, t.ex. 205/55 R16.': 'No results. Try the size, e.g. 205/55 R16.',
-  'Sök däck: storlek eller märke, t.ex. 205/55 R16':
-    'Search tyres: size or brand, e.g. 205/55 R16',
+  'Sök däck: storlek eller märke, t.ex. 205/55 R16': 'Search tyres: size or brand, e.g. 205/55 R16',
   'Inga beställningar hittades.': 'No orders found.',
   // Tidsbokning och arbetsorder: tid, koppling och planering
   'Koppla befintlig': 'Link existing',
   'Koppla loss': 'Unlink',
   'Välj arbetsorder': 'Choose a work order',
-  'En arbetsorder skapas när du sparar, med raderna under "Vad ska göras".': 'A work order is created when you save, with the rows under "What is to be done".',
-  'Öppna, pågående och väntande order som inte har någon tid i kalendern.': 'Open, in-progress and waiting orders that have no time in the calendar.',
-  'Bokningen är planeringen för ordern: tid, mekaniker och plats gäller båda.': 'The booking is the plan for the order: time, mechanic and place apply to both.',
-  'Tar jobbet flera dagar sätter du ett senare slutdatum.': 'If the job takes several days, set a later end date.',
+  'En arbetsorder skapas när du sparar, med raderna under "Vad ska göras".':
+    'A work order is created when you save, with the rows under "What is to be done".',
+  'Öppna, pågående och väntande order som inte har någon tid i kalendern.':
+    'Open, in-progress and waiting orders that have no time in the calendar.',
+  'Bokningen är planeringen för ordern: tid, mekaniker och plats gäller båda.':
+    'The booking is the plan for the order: time, mechanic and place apply to both.',
+  'Tar jobbet flera dagar sätter du ett senare slutdatum.':
+    'If the job takes several days, set a later end date.',
   'Efter starten': 'After the start',
   'Tid och plats': 'Time and place',
-  'Samma tid som en bokning: start och slut med klockslag. Internt, skrivs ut på arbetsbladet till mekanikern.': 'Same time as a booking: start and end with time of day. Internal, printed on the work sheet for the mechanic.',
-  'Planering': 'Planning',
-  'Vad som redan är bokat den dagen. Klicka på en rad för att flytta starttiden dit.': 'What is already booked that day. Click a row to move the start time there.',
+  'Samma tid som en bokning: start och slut med klockslag. Internt, skrivs ut på arbetsbladet till mekanikern.':
+    'Same time as a booking: start and end with time of day. Internal, printed on the work sheet for the mechanic.',
+  Planering: 'Planning',
+  'Vad som redan är bokat den dagen. Klicka på en rad för att flytta starttiden dit.':
+    'What is already booked that day. Click a row to move the start time there.',
   'Ligger i kalendern.': 'In the calendar.',
-  'Ändrar du tid, mekaniker eller plats här följer bokningen med.': 'If you change the time, mechanic or place here, the booking follows.',
+  'Ändrar du tid, mekaniker eller plats här följer bokningen med.':
+    'If you change the time, mechanic or place here, the booking follows.',
   'Inte i kalendern.': 'Not in the calendar.',
-  'Lägg in ordern så syns den för mekanikern och på tidsbokningen.': 'Add the order so it shows for the mechanic and on the booking calendar.',
+  'Lägg in ordern så syns den för mekanikern och på tidsbokningen.':
+    'Add the order so it shows for the mechanic and on the booking calendar.',
   'Lägg i kalendern': 'Add to calendar',
   'Visa i kalendern': 'Show in calendar',
   'Att planera': 'To plan',
   'Förfrågningar från bokningssidan': 'Requests from the booking page',
   'Arbetsorder utan tid i kalendern': 'Work orders without a time in the calendar',
-  'Planera': 'Plan',
-  'Dra ett kort till en mekaniker och tid i dagsvyn, eller tryck Planera.': 'Drag a card to a mechanic and time in the day view, or press Plan.',
+  Planera: 'Plan',
+  'Dra ett kort till en mekaniker och tid i dagsvyn, eller tryck Planera.':
+    'Drag a card to a mechanic and time in the day view, or press Plan.',
   'Tiden krockar med': 'The time clashes with',
-  'Startar': 'Starts',
-  'Slutar': 'Ends',
+  Startar: 'Starts',
+  Slutar: 'Ends',
   'Slut:': 'End:',
   'Skriv ut etiketter': 'Print labels',
   'Skriv ut etiketter på A4, tre per ark': 'Print labels on A4, three per sheet',
@@ -1134,25 +1142,28 @@ export const EN: Record<string, string> = {
   'Att fakturera nu': 'To invoice now',
   'Alla klara': 'All finished',
   'Skapa samlingsfakturor': 'Create collective invoices',
-  'Samlingsfaktura': 'Collective invoice',
+  Samlingsfaktura: 'Collective invoice',
   'Skapa faktura': 'Create invoice',
   'Väntar på samlingsfaktura': 'Waiting for the collective invoice',
   'Borde ha fakturerats': 'Should have been invoiced',
-  'Inga klara arbetsorder väntar på faktura.': 'No finished work orders are waiting to be invoiced.',
-  'Inget att fakturera just nu. Klara arbetsorder hamnar här tills de är fakturerade.': 'Nothing to invoice right now. Finished work orders show up here until they are invoiced.',
-  'Följesedel': 'Delivery note',
+  'Inga klara arbetsorder väntar på faktura.':
+    'No finished work orders are waiting to be invoiced.',
+  'Inget att fakturera just nu. Klara arbetsorder hamnar här tills de är fakturerade.':
+    'Nothing to invoice right now. Finished work orders show up here until they are invoiced.',
+  Följesedel: 'Delivery note',
   'Fakturera nu': 'Invoice now',
   'Följesedel att lämna med bilen': 'Delivery note to hand over with the car',
   'Utfört arbete och delar': 'Work done and parts',
   'Fordonet och arbetet ovan mottaget': 'Vehicle and the work above received',
-  'Underskrift': 'Signature',
-  'Namnförtydligande': 'Name in block letters',
+  Underskrift: 'Signature',
+  Namnförtydligande: 'Name in block letters',
   'Visa belopp': 'Show amounts',
   'Att faktureras inkl. moms': 'To be invoiced incl. VAT',
   'Ta bort ordern från kortet': 'Take the order off the card',
-  'Tomt = företagets villkor': 'Empty = the company\'s terms',
+  'Tomt = företagets villkor': "Empty = the company's terms",
   '0–120 dagar': '0–120 days',
-  'Klara arbetsorder lämnas ut med följesedel och faktureras en gång i månaden.': 'Finished work orders are handed over with a delivery note and invoiced once a month.',
+  'Klara arbetsorder lämnas ut med följesedel och faktureras en gång i månaden.':
+    'Finished work orders are handed over with a delivery note and invoiced once a month.',
   'Ta bort från kortet': 'Take off the card',
   'Skapa utkast': 'Create drafts',
   'Skapa samlingsfakturor?': 'Create collective invoices?',
@@ -1163,29 +1174,25 @@ export const EN: Record<string, string> = {
   'Bilar som redan är inlästa ligger kvar. Ni kan ansluta igen när som helst.':
     'Cars already imported stay. You can connect again at any time.',
 
-  'Ta bort läsnyckeln':
-    'Remove the read key',
+  'Ta bort läsnyckeln': 'Remove the read key',
 
-  'Handlargrupp (valfri)':
-    'Dealer group (optional)',
+  'Handlargrupp (valfri)': 'Dealer group (optional)',
 
-
-  'Läser in…':
-    'Importing…',
-  'Läs in bilar som redan ligger ute':
-    'Import cars that are already listed',
+  'Läser in…': 'Importing…',
+  'Läs in bilar som redan ligger ute': 'Import cars that are already listed',
   'Med en nyckel som får läsa annonser (Access API, get.vehicles) läser knappen Läs in från Blocket på bil-listan in bilarna ni redan har ute. Skriv in nyckeln här en gång. Mejla butikssupport@blocket.se och be om en.':
     'With a key that may read ads (the Access API, get.vehicles), the Import from Blocket button on the car list imports the cars you already have listed. Enter the key here once. Email butikssupport@blocket.se and ask for one.',
-  'Ny läsnyckel (lämna tom för att behålla)':
-    'New read key (leave empty to keep)',
-  'Läsnyckel från Blocket':
-    'Read key from Blocket',
+  'Ny läsnyckel (lämna tom för att behålla)': 'New read key (leave empty to keep)',
+  'Läsnyckel från Blocket': 'Read key from Blocket',
   'Lämna tom: gruppen eller handlaren hittas ur nyckeln.':
     'Leave empty: the group or dealer is found from the key.',
-  'Handlarkod i gruppen (valfri)':
-    'Dealer code in the group (optional)',
-  'Tom = hela gruppen.':
-    'Empty = the whole group.',
-  'Kopplad':
-    'Connected',
+  'Handlarkod i gruppen (valfri)': 'Dealer code in the group (optional)',
+  'Tom = hela gruppen.': 'Empty = the whole group.',
+  Kopplad: 'Connected',
+
+  'Publicera på Blocket': 'Publish on Blocket',
+  'Avpublicera (tillbaka till utkast)': 'Unpublish (back to draft)',
+  'Bilarna skickas alltid först som utkast, dolda hos Blocket. Du publicerar varje bil från bilkortet när du är redo.':
+    'Cars are always sent as drafts first, hidden at Blocket. You publish each car from its card when you are ready.',
+  'Utkast hos Blocket': 'Draft at Blocket',
 };

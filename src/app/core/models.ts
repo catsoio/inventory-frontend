@@ -1026,7 +1026,7 @@ export const BLOCKET_STATE_LABELS: Record<BlocketAdState, string> = {
   off: 'Inte på Blocket',
   pending: 'Skickas till Blocket…',
   live: 'Publicerad på Blocket',
-  hidden: 'Skickad dold',
+  hidden: 'Utkast hos Blocket',
   removed: 'Borttagen från Blocket',
   error: 'Gick inte att skicka',
 };
@@ -1035,6 +1035,11 @@ export const BLOCKET_STATE_LABELS: Record<BlocketAdState, string> = {
 export interface CarBlocket {
   /** Säljaren vill ha bilen på Blocket (den skickas medan den är till salu). */
   enabled: boolean;
+  /**
+   * Publicerad (synlig på Blocket och Bytbil) eller utkast (dold, syns bara i Blockets adminpanel).
+   * En bil skickas alltid som utkast först. Null = inte valt, bara äldre bilar.
+   */
+  published: boolean | null;
   blocketAdId: string | null;
   state: BlocketAdState;
   /** Senaste felet, eller en anmärkning om något som inte kunde skickas. */

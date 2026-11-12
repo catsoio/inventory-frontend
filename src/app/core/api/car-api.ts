@@ -43,9 +43,12 @@ export class CarApi {
     return this.http.post<CarListing>(`${this.base}/${id}/refresh`, {});
   }
 
-  /** Lägger bilen på Blocket eller tar ner den; den skickas medan den är till salu. */
-  setBlocket(id: string, enabled: boolean): Observable<CarListing> {
-    return this.http.post<CarListing>(`${this.base}/${id}/blocket`, { enabled });
+  /**
+   * Lägger bilen på Blocket (som utkast, dold) eller tar ner den, och publicerar den eller gör den
+   * till ett utkast igen. Det som utelämnas ändras inte. Bilen skickas medan den är till salu.
+   */
+  setBlocket(id: string, body: { enabled?: boolean; published?: boolean }): Observable<CarListing> {
+    return this.http.post<CarListing>(`${this.base}/${id}/blocket`, body);
   }
 
   /** Läser hur Blocket gick med annonsen: publicerad, nekad eller fortfarande på gång. */
