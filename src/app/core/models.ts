@@ -976,6 +976,49 @@ export interface BlocketStatus {
   live: boolean;
 }
 
+/** Verkstadens nyckel för att läsa sina egna annonser hos Blocket och Bytbil; aldrig nyckeln. */
+export interface BlocketAccessStatus {
+  /** Det finns en nyckel och en handlare (eller grupp) att försöka läsa med. */
+  connected: boolean;
+  dealerCode: string | null;
+  /** Handlargruppen när nyckeln är en gruppnyckel; handlarkoden smalnar då av till en handlare. */
+  group: string | null;
+  /** Vems nyckel som läser: en egen läsnyckel, annars den som skickar annonser (Bytbil kan neka den). */
+  source: 'own' | 'sending' | null;
+}
+
+/** Vad en annons hos Blocket blir vid inläsning: ny bil, finns redan, skickad härifrån eller hoppas över. */
+export type BlocketImportAction = 'new' | 'exists' | 'ours' | 'skipped';
+
+export interface BlocketImportRow {
+  adId: string | null;
+  regNo: string | null;
+  label: string;
+  action: BlocketImportAction;
+  /** Varför annonsen hoppas över eller bilen inte gick att läsa in. */
+  reason: string | null;
+  warnings: string[];
+  images: number;
+  /** Öre. */
+  price: number | null;
+  mileageKm: number | null;
+  carId: string | null;
+}
+
+export interface BlocketImportPreview {
+  rows: BlocketImportRow[];
+  counts: Record<BlocketImportAction, number>;
+  /** Hur Blockets miltal läses av servern. */
+  milageUnit: 'km' | 'mil';
+}
+
+export interface BlocketImportResult {
+  created: BlocketImportRow[];
+  failed: BlocketImportRow[];
+  /** Nya bilar som väntar på nästa körning. */
+  remaining: number;
+}
+
 /** Var en bils annons står hos Blocket. `off` = aldrig skickad. */
 export type BlocketAdState = 'off' | 'pending' | 'live' | 'hidden' | 'removed' | 'error';
 

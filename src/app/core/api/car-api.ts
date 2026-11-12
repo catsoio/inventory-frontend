@@ -3,6 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  BlocketAccessStatus,
+  BlocketImportPreview,
+  BlocketImportResult,
   CarListing,
   CarListingInput,
   ListingStatus,
@@ -118,5 +121,39 @@ export class SiteApi {
 
   removeDomain(hostname: string): Observable<SiteSettings> {
     return this.http.delete<SiteSettings>(`${this.base}/domains/${encodeURIComponent(hostname)}`);
+  }
+}
+
+/** Läsa in bilar som verkstaden redan har på Blocket och Bytbil (ägare). */
+@Injectable({ providedIn: 'root' })
+export class BlocketImportApi {
+  private readonly http = inject(HttpClient);
+  private readonly base = `${environment.apiUrl}/inventory/blocket-import`;
+
+  connection(): Observable<BlocketAccessStatus> {
+    return this.http.get<BlocketAccessStatus>(`${this.base}/connection`);
+  }
+
+  /** Kontrollerar en ny läsnyckel hos Bytbil och sparar den. */
+  saveConnection(body: {
+    token?: string;
+    dealerCode?: string | null;
+    group?: string | null;
+  }): Observable<BlocketAccessStatus> {
+    return this.http.put<BlocketAccessStatus>(`${this.base}/connection`, body);
+  }
+
+  clearConnection(): Observable<BlocketAccessStatus> {
+    return this.http.delete<BlocketAccessStatus>(`${this.base}/connection`);
+  }
+
+  /** Vad varje annons skulle bli. Sparar ingenting. */
+  preview(): Observable<BlocketImportPreview> {
+    return this.http.get<BlocketImportPreview>(`${this.base}/preview`);
+  }
+
+  /** Läser in nya bilar, högst 25 per anrop; `remaining` säger hur många som är kvar. */
+  run(body: { regNos?: string[]; publish?: boolean }): Observable<BlocketImportResult> {
+    return this.http.post<BlocketImportResult>(`${this.base}/run`, body);
   }
 }

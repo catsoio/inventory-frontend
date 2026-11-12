@@ -23,6 +23,8 @@ const MESSAGES: Record<string, string> = {
     'car.info godtog inte e-postadressen och lösenordet. Kontrollera dem och försök igen.',
   BLOCKET_TOKEN_REJECTED:
     'Blocket godtog inte nyckeln. Kontrollera att den är kopierad helt och försök igen.',
+  BLOCKET_READ_REFUSED:
+    'Nyckeln får inte läsa annonserna hos Blocket. Lägg in en läsnyckel från Blocket.',
   BLOCKET_FAILED: 'Blocket kunde inte nås eller svarade med ett fel. Försök igen om en stund.',
   INVALID_DEPOSIT: 'Ogiltig inlämning. Kontrollera uppgifterna.',
   INVALID_DEPOSIT_STATE: 'Åtgärden passar inte inlämningens status.',
@@ -71,6 +73,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       } else if (
         err.status !== 401 &&
         code !== 'NO_GARAGE' &&
+        // Inläsningsdialogen provar nyckeln själv när den öppnas och förklarar nekandet i dialogen.
+        code !== 'BLOCKET_READ_REFUSED' &&
         !req.url.includes('/public/screen/')
       ) {
         // Väggskärmen visar själv att den saknar kontakt; en ruta var halvminut vore bara i vägen.

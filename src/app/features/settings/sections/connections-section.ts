@@ -2,10 +2,17 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Observable, map, of, switchMap } from 'rxjs';
+import { BlocketImportApi } from '../../../core/api/car-api';
 import { SupplierCatalogApi } from '../../../core/api/supplier-catalog-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { Billing } from '../../../core/billing/billing';
-import type { BlocketStatus, CarInfoStatus, GummigrossenStatus } from '../../../core/models';
+import type {
+  BlocketAccessStatus,
+  BlocketStatus,
+  CarInfoStatus,
+  GummigrossenStatus,
+} from '../../../core/models';
 import { Confirm } from '../../../shared/confirm';
 
 /** Anslutningar till andra tjänster, ett kort per tjänst; klick öppnar inloggningen. */
@@ -282,6 +289,58 @@ export class CarInfoConnectionDialog {
             <span class="choice-text">Annonserna syns på Blocket och Bytbil.</span>
           </label>
         </mat-radio-group>
+        <div class="mt-4 border-t border-gray-200 pt-4">
+          <div class="mb-1 flex items-center gap-2">
+            <h3 class="flex-1 text-sm font-semibold">Läs in bilar som redan ligger ute</h3>
+            @if (read()?.source === 'own') {
+              <app-pill tone="green">Kopplad</app-pill>
+            }
+          </div>
+          <p class="mb-3 text-sm text-gray-600">
+            Med en nyckel som får läsa annonser (Access API, get.vehicles) läser knappen Läs in från
+            Blocket på bil-listan in bilarna ni redan har ute. Skriv in nyckeln här en gång. Mejla
+            butikssupport&#64;blocket.se och be om en.
+          </p>
+          <div class="flex flex-col gap-2">
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>{{
+                read()?.source === 'own'
+                  ? 'Ny läsnyckel (lämna tom för att behålla)'
+                  : 'Läsnyckel från Blocket'
+              }}</mat-label>
+              <input
+                matInput
+                type="password"
+                [formControl]="readToken"
+                autocomplete="new-password"
+              />
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Handlargrupp (valfri)</mat-label>
+              <input matInput [formControl]="readGroup" autocomplete="off" />
+              <mat-hint>Lämna tom: gruppen eller handlaren hittas ur nyckeln.</mat-hint>
+            </mat-form-field>
+            @if (readGroup.value.trim()) {
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Handlarkod i gruppen (valfri)</mat-label>
+                <input matInput [formControl]="readDealer" autocomplete="off" />
+                <mat-hint>Tom = hela gruppen.</mat-hint>
+              </mat-form-field>
+            }
+            @if (read()?.source === 'own') {
+              <button
+                mat-button
+                type="button"
+                color="warn"
+                class="self-start"
+                [disabled]="busy()"
+                (click)="removeRead()"
+              >
+                Ta bort läsnyckeln
+              </button>
+            }
+          </div>
+        </div>
       </mat-dialog-content>
       @if (busy()) {
         <mat-progress-bar mode="indeterminate" />
@@ -296,7 +355,7 @@ export class CarInfoConnectionDialog {
         <button mat-button type="button" mat-dialog-close>Avbryt</button>
         <button mat-flat-button color="primary" [disabled]="busy() || !canSave()">
           {{
-            token.value.trim()
+            token.value.trim() || readToken.value.trim()
               ? busy()
                 ? 'Testar…'
                 : 'Testa anslutning'
@@ -309,8 +368,9 @@ export class CarInfoConnectionDialog {
     </form>
   `,
 })
-export class BlocketConnectionDialog {
+export class BlocketConnectionDialog implements OnInit {
   private readonly api = inject(WorkshopApi);
+  private readonly importApi = inject(BlocketImportApi);
   private readonly snack = inject(MatSnackBar);
   private readonly confirm = inject(Confirm);
   private readonly ref = inject<MatDialogRef<BlocketConnectionDialog, BlocketStatus>>(MatDialogRef);
@@ -321,27 +381,100 @@ export class BlocketConnectionDialog {
   readonly dealerCode = new FormControl(this.current?.dealerCode ?? '', { nonNullable: true });
   readonly live = new FormControl(this.current?.live ?? false, { nonNullable: true });
 
-  /** En ny anslutning kräver nyckeln; en befintlig kan ändra resten utan den. */
+  /** Nyckeln för att läsa in bilar som redan ligger ute; en annan än den som skickar annonser. */
+  readonly read = signal<BlocketAccessStatus | null>(null);
+  readonly readToken = new FormControl('', { nonNullable: true });
+  readonly readGroup = new FormControl('', { nonNullable: true });
+  readonly readDealer = new FormControl('', { nonNullable: true });
+
+  ngOnInit() {
+    this.importApi.connection().subscribe((c) => {
+      this.read.set(c);
+      // Bara det en egen läsnyckel sparat fylls i; handlarkoden för att skicka annonser är inte den.
+      if (c.source === 'own') {
+        this.readGroup.setValue(c.group ?? '');
+        this.readDealer.setValue(c.group ? (c.dealerCode ?? '') : '');
+      }
+    });
+  }
+
+  /** Har läsinställningarna ändrats: en ny nyckel, eller en ändrad grupp eller handlare. */
+  private readChanged() {
+    if (this.readToken.value.trim()) return true;
+    const r = this.read();
+    if (r?.source !== 'own') return false;
+    return (
+      this.readGroup.value.trim() !== (r.group ?? '') ||
+      (!!this.readGroup.value.trim() && this.readDealer.value.trim() !== (r.dealerCode ?? ''))
+    );
+  }
+
+  /** En ny anslutning kräver en nyckel (för att skicka eller läsa); en befintlig kan ändra resten utan. */
   canSave() {
-    return !!this.current?.connected || this.token.value.trim().length > 0;
+    return !!this.current?.connected || this.token.value.trim().length > 0 || this.readChanged();
   }
 
   save() {
     if (!this.canSave()) return;
     this.busy.set(true);
     const token = this.token.value.trim();
-    this.api
-      .saveBlocket({
-        ...(token ? { token } : {}),
-        dealerCode: this.dealerCode.value.trim() || null,
-        live: this.live.value,
-      })
+    const readToken = this.readToken.value.trim();
+    const group = this.readGroup.value.trim();
+    const sending$: Observable<BlocketStatus | null> =
+      this.current?.connected || token
+        ? this.api.saveBlocket({
+            ...(token ? { token } : {}),
+            dealerCode: this.dealerCode.value.trim() || null,
+            live: this.live.value,
+          })
+        : of(null);
+    sending$
+      .pipe(
+        switchMap((s) =>
+          this.readChanged()
+            ? this.importApi
+                .saveConnection({
+                  ...(readToken ? { token: readToken } : {}),
+                  group: group || null,
+                  // Utan grupp läses handlaren som skickar annonser; med grupp väljer koden en i den.
+                  dealerCode: group ? this.readDealer.value.trim() || null : null,
+                })
+                .pipe(map(() => s))
+            : of(s),
+        ),
+      )
       .subscribe({
         next: (s) => {
-          this.snack.open(token ? 'Anslutningen fungerar' : 'Sparat', 'OK', { duration: 4000 });
-          this.ref.close(s);
+          this.snack.open(token || readToken ? 'Anslutningen fungerar' : 'Sparat', 'OK', {
+            duration: 4000,
+          });
+          this.ref.close(s ?? this.current ?? undefined);
         },
         error: () => this.busy.set(false),
+      });
+  }
+
+  removeRead() {
+    this.confirm
+      .ask({
+        title: 'Ta bort läsnyckeln?',
+        message:
+          'Bilar som redan är inlästa ligger kvar. Ni kan lägga in en nyckel igen när som helst.',
+        confirmText: 'Ta bort',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.busy.set(true);
+        this.importApi.clearConnection().subscribe({
+          next: (c) => {
+            this.busy.set(false);
+            this.read.set(c);
+            this.readGroup.setValue('');
+            this.readDealer.setValue('');
+          },
+          error: () => this.busy.set(false),
+        });
       });
   }
 

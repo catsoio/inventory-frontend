@@ -1158,4 +1158,34 @@ export const EN: Record<string, string> = {
   'Skapa samlingsfakturor?': 'Create collective invoices?',
   'Referenserna skrivs ut på kostnadsförslaget, följesedeln och fakturan.':
     'The references are printed on the estimate, the delivery note and the invoice.',
+  'Läs in från Blocket': 'Import from Blocket',
+  'Ta bort läsnyckeln?': 'Remove the read key?',
+  'Bilar som redan är inlästa ligger kvar. Ni kan ansluta igen när som helst.':
+    'Cars already imported stay. You can connect again at any time.',
+
+  'Ta bort läsnyckeln':
+    'Remove the read key',
+
+  'Handlargrupp (valfri)':
+    'Dealer group (optional)',
+
+
+  'Läser in…':
+    'Importing…',
+  'Läs in bilar som redan ligger ute':
+    'Import cars that are already listed',
+  'Med en nyckel som får läsa annonser (Access API, get.vehicles) läser knappen Läs in från Blocket på bil-listan in bilarna ni redan har ute. Skriv in nyckeln här en gång. Mejla butikssupport@blocket.se och be om en.':
+    'With a key that may read ads (the Access API, get.vehicles), the Import from Blocket button on the car list imports the cars you already have listed. Enter the key here once. Email butikssupport@blocket.se and ask for one.',
+  'Ny läsnyckel (lämna tom för att behålla)':
+    'New read key (leave empty to keep)',
+  'Läsnyckel från Blocket':
+    'Read key from Blocket',
+  'Lämna tom: gruppen eller handlaren hittas ur nyckeln.':
+    'Leave empty: the group or dealer is found from the key.',
+  'Handlarkod i gruppen (valfri)':
+    'Dealer code in the group (optional)',
+  'Tom = hela gruppen.':
+    'Empty = the whole group.',
+  'Kopplad':
+    'Connected',
 };

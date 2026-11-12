@@ -3,6 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { CarApi } from '../../core/api/car-api';
+import { Auth } from '../../core/auth/auth';
+import { BlocketImporter } from '../../core/blocket-importer';
 import { CarListing, LISTING_STATUS_LABELS, ListingStatus } from '../../core/models';
 import {
   CAR_FLAGS,
@@ -221,6 +223,19 @@ const TABS: SectionTab[] = [
         (rowClick)="pick($event)"
         (rowDblClick)="open($event)"
       >
+        @if (auth.isAdmin()) {
+          <button
+            actions
+            mat-stroked-button
+            type="button"
+            class="max-md:!hidden"
+            [disabled]="importing()"
+            (click)="importFromBlocket()"
+          >
+            <mat-icon>cloud_download</mat-icon>
+            {{ importing() ? 'Läser in…' : 'Läs in från Blocket' }}
+          </button>
+        }
         <!-- Mobil: ett fotokort per bil. -->
         <ng-template #card let-c="row">
           <div class="flex items-center gap-3">
@@ -298,6 +313,9 @@ const TABS: SectionTab[] = [
 })
 export class CarList {
   private readonly api = inject(CarApi);
+  private readonly importer = inject(BlocketImporter);
+  readonly auth = inject(Auth);
+  readonly importing = signal(false);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   readonly stage = this.route.snapshot.data['stage'] as Stage;
@@ -397,6 +415,16 @@ export class CarList {
   }
 
   readonly reload = () => this.load();
+
+  /** Läser in bilarna som redan ligger på Blocket, direkt; listan läses om när något kom in. */
+  async importFromBlocket() {
+    this.importing.set(true);
+    try {
+      if (await this.importer.run()) this.load();
+    } finally {
+      this.importing.set(false);
+    }
+  }
 
   tone(s: ListingStatus) {
     return TONE[s];
