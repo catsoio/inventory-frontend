@@ -75,6 +75,38 @@ export function stockFigures(cars: CarListing[], today = new Date()): StockFigur
   };
 }
 
+/**
+ * Vad bilarna i lager är värda till annonspris (öre) och hur många av dem som har ett pris. Det
+ * ger en siffra även när inköpspriserna inte är ifyllda (bundet kapital räknar bara det som är bokfört).
+ */
+export function askingValue(cars: CarListing[]): { total: number; priced: number; count: number } {
+  const stock = cars.filter(inStock);
+  const priced = stock.filter((c) => (c.price ?? 0) > 0);
+  return {
+    total: priced.reduce((s, c) => s + (c.price ?? 0), 0),
+    priced: priced.length,
+    count: stock.length,
+  };
+}
+
+/** Bilar som köptes in från och med `from` till och med `to` (YYYY-MM-DD): inköpsdagen, annars dagen bilen lades in. */
+export const purchasedBetween = (cars: CarListing[], from: string, to: string) =>
+  cars.filter((c) => {
+    const day = (c.purchase?.date ?? c.createdAt).slice(0, 10);
+    return day >= from && day <= to;
+  });
+
+/** Vad som betalats för bilarna (öre, som på köpehandlingen) och snittet; bara bilar med inköpspris räknas. */
+export function purchaseFigures(cars: CarListing[]): {
+  count: number;
+  total: number;
+  avg: number | null;
+} {
+  const paid = cars.filter((c) => (c.purchase?.price ?? 0) > 0);
+  const total = paid.reduce((s, c) => s + (c.purchase?.price ?? 0), 0);
+  return { count: paid.length, total, avg: paid.length ? Math.round(total / paid.length) : null };
+}
+
 /** De bilar som stått längst i lager, äldst först. */
 export const longestInStock = (cars: CarListing[], today = new Date(), limit = 5) =>
   cars

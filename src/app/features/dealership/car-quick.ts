@@ -24,21 +24,7 @@ const TONE: Record<ListingStatus, 'green' | 'amber' | 'gray' | 'blue'> = {
   template: `
     @if (car; as c) {
       <article class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
-        <div class="relative aspect-[4/3] bg-gray-100">
-          @if (photo(); as src) {
-            <img [src]="src" alt="" class="h-full w-full object-cover" />
-          } @else {
-            <div class="grid h-full place-items-center text-gray-300">
-              <mat-icon class="!h-14 !w-14 !text-6xl">directions_car</mat-icon>
-            </div>
-          }
-          @if (c.imageUrls.length > 1) {
-            <span
-              class="absolute right-2 bottom-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white"
-              >{{ c.imageUrls.length }} bilder</span
-            >
-          }
-        </div>
+        <app-photo-gallery [urls]="photos()" />
 
         <div class="flex flex-col gap-4 p-4">
           <header>
@@ -183,10 +169,9 @@ export class CarQuick {
   readonly statusText = (s: ListingStatus) => LISTING_STATUS_LABELS[s];
   readonly ago = (iso: string) => agoText(iso);
 
-  readonly photo = computed(() => {
-    const u = this.current()?.imageUrls[0];
-    return u ? environment.apiUrl + u : '';
-  });
+  readonly photos = computed(() =>
+    (this.current()?.imageUrls ?? []).map((u) => environment.apiUrl + u),
+  );
   readonly days = computed(() => {
     const c = this.current();
     return c ? daysInStock(c) : 0;

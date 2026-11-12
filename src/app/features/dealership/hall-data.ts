@@ -6,7 +6,16 @@ import { SalesCardApi } from '../../core/api/sales-card-api';
 import { Auth } from '../../core/auth/auth';
 import { CarListing } from '../../core/models';
 import { Todo } from '../../core/todo';
-import { longestInStock, recentInquiries, soldBetween, stockFigures } from '../../shared/car-stock';
+import {
+  askingValue,
+  inStock,
+  longestInStock,
+  purchaseFigures,
+  purchasedBetween,
+  recentInquiries,
+  soldBetween,
+  stockFigures,
+} from '../../shared/car-stock';
 import type { Attention } from '../dashboard/home-data';
 
 /**
@@ -50,6 +59,20 @@ export class HallData {
       profit: sold.reduce((s, c) => s + (c.economy.profit ?? 0), 0),
     };
   });
+
+  /** Lagrets värde till annonspris (öre), för bilarna som har ett pris. */
+  readonly asking = computed(() => askingValue(this.cars()));
+
+  /** Månadens inköp: antal bilar, vad som betalats (öre) och hur många som saknar inköpspris. */
+  readonly bought = computed(() => {
+    const from = format(startOfMonth(this.today), 'yyyy-MM-dd');
+    const cars = purchasedBetween(this.cars(), from, format(this.today, 'yyyy-MM-dd'));
+    const figures = purchaseFigures(cars);
+    return { count: cars.length, spent: figures.total, unpriced: cars.length - figures.count };
+  });
+
+  /** Snittet av vad bilarna i lager kostade i inköp (öre). */
+  readonly purchaseAvg = computed(() => purchaseFigures(this.cars().filter(inStock)));
 
   /** "Att göra": Halls del av samma lista som menyns siffror (`core/todo.ts`). */
   attention(desktop: boolean): Attention[] {

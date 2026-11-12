@@ -1,9 +1,12 @@
 import type { CarListing } from '../core/models';
 import {
   ageBand,
+  askingValue,
   carTodo,
   daysInStock,
   longestInStock,
+  purchaseFigures,
+  purchasedBetween,
   recentInquiries,
   soldBetween,
   stockFigures,
@@ -130,5 +133,42 @@ describe('det som väntar i bilarna', () => {
       inspectionSoon: 1,
       unlisted: 1,
     });
+  });
+});
+
+describe('inköpssiffror', () => {
+  it('värderar lagret till annonspris och säger hur många bilar som har ett pris', () => {
+    const cars = [
+      car({ price: 20_000_000 }),
+      car({ price: 10_000_000, status: 'reserved' }),
+      car({ price: null }),
+      car({ price: 99_000_000, status: 'sold' }),
+    ];
+    expect(askingValue(cars)).toEqual({ total: 30_000_000, priced: 2, count: 3 });
+    expect(askingValue([])).toEqual({ total: 0, priced: 0, count: 0 });
+  });
+
+  it('räknar månadens inköp på inköpsdagen, annars dagen bilen lades in', () => {
+    const cars = [
+      bought('2026-11-02'),
+      bought('2026-10-30'),
+      car({ createdAt: '2026-11-05T09:00:00.000Z' }),
+      car({ createdAt: '2026-10-05T09:00:00.000Z' }),
+    ];
+    expect(purchasedBetween(cars, '2026-11-01', '2026-11-30')).toHaveLength(2);
+  });
+
+  it('summerar vad som betalats och ger snittet bara över bilar med inköpspris', () => {
+    const cars = [
+      bought('2026-11-02', {
+        purchase: { price: 100_000, vatRate: 0, date: null, seller: null, sellerId: null },
+      }),
+      bought('2026-11-03', {
+        purchase: { price: 300_000, vatRate: 0, date: null, seller: null, sellerId: null },
+      }),
+      car({ purchase: null }),
+    ];
+    expect(purchaseFigures(cars)).toEqual({ count: 2, total: 400_000, avg: 200_000 });
+    expect(purchaseFigures([car()])).toEqual({ count: 0, total: 0, avg: null });
   });
 });

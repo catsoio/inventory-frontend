@@ -99,6 +99,28 @@ class HallView {
     return latest ? `senaste ${when(latest.inquiry.at)}` : 'inga nya';
   });
 
+  readonly askingHint = computed(() => {
+    const a = this.data.asking();
+    if (!a.count) return 'inga bilar i lager';
+    return a.priced === a.count
+      ? 'annonspris, alla bilar'
+      : `${a.priced} av ${a.count} bilar har pris`;
+  });
+  readonly boughtHint = computed(() => {
+    const b = this.data.bought();
+    if (!b.count) return 'inga inköp än';
+    if (!b.spent) return 'inköpspris saknas';
+    return b.unpriced
+      ? `${kr.transform(b.spent)} betalt · pris saknas på ${b.unpriced}`
+      : `${kr.transform(b.spent)} betalt`;
+  });
+  readonly purchaseAvgHint = computed(() => {
+    const p = this.data.purchaseAvg();
+    const stock = this.data.stock().count;
+    if (!stock) return 'inga bilar i lager';
+    return p.count ? `${p.count} av ${stock} bilar har inköpspris` : 'inköpspris saknas på bilarna';
+  });
+
   readonly monthHint = computed(() => {
     const m = this.data.month();
     return m.count ? `${m.count} bilar · vinst ${kr.transform(m.profit)}` : 'inga sålda än';
@@ -158,7 +180,7 @@ export class HallHome {
   standalone: false,
   host: { class: 'block' },
   template: `
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <app-stat
         label="Bilar i lager"
         [value]="data.loaded() ? data.stock().count : '–'"
@@ -171,21 +193,38 @@ export class HallHome {
         hint="inköp och kostnader"
       />
       <app-stat
+        label="Utpris i lager"
+        [value]="data.loaded() ? kr(data.asking().total) : '–'"
+        [hint]="askingHint()"
+        link="/dealership/cars"
+      />
+      <app-stat
         label="Snitt i lager"
         [value]="data.loaded() ? avgDays() : '–'"
         [hint]="avgHint()"
         [status]="avgStatus()"
       />
       <app-stat
-        label="Frågor, 7 dagar"
-        [value]="data.loaded() ? data.inquiries().length : '–'"
-        [hint]="inquiryHint()"
+        label="Inköpta i månaden"
+        [value]="data.loaded() ? data.bought().count : '–'"
+        [hint]="boughtHint()"
+        link="/dealership/cars/purchases"
+      />
+      <app-stat
+        label="Snitt inköpspris"
+        [value]="data.loaded() ? kr(data.purchaseAvg().avg) : '–'"
+        [hint]="purchaseAvgHint()"
       />
       <app-stat
         label="Sålt i månaden"
         [value]="data.loaded() ? kr(data.month().revenue) : '–'"
         [hint]="monthHint()"
         link="/dealership/cars/sold"
+      />
+      <app-stat
+        label="Frågor, 7 dagar"
+        [value]="data.loaded() ? data.inquiries().length : '–'"
+        [hint]="inquiryHint()"
       />
     </div>
 
