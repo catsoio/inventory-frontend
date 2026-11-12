@@ -995,8 +995,8 @@ export const EN: Record<string, string> = {
   Provläge: 'Trial mode',
   Publicera: 'Publish',
   'Annonserna syns på Blocket och Bytbil.': 'Ads are visible on Blocket and Bytbil.',
-  'Annonserna skickas dolda. De syns bara i Blockets adminpanel och kostar ingenting.':
-    'Ads are sent hidden. They only show in Blocket’s admin panel and cost nothing.',
+  'Annonserna skickas dolda. De syns bara i Blockets adminpanel och kostar ingenting. Ligger bilen redan ute på Blocket tar annonsen över den, så prova med en bil som inte gör det.':
+    'Ads are sent hidden. They only show in Blocket’s admin panel and cost nothing. If the car is already on Blocket, the ad takes it over, so try it with a car that is not.',
   'Bilarna läggs ut på Blocket och Bytbil med en API-nyckel från Blocket. Mejla butikssupport@blocket.se och be om nyckel till Pro Import API för ert handlarkonto.':
     'The cars are listed on Blocket and Bytbil with an API key from Blocket. Email butikssupport@blocket.se and ask for a Pro Import API key for your dealer account.',
   'Nyckel från Blocket': 'Key from Blocket',

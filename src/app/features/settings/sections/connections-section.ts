@@ -272,8 +272,9 @@ export class CarInfoConnectionDialog {
           <label class="choice" [class.is-on]="live.value === false">
             <mat-radio-button [value]="false" class="font-medium">Provläge</mat-radio-button>
             <span class="choice-text"
-              >Annonserna skickas dolda. De syns bara i Blockets adminpanel och kostar
-              ingenting.</span
+              >Annonserna skickas dolda. De syns bara i Blockets adminpanel och kostar ingenting.
+              Ligger bilen redan ute på Blocket tar annonsen över den, så prova med en bil som inte
+              gör det.</span
             >
           </label>
           <label class="choice" [class.is-on]="live.value === true">
