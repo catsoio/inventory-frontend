@@ -1466,8 +1466,11 @@ export interface InvoiceDocOrder {
   code: string;
   regNo: string | null;
   vehicle: string | null;
-  /** När arbetet utfördes: leveransens datum. */
+  /** När ordern sattes till klar: leveransens datum. */
   date: string;
+  /** Arbetets Start och Slut på ordern; saknas på äldre dokument (då gäller `date`). */
+  from?: string;
+  to?: string;
   /** Er referens: den som lämnade bilen, eller kundens eget ordernummer. */
   reference: string | null;
   performed: string | null;
@@ -1817,8 +1820,11 @@ export interface SalesCardOrder {
   code: string;
   regNo: string | null;
   vehicle: string | null;
-  /** När arbetet blev klart. */
+  /** När ordern sattes till klar. */
   doneAt: string;
+  /** Arbetets Start och Slut på ordern; saknas på äldre kort (då gäller `doneAt`). */
+  startAt?: string | null;
+  endAt?: string | null;
   yourReference: string | null;
   performed: string | null;
   /** Orderns delsumma på kortet (öre, före kortrabatt). */

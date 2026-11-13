@@ -2,12 +2,16 @@ import { appLocale } from '../../core/i18n/locale';
 import { Component, Input } from '@angular/core';
 import { differenceInCalendarDays } from 'date-fns';
 import {
+  InvoiceDocOrder,
   InvoiceDocRow,
   InvoiceDocSection,
   InvoiceSeller,
   WorkOrderInvoice,
   paidWith,
 } from '../../core/models';
+
+const sameText = (a: string | null | undefined, b: string | null | undefined) =>
+  !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
  * Fakturan eller kvittot som A4. Allt på sidan är det som frystes när dokumentet utfärdades
@@ -111,40 +115,44 @@ import {
             <tbody>
               @for (b of blocks(inv); track $index) {
                 @if (b.order; as o) {
-                  <!-- En arbetsorder på en samlingsfaktura: bil, referens och dagen arbetet gjordes. -->
+                  <!--
+                    En arbetsorder på en samlingsfaktura: ett block med bil, tid och referens överst
+                    och orderns summa sist.
+                  -->
                   <tr class="border-b border-[#4b5563] align-top">
-                    <td class="pt-5 pb-1" [attr.colspan]="cols(inv)">
-                      <span class="font-bold">{{ o.code }}</span>
-                      @if (o.regNo) {
-                        · <span class="font-bold">{{ o.regNo }}</span>
-                      }
-                      @if (o.vehicle) {
-                        {{ o.vehicle }}
-                      }
-                      · Utfört {{ day(o.date) }}
-                      @if (o.reference) {
-                        · Er referens: {{ o.reference }}
-                      }
-                      @if (o.performed) {
-                        <div class="whitespace-pre-line">{{ o.performed }}</div>
+                    <td class="pt-6 pb-2" [attr.colspan]="cols(inv)">
+                      <div class="text-sm">
+                        <span class="font-bold">{{ o.code }}</span>
+                        @if (o.regNo) {
+                          · <span class="font-bold">{{ o.regNo }}</span>
+                        }
+                      </div>
+                      <div class="text-xs text-gray-600">
+                        Utfört {{ orderSpan(o) }}
+                        @if (o.reference) {
+                          · Er referens: {{ o.reference }}
+                        }
+                      </div>
+                      @if (showPerformed(o, b.groups)) {
+                        <div class="mt-1 text-xs whitespace-pre-line">{{ o.performed }}</div>
                       }
                     </td>
                   </tr>
                 } @else if (b.other) {
-                  <tr>
-                    <td class="pt-5 pb-1 font-bold" [attr.colspan]="cols(inv)">Övrigt</td>
+                  <tr class="border-b border-[#4b5563]">
+                    <td class="pt-6 pb-2 text-sm font-bold" [attr.colspan]="cols(inv)">Övrigt</td>
                   </tr>
                 }
                 @for (g of b.groups; track $index) {
-                  @if (g.section; as sec) {
+                  @if (g.section && g.showTitle) {
                     <tr>
                       <td class="pt-3 pb-1 font-bold" [attr.colspan]="cols(inv)">
-                        {{ sec.title }}
+                        {{ g.section.title }}
                       </td>
                     </tr>
                   }
                   @for (r of g.rows; track $index) {
-                    <tr class="border-b border-gray-300 align-top">
+                    <tr class="border-b border-gray-200 align-top">
                       @if (hasCodes(inv)) {
                         <td class="py-2 tabular-nums">{{ r.code }}</td>
                       }
@@ -164,23 +172,27 @@ import {
                       }
                     </tr>
                   }
-                  @if (g.section; as sec) {
-                    <tr class="border-b border-gray-300">
+                  @if (
+                    g.section &&
+                    g.showSum &&
+                    !(b.order && b.groups.length === 1 && !g.section.fixed)
+                  ) {
+                    <tr class="border-b border-gray-200">
                       <td class="py-1 text-right text-gray-600" [attr.colspan]="cols(inv) - 1">
-                        {{ sec.fixed ? 'Fast pris' : 'Summa' }}
+                        {{ g.section.fixed ? 'Fast pris' : 'Summa ' + g.section.title }}
                       </td>
-                      <td class="py-1 text-right font-bold tabular-nums">{{ sec.total | kr }}</td>
+                      <td class="py-1 text-right font-bold tabular-nums">
+                        {{ g.section.total | kr }}
+                      </td>
                     </tr>
                   }
                 }
-                @if (b.order && b.groups.length > 1) {
+                @if (b.order; as o) {
                   <tr class="border-b border-gray-300">
                     <td class="py-1 text-right" [attr.colspan]="cols(inv) - 1">
-                      Summa {{ b.order.code }}
+                      Summa {{ o.code }}
                     </td>
-                    <td class="py-1 text-right font-bold tabular-nums">
-                      {{ b.order.total | kr }}
-                    </td>
+                    <td class="py-1 text-right font-bold tabular-nums">{{ o.total | kr }}</td>
                   </tr>
                 }
               }
@@ -428,7 +440,10 @@ export class InvoiceDocument {
     ].filter((b) => b.order || b.groups.length);
   }
 
-  /** Raderna under sina jobb (i jobbens ordning), sedan raderna utan jobb. */
+  /**
+   * Raderna under sina jobb (i jobbens ordning), sedan raderna utan jobb. Ett jobb med en enda rad
+   * som säger samma sak som jobbet behöver varken rubrik eller summa: de skulle bara upprepa raden.
+   */
   groups(rows: InvoiceDocRow[], sections: InvoiceDocSection[]) {
     const ids = new Set(sections.map((x) => x.id));
     return [
@@ -437,16 +452,56 @@ export class InvoiceDocument {
         rows: rows.filter((r) => r.sectionId === section.id),
       })),
       { section: null, rows: rows.filter((r) => !r.sectionId || !ids.has(r.sectionId)) },
-    ].filter((g) => g.rows.length);
+    ]
+      .filter((g) => g.rows.length)
+      .map((g) => ({
+        ...g,
+        showTitle:
+          !!g.section &&
+          (g.section.fixed ||
+            g.rows.length > 1 ||
+            !sameText(g.section.title, g.rows[0].description)),
+        showSum: !!g.section && (g.section.fixed || g.rows.length > 1),
+      }));
+  }
+
+  /** Arbetets tid på en order: dag och klockslag från och till; äldre dokument har bara dagen. */
+  orderSpan(o: InvoiceDocOrder): string {
+    if (!o.from) return this.day(o.date);
+    const time = (iso: string) =>
+      new Date(iso).toLocaleTimeString(appLocale(), { hour: '2-digit', minute: '2-digit' });
+    const start = `${this.day(o.from)} ${time(o.from)}`;
+    if (!o.to || new Date(o.to) <= new Date(o.from)) return start;
+    return this.day(o.to) === this.day(o.from)
+      ? `${start}–${time(o.to)}`
+      : `${start} – ${this.day(o.to)} ${time(o.to)}`;
+  }
+
+  /** Vad som gjordes, när det inte bara är en upprepning av jobben och raderna under. */
+  showPerformed(
+    o: InvoiceDocOrder,
+    groups: { section: InvoiceDocSection | null; rows: InvoiceDocRow[] }[],
+  ): boolean {
+    const text = o.performed?.trim();
+    if (!text) return false;
+    const known = groups.flatMap((g) => [g.section?.title, ...g.rows.map((r) => r.description)]);
+    return text.split('\n').some((line) => !known.some((k) => sameText(k, line)));
   }
 
   /** En samlingsfakturas period: första och sista dagen ett arbete utfördes. Null för andra dokument. */
   period(inv: WorkOrderInvoice): string | null {
-    const dates = (inv.orders ?? []).map((o) => new Date(o.date).getTime());
-    if (!dates.length) return null;
-    const first = this.day(new Date(Math.min(...dates)).toISOString());
-    const last = this.day(new Date(Math.max(...dates)).toISOString());
-    return first === last ? first : `${first} – ${last}`;
+    const orders = inv.orders ?? [];
+    if (!orders.length) return null;
+    const from = Math.min(...orders.map((o) => new Date(o.from ?? o.date).getTime()));
+    const to = Math.max(...orders.map((o) => new Date(o.to ?? o.date).getTime()));
+    return this.span(new Date(from).toISOString(), new Date(to).toISOString());
+  }
+
+  /** Från och med till och med: en dag om båda ligger på samma, annars "ÅÅÅÅ-MM-DD – ÅÅÅÅ-MM-DD". */
+  span(from: string, to: string): string {
+    const a = this.day(from);
+    const b = this.day(to);
+    return a === b || new Date(to) < new Date(from) ? a : `${a} – ${b}`;
   }
 
   /**

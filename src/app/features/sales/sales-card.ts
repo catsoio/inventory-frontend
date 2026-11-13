@@ -783,7 +783,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                             @if (o.vehicle) {
                               {{ o.vehicle }}
                             }
-                            · klar {{ dayOf(o.doneAt) }}
+                            · {{ spanOf(o) }}
                             @if (o.yourReference) {
                               · Er ref: {{ o.yourReference }}
                             }
@@ -1682,10 +1682,8 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         { key: `head-${o.id}`, section: null, items: [], head: o, inOrder: true },
         ...mine.map((g) => ({ ...g, inOrder: true })),
       );
-      // Med ett enda jobb är jobbets delsumma redan orderns.
-      if (mine.length > 1) {
-        out.push({ key: `foot-${o.id}`, section: null, items: [], foot: o, inOrder: true });
-      }
+      // Varje order slutar med sin summa, även med ett enda jobb, så blocken ser likadana ut.
+      out.push({ key: `foot-${o.id}`, section: null, items: [], foot: o, inOrder: true });
     }
     const rest = groupsOf(
       items.filter((x) => loose(x.r)),
@@ -1710,6 +1708,17 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   });
   readonly dayOf = (iso: string) =>
     new Date(iso).toLocaleDateString(appLocale(), { day: 'numeric', month: 'short' });
+  /** Arbetets tid på ordern ("12 nov 08:00–16:00"); äldre kort har bara dagen ordern blev klar. */
+  readonly spanOf = (o: SalesCardOrder) => {
+    if (!o.startAt) return this.dayOf(o.doneAt);
+    const time = (iso: string) =>
+      new Date(iso).toLocaleTimeString(appLocale(), { hour: '2-digit', minute: '2-digit' });
+    const start = `${this.dayOf(o.startAt)} ${time(o.startAt)}`;
+    if (!o.endAt || new Date(o.endAt) <= new Date(o.startAt)) return start;
+    return this.dayOf(o.endAt) === this.dayOf(o.startAt)
+      ? `${start}–${time(o.endAt)}`
+      : `${start} – ${this.dayOf(o.endAt)} ${time(o.endAt)}`;
+  };
   readonly sectionTotals = computed(() =>
     groupAmounts(this.priced(), rowAmounts(this.priced(), null, this.groups())),
   );
