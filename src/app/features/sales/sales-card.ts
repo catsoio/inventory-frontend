@@ -1232,36 +1232,38 @@ interface PayWayOption {
                   <span class="text-gray-600"
                     >Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</span
                   >
-                  <mat-select
-                    class="!flex h-9 w-64 items-center rounded-md border border-gray-300 bg-white px-3 text-sm focus-within:border-teal-700"
-                    aria-label="Hur betalar kunden?"
-                    panelWidth="22rem"
-                    [value]="way()"
-                    [disabled]="readerWaiting()"
-                    (selectionChange)="chooseWay($event.value)"
-                  >
-                    <mat-select-trigger>
-                      <span class="flex items-center gap-2">
-                        <mat-icon class="!h-5 !w-5 !text-[20px] text-teal-700">{{
-                          wayIcon()
-                        }}</mat-icon>
-                        {{ wayLabel() }}
-                      </span>
-                    </mat-select-trigger>
-                    @for (o of wayOptions(); track o.id) {
-                      <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
-                        <span class="flex items-center gap-3">
-                          <mat-icon class="text-gray-500">{{ o.icon }}</mat-icon>
-                          <span>
-                            <span class="block leading-tight">{{ o.label }}</span>
-                            <span class="block text-xs leading-tight text-gray-500">{{
-                              o.hint
-                            }}</span>
-                          </span>
+                  <div class="w-64 shrink-0">
+                    <mat-select
+                      class="!flex h-9 w-full items-center rounded-md border border-gray-300 bg-white px-3 text-sm focus-within:border-teal-700"
+                      aria-label="Hur betalar kunden?"
+                      panelWidth="22rem"
+                      [value]="way()"
+                      [disabled]="readerWaiting()"
+                      (selectionChange)="chooseWay($event.value)"
+                    >
+                      <mat-select-trigger>
+                        <span class="flex items-center gap-2">
+                          <mat-icon class="!h-5 !w-5 !text-[20px] text-teal-700">{{
+                            wayIcon()
+                          }}</mat-icon>
+                          {{ wayLabel() }}
                         </span>
-                      </mat-option>
-                    }
-                  </mat-select>
+                      </mat-select-trigger>
+                      @for (o of wayOptions(); track o.id) {
+                        <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
+                          <span class="flex items-center gap-3">
+                            <mat-icon class="text-gray-500">{{ o.icon }}</mat-icon>
+                            <span>
+                              <span class="block leading-tight">{{ o.label }}</span>
+                              <span class="block text-xs leading-tight text-gray-500">{{
+                                o.hint
+                              }}</span>
+                            </span>
+                          </span>
+                        </mat-option>
+                      }
+                    </mat-select>
+                  </div>
                 </div>
                 @switch (way()) {
                   @case ('invoice') {
