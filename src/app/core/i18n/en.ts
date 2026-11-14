@@ -1266,4 +1266,14 @@ export const EN: Record<string, string> = {
   'Sparar ändringarna…': 'Saving changes…',
   'Sparar…': 'Saving…',
   'Rätta det som står nedan först.': 'Fix what is shown below first.',
+  'Annat betalsätt': 'Other way of paying',
+  'Kort, Swish eller kontant utan kassa': 'Card, Swish or cash without a till',
+  Förhandsgranska: 'Preview',
+  'Starta betalning': 'Start payment',
+  'Betalning i PayPal-kassan': 'Payment in the PayPal till',
+  'Köpet hittades. Bokför…': 'Purchase found. Posting…',
+  'Låt kunden betala där: kort, Swish eller kontant.':
+    'Let the customer pay there: card, Swish or cash.',
+  'Klart! Köpet hittas här av sig självt och kortet bokförs.':
+    'Done! The purchase is found here by itself and the card is posted.',
 };

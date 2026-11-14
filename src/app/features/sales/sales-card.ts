@@ -1,5 +1,7 @@
 import { CreditDialog, type CreditResult } from './credit-dialog';
 import { ReturnDialog } from './return-dialog';
+import { TillPayDialog, type TillPayData } from './till-pay';
+import { ReaderPayment } from './reader-payment';
 import {
   Component,
   computed,
@@ -181,6 +183,28 @@ interface PayWayOption {
             >
               <mat-icon>delete_outline</mat-icon>
             </button>
+            @if (way() !== 'till' && way() !== 'reader') {
+              <a
+                mat-stroked-button
+                [routerLink]="['/sales', c.id, 'invoice']"
+                [queryParams]="choiceParams()"
+                [class.pointer-events-none]="dirty() || !rows().length"
+              >
+                <mat-icon>visibility</mat-icon> Förhandsgranska
+              </a>
+            }
+            @if (primary(); as pr) {
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="dirty() || busy() || readerWaiting() || !rows().length || !!blocker()"
+                [matTooltip]="blocker()?.text ?? ''"
+                (click)="pr.run()"
+              >
+                <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
+              </button>
+            }
           }
           @if (c.status === 'posted') {
             @if (isOwner && !c.document?.register && !c.credit) {
@@ -1221,141 +1245,83 @@ interface PayWayOption {
               }}
               Därefter går kortet inte att ändra.
             </p>
-            <div
-              class="mb-4 flex flex-wrap gap-2"
-              role="radiogroup"
-              aria-label="Hur betalar kunden?"
-            >
-              @for (o of wayOptions(); track o.id) {
-                <button
-                  type="button"
-                  role="radio"
-                  class="min-w-52 rounded-xl border px-4 py-2 text-left disabled:opacity-50"
-                  [attr.aria-checked]="way() === o.id"
-                  [class.border-teal-700]="way() === o.id"
-                  [class.bg-teal-50]="way() === o.id"
-                  [class.border-gray-200]="way() !== o.id"
-                  [disabled]="readerWaiting() || o.disabled"
-                  (click)="chooseWay(o.id)"
+            <div class="flex flex-wrap items-start gap-3">
+              <mat-form-field class="w-72" subscriptSizing="dynamic">
+                <mat-label>Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</mat-label>
+                <mat-select
+                  [value]="way()"
+                  [disabled]="readerWaiting()"
+                  (selectionChange)="chooseWay($event.value)"
                 >
-                  <span class="flex items-center gap-2 font-medium">
-                    <mat-icon class="!h-5 !w-5 !text-[20px]">{{ o.icon }}</mat-icon>
-                    {{ o.label }}
-                  </span>
-                  <span class="block text-xs text-gray-500">{{ o.hint }}</span>
-                </button>
+                  @for (o of wayOptions(); track o.id) {
+                    <mat-option [value]="o.id" [disabled]="o.disabled">
+                      {{ o.label }}
+                      <span class="ml-1 text-xs text-gray-500">{{ o.hint }}</span>
+                    </mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              @switch (way()) {
+                @case ('invoice') {
+                  <mat-form-field class="w-56" subscriptSizing="dynamic">
+                    <mat-label>Betalningsvillkor (dagar)</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      max="365"
+                      [value]="terms()"
+                      (input)="termsDays.set($any($event.target).valueAsNumber)"
+                    />
+                    <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
+                  </mat-form-field>
+                }
+                @case ('cash_invoice') {
+                  <mat-form-field class="w-56" subscriptSizing="dynamic">
+                    <mat-label>Betalsätt</mat-label>
+                    <mat-select
+                      [value]="receiptMethod()"
+                      (selectionChange)="receiptMethod.set($event.value)"
+                    >
+                      @for (m of receiptMethods; track m[0]) {
+                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                }
+                @case ('receipt') {
+                  <mat-form-field class="w-56" subscriptSizing="dynamic">
+                    <mat-label>Betalsätt</mat-label>
+                    <mat-select
+                      [value]="receiptMethod()"
+                      (selectionChange)="receiptMethod.set($event.value)"
+                    >
+                      @for (m of receiptMethods; track m[0]) {
+                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                }
               }
             </div>
-
-            @switch (way()) {
-              @case ('invoice') {
-                <mat-form-field class="w-56" subscriptSizing="dynamic">
-                  <mat-label>Betalningsvillkor (dagar)</mat-label>
-                  <input
-                    matInput
-                    type="number"
-                    min="0"
-                    max="365"
-                    [value]="terms()"
-                    (input)="termsDays.set($any($event.target).valueAsNumber)"
-                  />
-                  <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
-                </mat-form-field>
-              }
-              @case ('cash_invoice') {
-                <mat-form-field class="w-56" subscriptSizing="dynamic">
-                  <mat-label>Betalsätt</mat-label>
-                  <mat-select
-                    [value]="receiptMethod()"
-                    (selectionChange)="receiptMethod.set($event.value)"
-                  >
-                    @for (m of receiptMethods; track m[0]) {
-                      <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                    }
-                  </mat-select>
-                  <mat-hint>Så som kunden betalade vid disken</mat-hint>
-                </mat-form-field>
-              }
-              @case ('receipt') {
-                <mat-form-field class="w-56" subscriptSizing="dynamic">
-                  <mat-label>Betalsätt</mat-label>
-                  <mat-select
-                    [value]="receiptMethod()"
-                    (selectionChange)="receiptMethod.set($event.value)"
-                  >
-                    @for (m of receiptMethods; track m[0]) {
-                      <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                  <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
-                  kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
-                  prisbasbelopp inkl. moms (236 800 kr för 2026). Axle är inget kassaregister: ta
-                  betalt i PayPal-kassan eller kontrollera med Skatteverket eller er revisor.
-                </p>
-              }
-              @case ('till') {
-                <app-till-pay
-                  [cardId]="c.id"
-                  [cardCode]="c.code"
-                  [total]="totals().total"
-                  [disabled]="dirty() || readerWaiting() || !rows().length || !!blocker()"
-                  [disabledHint]="
-                    dirty() ? 'Sparar ändringarna…' : 'Rätta det som står nedan först.'
-                  "
-                  (booked)="load(c.id)"
-                />
-              }
-              @case ('reader') {
-                <app-reader-payment
-                  [cardId]="c.id"
-                  [disabled]="dirty() || !!blocker() || !rows().length"
-                  [disabledHint]="
-                    dirty() ? 'Sparar ändringarna…' : 'Rätta det som står nedan först.'
-                  "
-                  [document]="kind()"
-                  (waitingChange)="readerWaiting.set($event)"
-                  (booked)="readerWaiting.set(false); load(c.id)"
-                />
-              }
+            @if (way() === 'receipt') {
+              <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
+                kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
+                prisbasbelopp inkl. moms (236 800 kr för 2026). Axle är inget kassaregister: ta
+                betalt i PayPal-kassan eller kontrollera med Skatteverket eller er revisor.
+              </p>
             }
-
+            @if (way() === 'reader') {
+              <app-reader-payment
+                [cardId]="c.id"
+                [showStart]="false"
+                (waitingChange)="readerWaiting.set($event)"
+                (booked)="readerWaiting.set(false); load(c.id)"
+              />
+            }
             @if (blocker(); as b) {
               <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
-            }
-            @if (way() === 'invoice' || way() === 'cash_invoice' || way() === 'receipt') {
-              @if (dirty()) {
-                <p class="mt-3 text-sm text-gray-500">Sparar ändringarna…</p>
-              }
-              <div class="mt-4 flex flex-wrap gap-2">
-                <button
-                  mat-flat-button
-                  color="primary"
-                  type="button"
-                  [disabled]="dirty() || busy() || readerWaiting() || !rows().length || !!blocker()"
-                  (click)="post()"
-                >
-                  <mat-icon>receipt_long</mat-icon>
-                  {{
-                    way() === 'cash_invoice'
-                      ? 'Bokför som betald (' +
-                        payLabel('receipt', receiptMethod()).toLowerCase() +
-                        ')'
-                      : way() === 'invoice'
-                        ? 'Bokför som faktura'
-                        : 'Bokför som kvitto'
-                  }}
-                </button>
-                <a
-                  mat-stroked-button
-                  [routerLink]="['/sales', c.id, 'invoice']"
-                  [queryParams]="choiceParams()"
-                  [class.pointer-events-none]="dirty() || !rows().length"
-                >
-                  <mat-icon>visibility</mat-icon> Förhandsgranska utkast
-                </a>
-              </div>
             }
           </section>
         } @else if (c.document; as inv) {
@@ -1772,13 +1738,54 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
       out.push({
         id: 'receipt',
         icon: 'receipt',
-        label: 'Kvitto',
-        hint: 'Kort, Swish eller kontant',
+        label: 'Annat betalsätt',
+        hint: 'Kort, Swish eller kontant utan kassa',
         disabled: noReceipt,
       });
     }
     return out;
   });
+
+  /** Kortets stora knapp i huvudet: vad som händer beror på hur kunden betalar. */
+  readonly primary = computed<{ label: string; icon: string; run: () => void } | null>(() => {
+    switch (this.way()) {
+      case 'invoice':
+        return { label: 'Bokför som faktura', icon: 'receipt_long', run: () => this.post() };
+      case 'cash_invoice':
+        return {
+          label: `Bokför som betald (${paymentLabel('receipt', this.receiptMethod()).toLowerCase()})`,
+          icon: 'receipt_long',
+          run: () => this.post(),
+        };
+      case 'receipt':
+        return { label: 'Bokför som kvitto', icon: 'receipt_long', run: () => this.post() };
+      case 'till':
+        return { label: 'Starta betalning', icon: 'point_of_sale', run: () => this.openTill() };
+      case 'reader':
+        return {
+          label: 'Ta betalt på läsaren',
+          icon: 'contactless',
+          run: () => this.reader?.start(),
+        };
+    }
+  });
+
+  @ViewChild(ReaderPayment) private reader?: ReaderPayment;
+
+  /** Öppnar stegen för PayPal-kassan; dialogen hittar köpet och bokför kortet. */
+  openTill() {
+    const c = this.card();
+    if (!c) return;
+    this.dialog
+      .open<TillPayDialog, TillPayData, boolean>(TillPayDialog, {
+        data: { cardId: c.id, cardCode: c.code, total: this.totals().total },
+        width: '520px',
+        maxWidth: '95vw',
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((ok) => ok && this.load(c.id));
+  }
 
   chooseWay(id: PayWay) {
     if (id === 'till' || id === 'reader') {

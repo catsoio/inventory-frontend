@@ -17,7 +17,12 @@ const day = (iso: string | null | undefined) =>
 const stateOf = (c: SalesCardItem) =>
   c.status === 'draft'
     ? null
-    : invoiceStatus({ kind: c.kind ?? 'receipt', dueAt: c.dueAt, paidAt: c.paidAt, creditedAt: c.creditedAt });
+    : invoiceStatus({
+        kind: c.kind ?? 'receipt',
+        dueAt: c.dueAt,
+        paidAt: c.paidAt,
+        creditedAt: c.creditedAt,
+      });
 const statusOf = (c: SalesCardItem) => {
   const s = stateOf(c);
   return s ? STATUS_TEXT[s] : 'Utkast';

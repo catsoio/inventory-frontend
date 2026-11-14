@@ -29,8 +29,8 @@ const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
     </h2>
     <mat-dialog-content class="!flex flex-col gap-4 !pt-2">
       <p class="text-sm text-gray-600">
-        {{ data.customerName }} får ett mejl med en länk till {{ the }}, precis som det ser ut
-        när du skriver ut det.
+        {{ data.customerName }} får ett mejl med en länk till {{ the }}, precis som det ser ut när
+        du skriver ut det.
         @if (!data.resend) {
           Efter att det skickats går det inte att återöppna kortet.
         }

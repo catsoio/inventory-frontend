@@ -24,7 +24,7 @@ import { PaymentReader, PaymentRow } from '../../core/models';
   selector: 'app-reader-payment',
   standalone: false,
   template: `
-    @if (ready()) {
+    @if (ready() && (showStart || waiting() || error() || unbooked())) {
       <div class="mt-4 rounded-lg border border-gray-200 p-3">
         <div class="flex flex-wrap items-center gap-3">
           <mat-icon class="text-gray-500">contactless</mat-icon>
@@ -47,16 +47,18 @@ import { PaymentReader, PaymentRow } from '../../core/models';
                 </mat-select>
               </mat-form-field>
             }
-            <button
-              mat-flat-button
-              color="primary"
-              type="button"
-              [disabled]="disabled || busy() || !readerId()"
-              (click)="start()"
-            >
-              Ta betalt på läsaren
-            </button>
-            @if (disabled) {
+            @if (showStart) {
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="disabled || busy() || !readerId()"
+                (click)="start()"
+              >
+                Ta betalt på läsaren
+              </button>
+            }
+            @if (showStart && disabled) {
               <span class="text-sm text-gray-500">{{ disabledHint }}</span>
             }
           }
@@ -82,6 +84,8 @@ export class ReaderPayment implements OnInit {
   @Input({ required: true }) cardId!: string;
   /** Kortet har osparade ändringar (beloppet på läsaren skulle bli fel) eller kan inte bokföras än. */
   @Input() disabled = false;
+  /** Falskt när knappen ligger någon annanstans (kortets huvud) och komponenten bara visar läget. */
+  @Input() showStart = true;
   /** Varför knappen är avstängd. */
   @Input() disabledHint = 'Spara ändringarna först.';
   /** Vad ett utkast blir när kunden betalat: kvitto eller kontantfaktura. Utan värde avgör servern. */
@@ -117,6 +121,7 @@ export class ReaderPayment implements OnInit {
     });
   }
 
+  /** Skickar kortets belopp till läsaren (anropas också från kortets huvud). */
   start() {
     this.busy.set(true);
     this.error.set('');

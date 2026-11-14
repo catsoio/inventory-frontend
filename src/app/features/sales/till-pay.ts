@@ -1,172 +1,129 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { catchError, of, switchMap, timer } from 'rxjs';
 import { ZettleApi } from '../../core/api/zettle-api';
 import { appLocale } from '../../core/i18n/locale';
 import { PosSale } from '../../core/models';
-import { Confirm } from '../../shared/confirm';
 
+export interface TillPayData {
+  cardId: string;
+  cardCode: string;
+  /** Vad kortet går på, öre inkl. moms: köpet i kassan måste vara exakt det. */
+  total: number;
+}
+
+/** Köp äldre än så här (före dialogen öppnades) räknas inte som betalningen. */
+const LOOKBACK_MS = 15 * 60 * 1000;
 const METHOD: Record<string, string> = { card: 'kort', swish: 'Swish', cash: 'kontant' };
 
 /**
- * Betald i PayPal-kassan: en känd kunds jobb som betalas vid disken. Personalen slår in beloppet i
- * PayPals app (kassan är kassaregistret och ger kunden kvittot) och väljer köpet här; kortet bokförs
- * då som ett kvitto som hänvisar till kassans, momsen räknas en gång och lagret dras en gång. Syns
- * bara när PayPal-kassan är kopplad.
+ * Betald i PayPal-kassan, steg för steg: personalen slår in beloppet i PayPal-appen och dialogen
+ * läser in köp var fjärde sekund. Ett enda köp med exakt kortets belopp, slaget in nyss, bokför
+ * kortet direkt; flera sådana visas så att rätt kan väljas. Kassan registrerar köpet och ger
+ * kunden kvittot; kortet blir ett kvitto som hänvisar till det.
  */
 @Component({
-  selector: 'app-till-pay',
+  selector: 'app-till-pay-dialog',
   standalone: false,
   template: `
-    @if (connected()) {
-      <div class="mt-4 rounded-lg border border-gray-200 p-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <mat-icon class="text-gray-500">point_of_sale</mat-icon>
-          <span class="font-medium">Betald i PayPal-kassan</span>
-          <span class="flex-1"></span>
-          <button mat-button type="button" [disabled]="busy()" (click)="refresh()">
-            <mat-icon>sync</mat-icon> Hämta köp
-          </button>
-        </div>
-        <p class="mt-1 text-sm text-gray-600">
-          Slå in {{ total | kr }} i PayPal-appen och ta betalt där. Tryck Hämta köp och välj köpet:
-          kortet bokförs som kvitto och kunden har fått kvittot från kassan.
-        </p>
-        @if (disabled) {
-          <p class="mt-1 text-sm text-gray-500">{{ disabledHint }}</p>
-        }
-        <div class="mt-2 flex flex-col gap-1">
-          @for (s of sales(); track s.id) {
+    <h2 mat-dialog-title>Betalning i PayPal-kassan</h2>
+    <mat-dialog-content class="!flex flex-col gap-3 !pt-2">
+      <ol class="list-decimal space-y-1 pl-5 text-sm text-gray-700">
+        <li>
+          Öppna PayPal-appen och slå in <b>{{ data.total | kr }}</b> (en vara eller ett eget
+          belopp).
+        </li>
+        <li>Låt kunden betala där: kort, Swish eller kontant.</li>
+        <li>Klart! Köpet hittas här av sig självt och kortet bokförs.</li>
+      </ol>
+
+      @if (booking()) {
+        <p class="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">Köpet hittades. Bokför…</p>
+      } @else if (!matches().length) {
+        <p class="text-sm text-gray-600">Väntar på ett köp på {{ data.total | kr }}…</p>
+        <mat-progress-bar mode="indeterminate" />
+      } @else {
+        <p class="text-sm text-gray-700">Flera köp passar. Välj det som hör till kunden:</p>
+        <div class="flex flex-col gap-1">
+          @for (s of matches(); track s.id) {
             <button
               type="button"
-              class="flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm"
-              [class.border-teal-600]="chosen() === s.id"
-              [class.bg-teal-50]="chosen() === s.id"
-              [class.border-gray-200]="chosen() !== s.id"
-              [class.opacity-50]="s.amount !== total"
-              [disabled]="disabled || busy() || s.amount !== total"
-              (click)="chosen.set(s.id)"
+              class="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-left text-sm hover:bg-gray-50"
+              [disabled]="booking()"
+              (click)="pay(s)"
             >
               <span class="tabular-nums text-gray-500">{{ time(s.soldAt) }}</span>
               <span class="tabular-nums">nr {{ s.number ?? '–' }}</span>
               <span class="min-w-0 flex-1 truncate text-gray-600">{{ goods(s) }}</span>
               <span class="text-gray-500">{{ paid(s) }}</span>
-              <span class="font-medium tabular-nums">{{ s.amount | kr }}</span>
             </button>
-          } @empty {
-            <p class="text-sm text-gray-500">
-              {{
-                loading()
-                  ? 'Läser in…'
-                  : 'Inga köp i kassan de senaste två dagarna som inte redan betalar ett kort.'
-              }}
-            </p>
           }
         </div>
-        @if (sales().length && !hasMatch()) {
-          <p class="mt-2 text-sm text-amber-800">
-            Inget köp går på {{ total | kr }}. Slå in exakt det beloppet, eller ändra kortet.
-          </p>
-        }
-        <button
-          mat-stroked-button
-          type="button"
-          class="mt-2"
-          [disabled]="disabled || busy() || !chosen()"
-          (click)="pay()"
-        >
-          <mat-icon>receipt_long</mat-icon> Bokför som betald i kassan
-        </button>
-      </div>
-    }
+      }
+      @if (error(); as e) {
+        <p class="text-sm text-red-700">{{ e }}</p>
+      }
+    </mat-dialog-content>
+    <mat-dialog-actions>
+      <span class="flex-1"></span>
+      <button mat-button type="button" [disabled]="booking()" mat-dialog-close>Avbryt</button>
+    </mat-dialog-actions>
   `,
 })
-export class TillPay implements OnInit {
+export class TillPayDialog implements OnInit {
+  readonly data = inject<TillPayData>(MAT_DIALOG_DATA);
+  private readonly ref = inject<MatDialogRef<TillPayDialog, boolean>>(MatDialogRef);
   private readonly api = inject(ZettleApi);
   private readonly snack = inject(MatSnackBar);
-  private readonly confirm = inject(Confirm);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly startedAt = Date.now();
 
-  @Input({ required: true }) cardId!: string;
-  @Input({ required: true }) cardCode!: string;
-  /** Vad kortet går på, öre inkl. moms: köpet i kassan måste vara exakt det. */
-  @Input({ required: true }) total!: number;
-  /** Kortet har osparade ändringar eller kan inte bokföras än. */
-  @Input() disabled = false;
-  @Input() disabledHint = 'Spara ändringarna först.';
-  /** Kortet är bokfört: sidan ska läsa om det. */
-  @Output() booked = new EventEmitter<void>();
-
-  readonly connected = signal(false);
-  readonly sales = signal<PosSale[]>([]);
-  readonly chosen = signal<string | null>(null);
-  readonly busy = signal(false);
-  readonly loading = signal(false);
+  readonly matches = signal<PosSale[]>([]);
+  readonly booking = signal(false);
+  readonly error = signal('');
 
   ngOnInit() {
-    this.api.status().subscribe((s) => {
-      this.connected.set(s.connected);
-      if (s.connected) this.load();
-    });
+    // Läs in köp och leta matchning var fjärde sekund så länge dialogen är öppen.
+    timer(0, 4000)
+      .pipe(
+        switchMap(() =>
+          this.booking()
+            ? of(null)
+            : this.api.sync().pipe(
+                catchError(() => of(null)),
+                switchMap(() => this.api.openSales().pipe(catchError(() => of(null)))),
+              ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((list) => {
+        if (!list || this.booking()) return;
+        const cutoff = this.startedAt - LOOKBACK_MS;
+        const found = list.filter(
+          (s) => s.amount === this.data.total && new Date(s.soldAt).getTime() >= cutoff,
+        );
+        this.matches.set(found);
+        if (found.length === 1) this.pay(found[0]);
+      });
   }
 
-  hasMatch() {
-    return this.sales().some((s) => s.amount === this.total);
-  }
-
-  load() {
-    this.loading.set(true);
-    this.api.openSales().subscribe({
-      next: (list) => {
-        this.loading.set(false);
-        this.sales.set(list);
-        // Förvälj när precis ett köp går på kortets belopp.
-        const match = list.filter((s) => s.amount === this.total);
-        if (!this.chosen() && match.length === 1) this.chosen.set(match[0].id);
-      },
-      error: () => this.loading.set(false),
-    });
-  }
-
-  /** Läser in nya köp från kassan och visar listan igen. */
-  refresh() {
-    this.busy.set(true);
-    this.api.sync().subscribe({
+  pay(sale: PosSale) {
+    this.booking.set(true);
+    this.error.set('');
+    this.api.payCard(sale.id, this.data.cardId).subscribe({
       next: () => {
-        this.busy.set(false);
-        this.load();
+        this.snack.open(`${this.data.cardCode} är betalt i kassan och bokfört`, 'OK', {
+          duration: 4000,
+        });
+        this.ref.close(true);
       },
       error: () => {
-        this.busy.set(false);
-        this.load();
+        this.booking.set(false);
+        this.error.set('Kortet kunde inte bokföras. Kontrollera meddelandet och försök igen.');
       },
     });
-  }
-
-  pay() {
-    const sale = this.sales().find((s) => s.id === this.chosen());
-    if (!sale) return;
-    this.confirm
-      .ask({
-        title: `Bokför ${this.cardCode} som betald i kassan?`,
-        message: `Kortet bokförs som ett kvitto, betalt ${this.paid(sale)} i PayPal-kassan (köp nr ${sale.number ?? '–'}, ${this.time(sale.soldAt)}). Lagret minskas för artiklarna på kortet. Därefter går kortet inte att ändra; ett fel rättas med kreditfaktura och retur i PayPal-appen.`,
-        confirmText: 'Bokför',
-      })
-      .subscribe((ok) => {
-        if (!ok) return;
-        this.busy.set(true);
-        this.api.payCard(sale.id, this.cardId).subscribe({
-          next: () => {
-            this.busy.set(false);
-            this.snack.open(`${this.cardCode} är betalt i kassan och bokfört`, 'OK', {
-              duration: 4000,
-            });
-            this.booked.emit();
-          },
-          error: () => {
-            this.busy.set(false);
-            this.load();
-          },
-        });
-      });
   }
 
   goods(s: PosSale) {
@@ -181,10 +138,6 @@ export class TillPay implements OnInit {
   }
 
   time(iso: string) {
-    return new Date(iso).toLocaleString(appLocale(), {
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return new Date(iso).toLocaleString(appLocale(), { hour: '2-digit', minute: '2-digit' });
   }
 }
