@@ -1097,132 +1097,149 @@ interface PayWayOption {
         </section>
       }
 
-      <div class="grid items-start gap-4 lg:grid-cols-2">
-        <section class="rounded-xl bg-white p-5 shadow-sm">
-          <h2 class="mb-2 text-base font-semibold">
-            {{ hall() ? 'Rabatt' : 'Rabatt på hela kortet' }}
-          </h2>
-          @if (readOnly()) {
-            <p class="text-sm">
-              @if (card()?.discount; as d) {
-                {{ d.type === 'percent' ? d.value + ' %' : (d.value | kr) }}
-                @if (d.reason) {
-                  <span class="text-gray-500"> · {{ d.reason }}</span>
+      <section class="rounded-xl bg-white p-5 shadow-sm">
+        <div class="grid gap-6 lg:grid-cols-[1fr_22rem] lg:gap-10">
+          <div>
+            <h2 class="mb-3 text-base font-semibold">Rabatt</h2>
+            @if (readOnly()) {
+              <p class="text-sm">
+                @if (card()?.discount; as d) {
+                  {{ d.type === 'percent' ? d.value + ' %' : (d.value | kr) }}
+                  @if (d.reason) {
+                    <span class="text-gray-500"> · {{ d.reason }}</span>
+                  }
+                } @else {
+                  Ingen rabatt.
                 }
-              } @else {
-                Ingen rabatt.
+              </p>
+            } @else {
+              <div class="flex flex-wrap items-start gap-3">
+                <mat-button-toggle-group
+                  hideSingleSelectionIndicator
+                  [value]="discType()"
+                  (change)="discType.set($event.value); touch()"
+                  aria-label="Typ av rabatt"
+                >
+                  <mat-button-toggle value="percent">%</mat-button-toggle>
+                  <mat-button-toggle value="amount">kr</mat-button-toggle>
+                </mat-button-toggle-group>
+                <mat-form-field subscriptSizing="dynamic" class="w-36">
+                  <mat-label>{{ discType() === 'percent' ? 'Procent' : 'Kronor' }}</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    [value]="discValue() || ''"
+                    (input)="discValue.set($any($event.target).valueAsNumber || 0); touch()"
+                  />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic" class="min-w-52 flex-1">
+                  <mat-label>{{
+                    hall()
+                      ? 'Anledning (syns inte på fakturan)'
+                      : 'Anledning (syns inte på kvittot)'
+                  }}</mat-label>
+                  <input
+                    matInput
+                    [value]="discReason()"
+                    (input)="discReason.set($any($event.target).value); touch()"
+                    [placeholder]="
+                      hall() ? 't.ex. kampanj eller inbytesbonus' : 't.ex. 4 bilar på däckhotell'
+                    "
+                  />
+                </mat-form-field>
+              </div>
+            }
+          </div>
+          <div class="lg:border-l lg:border-gray-100 lg:pl-10">
+            <h2 class="mb-3 text-base font-semibold">Summa</h2>
+            <div class="text-sm">
+              @if (totals().discount > 0) {
+                <div class="flex justify-between py-0.5 text-gray-600">
+                  <span>Före rabatt</span><span>{{ totals().gross | kr }}</span>
+                </div>
+                <div class="flex justify-between py-0.5 text-green-700">
+                  <span>Rabatt</span><span>−{{ totals().discount | kr }}</span>
+                </div>
               }
-            </p>
-          } @else {
-            <div class="flex flex-wrap items-start gap-3">
-              <mat-button-toggle-group
-                hideSingleSelectionIndicator
-                [value]="discType()"
-                (change)="discType.set($event.value); touch()"
-                aria-label="Typ av rabatt"
-              >
-                <mat-button-toggle value="percent">%</mat-button-toggle>
-                <mat-button-toggle value="amount">kr</mat-button-toggle>
-              </mat-button-toggle-group>
-              <mat-form-field subscriptSizing="dynamic" class="w-36">
-                <mat-label>{{ discType() === 'percent' ? 'Procent' : 'Kronor' }}</mat-label>
-                <input
-                  matInput
-                  type="number"
-                  min="0"
-                  [value]="discValue() || ''"
-                  (input)="discValue.set($any($event.target).valueAsNumber || 0); touch()"
-                />
-              </mat-form-field>
-              <mat-form-field subscriptSizing="dynamic" class="min-w-52 flex-1">
-                <mat-label>{{
-                  hall() ? 'Anledning (syns inte på fakturan)' : 'Anledning (syns inte på kvittot)'
-                }}</mat-label>
-                <input
-                  matInput
-                  [value]="discReason()"
-                  (input)="discReason.set($any($event.target).value); touch()"
-                  [placeholder]="
-                    hall() ? 't.ex. kampanj eller inbytesbonus' : 't.ex. 4 bilar på däckhotell'
-                  "
-                />
-              </mat-form-field>
-            </div>
-          }
-        </section>
-
-        <section class="rounded-xl bg-white p-5 shadow-sm">
-          <div class="ml-auto max-w-sm text-sm">
-            @if (totals().discount > 0) {
               <div class="flex justify-between py-0.5 text-gray-600">
-                <span>Före rabatt</span><span>{{ totals().gross | kr }}</span>
+                <span>Summa exkl. moms</span><span>{{ totals().net | kr }}</span>
               </div>
-              <div class="flex justify-between py-0.5 text-green-700">
-                <span>Rabatt</span><span>−{{ totals().discount | kr }}</span>
+              @for (b of totals().byRate; track b.rate) {
+                <div class="flex justify-between py-0.5 text-gray-600">
+                  <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span
+                  ><span>{{ b.vat | kr }}</span>
+                </div>
+              }
+              @if (totals().rounding) {
+                <div class="flex justify-between py-0.5 text-gray-600">
+                  <span>Öresutjämning</span><span>{{ totals().rounding! | kr }}</span>
+                </div>
+              }
+              <div class="mt-1 flex justify-between gap-6 border-t pt-1 text-lg font-semibold">
+                <span>Att betala inkl. moms</span><span>{{ totals().total | kr }}</span>
               </div>
-            }
-            <div class="flex justify-between py-0.5 text-gray-600">
-              <span>Summa exkl. moms</span><span>{{ totals().net | kr }}</span>
-            </div>
-            @for (b of totals().byRate; track b.rate) {
-              <div class="flex justify-between py-0.5 text-gray-600">
-                <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span
-                ><span>{{ b.vat | kr }}</span>
-              </div>
-            }
-            @if (totals().rounding) {
-              <div class="flex justify-between py-0.5 text-gray-600">
-                <span>Öresutjämning</span><span>{{ totals().rounding! | kr }}</span>
-              </div>
-            }
-            <div class="mt-1 flex justify-between gap-6 border-t pt-1 text-lg font-semibold">
-              <span>Att betala inkl. moms</span><span>{{ totals().total | kr }}</span>
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <ng-template #textBlock>
         <section class="rounded-xl bg-white p-5 shadow-sm">
-          <h2 class="mb-2 text-base font-semibold">Text och anteckning</h2>
-          <div class="grid gap-x-4 sm:grid-cols-2">
-            <mat-form-field class="sm:col-span-2">
-              <mat-label>{{
-                hall() ? 'Villkor och text på fakturan' : 'Text under raderna på kvittot'
-              }}</mat-label>
-              <textarea
-                matInput
-                rows="2"
-                [disabled]="readOnly()"
-                [value]="performed()"
-                (input)="performed.set($any($event.target).value); touch()"
-                [placeholder]="
-                  hall()
-                    ? 't.ex. Bilen säljs i befintligt skick. Leverans den 15 november.'
-                    : 't.ex. Bytt däck och balanserat'
-                "
-              ></textarea>
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Garanti</mat-label>
-              <input
-                matInput
-                [placeholder]="hall() ? 't.ex. 12 månaders begagnatgaranti' : ''"
-                [disabled]="readOnly()"
-                [value]="warranty()"
-                (input)="warranty.set($any($event.target).value); touch()"
-              />
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Intern anteckning</mat-label>
-              <input
-                matInput
-                [disabled]="readOnly()"
-                [value]="note()"
-                (input)="note.set($any($event.target).value); touch()"
-              />
-            </mat-form-field>
-          </div>
+          <button
+            type="button"
+            class="flex w-full items-center justify-between text-left"
+            [attr.aria-expanded]="showText()"
+            (click)="showText.set(!showText())"
+          >
+            <span class="text-base font-semibold">Text och anteckning</span>
+            <span class="flex items-center gap-1 text-sm text-gray-500">
+              {{ hasText() ? 'Ifylld' : 'Valfritt' }}
+              <mat-icon>{{ showText() ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </span>
+          </button>
+          @if (showText()) {
+            <div class="mt-3">
+              <div class="grid gap-x-4 sm:grid-cols-2">
+                <mat-form-field class="sm:col-span-2">
+                  <mat-label>{{
+                    hall() ? 'Villkor och text på fakturan' : 'Text under raderna på kvittot'
+                  }}</mat-label>
+                  <textarea
+                    matInput
+                    rows="2"
+                    [disabled]="readOnly()"
+                    [value]="performed()"
+                    (input)="performed.set($any($event.target).value); touch()"
+                    [placeholder]="
+                      hall()
+                        ? 't.ex. Bilen säljs i befintligt skick. Leverans den 15 november.'
+                        : 't.ex. Bytt däck och balanserat'
+                    "
+                  ></textarea>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Garanti</mat-label>
+                  <input
+                    matInput
+                    [placeholder]="hall() ? 't.ex. 12 månaders begagnatgaranti' : ''"
+                    [disabled]="readOnly()"
+                    [value]="warranty()"
+                    (input)="warranty.set($any($event.target).value); touch()"
+                  />
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Intern anteckning</mat-label>
+                  <input
+                    matInput
+                    [disabled]="readOnly()"
+                    [value]="note()"
+                    (input)="note.set($any($event.target).value); touch()"
+                  />
+                </mat-form-field>
+              </div>
+            </div>
+          }
         </section>
       </ng-template>
 
@@ -1232,31 +1249,28 @@ interface PayWayOption {
       @if (card(); as c) {
         @if (c.status === 'draft') {
           <section class="rounded-xl bg-white p-5 shadow-sm">
-            <div class="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 class="text-base font-semibold">Betalning</h2>
-              <span class="text-sm text-gray-500">Att betala {{ totals().total | kr }}</span>
-            </div>
-            <p class="mb-3 text-sm text-gray-600">
-              Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?
+            <h2 class="mb-1 text-base font-semibold">Betalning</h2>
+            <p class="mb-4 text-sm text-gray-500">
               {{
                 hall()
-                  ? 'Vid bokföring sätts bilen som såld och låses, och dokumentet får sitt nummer.'
-                  : 'Vid bokföring minskar lagret för artiklarna och dokumentet får sitt nummer.'
+                  ? 'Vid bokföring sätts bilen som såld och dokumentet får sitt nummer.'
+                  : 'Vid bokföring minskar lagret och dokumentet får sitt nummer.'
               }}
               Därefter går kortet inte att ändra.
             </p>
-            <div class="flex flex-wrap items-start gap-3">
-              <mat-form-field class="w-72" subscriptSizing="dynamic">
+            <div class="flex flex-wrap items-start gap-4">
+              <mat-form-field class="w-80" subscriptSizing="dynamic">
                 <mat-label>Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</mat-label>
                 <mat-select
                   [value]="way()"
                   [disabled]="readerWaiting()"
                   (selectionChange)="chooseWay($event.value)"
                 >
+                  <mat-select-trigger>{{ wayLabel() }}</mat-select-trigger>
                   @for (o of wayOptions(); track o.id) {
-                    <mat-option [value]="o.id" [disabled]="o.disabled">
-                      {{ o.label }}
-                      <span class="ml-1 text-xs text-gray-500">{{ o.hint }}</span>
+                    <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
+                      <span class="block leading-tight">{{ o.label }}</span>
+                      <span class="block text-xs leading-tight text-gray-500">{{ o.hint }}</span>
                     </mat-option>
                   }
                 </mat-select>
@@ -1786,6 +1800,15 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
       .afterClosed()
       .subscribe((ok) => ok && this.load(c.id));
   }
+
+  readonly wayLabel = computed(
+    () => this.wayOptions().find((o) => o.id === this.way())?.label ?? '',
+  );
+
+  /** Text och anteckning är hopfälld tills något står där (eller man öppnar den). */
+  readonly showText = signal(false);
+  readonly hasText = () =>
+    !!(this.performed().trim() || this.warranty().trim() || this.note().trim());
 
   chooseWay(id: PayWay) {
     if (id === 'till' || id === 'reader') {
@@ -2359,6 +2382,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     this.note.set(c.note ?? '');
     this.performed.set(c.performed ?? '');
     this.warranty.set(c.document?.warranty ?? '');
+    if (this.hasText()) this.showText.set(true);
     this.payMethod.set(c.document?.paymentMethod ?? (c.kind === 'invoice' ? 'invoice' : 'card'));
     this.dirty.set(false);
   }
