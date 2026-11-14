@@ -1313,6 +1313,32 @@ interface PayWayOption {
                   }
                 }
               </div>
+              <!-- Samma knappar som i kortets huvud, här där man betalar. -->
+              <div class="mt-4 flex flex-wrap items-center gap-3">
+                @if (primary(); as pr) {
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    [disabled]="
+                      dirty() || busy() || readerWaiting() || !rows().length || !!blocker()
+                    "
+                    (click)="pr.run()"
+                  >
+                    <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
+                  </button>
+                }
+                @if (way() !== 'till' && way() !== 'reader') {
+                  <a
+                    mat-stroked-button
+                    [routerLink]="['/sales', c.id, 'invoice']"
+                    [queryParams]="choiceParams()"
+                    [class.pointer-events-none]="dirty() || !rows().length"
+                  >
+                    <mat-icon>visibility</mat-icon> Förhandsgranska
+                  </a>
+                }
+              </div>
               @if (way() === 'reader') {
                 <app-reader-payment
                   [cardId]="c.id"
