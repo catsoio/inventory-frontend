@@ -9,22 +9,24 @@ import type { ProductScope } from '../../core/layout/products';
 @Component({
   selector: 'app-product-filter',
   standalone: false,
+  host: { class: 'contents' },
   template: `
     @if (visible()) {
-      <mat-button-toggle-group
-        hideSingleSelectionIndicator
+      <app-segmented
+        label="Produkt"
+        [options]="options"
         [value]="value()"
-        (change)="value.set($event.value)"
-        aria-label="Produkt"
-      >
-        <mat-button-toggle value="all">Alla</mat-button-toggle>
-        <mat-button-toggle value="axle">Verkstad</mat-button-toggle>
-        <mat-button-toggle value="hall">Bilhandel</mat-button-toggle>
-      </mat-button-toggle-group>
+        (valueChange)="value.set($any($event))"
+      />
     }
   `,
 })
 export class ProductFilter {
+  readonly options = [
+    { value: 'all', label: 'Alla' },
+    { value: 'axle', label: 'Verkstad' },
+    { value: 'hall', label: 'Bilhandel' },
+  ];
   private readonly billing = inject(Billing);
   readonly value = model<ProductScope>('all');
   readonly visible = computed(() => this.billing.allows('bilhandel'));

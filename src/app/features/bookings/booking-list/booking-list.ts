@@ -64,30 +64,26 @@ const DAY = 86_400_000;
       [rows]="shown()"
       [loading]="loading()"
       newLabel="Ny bokning"
+      [newButton]="!embedded"
+      (newClick)="create()"
       emptyText="Inga bokningar i perioden."
       searchPlaceholder="Sök kund, regnr, åtgärd eller TID-nummer…"
       (search)="query.set($event)"
       (rowClick)="open($event)"
     >
-      <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-        @if (!embedded) {
-          <app-booking-views value="list" (pick)="goView($event)" />
-        }
-        <mat-button-toggle-group
-          hideSingleSelectionIndicator
-          [value]="range()"
-          (change)="setRange($event.value)"
-          aria-label="Period"
-        >
-          <mat-button-toggle value="upcoming">Kommande 30 dagar</mat-button-toggle>
-          <mat-button-toggle value="past">Senaste 30 dagarna</mat-button-toggle>
-        </mat-button-toggle-group>
-        @if (!embedded) {
-          <button mat-flat-button color="primary" (click)="create()">
-            <mat-icon>add</mat-icon> Ny bokning
-          </button>
-        }
-      </div>
+      @if (!embedded) {
+        <app-booking-views filters value="list" (pick)="goView($event)" />
+      }
+      <app-segmented
+        filters
+        label="Period"
+        [options]="[
+          { value: 'upcoming', label: 'Kommande 30 dagar' },
+          { value: 'past', label: 'Senaste 30 dagarna' },
+        ]"
+        [value]="range()"
+        (valueChange)="setRange($any($event))"
+      />
       <ng-template #cell let-b="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill

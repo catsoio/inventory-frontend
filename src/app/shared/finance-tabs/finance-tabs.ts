@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Auth } from '../../core/auth/auth';
 import { Nav } from '../../core/layout/nav';
-import type { SectionTab } from '../section-tabs/section-tabs';
+import type { SectionTab } from '../page-header/page-header';
 
 /**
  * Flikraden för Ekonomi, bara på mobil. På dator är Översikt, Fakturor och Moms och bokföring
@@ -12,7 +12,7 @@ import type { SectionTab } from '../section-tabs/section-tabs';
   selector: 'app-finance-tabs',
   standalone: false,
   host: { class: 'block' },
-  template: `<app-section-tabs [tabs]="tabs" label="Ekonomi" [mobileOnly]="true" />`,
+  template: `<app-page-header [tabs]="tabs" label="Ekonomi" [mobileOnly]="true" />`,
 })
 export class FinanceTabs {
   private readonly auth = inject(Auth);

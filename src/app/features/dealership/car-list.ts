@@ -17,7 +17,7 @@ import {
 import { carColorHex } from '../../shared/car-color';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
-import type { SectionTab } from '../../shared/section-tabs/section-tabs';
+import type { SectionTab } from '../../shared/page-header/page-header';
 
 const kr = new KrPipe();
 const money = (n: number | null | undefined) => (n == null ? '–' : kr.transform(n));
@@ -188,7 +188,7 @@ const TABS: SectionTab[] = [
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" label="Bilar" [mobileOnly]="true" />
+    <app-page-header class="shrink-0" [tabs]="tabs" label="Bilar" [mobileOnly]="true" />
     @if (flag(); as f) {
       <app-callout
         class="mb-3 shrink-0"
@@ -209,7 +209,7 @@ const TABS: SectionTab[] = [
     }
     <div class="min-h-0 flex-1">
       <app-list-page
-        title=""
+        [title]="heading"
         [columns]="cols()"
         [rows]="shown()"
         [loading]="loading()"
@@ -224,17 +224,30 @@ const TABS: SectionTab[] = [
         (rowDblClick)="open($event)"
       >
         @if (auth.isAdmin()) {
-          <button
-            actions
-            mat-stroked-button
-            type="button"
-            class="max-md:!hidden"
-            [disabled]="importing()"
-            (click)="importFromBlocket()"
-          >
-            <mat-icon>cloud_download</mat-icon>
-            {{ importing() ? 'Läser in…' : 'Läs in från Blocket' }}
-          </button>
+          <div actions class="contents">
+            <button
+              mat-stroked-button
+              type="button"
+              class="btn-icon max-md:!hidden"
+              title="Fler åtgärder"
+              aria-label="Fler åtgärder"
+              [matMenuTriggerFor]="more"
+            >
+              <mat-icon>more_horiz</mat-icon>
+            </button>
+            <mat-menu #more="matMenu" xPosition="before">
+              <!-- Ej inställt ger importen själv vägen till Anslutningar. -->
+              <button
+                mat-menu-item
+                type="button"
+                [disabled]="importing()"
+                (click)="importFromBlocket()"
+              >
+                <mat-icon>cloud_download</mat-icon>
+                {{ importing() ? 'Läser in…' : 'Läs in från Blocket' }}
+              </button>
+            </mat-menu>
+          </div>
         }
         <!-- Mobil: ett fotokort per bil. -->
         <ng-template #card let-c="row">
@@ -290,7 +303,7 @@ const TABS: SectionTab[] = [
         </ng-template>
         <aside
           detail
-          class="hidden min-h-0 w-[34%] max-w-[28rem] min-w-[22rem] shrink-0 overflow-y-auto lg:mt-11 lg:block"
+          class="hidden min-h-0 w-[34%] max-w-[28rem] min-w-[22rem] shrink-0 overflow-y-auto lg:block"
         >
           @if (selectedCar(); as c) {
             <app-car-quick [car]="c" />
@@ -319,6 +332,13 @@ export class CarList {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   readonly stage = this.route.snapshot.data['stage'] as Stage;
+  /** Sidans rubrik: samma namn som posten i Bilar-menyn. */
+  readonly heading = {
+    all: 'Alla bilar',
+    sales: 'Till salu',
+    purchases: 'Inköpta',
+    sold: 'Sålda',
+  }[this.stage];
 
   readonly tabs = TABS;
   readonly IDLE_DAYS = IDLE_DAYS;

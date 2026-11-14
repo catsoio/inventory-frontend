@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -27,7 +27,9 @@ import {
   printStorageLabels,
   setLabelFormat,
 } from '../../../shared/storage-print';
-import { HOTEL_TABS } from '../../../shared/section-tabs/tabs';
+import { HOTEL_TABS } from '../../../shared/page-header/tabs';
+import type { SegmentOption } from '../../../shared/toolbar/segmented';
+import type { SummaryFlag } from '../../../shared/toolbar/summary';
 import { contentsText, dateText } from '../storage-format';
 
 const kr = new KrPipe();
@@ -98,150 +100,97 @@ type PaymentFilter = PaymentStatus | '';
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Däckhotell" />
-    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <div
-        class="relative order-first w-full min-w-0 md:order-none md:max-w-md md:min-w-56 md:w-auto md:flex-1"
-      >
-        <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
-        <input
-          type="search"
-          [formControl]="search"
-          (keydown.enter)="openIfSingle()"
-          placeholder="Sök regnr, kund, telefon, plats, märke…"
-          class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-10 outline-none focus:ring-2"
-        />
+    <app-page-header [tabs]="tabs" [desktopOnly]="true" label="Däckhotell">
+      <div actions class="contents">
+        <button mat-stroked-button type="button" (click)="openRecall()">
+          <mat-icon>sms</mat-icon> Kalla in
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="!items().length"
+          [matMenuTriggerFor]="printMenu"
+        >
+          <mat-icon>print</mat-icon> Skriv ut etiketter ({{ items().length }})
+          <mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
+        </button>
+        <mat-menu #printMenu="matMenu">
+          <button mat-menu-item type="button" (click)="printLabels('a4')">
+            <mat-icon>{{ format() === 'a4' ? 'check' : '' }}</mat-icon> A4, tre per ark
+          </button>
+          <button mat-menu-item type="button" (click)="printLabels('roll')">
+            <mat-icon>{{ format() === 'roll' ? 'check' : '' }}</mat-icon> Rullskrivare, 100 × 50 mm
+          </button>
+        </mat-menu>
+        <a mat-flat-button color="primary" routerLink="new"
+          ><mat-icon>add</mat-icon> Ny inlämning</a
+        >
       </div>
-      <span class="hidden flex-1 md:block"></span>
-      <button mat-stroked-button type="button" class="max-md:!hidden" (click)="openRecall()">
-        <mat-icon>sms</mat-icon> Kalla in
-      </button>
+    </app-page-header>
+
+    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+      <app-search-field
+        class="w-full md:w-80"
+        [control]="search"
+        placeholder="Sök regnr, kund, telefon, plats, märke…"
+        (enter)="openIfSingle()"
+      />
+      <app-segmented
+        label="Status"
+        [options]="statusOptions"
+        [value]="status()"
+        (valueChange)="setStatus($any($event))"
+      />
+      <app-filter-button [count]="activeExtra()" (clear)="clearFilters()">
+        <div>
+          <div class="sec">Betalning</div>
+          <app-segmented
+            [fill]="true"
+            label="Betalning"
+            [options]="paymentOptions"
+            [value]="payment()"
+            (valueChange)="setPayment($any($event))"
+          />
+        </div>
+        <div>
+          <div class="sec">Innehåll</div>
+          <app-segmented
+            [fill]="true"
+            label="Innehåll"
+            [options]="contentsOptions"
+            [value]="contentsFilter()"
+            (valueChange)="setContents($any($event))"
+          />
+        </div>
+        <mat-checkbox [checked]="overdue()" (change)="setOverdue($event.checked)">
+          Skulle hämtats
+        </mat-checkbox>
+      </app-filter-button>
+      <span class="flex-1 max-md:hidden"></span>
       <button
         mat-stroked-button
         type="button"
-        class="max-md:!hidden"
-        [disabled]="!items().length"
-        [title]="
-          format() === 'roll'
-            ? 'Skriv ut etiketter för rullskrivare, en per sida'
-            : 'Skriv ut etiketter på A4, tre per ark'
-        "
-        (click)="printLabels()"
+        class="btn-icon max-md:!hidden"
+        title="Filtrera per kolumn"
+        aria-label="Filtrera per kolumn"
+        [class.is-on]="table.showFilters()"
+        (click)="table.showFilters.set(!table.showFilters())"
       >
-        <mat-icon>print</mat-icon> Skriv ut etiketter ({{ items().length }})
+        <mat-icon>filter_alt</mat-icon>
       </button>
-      <button
-        mat-icon-button
-        type="button"
-        class="max-md:!hidden"
-        aria-label="Etikettformat"
-        title="Etikettformat"
-        [matMenuTriggerFor]="formatMenu"
-      >
-        <mat-icon>tune</mat-icon>
-      </button>
-      <mat-menu #formatMenu="matMenu">
-        <button mat-menu-item type="button" (click)="setFormat('a4')">
-          <mat-icon>{{ format() === 'a4' ? 'check' : '' }}</mat-icon> A4, tre per ark
-        </button>
-        <button mat-menu-item type="button" (click)="setFormat('roll')">
-          <mat-icon>{{ format() === 'roll' ? 'check' : '' }}</mat-icon> Rullskrivare, 100 × 50 mm
-        </button>
-      </mat-menu>
-      <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
-        ><mat-icon>add</mat-icon> Ny inlämning</a
-      >
-    </div>
-
-    <div class="mb-2 flex shrink-0 items-center gap-2 md:hidden">
-      <mat-button-toggle-group
-        hideSingleSelectionIndicator
-        class="compact-toggle min-w-0 flex-1"
-        [value]="status()"
-        (change)="setStatus($event.value)"
-        aria-label="Status"
-      >
-        <mat-button-toggle value="stored" class="flex-1">Inlagrade</mat-button-toggle>
-        <mat-button-toggle value="picked_up" class="flex-1">Utlämnade</mat-button-toggle>
-        <mat-button-toggle value="" class="flex-1">Alla</mat-button-toggle>
-      </mat-button-toggle-group>
-      <button
-        mat-stroked-button
-        type="button"
-        class="!min-w-0 !px-3"
-        (click)="showFilters.set(!showFilters())"
-        aria-label="Fler filter"
-      >
-        <mat-icon class="!m-0">tune</mat-icon>
-        @if (activeExtra()) {
-          <b class="ml-1">{{ activeExtra() }}</b>
-        }
-      </button>
-    </div>
-
-    <div
-      class="mb-2 shrink-0 flex-wrap items-center gap-x-4 gap-y-2 md:mb-3 md:flex"
-      [class]="showFilters() ? 'flex' : 'hidden'"
-    >
-      <mat-button-toggle-group
-        class="max-md:!hidden"
-        hideSingleSelectionIndicator
-        [value]="status()"
-        (change)="setStatus($event.value)"
-        aria-label="Status"
-      >
-        <mat-button-toggle value="stored">Inlagrade</mat-button-toggle>
-        <mat-button-toggle value="picked_up">Utlämnade</mat-button-toggle>
-        <mat-button-toggle value="">Alla</mat-button-toggle>
-      </mat-button-toggle-group>
-      <mat-button-toggle-group
-        hideSingleSelectionIndicator
-        [value]="payment()"
-        (change)="setPayment($event.value)"
-        aria-label="Betalning"
-      >
-        <mat-button-toggle value="">Alla</mat-button-toggle>
-        <mat-button-toggle value="unpaid">Obetalda</mat-button-toggle>
-        <mat-button-toggle value="paid">Betalda</mat-button-toggle>
-      </mat-button-toggle-group>
-      <mat-button-toggle-group
-        hideSingleSelectionIndicator
-        [value]="contentsFilter()"
-        (change)="setContents($event.value)"
-        aria-label="Innehåll"
-      >
-        <mat-button-toggle value="">Allt</mat-button-toggle>
-        @for (c of contentsOptions; track c[0]) {
-          <mat-button-toggle [value]="c[0]">{{ c[1] }}</mat-button-toggle>
-        }
-      </mat-button-toggle-group>
-      <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" [checked]="overdue()" (change)="setOverdue(!overdue())" />
-        Skulle hämtats
-      </label>
     </div>
 
     @if (summary(); as s) {
-      <div class="mb-2 flex shrink-0 flex-wrap gap-1.5 text-xs md:mb-3 md:gap-2 md:text-sm">
-        <span class="rounded-xl bg-white shadow-sm px-3 py-1"
-          ><b>{{ s.stored }}</b> set inlagrade ({{ s.units }} st)</span
-        >
-        @if (s.unpaid) {
-          <span class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1 text-amber-900"
-            ><b>{{ s.unpaid }}</b> obetalda · {{ s.unpaidAmount | kr }}</span
-          >
-        }
-        @if (s.overdue) {
-          <span class="rounded-lg border border-red-300 bg-red-50 px-3 py-1 text-red-900"
-            ><b>{{ s.overdue }}</b> försenade</span
-          >
-        }
-      </div>
+      <app-summary [flags]="flags()">
+        <b>{{ s.stored }}</b> set inlagrade · {{ s.units }} st
+      </app-summary>
     }
 
     <div class="hidden min-h-0 flex-1 flex-col md:flex">
       <app-data-table
+        #table
         class="min-h-0 flex-1"
+        [chrome]="false"
         [columns]="cols"
         [rows]="items()"
         [clickable]="true"
@@ -339,7 +288,20 @@ export class StorageList implements OnInit {
   private readonly PAGE = inject(Settings).value().pageSize;
 
   readonly cols = COLS;
-  readonly contentsOptions = Object.entries(STORAGE_CONTENTS_LABELS);
+  readonly statusOptions: SegmentOption[] = [
+    { value: 'stored', label: 'Inlagrade' },
+    { value: 'picked_up', label: 'Utlämnade' },
+    { value: '', label: 'Alla' },
+  ];
+  readonly paymentOptions: SegmentOption[] = [
+    { value: '', label: 'Alla' },
+    { value: 'unpaid', label: 'Obetalda' },
+    { value: 'paid', label: 'Betalda' },
+  ];
+  readonly contentsOptions: SegmentOption[] = [
+    { value: '', label: 'Allt' },
+    ...Object.entries(STORAGE_CONTENTS_LABELS).map(([value, label]) => ({ value, label })),
+  ];
   readonly paymentLabels = PAYMENT_STATUS_LABELS;
   readonly statusLabels = STORAGE_STATUS_LABELS;
   readonly contents = contentsText;
@@ -351,7 +313,7 @@ export class StorageList implements OnInit {
   readonly payment = signal<PaymentFilter>('');
   readonly contentsFilter = signal<StorageContents | ''>('');
   readonly overdue = signal(false);
-  readonly showFilters = signal(false);
+  /** Antal filter bakom Filter-knappen (status ligger synlig i verktygsraden). */
   readonly activeExtra = () =>
     (this.payment() ? 1 : 0) + (this.contentsFilter() ? 1 : 0) + (this.overdue() ? 1 : 0);
   readonly items = signal<StorageDeposit[]>([]);
@@ -359,14 +321,11 @@ export class StorageList implements OnInit {
   /** Etikettformatet som valts i den här webbläsaren. */
   readonly format = signal<LabelFormat>(labelFormat());
 
-  setFormat(f: LabelFormat) {
+  /** Etiketter för det listan visar just nu. Formatet som väljs här minns webbläsaren till nästa gång. */
+  printLabels(f: LabelFormat) {
     setLabelFormat(f);
     this.format.set(f);
-  }
-
-  /** Etiketter för det listan visar just nu, i det valda formatet. */
-  printLabels() {
-    void printStorageLabels(this.items(), this.format());
+    void printStorageLabels(this.items(), f);
   }
 
   readonly total = signal(0);
@@ -412,6 +371,34 @@ export class StorageList implements OnInit {
       this.load$.next(0);
     });
     this.api.summary().subscribe((s) => this.summary.set(s));
+  }
+
+  /** Det som väntar på någon (obetalt, försenat) som genvägar till filtret som visar just de. */
+  readonly flags = computed<SummaryFlag[]>(() => {
+    const s = this.summary();
+    if (!s) return [];
+    const out: SummaryFlag[] = [];
+    if (s.unpaid) {
+      out.push({
+        text: `${s.unpaid} obetalda · ${kr.transform(s.unpaidAmount)}`,
+        tone: 'amber',
+        click: () => {
+          this.status.set('');
+          this.setPayment('unpaid');
+        },
+      });
+    }
+    if (s.overdue) {
+      out.push({ text: `${s.overdue} försenade`, tone: 'red', click: () => this.setOverdue(true) });
+    }
+    return out;
+  });
+
+  clearFilters() {
+    this.payment.set('');
+    this.contentsFilter.set('');
+    this.overdue.set(false);
+    this.load$.next(0);
   }
 
   setStatus(v: StatusFilter) {

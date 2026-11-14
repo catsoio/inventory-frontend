@@ -21,7 +21,7 @@ import { bars, columns, kronor } from '../../../shared/chart/chart-kit';
 import { ACCENT, HEAT, INK, OTHER, SEASON, STATUS, heat } from '../../../shared/chart/chart-theme';
 import type { MixPart } from '../../../shared/mix-bar/mix-bar';
 import type { PanelTable } from '../../../shared/panel/panel';
-import { HOTEL_TABS } from '../../../shared/section-tabs/tabs';
+import { HOTEL_TABS } from '../../../shared/page-header/tabs';
 
 const MIX_COLORS = {
   winter: SEASON.winter,
@@ -39,7 +39,7 @@ const MIX_COLORS = {
   standalone: false,
   host: { class: 'block' },
   template: `
-    <app-section-tabs [tabs]="tabs" [desktopOnly]="true" label="Däckhotell" />
+    <app-page-header [tabs]="tabs" [desktopOnly]="true" label="Däckhotell" />
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <app-stat

@@ -53,7 +53,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
   template: `
     <app-list-page
       class="min-h-0 min-w-0 flex-1"
-      title=""
+      title="Arbetsorder"
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
@@ -66,21 +66,21 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
       (rowClick)="open($event)"
       (rowDblClick)="router.navigate(['/workorders', $event.id])"
     >
-      <mat-button-toggle-group
-        class="mb-3 self-start"
-        hideSingleSelectionIndicator
+      <app-segmented
+        filters
+        label="Status"
+        [options]="[
+          { value: 'active', label: 'Aktiva' },
+          { value: 'open', label: 'Öppna' },
+          { value: 'in_progress', label: 'Pågår' },
+          { value: 'waiting_parts', label: 'Väntar på del' },
+          { value: 'done', label: 'Klara' },
+          { value: '', label: 'Alla' },
+          { value: 'action', label: 'Behöver åtgärd' },
+        ]"
         [value]="status()"
-        (change)="status.set($event.value); load()"
-        aria-label="Status"
-      >
-        <mat-button-toggle value="active">Aktiva</mat-button-toggle>
-        <mat-button-toggle value="open">Öppna</mat-button-toggle>
-        <mat-button-toggle value="in_progress">Pågår</mat-button-toggle>
-        <mat-button-toggle value="waiting_parts">Väntar på del</mat-button-toggle>
-        <mat-button-toggle value="done">Klara</mat-button-toggle>
-        <mat-button-toggle value="">Alla</mat-button-toggle>
-        <mat-button-toggle value="action">Behöver åtgärd</mat-button-toggle>
-      </mat-button-toggle-group>
+        (valueChange)="status.set($any($event)); load()"
+      />
       <ng-template #cell let-o="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill [tone]="tones[o.status]">{{ text }}</app-pill>
@@ -115,7 +115,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
       </ng-template>
       <aside
         detail
-        class="hidden min-h-0 w-[38%] max-w-[32rem] min-w-[24rem] shrink-0 overflow-y-auto lg:mt-11 lg:block"
+        class="hidden min-h-0 w-[38%] max-w-[32rem] min-w-[24rem] shrink-0 overflow-y-auto lg:block"
       >
         @if (selected(); as id) {
           <app-work-order-quick

@@ -52,7 +52,7 @@ import { FinanceTabs } from './finance-tabs/finance-tabs';
 import { MixBar } from './mix-bar/mix-bar';
 import { Panel } from './panel/panel';
 import { ProductFilter } from './product-filter/product-filter';
-import { SectionTabs } from './section-tabs/section-tabs';
+import { PageHeader } from './page-header/page-header';
 import { Spark } from './spark/spark';
 import { Stat } from './stat/stat';
 import { RegPlate, SvFlag } from './reg-plate/reg-plate';
@@ -63,6 +63,11 @@ import { SupplierSelect } from './supplier-select/supplier-select';
 import { TradeDocumentDialog } from './trade-document-dialog/trade-document-dialog';
 import { TradeHistory } from './trade-history/trade-history';
 import { StockBadge } from './stock-badge/stock-badge';
+import { ConnectPrompt } from './toolbar/connect-prompt';
+import { FilterButton } from './toolbar/filter-button';
+import { SearchField } from './toolbar/search-field';
+import { Segmented } from './toolbar/segmented';
+import { Summary } from './toolbar/summary';
 
 const MATERIAL = [
   MatAutocompleteModule,
@@ -119,7 +124,12 @@ const MATERIAL = [
     MixBar,
     Panel,
     ProductFilter,
-    SectionTabs,
+    PageHeader,
+    SearchField,
+    Segmented,
+    FilterButton,
+    Summary,
+    ConnectPrompt,
     Spark,
     Stat,
     ItemIcon,
@@ -166,7 +176,12 @@ const MATERIAL = [
     MixBar,
     Panel,
     ProductFilter,
-    SectionTabs,
+    PageHeader,
+    SearchField,
+    Segmented,
+    FilterButton,
+    Summary,
+    ConnectPrompt,
     Spark,
     Stat,
     ItemIcon,

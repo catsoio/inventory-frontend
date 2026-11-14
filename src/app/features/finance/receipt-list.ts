@@ -75,7 +75,7 @@ type MethodFilter = 'all' | PaymentMethod;
     </div>
     <div class="min-h-0 flex-1">
       <app-list-page
-        title=""
+        title="Kvitton"
         [columns]="cols"
         [rows]="shown()"
         [loading]="loading()"
@@ -88,20 +88,19 @@ type MethodFilter = 'all' | PaymentMethod;
         (search)="query.set($event)"
         (rowClick)="open($event)"
       >
-        <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-          <mat-button-toggle-group
-            hideSingleSelectionIndicator
-            [value]="method()"
-            (change)="method.set($event.value)"
-            aria-label="Betalsätt"
-          >
-            <mat-button-toggle value="all">Alla</mat-button-toggle>
-            <mat-button-toggle value="card">Kort</mat-button-toggle>
-            <mat-button-toggle value="cash">Kontant</mat-button-toggle>
-            <mat-button-toggle value="swish">Swish</mat-button-toggle>
-          </mat-button-toggle-group>
-          <span class="text-sm text-gray-600">{{ summary() }}</span>
-        </div>
+        <app-segmented
+          filters
+          label="Betalsätt"
+          [options]="[
+            { value: 'all', label: 'Alla' },
+            { value: 'card', label: 'Kort' },
+            { value: 'cash', label: 'Kontant' },
+            { value: 'swish', label: 'Swish' },
+          ]"
+          [value]="method()"
+          (valueChange)="method.set($any($event))"
+        />
+        <app-summary>{{ summary() }}</app-summary>
         <!-- Mobil: ett kompakt kort i stället för alla kolumner under varandra. -->
         <ng-template #card let-o="row">
           <div class="flex items-start justify-between gap-3">

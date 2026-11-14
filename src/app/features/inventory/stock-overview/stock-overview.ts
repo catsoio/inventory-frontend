@@ -17,7 +17,7 @@ import { bars, columns, fmtKr, kronor, line, tickKr } from '../../../shared/char
 import { ACCENT, OTHER, SEASON, STATUS, tint } from '../../../shared/chart/chart-theme';
 import type { MixPart } from '../../../shared/mix-bar/mix-bar';
 import type { PanelTable } from '../../../shared/panel/panel';
-import { STOCK_TABS } from '../../../shared/section-tabs/tabs';
+import { STOCK_TABS } from '../../../shared/page-header/tabs';
 
 const fmt = (n: number) => n.toLocaleString('sv-SE');
 const day = (iso: string) =>
@@ -32,7 +32,7 @@ const day = (iso: string) =>
   standalone: false,
   host: { class: 'block' },
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
+    <app-page-header class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <app-stat

@@ -2,7 +2,6 @@ import { costInclOre } from '../../../core/pricing';
 import {
   Component,
   DestroyRef,
-  ElementRef,
   OnInit,
   afterNextRender,
   computed,
@@ -29,7 +28,9 @@ import {
 } from '../../../core/models';
 import { KrPipe } from '../../../shared/kr-pipe';
 import { Settings } from '../../../core/settings';
-import { STOCK_TABS } from '../../../shared/section-tabs/tabs';
+import { STOCK_TABS } from '../../../shared/page-header/tabs';
+import { SearchField } from '../../../shared/toolbar/search-field';
+import type { SegmentOption } from '../../../shared/toolbar/segmented';
 import { TyrePrintLayout, printTyres } from '../../../shared/tyre-print';
 
 type Sel = Record<string, string | number | boolean | undefined>;
@@ -190,100 +191,86 @@ const COLS: Col[] = [
     }
   `,
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
-    <div
-      class="mb-3 flex shrink-0 gap-1.5 overflow-x-auto"
-      role="tablist"
-      aria-label="Artikelgrupp"
-    >
-      @for (g of groups_; track g[0]) {
-        <button
-          role="tab"
-          [attr.aria-selected]="group() === g[0]"
-          class="h-9 shrink-0 rounded-full px-4 text-sm font-medium"
-          [class]="
-            group() === g[0]
-              ? 'bg-brand text-white'
-              : 'bg-white text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50'
-          "
-          (click)="setGroup(g[0])"
-        >
-          {{ g[1] }}
-        </button>
-      }
-    </div>
-    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
-        <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
-        <input
-          #searchEl
-          type="search"
-          [formControl]="search"
-          (keydown.enter)="openIfSingle()"
-          placeholder="Sök storlek, märke, säsong, 5x112…"
-          class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white shadow-sm ring-1 ring-gray-200 pr-3 pl-10 outline-none focus:ring-2"
-        />
+    <app-page-header [tabs]="tabs" [desktopOnly]="true" label="Lager">
+      <div actions class="contents">
+        @if (printable().length) {
+          <button mat-stroked-button [matMenuTriggerFor]="printMenu" title="Skriv ut däck på A4">
+            <mat-icon>print</mat-icon>
+            {{ pickedCount() ? 'Skriv ut valda (' + pickedCount() + ')' : 'Skriv ut däck' }}
+            <mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
+          </button>
+          <mat-menu #printMenu="matMenu" xPosition="before">
+            <button mat-menu-item (click)="print('labels')">
+              <mat-icon>label</mat-icon> Etiketter, {{ printable().length }} st
+            </button>
+            <button mat-menu-item (click)="print('list')">
+              <mat-icon>list</mat-icon> Lista, {{ printable().length }} rader
+            </button>
+            @if (pickedCount()) {
+              <button mat-menu-item (click)="pickAll(false)">
+                <mat-icon>deselect</mat-icon> Rensa valda
+              </button>
+            }
+          </mat-menu>
+        }
+        <a mat-flat-button color="primary" routerLink="new"><mat-icon>add</mat-icon> Ny artikel</a>
       </div>
-      <span class="flex-1 max-md:hidden"></span>
+    </app-page-header>
+
+    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+      <app-search-field
+        class="w-full md:w-80"
+        [control]="search"
+        placeholder="Sök storlek, märke, säsong, 5x112…"
+        (enter)="openIfSingle()"
+      />
+      <app-segmented
+        label="Artikelgrupp"
+        [options]="groupOptions"
+        [value]="group()"
+        (valueChange)="setGroup($any($event))"
+      />
+      <!-- Filterpanelen ligger till vänster på bred skärm; här öppnar knappen den som ett blad. -->
       <button
-        mat-icon-button
-        class="relative lg:!hidden"
-        title="Filter"
-        [class.text-brand]="activeFilters()"
+        mat-stroked-button
+        type="button"
+        class="lg:!hidden"
+        [class.is-on]="activeFilters()"
         (click)="showFilters.set(!showFilters())"
       >
-        <mat-icon>filter_list</mat-icon>
+        <mat-icon>filter_list</mat-icon> Filter
         @if (activeCount()) {
           <span
-            class="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] leading-none font-semibold text-white"
+            class="bg-brand ml-2 grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs leading-none font-semibold text-white"
             >{{ activeCount() }}</span
           >
         }
       </button>
-      @if (printable().length) {
-        <button
-          class="max-md:!hidden"
-          mat-stroked-button
-          [matMenuTriggerFor]="printMenu"
-          title="Skriv ut däck på A4"
-        >
-          <mat-icon>print</mat-icon>
-          {{ pickedCount() ? 'Skriv ut valda (' + pickedCount() + ')' : 'Skriv ut däck' }}
-        </button>
-        <mat-menu #printMenu="matMenu">
-          <button mat-menu-item (click)="print('labels')">
-            <mat-icon>label</mat-icon> Etiketter, {{ printable().length }} st
-          </button>
-          <button mat-menu-item (click)="print('list')">
-            <mat-icon>list</mat-icon> Lista, {{ printable().length }} rader
-          </button>
-          @if (pickedCount()) {
-            <button mat-menu-item (click)="pickAll(false)">
-              <mat-icon>deselect</mat-icon> Rensa valda
-            </button>
-          }
-        </mat-menu>
-      }
+      <span class="flex-1 max-md:hidden"></span>
       @if (view() === 'table') {
         <button
-          class="max-md:!hidden"
-          mat-icon-button
-          [matMenuTriggerFor]="colMenu"
+          mat-stroked-button
+          type="button"
+          class="btn-icon max-md:!hidden"
           title="Välj kolumner"
+          aria-label="Välj kolumner"
+          [matMenuTriggerFor]="colMenu"
         >
           <mat-icon>view_column</mat-icon>
         </button>
         <button
-          class="max-md:!hidden"
-          mat-icon-button
+          mat-stroked-button
+          type="button"
+          class="btn-icon max-md:!hidden"
           title="Filtrera per kolumn"
-          [class.text-brand]="showColFilters()"
+          aria-label="Filtrera per kolumn"
+          [class.is-on]="showColFilters()"
           (click)="showColFilters.set(!showColFilters())"
         >
           <mat-icon>filter_alt</mat-icon>
         </button>
       }
-      <mat-menu #colMenu="matMenu">
+      <mat-menu #colMenu="matMenu" xPosition="before">
         @for (c of cols; track c.key) {
           <button mat-menu-item (click)="toggleCol(c.key); $event.stopPropagation()">
             <mat-icon>{{
@@ -293,23 +280,13 @@ const COLS: Col[] = [
           </button>
         }
       </mat-menu>
-      <mat-button-toggle-group
+      <app-segmented
         class="max-md:!hidden"
-        hideSingleSelectionIndicator
+        label="Vy"
+        [options]="viewOptions"
         [value]="view()"
-        (change)="setView($event.value)"
-        aria-label="Vy"
-      >
-        <mat-button-toggle value="table" aria-label="Tabell"
-          ><mat-icon>table_rows</mat-icon></mat-button-toggle
-        >
-        <mat-button-toggle value="cards" aria-label="Kort"
-          ><mat-icon>grid_view</mat-icon></mat-button-toggle
-        >
-      </mat-button-toggle-group>
-      <a mat-flat-button color="primary" routerLink="new" class="max-md:!hidden"
-        ><mat-icon>add</mat-icon> Ny artikel</a
-      >
+        (valueChange)="setView($any($event))"
+      />
     </div>
 
     <a
@@ -359,17 +336,6 @@ const COLS: Col[] = [
         >
           Visa förbrukade enstaka delar
         </button>
-
-        <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Typ</div>
-        @for (c of categories; track c[0]) {
-          <button
-            class="flex w-full justify-between rounded-lg px-2 py-1 text-left text-sm hover:bg-gray-100"
-            [class]="sel()['category'] === c[0] ? 'bg-brand-soft font-semibold text-brand' : ''"
-            (click)="toggle('category', c[0])"
-          >
-            {{ c[1] }}
-          </button>
-        }
 
         @if (showTyreFilters()) {
           <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">Säsong</div>
@@ -421,18 +387,18 @@ const COLS: Col[] = [
       </aside>
 
       <section class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div class="mb-2 shrink-0 text-sm text-gray-500">
+        <app-summary>
           Visar {{ rows().length }}
           {{
             hasColFilters() ? 'filtrerade rader av ' + items().length + ' inlästa' : 'av ' + total()
           }}
           artiklar
           @if (hasColFilters()) {
-            <button class="ml-2 text-brand underline" (click)="colFilters.set({})">
+            <button class="text-brand ml-2 underline" (click)="colFilters.set({})">
               Rensa kolumnfilter
             </button>
           }
-        </div>
+        </app-summary>
 
         <div class="min-h-0 flex-1 overflow-auto md:rounded-xl md:bg-white md:shadow-sm">
           @if (view() === 'table') {
@@ -607,7 +573,7 @@ export class ArticleList implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
+  private readonly searchEl = viewChild(SearchField);
   private readonly load$ = new Subject<number>();
   private readonly facetLoad$ = new Subject<void>();
   private readonly settings = inject(Settings).value();
@@ -639,6 +605,11 @@ export class ArticleList implements OnInit {
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly showFilters = signal(false);
+  readonly groupOptions: SegmentOption[] = this.groups_.map(([value, label]) => ({ value, label }));
+  readonly viewOptions: SegmentOption[] = [
+    { value: 'table', label: '', icon: 'table_rows', title: 'Tabell' },
+    { value: 'cards', label: '', icon: 'grid_view', title: 'Kort' },
+  ];
   readonly showColFilters = signal(false);
   readonly view = signal<'table' | 'cards'>(
     (localStorage.getItem(VIEW_KEY) as 'table' | 'cards' | null) ??
@@ -712,7 +683,9 @@ export class ArticleList implements OnInit {
   /** Däck som visas i listan, och vilka av dem som är valda för utskrift. */
   readonly tyreRows = computed(() => this.rows().filter((a) => a.tyre));
   readonly picked = signal<Set<string>>(new Set());
-  readonly pickedCount = computed(() => this.tyreRows().filter((a) => this.picked().has(a.id)).length);
+  readonly pickedCount = computed(
+    () => this.tyreRows().filter((a) => this.picked().has(a.id)).length,
+  );
   readonly allPicked = computed(
     () => this.tyreRows().length > 0 && this.pickedCount() === this.tyreRows().length,
   );
@@ -725,7 +698,7 @@ export class ArticleList implements OnInit {
     afterNextRender(() => {
       // Dator: sökfältet är redo direkt. Mobil: bara när man kom för att söka (`?focus=1`, från Hem).
       if (window.innerWidth >= 768 || this.route.snapshot.queryParamMap.get('focus') === '1')
-        this.searchEl()?.nativeElement.focus();
+        this.searchEl()?.focus();
     });
   }
 

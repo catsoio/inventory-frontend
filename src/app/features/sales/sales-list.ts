@@ -7,7 +7,7 @@ import { SalesCardItem } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
 import { STATUS_TEXT, STATUS_TONE, invoiceStatus } from '../../shared/invoice-status';
-import { SALES_TABS } from '../../shared/section-tabs/tabs';
+import { SALES_TABS } from '../../shared/page-header/tabs';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
@@ -79,12 +79,11 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
   imports: [SharedModule],
   host: { class: 'flex h-full flex-col' },
   template: `
-    @if (!hall) {
-      <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Försäljning" />
-    }
     <app-list-page
       class="min-h-0 flex-1"
       [title]="hall ? 'Affärer' : ''"
+      [tabs]="hall ? [] : tabs"
+      tabsLabel="Försäljning"
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
@@ -95,20 +94,19 @@ type Filter = 'all' | 'draft' | 'unpaid' | 'paid';
       (search)="q.set($event); load()"
       (rowClick)="router.navigate(['/sales', $event.id])"
     >
-      <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-        <mat-button-toggle-group
-          hideSingleSelectionIndicator
-          [value]="filter()"
-          (change)="filter.set($event.value); load()"
-          aria-label="Visa"
-        >
-          <mat-button-toggle value="all">Alla</mat-button-toggle>
-          <mat-button-toggle value="draft">Utkast</mat-button-toggle>
-          <mat-button-toggle value="unpaid">Obetalda</mat-button-toggle>
-          <mat-button-toggle value="paid">Betalda</mat-button-toggle>
-        </mat-button-toggle-group>
-        <span class="text-sm text-gray-600">{{ items().length }} st · {{ sum() }}</span>
-      </div>
+      <app-segmented
+        filters
+        label="Visa"
+        [options]="[
+          { value: 'all', label: 'Alla' },
+          { value: 'draft', label: 'Utkast' },
+          { value: 'unpaid', label: 'Obetalda' },
+          { value: 'paid', label: 'Betalda' },
+        ]"
+        [value]="filter()"
+        (valueChange)="filter.set($any($event)); load()"
+      />
+      <app-summary>{{ items().length }} st · {{ sum() }}</app-summary>
       <!-- Mobil: ett kompakt kort i stället för alla kolumner under varandra. -->
       <ng-template #card let-c="row">
         <div class="flex items-start justify-between gap-3">

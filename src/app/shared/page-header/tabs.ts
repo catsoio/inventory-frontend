@@ -1,4 +1,4 @@
-import type { SectionTab } from './section-tabs';
+import type { SectionTab } from './page-header';
 
 /** Lager: listan, en översikt med diagram och lagerloggen (som förut hette Logg och rapport). */
 export const STOCK_TABS: SectionTab[] = [

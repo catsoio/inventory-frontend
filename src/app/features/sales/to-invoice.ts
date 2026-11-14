@@ -6,7 +6,7 @@ import { appLocale } from '../../core/i18n/locale';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { UnbilledCustomer, UnbilledOrder } from '../../core/models';
 import { Confirm } from '../../shared/confirm';
-import { SALES_TABS } from '../../shared/section-tabs/tabs';
+import { SALES_TABS } from '../../shared/page-header/tabs';
 import { SharedModule } from '../../shared/shared-module';
 import {
   INVOICE_STATE_TEXT,
@@ -41,7 +41,7 @@ const day = (iso: string) =>
   imports: [SharedModule],
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Försäljning" />
+    <app-page-header class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Försäljning" />
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
       <mat-button-toggle-group
         hideSingleSelectionIndicator

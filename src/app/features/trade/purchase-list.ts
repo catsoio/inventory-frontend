@@ -5,10 +5,12 @@ import { appLocale } from '../../core/i18n/locale';
 import { PurchaseCardApi } from '../../core/api/purchase-card-api';
 import { SupplierCatalogApi } from '../../core/api/supplier-catalog-api';
 import { Auth } from '../../core/auth/auth';
+import { Connections } from '../../core/connections';
 import { CatalogOrder, PurchaseCard } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
 import { SharedModule } from '../../shared/shared-module';
+import type { SegmentOption } from '../../shared/toolbar/segmented';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
@@ -150,27 +152,41 @@ export class GummigrossenOrdersDialog {
       (search)="q.set($event); load()"
       (rowClick)="router.navigate(['/purchases', $event.id])"
     >
-      <div actions class="flex items-center gap-2">
-        @if (fromSupplier()) {
-          <button mat-stroked-button type="button" (click)="openOrders()">
-            <mat-icon>cloud_download</mat-icon> Hämta från Gummigrossen
-          </button>
-        }
-        <a mat-stroked-button routerLink="/purchases/documents">Äldre inköp</a>
-      </div>
-      <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-        <mat-button-toggle-group
-          hideSingleSelectionIndicator
-          [value]="filter()"
-          (change)="filter.set($event.value); load()"
-          aria-label="Visa"
+      <div actions class="contents">
+        <button
+          mat-stroked-button
+          type="button"
+          class="btn-icon"
+          title="Fler åtgärder"
+          aria-label="Fler åtgärder"
+          [matMenuTriggerFor]="more"
         >
-          <mat-button-toggle value="all">Alla</mat-button-toggle>
-          <mat-button-toggle value="draft">Utkast</mat-button-toggle>
-          <mat-button-toggle value="posted">Bokförda</mat-button-toggle>
-        </mat-button-toggle-group>
-        <span class="text-sm text-gray-600">{{ items().length }} st · {{ sum() }}</span>
+          <mat-icon>more_horiz</mat-icon>
+        </button>
+        <mat-menu #more="matMenu" xPosition="before">
+          <!-- En integration som inte är ansluten visar vägen att ansluta den, inte åtgärden. -->
+          @if (fromSupplier()) {
+            <button mat-menu-item type="button" (click)="openOrders()">
+              <mat-icon>cloud_download</mat-icon> Hämta från Gummigrossen
+            </button>
+          } @else if (connections.canConnect()) {
+            <button mat-menu-item type="button" (click)="connections.open(loadSupplier)">
+              <mat-icon>link</mat-icon> Anslut Gummigrossen
+            </button>
+          }
+          <a mat-menu-item routerLink="/purchases/documents">
+            <mat-icon>history</mat-icon> Äldre inköp
+          </a>
+        </mat-menu>
       </div>
+      <app-segmented
+        filters
+        label="Visa"
+        [options]="filterOptions"
+        [value]="filter()"
+        (valueChange)="filter.set($any($event)); load()"
+      />
+      <app-summary>{{ items().length }} st · {{ sum() }}</app-summary>
       <ng-template #card let-c="row">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -214,8 +230,15 @@ export class PurchaseList {
   readonly dateOf = (c: PurchaseCard) => day(c.purchasedAt ?? c.createdAt);
   private readonly dialog = inject(MatDialog);
   private readonly catalog = inject(SupplierCatalogApi);
+  private readonly auth = inject(Auth);
   /** Tidigare beställningar hos grossisten kan hämtas av ägaren när grossisten är ansluten. */
   readonly fromSupplier = signal(false);
+  readonly connections = inject(Connections);
+  readonly filterOptions: SegmentOption[] = [
+    { value: 'all', label: 'Alla' },
+    { value: 'draft', label: 'Utkast' },
+    { value: 'posted', label: 'Bokförda' },
+  ];
   readonly items = signal<PurchaseCard[]>([]);
   readonly loading = signal(true);
   readonly q = signal('');
@@ -224,12 +247,16 @@ export class PurchaseList {
 
   constructor() {
     this.load();
-    if (inject(Auth).isAdmin()) {
-      this.catalog
-        .status()
-        .subscribe({ next: (s) => this.fromSupplier.set(s.connected), error: () => {} });
-    }
+    this.loadSupplier();
   }
+
+  /** Läser om om Gummigrossen är ansluten (bara ägaren får se anslutningen). */
+  readonly loadSupplier = () => {
+    if (!this.auth.isAdmin()) return;
+    this.catalog
+      .status()
+      .subscribe({ next: (s) => this.fromSupplier.set(s.connected), error: () => {} });
+  };
 
   openOrders() {
     this.dialog

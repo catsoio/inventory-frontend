@@ -55,7 +55,7 @@ type Filter = '' | 'draft' | 'given' | 'approved' | 'declined';
   template: `
     <app-list-page
       class="min-h-0 flex-1"
-      title=""
+      title="Offerter"
       [columns]="cols"
       [rows]="items()"
       [loading]="loading()"
@@ -66,21 +66,20 @@ type Filter = '' | 'draft' | 'given' | 'approved' | 'declined';
       (search)="q.set($event); load()"
       (rowClick)="router.navigate(['/quotes', $event.id])"
     >
-      <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-        <mat-button-toggle-group
-          hideSingleSelectionIndicator
-          [value]="filter()"
-          (change)="filter.set($event.value); load()"
-          aria-label="Visa"
-        >
-          <mat-button-toggle value="">Alla</mat-button-toggle>
-          <mat-button-toggle value="draft">Utkast</mat-button-toggle>
-          <mat-button-toggle value="given">Väntar på svar</mat-button-toggle>
-          <mat-button-toggle value="approved">Godkända</mat-button-toggle>
-          <mat-button-toggle value="declined">Nekade</mat-button-toggle>
-        </mat-button-toggle-group>
-        <span class="text-sm text-gray-600">{{ items().length }} st · {{ sum() }}</span>
-      </div>
+      <app-segmented
+        filters
+        label="Visa"
+        [options]="[
+          { value: '', label: 'Alla' },
+          { value: 'draft', label: 'Utkast' },
+          { value: 'given', label: 'Väntar på svar' },
+          { value: 'approved', label: 'Godkända' },
+          { value: 'declined', label: 'Nekade' },
+        ]"
+        [value]="filter()"
+        (valueChange)="filter.set($any($event)); load()"
+      />
+      <app-summary>{{ items().length }} st · {{ sum() }}</app-summary>
       <ng-template #cell let-r="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
           <app-pill [tone]="tones[r.shownStatus]">{{ text }}</app-pill>

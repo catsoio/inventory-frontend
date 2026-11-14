@@ -7,75 +7,123 @@ import {
   OnInit,
   Output,
   TemplateRef,
+  contentChild,
   inject,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { debounceTime } from 'rxjs';
-import type { DtCol } from '../data-table/data-table';
+import { DataTable, type DtCol } from '../data-table/data-table';
+import type { SectionTab } from '../page-header/page-header';
+import { Summary } from '../toolbar/summary';
 
 /**
- * Listsidan för en tabell (som en lista i Business Central): rubrik, sökruta, "Ny"-knapp mot
- * tabellens kort (och eventuella sekundärknappar bredvid, `[actions]`) och själva tabellen. Sidan som använder den hämtar data och lyssnar på `search`.
+ * Listsidan för en tabell (som en lista i Business Central). Uppbyggnaden är samma på alla listor,
+ * se `docs/axle/design.md`:
+ *
+ * 1. Sidhuvud (`app-page-header`): rubrik eller flikar, sekundära knappar (`[actions]`) och den
+ *    primära "Ny …"-knappen längst till höger.
+ * 2. Verktygsrad: sökrutan, sidans filter (`[filters]`: ett segmenterat val och `app-filter-button`),
+ *    och längst till höger tabellens verktyg (`[tools]`, kolumnfilter).
+ * 3. Sammanfattning (`app-summary`): vad man tittar på. Saknas den visas antalet rader.
+ * 4. Tabellen, och en detaljpanel bredvid den (`[detail]`).
+ *
+ * Det som inte hör hemma i någon av dem (en varning, `app-callout`) läggs som vanligt innehåll och
+ * hamnar mellan sammanfattningen och tabellen. Sidan som använder den hämtar data och lyssnar på `search`.
  */
 @Component({
   selector: 'app-list-page',
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
+    @if (hasHeader()) {
+      <app-page-header
+        [title]="title"
+        [tabs]="tabs"
+        [label]="tabsLabel"
+        [desktopOnly]="tabs.length > 0 && tabsDesktopOnly"
+      >
+        <div actions class="contents">
+          <ng-content select="[actions]" />
+          @if (newLink) {
+            <a
+              mat-flat-button
+              color="primary"
+              [routerLink]="newLink"
+              [queryParams]="newQuery"
+              class="max-md:!hidden"
+            >
+              <mat-icon>add</mat-icon> {{ newLabel }}
+            </a>
+          } @else if (newButton) {
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              class="max-md:!hidden"
+              (click)="newClick.emit()"
+            >
+              <mat-icon>add</mat-icon> {{ newLabel }}
+            </button>
+          }
+        </div>
+      </app-page-header>
+    }
+    @if (newLink && newFab) {
+      <a
+        mat-fab
+        color="primary"
+        [routerLink]="newLink"
+        [queryParams]="newQuery"
+        [attr.aria-label]="newLabel"
+        class="!fixed right-4 bottom-20 z-10 md:!hidden"
+        ><mat-icon>add</mat-icon></a
+      >
+    }
     <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      @if (title) {
-        <h1 class="mr-2 hidden text-2xl font-semibold md:block">{{ title }}</h1>
-      }
-      <div class="relative min-w-0 flex-1 md:max-w-md md:min-w-56">
-        <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400">search</mat-icon>
-        <input
-          type="search"
-          [formControl]="query"
-          [placeholder]="searchPlaceholder"
-          class="focus:ring-brand h-10 w-full rounded-xl border-0 bg-white pr-3 pl-10 shadow-sm ring-1 ring-gray-200 outline-none focus:ring-2"
-        />
-      </div>
+      <app-search-field
+        class="w-full md:w-80"
+        [control]="query"
+        [placeholder]="searchPlaceholder"
+      />
+      <ng-content select="[filters]" />
       @if (archivable) {
-        <label class="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            [checked]="archived"
-            (change)="archived = !archived; archivedChange.emit(archived)"
-          />
-          Visa arkiverade
-        </label>
+        <button
+          mat-stroked-button
+          type="button"
+          [class.is-on]="archived"
+          (click)="toggleArchived()"
+        >
+          <mat-icon>{{ archived ? 'check' : 'inventory_2' }}</mat-icon> Visa arkiverade
+        </button>
       }
       <span class="flex-1 max-md:hidden"></span>
-      <!-- Sekundära knappar (t.ex. "Lägg till gammal faktura") ligger bredvid "Ny", inte under. -->
-      <ng-content select="[actions]" />
-      @if (newLink) {
-        <a
-          mat-flat-button
-          color="primary"
-          [routerLink]="newLink"
-          [queryParams]="newQuery"
-          class="max-md:!hidden"
-        >
-          <mat-icon>add</mat-icon> {{ newLabel }}
-        </a>
-        @if (newFab) {
-          <a
-            mat-fab
-            color="primary"
-            [routerLink]="newLink"
-            [queryParams]="newQuery"
-            [attr.aria-label]="newLabel"
-            class="!fixed right-4 bottom-20 z-10 md:!hidden"
-            ><mat-icon>add</mat-icon></a
-          >
-        }
-      }
+      <ng-content select="[tools]" />
+      <button
+        mat-stroked-button
+        type="button"
+        class="btn-icon max-md:!hidden"
+        title="Filtrera per kolumn"
+        aria-label="Filtrera per kolumn"
+        [class.is-on]="table()?.showFilters()"
+        (click)="table()?.showFilters.set(!table()?.showFilters())"
+      >
+        <mat-icon>filter_alt</mat-icon>
+      </button>
     </div>
+    <ng-content select="app-summary" />
+    @if (!customSummary() && !loading) {
+      <app-summary class="max-md:!hidden">
+        {{ table()?.view()?.length ?? rowCount()
+        }}{{ table()?.filtered() ? ' av ' + rowCount() : '' }} rader
+      </app-summary>
+    }
     <ng-content />
     <div class="flex min-h-0 flex-1 gap-4">
       <app-data-table
         class="min-h-0 min-w-0 flex-1"
+        [chrome]="false"
         [columns]="columns"
         [rows]="rows"
         [clickable]="true"
@@ -105,8 +153,13 @@ import type { DtCol } from '../data-table/data-table';
 export class ListPage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
-  /** Sidans rubrik på dator; tom när sidan redan har flikar eller en rubrik i topbaren. */
+  /** Sidans rubrik på dator (syns inte på mobil, där namnet står i topbaren). */
   @Input() title = '';
+  /** Flikar i stället för rubrik när avsnittet har flera vyer (`STOCK_TABS` m.fl.). */
+  @Input() tabs: SectionTab[] = [];
+  @Input() tabsLabel = 'Avsnitt';
+  /** Flikarna visas bara på dator (vyer för uppföljning). Av när de ska synas på mobil också. */
+  @Input() tabsDesktopOnly = true;
   @Input({ required: true }) columns: DtCol[] = [];
   @Input() rows: unknown[] | null = [];
   @Input() loading = false;
@@ -114,6 +167,9 @@ export class ListPage implements OnInit {
   /** Adressparametrar till "Ny"-knappen, t.ex. `{ kind: 'invoice' }` för en ny faktura. */
   @Input() newQuery: Record<string, string> | null = null;
   @Input() newLabel = 'Ny';
+  /** "Ny"-knapp som gör något på sidan (öppnar en dialog) i stället för att gå till `newLink`; svaret är `newClick`. */
+  @Input() newButton = false;
+  @Output() newClick = new EventEmitter<void>();
   /** Rund flytande knapp på mobil. Av för listor där det som skapas inte görs i farten. */
   @Input() newFab = true;
   @Input() emptyText = 'Inget hittades.';
@@ -137,6 +193,22 @@ export class ListPage implements OnInit {
 
   readonly query = new FormControl('', { nonNullable: true });
   archived = false;
+  readonly table = viewChild(DataTable);
+  /** Sidan har lagt en egen sammanfattning (`<app-summary>`); annars visas antalet rader. */
+  readonly customSummary = contentChild(Summary);
+
+  hasHeader() {
+    return !!(this.title || this.tabs.length || this.newLink || this.newButton);
+  }
+
+  rowCount() {
+    return this.rows?.length ?? 0;
+  }
+
+  toggleArchived() {
+    this.archived = !this.archived;
+    this.archivedChange.emit(this.archived);
+  }
 
   ngOnInit() {
     // Första sökningen direkt, därefter när man slutat skriva en stund.

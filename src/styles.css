@@ -140,6 +140,29 @@ app-shell main {
   box-shadow: 0 0 0 1px var(--mat-sys-primary);
 }
 
+/*
+ * Verktygsrad och sidhuvud (docs/axle/design.md). Allt i en verktygsrad är 40 px högt, har samma
+ * grå ram (#d1d5db) och samma radie: sökrutan (.field), segmenterade val, kantade knappar och
+ * ikonknappar. Ikonknappen (.btn-icon) är en kantad kvadrat och används bara för verktyg som har en
+ * tooltip: kolumnfilter, kolumner, vy, "fler åtgärder". Ett verktyg som är påslaget (.is-on) får
+ * primärfärg på ram och ikon, så att man ser vad som styr listan.
+ */
+.mat-mdc-outlined-button.btn-icon {
+  min-width: 40px;
+  width: 40px;
+  padding: 0;
+}
+.mat-mdc-outlined-button.btn-icon > .mat-icon,
+.mat-mdc-outlined-button.btn-icon > .mat-mdc-button-persistent-ripple + .mat-icon {
+  margin: 0;
+}
+.mat-mdc-outlined-button.is-on {
+  --mat-button-outlined-outline-color: var(--mat-sys-primary);
+  --mat-button-outlined-label-text-color: var(--mat-sys-primary);
+  background: var(--color-brand-soft);
+  color: var(--mat-sys-primary);
+}
+
 /* Rubrik över en grupp fält i en dialog eller ett kort. */
 .sec {
   margin: 0 0 8px;

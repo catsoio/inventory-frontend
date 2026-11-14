@@ -3,7 +3,7 @@ import { FormBuilder } from '@angular/forms';
 import { Auth } from '../../core/auth/auth';
 import { AxleApi } from '../../core/api/axle-api';
 import { MOVEMENT_LABELS, MovementType, Report } from '../../core/models';
-import { STOCK_TABS } from '../../shared/section-tabs/tabs';
+import { STOCK_TABS } from '../../shared/page-header/tabs';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -12,7 +12,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-section-tabs class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
+    <app-page-header class="shrink-0" [tabs]="tabs" [desktopOnly]="true" label="Lager" />
     <form [formGroup]="form" class="mb-4 flex shrink-0 flex-wrap items-center gap-3">
       <app-date-field label="Från" formControlName="from" />
       <app-date-field label="Till" formControlName="to" />

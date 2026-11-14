@@ -100,7 +100,7 @@ type StatusFilter = 'all' | 'unpaid' | 'overdue' | 'paid';
     </div>
     <div class="min-h-0 flex-1">
       <app-list-page
-        title=""
+        title="Fakturor"
         [columns]="cols"
         [rows]="shown()"
         [loading]="loading()"
@@ -113,21 +113,20 @@ type StatusFilter = 'all' | 'unpaid' | 'overdue' | 'paid';
         (search)="query.set($event)"
         (rowClick)="open($event)"
       >
-        <div class="mb-3 flex shrink-0 flex-wrap items-center gap-3">
-          <mat-button-toggle-group
-            hideSingleSelectionIndicator
-            [value]="status()"
-            (change)="status.set($event.value)"
-            aria-label="Status"
-          >
-            <mat-button-toggle value="all">Alla</mat-button-toggle>
-            <mat-button-toggle value="unpaid">Obetalda</mat-button-toggle>
-            <mat-button-toggle value="overdue">Förfallna</mat-button-toggle>
-            <mat-button-toggle value="paid">Betalda</mat-button-toggle>
-          </mat-button-toggle-group>
-          <app-product-filter [(value)]="scope" />
-          <span class="text-sm text-gray-600">{{ summary() }}</span>
-        </div>
+        <app-segmented
+          filters
+          label="Status"
+          [options]="[
+            { value: 'all', label: 'Alla' },
+            { value: 'unpaid', label: 'Obetalda' },
+            { value: 'overdue', label: 'Förfallna' },
+            { value: 'paid', label: 'Betalda' },
+          ]"
+          [value]="status()"
+          (valueChange)="status.set($any($event))"
+        />
+        <app-product-filter filters [(value)]="scope" />
+        <app-summary>{{ summary() }}</app-summary>
         <a actions mat-stroked-button routerLink="/finance/invoices/new" class="max-md:!hidden">
           <mat-icon>history</mat-icon> Lägg till gammal faktura
         </a>

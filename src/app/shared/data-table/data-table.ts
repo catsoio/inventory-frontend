@@ -46,19 +46,21 @@ export interface DtCol<T = any> {
   standalone: false,
   host: { class: 'flex min-h-0 flex-col' },
   template: `
-    <div
-      class="mb-1 flex shrink-0 items-center justify-end gap-1 text-sm text-gray-500 max-md:hidden"
-    >
-      <span> {{ view().length }}{{ filtered() ? ' av ' + rowsSig().length : '' }} rader </span>
-      <button
-        mat-icon-button
-        title="Filtrera per kolumn"
-        [class.text-brand]="showFilters()"
-        (click)="showFilters.set(!showFilters())"
+    @if (chrome) {
+      <div
+        class="mb-1 flex shrink-0 items-center justify-end gap-1 text-sm text-gray-500 max-md:hidden"
       >
-        <mat-icon>filter_alt</mat-icon>
-      </button>
-    </div>
+        <span> {{ view().length }}{{ filtered() ? ' av ' + rowsSig().length : '' }} rader </span>
+        <button
+          mat-icon-button
+          title="Filtrera per kolumn"
+          [class.text-brand]="showFilters()"
+          (click)="showFilters.set(!showFilters())"
+        >
+          <mat-icon>filter_alt</mat-icon>
+        </button>
+      </div>
+    }
     <div
       class="min-h-0 overflow-auto rounded-xl bg-white shadow-sm [-webkit-overflow-scrolling:touch] max-md:hidden"
       [class]="scrollClass"
@@ -211,6 +213,11 @@ export class DataTable {
   /** Markerar hela raden (t.ex. den som visas i en panel bredvid). */
   @Input() highlight?: (row: any) => boolean;
   @Input() clickable = false;
+  /**
+   * Raden ovanför tabellen med antal och kolumnfilter. Av på sidor som har en verktygsrad
+   * (`ListPage`, lagerlistorna): där sitter kolumnfiltret bland verktygen och antalet i sammanfattningen.
+   */
+  @Input() chrome = true;
   // Standard: fyller tillgänglig höjd. Skicka t.ex. 'max-h-96' för en fast maxhöjd.
   @Input() scrollClass = 'flex-1';
   @Output() rowClick = new EventEmitter<any>();
