@@ -3,6 +3,7 @@ import { RouterModule } from '@angular/router';
 import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
 import { ReaderPayment } from './reader-payment';
+import { TillPay } from './till-pay';
 import { CreditDialog } from './credit-dialog';
 import { ReturnDialog } from './return-dialog';
 import { SalesCardPage } from './sales-card';
@@ -18,6 +19,7 @@ import { TyreFinderDialog } from './tyre-finder';
     SalesInvoicePage,
     SalesSendDialog,
     ReaderPayment,
+    TillPay,
     ReturnDialog,
     CreditDialog,
     TyreFinderDialog,

@@ -324,6 +324,12 @@ const sameText = (a: string | null | undefined, b: string | null | undefined) =>
           @if (inv.seller.footer) {
             <p class="mt-1 text-gray-600">{{ inv.seller.footer }}</p>
           }
+          @if (inv.till; as t) {
+            <!-- Betalt i PayPal-kassan: kassans kvitto är kassakvittot, det här är underlaget. -->
+            <p class="mt-1 text-gray-600">
+              Betalt och registrerat i PayPal-kassan, kassakvitto nr {{ t.number ?? '–' }}.
+            </p>
+          }
           @if (inv.register; as r) {
             <div class="mt-3 border-t border-gray-300 pt-2 text-[11px] leading-tight text-gray-600">
               <div>

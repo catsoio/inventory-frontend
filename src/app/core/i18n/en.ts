@@ -1251,4 +1251,7 @@ export const EN: Record<string, string> = {
   'Ta bort ur kassan': 'Remove from the till',
   'Ta bort ur kassan?': 'Remove from the till?',
   'PayPal-kassan (köp vid disken)': 'PayPal till (counter sales)',
+  'Betald i PayPal-kassan': 'Paid in the PayPal till',
+  'Hämta köp': 'Fetch sales',
+  'Bokför som betald i kassan': 'Post as paid in the till',
 };

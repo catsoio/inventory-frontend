@@ -126,6 +126,14 @@ const ymd = (d: Date) =>
                       @if (s.refund) {
                         <app-pill tone="amber">Retur</app-pill>
                       }
+                      @if (s.card; as card) {
+                        <a
+                          class="mr-1 text-teal-700 underline"
+                          [routerLink]="['/sales', card.id]"
+                          (click)="$event.stopPropagation()"
+                          >{{ card.code }}</a
+                        >
+                      }
                       {{ goods(s) }}
                     </td>
                     <td class="pr-3 whitespace-nowrap">{{ paid(s) }}</td>

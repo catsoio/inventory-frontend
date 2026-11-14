@@ -40,6 +40,16 @@ export class ZettleApi {
     return this.http.get<Page<PosSale>>(`${this.base}/sales`, { params });
   }
 
+  /** Köp de senaste två dagarna som inte redan betalar ett säljkort (personalen väljer bland dem). */
+  openSales(): Observable<PosSale[]> {
+    return this.http.get<PosSale[]>(`${this.base}/open-sales`);
+  }
+
+  /** Bokför utkastet som betalt med köpet i kassan. */
+  payCard(saleId: string, cardId: string): Observable<unknown> {
+    return this.http.post(`${this.base}/sales/${saleId}/pay-card`, { cardId });
+  }
+
   products(): Observable<PosProduct[]> {
     return this.http.get<PosProduct[]>(`${this.base}/products`);
   }

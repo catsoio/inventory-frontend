@@ -1445,6 +1445,8 @@ export interface WorkOrderInvoice {
   paymentReference?: string;
   /** Satt när kvittot är registrerat i kassaregistret: dess nummer, kontrollkod och kassa. */
   register?: RegisteredReceiptRef;
+  /** Betald och registrerad i PayPal-kassan, som gav kunden kvittot; det här är Axles underlag. */
+  till?: { source: 'zettle'; saleId: string; number: number | null };
 }
 
 /** Det ett registrerat kvitto bär med sig, så att det kan skrivas ut med kontrollkod och nummer. */
@@ -2817,6 +2819,8 @@ export interface PosSale {
   /** Referensen på lagerrörelserna (KASSA-1042). */
   stockReference: string | null;
   stockError: string | null;
+  /** Säljkortet köpet betalade (eller, för en retur, kortet köpet den ger tillbaka hörde till). */
+  card?: { id: string; code: string } | null;
   importedAt: string;
 }
 

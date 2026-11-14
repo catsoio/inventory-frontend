@@ -1353,6 +1353,16 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 (booked)="readerWaiting.set(false); load(c.id)"
               />
             }
+            @if (!hall()) {
+              <!-- Betald i PayPal-kassan: kassan registrerar köpet, kortet bokförs som kvitto. -->
+              <app-till-pay
+                [cardId]="c.id"
+                [cardCode]="c.code"
+                [total]="totals().total"
+                [disabled]="dirty() || readerWaiting() || !rows().length"
+                (booked)="load(c.id)"
+              />
+            }
           </section>
         } @else if (c.document; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
