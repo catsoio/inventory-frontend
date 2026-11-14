@@ -2395,7 +2395,8 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   ngOnDestroy() {
     // Ett utkast som öppnades men aldrig fick något innehåll lämnas inte kvar som ett tomt kort.
     const c = this.card();
-    if (!c || c.status !== 'draft' || this.id === 'new' || c.reservedDocumentCode) return;
+    if (!c || c.status !== 'draft' || !this.id || this.id === 'new' || c.reservedDocumentCode)
+      return;
     const empty =
       !this.rows().some((r) => r.type !== 'service' || r.description.trim() || r.price) &&
       !this.link() &&
