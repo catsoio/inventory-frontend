@@ -183,30 +183,6 @@ interface PayWayOption {
             >
               <mat-icon>delete_outline</mat-icon>
             </button>
-            @if (way() !== 'till' && way() !== 'reader') {
-              <a
-                mat-icon-button
-                aria-label="Förhandsgranska utkast"
-                matTooltip="Förhandsgranska utkast"
-                [routerLink]="['/sales', c.id, 'invoice']"
-                [queryParams]="choiceParams()"
-                [class.pointer-events-none]="dirty() || !rows().length"
-              >
-                <mat-icon>visibility</mat-icon>
-              </a>
-            }
-            @if (primary(); as pr) {
-              <button
-                mat-flat-button
-                color="primary"
-                type="button"
-                [disabled]="dirty() || busy() || readerWaiting() || !rows().length || !!blocker()"
-                [matTooltip]="blocker()?.text ?? ''"
-                (click)="pr.run()"
-              >
-                <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
-              </button>
-            }
           }
           @if (c.status === 'posted') {
             @if (isOwner && !c.document?.register && !c.credit) {
