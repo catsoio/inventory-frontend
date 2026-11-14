@@ -1121,21 +1121,9 @@ interface PayWayOption {
             }
             <!-- Rabatten är en rad i summan: skriv 10% eller ett belopp i kronor. -->
             <div class="flex items-center justify-between gap-4 py-1">
-              <span class="text-gray-600">Rabatt</span>
-              @if (readOnly()) {
-                <span class="tabular-nums text-green-700">
-                  {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
-                </span>
-              } @else {
-                <span class="flex items-center gap-2">
-                  <input
-                    class="h-8 w-20 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
-                    inputmode="decimal"
-                    placeholder="0"
-                    aria-label="Rabatt"
-                    [value]="discText()"
-                    (input)="setDiscText($any($event.target).value)"
-                  />
+              <span class="flex items-center gap-2 text-gray-600">
+                Rabatt
+                @if (!readOnly()) {
                   <span
                     class="inline-flex h-8 overflow-hidden rounded-md border border-gray-300 text-sm"
                     role="group"
@@ -1160,6 +1148,22 @@ interface PayWayOption {
                       kr
                     </button>
                   </span>
+                }
+              </span>
+              @if (readOnly()) {
+                <span class="tabular-nums text-green-700">
+                  {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
+                </span>
+              } @else {
+                <span class="flex items-center">
+                  <input
+                    class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
+                    inputmode="decimal"
+                    placeholder="0"
+                    aria-label="Rabatt"
+                    [value]="discText()"
+                    (input)="setDiscText($any($event.target).value)"
+                  />
                 </span>
               }
             </div>
@@ -1309,14 +1313,6 @@ interface PayWayOption {
                   }
                 }
               </div>
-              @if (way() === 'receipt') {
-                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                  <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
-                  kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
-                  prisbasbelopp inkl. moms (236 800 kr för 2026). Axle är inget kassaregister: ta
-                  betalt i PayPal-kassan eller kontrollera med Skatteverket eller er revisor.
-                </p>
-              }
               @if (way() === 'reader') {
                 <app-reader-payment
                   [cardId]="c.id"
