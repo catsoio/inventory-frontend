@@ -1152,7 +1152,7 @@ interface PayWayOption {
       }
 
       <ng-template #textBlock>
-        <section class="rounded-xl bg-white p-5 shadow-sm">
+        <section class="h-full rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-1 text-base font-semibold">Text och anteckning</h2>
           @if (showText()) {
             <div class="mt-3">
@@ -1204,7 +1204,7 @@ interface PayWayOption {
       }
       @if (card(); as c) {
         @if (c.status === 'draft') {
-          <div class="grid items-start gap-4 lg:grid-cols-[20rem_1fr]">
+          <div class="grid gap-4 lg:grid-cols-[20rem_1fr]">
             <ng-container *ngTemplateOutlet="textBlock" />
             <section class="rounded-xl bg-white p-6 shadow-sm">
               <div class="grid gap-6 md:grid-cols-[15rem_1fr] md:gap-0">
@@ -1232,7 +1232,9 @@ interface PayWayOption {
                       >
                       <span class="min-w-0">
                         <span class="block text-sm font-medium leading-tight">{{ o.label }}</span>
-                        <span class="block text-xs leading-snug text-gray-500">{{ o.hint }}</span>
+                        <span class="block truncate text-xs leading-snug text-gray-500">{{
+                          o.hint
+                        }}</span>
                       </span>
                     </button>
                   }
@@ -1751,7 +1753,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         id: 'invoice',
         icon: 'description',
         label: 'Faktura',
-        hint: 'Kunden betalar senare',
+        hint: 'Betalar senare',
         disabled: noInvoice,
       },
     ];
@@ -1760,7 +1762,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         id: 'cash_invoice',
         icon: 'paid',
         label: 'Betald nu',
-        hint: 'Kontantfaktura, betald vid disken',
+        hint: 'Kontantfaktura',
         disabled: noInvoice,
       });
     }
@@ -1769,7 +1771,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         id: 'till',
         icon: 'point_of_sale',
         label: 'PayPal-kassan',
-        hint: 'Slås in i kassan, som ger kvittot',
+        hint: 'Slås in i kassan',
         disabled: noReceipt,
       });
     }
@@ -1778,7 +1780,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         id: 'reader',
         icon: 'contactless',
         label: 'Kortläsare',
-        hint: 'Kunden knackar kortet',
+        hint: 'Kort på läsaren',
         disabled: noReceipt,
       });
     }
@@ -1787,7 +1789,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         id: 'receipt',
         icon: 'receipt',
         label: 'Annat betalsätt',
-        hint: 'Kort, Swish eller kontant utan kassa',
+        hint: 'Kort, Swish, kontant',
         disabled: noReceipt,
       });
     }
