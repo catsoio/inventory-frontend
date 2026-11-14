@@ -1250,93 +1250,79 @@ interface PayWayOption {
       @if (card(); as c) {
         @if (c.status === 'draft') {
           <div class="grid gap-4 lg:grid-cols-[1fr_24rem]">
-            <section class="rounded-xl bg-white p-5 shadow-sm">
-              <h2 class="mb-3 text-base font-semibold">Betalning</h2>
-
-              <div class="flex flex-wrap items-start gap-4">
-                <mat-form-field class="w-80" subscriptSizing="dynamic">
-                  <mat-label>Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</mat-label>
-                  <mat-select
-                    [value]="way()"
-                    [disabled]="readerWaiting()"
-                    (selectionChange)="chooseWay($event.value)"
+            <section class="flex flex-col rounded-xl bg-white p-5 shadow-sm">
+              <div class="text-sm">
+                <div class="flex items-center justify-between gap-4 py-1">
+                  <span class="text-gray-600"
+                    >Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</span
                   >
-                    <mat-select-trigger>{{ wayLabel() }}</mat-select-trigger>
+                  <select
+                    class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
+                    aria-label="Hur betalar kunden?"
+                    [disabled]="readerWaiting()"
+                    (change)="chooseWay($any($event.target).value)"
+                  >
                     @for (o of wayOptions(); track o.id) {
-                      <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
-                        <span class="block leading-tight">{{ o.label }}</span>
-                        <span class="block text-xs leading-tight text-gray-500">{{ o.hint }}</span>
-                      </mat-option>
+                      <option [value]="o.id" [selected]="o.id === way()" [disabled]="o.disabled">
+                        {{ o.label }}
+                      </option>
                     }
-                  </mat-select>
-                </mat-form-field>
+                  </select>
+                </div>
                 @switch (way()) {
                   @case ('invoice') {
-                    <mat-form-field class="w-56" subscriptSizing="dynamic">
-                      <mat-label>Betalningsvillkor (dagar)</mat-label>
-                      <input
-                        matInput
-                        type="number"
-                        min="0"
-                        max="365"
-                        [value]="terms()"
-                        (input)="termsDays.set($any($event.target).valueAsNumber)"
-                      />
-                    </mat-form-field>
-                    <span class="self-center text-sm text-gray-600">Förfaller {{ dueDate() }}</span>
+                    <div class="flex items-center justify-between gap-4 py-1">
+                      <span class="text-gray-600">Betalningsvillkor</span>
+                      <span class="flex items-center gap-2 text-gray-500">
+                        <input
+                          class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-20 text-right"
+                          type="number"
+                          min="0"
+                          max="365"
+                          aria-label="Betalningsvillkor i dagar"
+                          [value]="terms()"
+                          (input)="termsDays.set($any($event.target).valueAsNumber)"
+                        />
+                        dagar
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 py-1 text-gray-600">
+                      <span>Förfaller</span>
+                      <span class="tabular-nums">{{ dueDate() }}</span>
+                    </div>
                   }
                   @case ('cash_invoice') {
-                    <mat-form-field class="w-56" subscriptSizing="dynamic">
-                      <mat-label>Betalsätt</mat-label>
-                      <mat-select
-                        [value]="receiptMethod()"
-                        (selectionChange)="receiptMethod.set($event.value)"
+                    <div class="flex items-center justify-between gap-4 py-1">
+                      <span class="text-gray-600">Betalsätt</span>
+                      <select
+                        class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
+                        aria-label="Betalsätt"
+                        (change)="receiptMethod.set($any($event.target).value)"
                       >
                         @for (m of receiptMethods; track m[0]) {
-                          <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                          <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
+                            {{ m[1] }}
+                          </option>
                         }
-                      </mat-select>
-                    </mat-form-field>
+                      </select>
+                    </div>
                   }
                   @case ('receipt') {
-                    <mat-form-field class="w-56" subscriptSizing="dynamic">
-                      <mat-label>Betalsätt</mat-label>
-                      <mat-select
-                        [value]="receiptMethod()"
-                        (selectionChange)="receiptMethod.set($event.value)"
+                    <div class="flex items-center justify-between gap-4 py-1">
+                      <span class="text-gray-600">Betalsätt</span>
+                      <select
+                        class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
+                        aria-label="Betalsätt"
+                        (change)="receiptMethod.set($any($event.target).value)"
                       >
                         @for (m of receiptMethods; track m[0]) {
-                          <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                          <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
+                            {{ m[1] }}
+                          </option>
                         }
-                      </mat-select>
-                    </mat-form-field>
+                      </select>
+                    </div>
                   }
-                }
-              </div>
-              <!-- Samma knappar som i kortets huvud, här där man betalar. -->
-              <div class="mt-4 flex flex-wrap items-center gap-3">
-                @if (primary(); as pr) {
-                  <button
-                    mat-flat-button
-                    color="primary"
-                    type="button"
-                    [disabled]="
-                      dirty() || busy() || readerWaiting() || !rows().length || !!blocker()
-                    "
-                    (click)="pr.run()"
-                  >
-                    <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
-                  </button>
-                }
-                @if (way() !== 'till' && way() !== 'reader') {
-                  <a
-                    mat-stroked-button
-                    [routerLink]="['/sales', c.id, 'invoice']"
-                    [queryParams]="choiceParams()"
-                    [class.pointer-events-none]="dirty() || !rows().length"
-                  >
-                    <mat-icon>visibility</mat-icon> Förhandsgranska
-                  </a>
                 }
               </div>
               @if (way() === 'reader') {
@@ -1350,6 +1336,34 @@ interface PayWayOption {
               @if (blocker(); as b) {
                 <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
               }
+              <!-- Knapparna ligger alltid längst ned, samma som i kortets huvud. -->
+              <div
+                class="mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4"
+              >
+                @if (way() !== 'till' && way() !== 'reader') {
+                  <a
+                    mat-stroked-button
+                    [routerLink]="['/sales', c.id, 'invoice']"
+                    [queryParams]="choiceParams()"
+                    [class.pointer-events-none]="dirty() || !rows().length"
+                  >
+                    <mat-icon>visibility</mat-icon> Förhandsgranska
+                  </a>
+                }
+                @if (primary(); as pr) {
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    [disabled]="
+                      dirty() || busy() || readerWaiting() || !rows().length || !!blocker()
+                    "
+                    (click)="pr.run()"
+                  >
+                    <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
+                  </button>
+                }
+              </div>
             </section>
             <ng-container *ngTemplateOutlet="summaryBlock" />
           </div>
