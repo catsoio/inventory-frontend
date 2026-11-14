@@ -23,12 +23,12 @@ import { SettingsStore } from '../settings-store';
         <app-setting-group title="Företaget" [form]="true">
           <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
             <mat-form-field subscriptSizing="dynamic">
-              <mat-label>Företagsnamn</mat-label>
-              <input matInput formControlName="name" />
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
               <mat-label>Organisationsnummer</mat-label>
               <input matInput formControlName="orgNo" placeholder="556123-4567" />
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic">
+              <mat-label>Företagsnamn</mat-label>
+              <input matInput formControlName="name" />
             </mat-form-field>
             <mat-form-field subscriptSizing="dynamic">
               <mat-label>Momsregistreringsnummer</mat-label>
@@ -36,6 +36,7 @@ import { SettingsStore } from '../settings-store';
               <mat-hint>SE + organisationsnumret utan bindestreck + 01</mat-hint>
             </mat-form-field>
           </div>
+          <app-company-lookup class="mt-2" [form]="s.sellerForm" />
           <div class="mt-3 flex items-center justify-between gap-4 border-t border-gray-100 pt-3">
             <span class="text-[15px] font-medium">Godkänd för F-skatt</span>
             <mat-slide-toggle formControlName="fTax" aria-label="Godkänd för F-skatt" />

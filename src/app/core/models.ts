@@ -1156,6 +1156,38 @@ export interface VehicleLookup {
   fetchedAt?: string | null;
 }
 
+/** Vad ett företagsregister säger om ett organisationsnummer. */
+export interface CompanyInfo {
+  /** Som det skrivs på ett dokument: 556012-5790. */
+  orgNo: string;
+  name: string;
+  /** Bolagsform: Aktiebolag, Handelsbolag … */
+  form: string | null;
+  address: string | null;
+  postalCode: string | null;
+  city: string | null;
+  phone: string | null;
+  email: string | null;
+  /** SE + organisationsnumret + 01; bara när bolaget är momsregistrerat. */
+  vatNumber: string | null;
+  /** Godkänd för F-skatt; null när källan inte säger. */
+  fTax: boolean | null;
+  /** Falskt för ett bolag i konkurs eller som är avregistrerat. */
+  active: boolean;
+  /** Varför bolaget inte är aktivt ("Konkurs avslutad"). */
+  statusNote: string | null;
+}
+
+export interface CompanyLookup {
+  /**
+   * `invalid`: texten är inget organisationsnummer som slås upp (se `problem`).
+   * `unavailable`: källan gick inte att använda just nu, fyll i för hand.
+   */
+  status: 'found' | 'not_found' | 'invalid' | 'unavailable';
+  company: CompanyInfo | null;
+  problem: 'format' | 'checksum' | null;
+}
+
 /** Bilens kort: bilen med dess senaste bokningar. */
 export interface VehicleDetail extends Vehicle {
   bookings: Booking[];

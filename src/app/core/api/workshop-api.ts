@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import {
   BlocketStatus,
   CarInfoStatus,
+  CompanyLookup,
   Customer,
   CustomerDetail,
   CustomerInput,
@@ -112,6 +113,18 @@ export class WorkshopApi {
   lookupVehicle(regNo: string, refresh = false): Observable<VehicleLookup> {
     return this.http.get<VehicleLookup>(
       `${this.base}/vehicles/lookup/${encodeURIComponent(regNo)}`,
+      refresh ? { params: { refresh: 'true' } } : {},
+    );
+  }
+
+  /**
+   * Namn, adress, telefon, momsnummer och F-skatt för ett organisationsnummer ur ett öppet
+   * företagsregister. Svarar alltid med en status, aldrig fel. Personnummer slås aldrig upp.
+   * `refresh` frågar källan på nytt.
+   */
+  lookupCompany(orgNo: string, refresh = false): Observable<CompanyLookup> {
+    return this.http.get<CompanyLookup>(
+      `${this.base}/companies/lookup/${encodeURIComponent(orgNo)}`,
       refresh ? { params: { refresh: 'true' } } : {},
     );
   }

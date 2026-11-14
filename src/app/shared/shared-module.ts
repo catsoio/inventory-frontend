@@ -42,6 +42,7 @@ import { KrPipe } from './kr-pipe';
 import { VatPartPipe } from './vat-part-pipe';
 import { InvoiceDocument } from './invoice-document/invoice-document';
 import { Callout } from './callout/callout';
+import { CompanyLookupStatus } from './company-lookup/company-lookup';
 import { QuoteHistory } from './quote-history/quote-history';
 import { SalesCardHistory } from './sales-card-history/sales-card-history';
 import { MovementList } from './movement-list/movement-list';
@@ -142,7 +143,7 @@ const MATERIAL = [
     TradeDocumentDialog,
     TradeHistory,
   ],
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, ...MATERIAL],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, ...MATERIAL, CompanyLookupStatus],
   exports: [
     CommonModule,
     ReactiveFormsModule,
@@ -165,6 +166,7 @@ const MATERIAL = [
     VatPartPipe,
     InvoiceDocument,
     Callout,
+    CompanyLookupStatus,
     QuoteHistory,
     SalesCardHistory,
     StockBadge,

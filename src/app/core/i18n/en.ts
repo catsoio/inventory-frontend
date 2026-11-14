@@ -1276,4 +1276,22 @@ export const EN: Record<string, string> = {
     'Let the customer pay there: card, Swish or cash.',
   'Klart! Köpet hittas här av sig självt och kortet bokförs.':
     'Done! The purchase is found here by itself and the card is posted.',
+  // Hämta företagsuppgifter ur organisationsnumret
+  'Hämta uppgifter': 'Fetch details',
+  'Hämtar uppgifter…': 'Fetching details…',
+  'Ersätt med registrets uppgifter': 'Replace with the register’s details',
+  'Uppgifterna stämmer med registret.': 'The details match the register.',
+  'Källa: Allabolag': 'Source: Allabolag',
+  'Hittade inget företag med det numret.': 'Found no company with that number.',
+  'Fyll i uppgifterna för hand.': 'Fill in the details by hand.',
+  'Kunde inte hämta uppgifter just nu.': 'Could not fetch details right now.',
+  'Fyll i för hand.': 'Fill them in by hand.',
+  'Fyll i för hand': 'Fill in by hand',
+  'Företagets uppgifter fylls i av organisationsnumret.':
+    'The company’s details are filled in from the organisation number.',
+  'Skriv organisationsnumret först': 'Enter the organisation number first',
+  'Skriv organisationsnumret med tio siffror.': 'Enter the organisation number with ten digits.',
+  'Kontrollsiffran stämmer inte. Kontrollera numret.':
+    'The check digit does not match. Check the number.',
+  'Adress (krävs på faktura)': 'Address (required on invoices)',
 };

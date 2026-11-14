@@ -64,25 +64,48 @@ import { Auth } from '../../../core/auth/auth';
             <mat-button-toggle [value]="t[0]">{{ t[1] }}</mat-button-toggle>
           }
         </mat-button-toggle-group>
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>{{
-            form.controls.type.value === 'company' ? 'Företagsnamn' : 'Namn'
-          }}</mat-label>
-          <input matInput formControlName="name" autocomplete="off" />
-          <mat-error>Ange namn</mat-error>
-        </mat-form-field>
         @if (form.controls.type.value === 'company') {
-          <mat-form-field>
+          <!-- Ett företag börjar med organisationsnumret: företagets uppgifter hämtas ur det. -->
+          <mat-form-field class="sm:col-span-2">
             <mat-label>Organisationsnummer</mat-label>
             <input matInput formControlName="orgNo" placeholder="556123-4567" />
             <mat-hint>Krävs på företagsfaktura</mat-hint>
           </mat-form-field>
+          <app-company-lookup
+            class="mb-2 mt-1 sm:col-span-2"
+            [form]="form"
+            [lock]="isNew"
+            [(manual)]="manual"
+          />
+        }
+        <mat-form-field class="sm:col-span-2">
+          <mat-label>{{ form.controls.type.value === 'company' ? 'Företagsnamn' : 'Namn' }}</mat-label>
+          <input matInput formControlName="name" autocomplete="off" [readonly]="locked()" />
+          @if (locked()) {
+            <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+          }
+          <mat-error>
+            @if (locked()) {
+              Skriv organisationsnumret först
+            } @else {
+              Ange namn
+            }
+          </mat-error>
+        </mat-form-field>
+        @if (form.controls.type.value === 'company') {
           <mat-form-field>
             <mat-label>Momsregistreringsnummer</mat-label>
-            <input matInput formControlName="vatNumber" placeholder="SE556123456701" />
-            <mat-hint>Valfritt för svenska företag</mat-hint>
+            <input
+              matInput
+              formControlName="vatNumber"
+              placeholder="SE556123456701"
+              [readonly]="locked()"
+            />
+            @if (locked()) {
+              <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+            }
           </mat-form-field>
-          <mat-form-field class="mt-3 sm:col-span-2">
+          <mat-form-field>
             <mat-label>Kontaktperson</mat-label>
             <input matInput formControlName="contactPerson" autocomplete="off" />
           </mat-form-field>
@@ -99,15 +122,24 @@ import { Auth } from '../../../core/auth/auth';
               form.controls.type.value === 'company' ? ' (krävs på faktura)' : ''
             }}</mat-label
           >
-          <input matInput formControlName="address" autocomplete="off" />
+          <input matInput formControlName="address" autocomplete="off" [readonly]="locked()" />
+          @if (locked()) {
+            <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+          }
         </mat-form-field>
         <mat-form-field>
           <mat-label>Postnummer</mat-label>
-          <input matInput formControlName="postalCode" autocomplete="off" />
+          <input matInput formControlName="postalCode" autocomplete="off" [readonly]="locked()" />
+          @if (locked()) {
+            <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+          }
         </mat-form-field>
         <mat-form-field>
           <mat-label>Ort</mat-label>
-          <input matInput formControlName="city" autocomplete="off" />
+          <input matInput formControlName="city" autocomplete="off" [readonly]="locked()" />
+          @if (locked()) {
+            <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+          }
         </mat-form-field>
         @if (mapsLink(); as link) {
           <a
@@ -287,6 +319,10 @@ export class CustomerCard implements OnInit {
   private readonly snack = inject(MatSnackBar);
   private readonly router = inject(Router);
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  /** Ett nytt kort: ett företags egna uppgifter hämtas ur organisationsnumret och är låsta. */
+  readonly isNew = !this.id;
+  /** Användaren valde "Fyll i för hand" för ett företag som registret inte känner. */
+  readonly manual = signal(false);
 
   readonly types = Object.entries(CUSTOMER_TYPE_LABELS);
   readonly statuses = BOOKING_STATUS_LABELS;
@@ -315,6 +351,11 @@ export class CustomerCard implements OnInit {
 
   ngOnInit() {
     if (this.id) this.load();
+  }
+
+  /** Företagets egna fält går inte att skriva i: de fylls i av organisationsnumret. */
+  locked(): boolean {
+    return this.isNew && this.form.controls.type.value === 'company' && !this.manual();
   }
 
   mapsLink() {

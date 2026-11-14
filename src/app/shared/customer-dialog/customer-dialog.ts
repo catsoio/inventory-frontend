@@ -30,23 +30,75 @@ export interface CustomerDialogData {
             <mat-button-toggle [value]="t[0]">{{ t[1] }}</mat-button-toggle>
           }
         </mat-button-toggle-group>
+        @if (company()) {
+          <!-- Ett företag börjar med organisationsnumret: resten kan hämtas ur det. -->
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Organisationsnummer</mat-label>
+            <input matInput formControlName="orgNo" placeholder="556123-4567" autocomplete="off" />
+          </mat-form-field>
+          <app-company-lookup
+            class="-mt-2 mb-2 sm:col-span-2"
+            [form]="form"
+            [lock]="!data.customer"
+            [(manual)]="manual"
+          />
+        }
         <mat-form-field class="sm:col-span-2">
-          <mat-label>{{
-            form.controls.type.value === 'company' ? 'Företagsnamn' : 'Namn'
-          }}</mat-label>
-          <input matInput formControlName="name" autocomplete="off" />
-          <mat-error>Ange namn</mat-error>
+          <mat-label>{{ company() ? 'Företagsnamn' : 'Namn' }}</mat-label>
+          <input matInput formControlName="name" autocomplete="off" [readonly]="locked()" />
+          @if (locked()) {
+            <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+          }
+          <mat-error>
+            @if (locked()) {
+              Skriv organisationsnumret först
+            } @else {
+              Ange namn
+            }
+          </mat-error>
         </mat-form-field>
-        <mat-form-field class="sm:col-span-2">
-          <mat-label>{{
-            form.controls.type.value === 'company' ? 'Organisationsnummer' : 'Personnummer'
-          }}</mat-label>
-          <input matInput formControlName="orgNo" autocomplete="off" />
-        </mat-form-field>
-        @if (form.controls.type.value === 'company') {
+        @if (company()) {
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Momsregistreringsnummer</mat-label>
+            <input
+              matInput
+              formControlName="vatNumber"
+              placeholder="SE556123456701"
+              [readonly]="locked()"
+            />
+            @if (locked()) {
+              <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+            }
+          </mat-form-field>
           <mat-form-field class="sm:col-span-2">
             <mat-label>Kontaktperson</mat-label>
             <input matInput formControlName="contactPerson" autocomplete="off" />
+          </mat-form-field>
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Adress (krävs på faktura)</mat-label>
+            <input matInput formControlName="address" autocomplete="off" [readonly]="locked()" />
+            @if (locked()) {
+              <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+            }
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Postnummer</mat-label>
+            <input matInput formControlName="postalCode" autocomplete="off" [readonly]="locked()" />
+            @if (locked()) {
+              <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+            }
+          </mat-form-field>
+          <mat-form-field>
+            <mat-label>Ort</mat-label>
+            <input matInput formControlName="city" autocomplete="off" [readonly]="locked()" />
+            @if (locked()) {
+              <mat-icon matSuffix class="!text-gray-400">lock</mat-icon>
+            }
+          </mat-form-field>
+        } @else {
+          <mat-form-field class="sm:col-span-2">
+            <mat-label>Personnummer</mat-label>
+            <input matInput formControlName="orgNo" autocomplete="off" />
           </mat-form-field>
         }
         <mat-form-field>
@@ -76,6 +128,8 @@ export class CustomerDialog {
   private readonly ref = inject<MatDialogRef<CustomerDialog, Customer>>(MatDialogRef);
 
   readonly busy = signal(false);
+  /** Användaren valde "Fyll i för hand" för ett företag som registret inte känner. */
+  readonly manual = signal(false);
   readonly types = Object.entries(CUSTOMER_TYPE_LABELS);
   readonly form;
 
@@ -85,21 +139,43 @@ export class CustomerDialog {
       type: [(c?.type ?? 'private') as CustomerType],
       name: [c?.name ?? data.name ?? '', Validators.required],
       orgNo: [c?.orgNo ?? ''],
+      vatNumber: [c?.vatNumber ?? ''],
       contactPerson: [c?.contactPerson ?? ''],
+      address: [c?.address ?? ''],
+      postalCode: [c?.postalCode ?? ''],
+      city: [c?.city ?? ''],
       phone: [c?.phone ?? ''],
       email: [c?.email ?? '', Validators.email],
       notes: [c?.notes ?? ''],
     });
   }
 
+  company(): boolean {
+    return this.form.controls.type.value === 'company';
+  }
+
+  /** En ny kund som är ett företag: företagets egna uppgifter fylls i av organisationsnumret. */
+  locked(): boolean {
+    return !this.data.customer && this.company() && !this.manual();
+  }
+
   save() {
     if (!ensureValid(this.form, this.snack)) return;
 
-    const v = this.form.getRawValue();
+    const { vatNumber, address, postalCode, city, ...v } = this.form.getRawValue();
     const body = {
       ...v,
       orgNo: v.orgNo || null,
       contactPerson: v.type === 'company' ? v.contactPerson || null : null,
+      // Dialogen visar adressen bara för ett företag; en privatkunds adress rörs aldrig här.
+      ...(v.type === 'company'
+        ? {
+            vatNumber: vatNumber || null,
+            address: address || null,
+            postalCode: postalCode || null,
+            city: city || null,
+          }
+        : {}),
       phone: v.phone || null,
       email: v.email || null,
       notes: v.notes || null,
