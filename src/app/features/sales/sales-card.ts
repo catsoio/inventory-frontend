@@ -1254,8 +1254,8 @@ interface PayWayOption {
                         [value]="terms()"
                         (input)="termsDays.set($any($event.target).valueAsNumber)"
                       />
-                      <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
                     </mat-form-field>
+                    <span class="self-center text-sm text-gray-600">Förfaller {{ dueDate() }}</span>
                   }
                   @case ('cash_invoice') {
                     <mat-form-field class="w-56" subscriptSizing="dynamic">
