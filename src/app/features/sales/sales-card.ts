@@ -1232,18 +1232,36 @@ interface PayWayOption {
                   <span class="text-gray-600"
                     >Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</span
                   >
-                  <select
-                    class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
+                  <mat-select
+                    class="!flex h-9 w-64 items-center rounded-md border border-gray-300 bg-white px-3 text-sm focus-within:border-teal-700"
                     aria-label="Hur betalar kunden?"
+                    panelWidth="22rem"
+                    [value]="way()"
                     [disabled]="readerWaiting()"
-                    (change)="chooseWay($any($event.target).value)"
+                    (selectionChange)="chooseWay($event.value)"
                   >
+                    <mat-select-trigger>
+                      <span class="flex items-center gap-2">
+                        <mat-icon class="!h-5 !w-5 !text-[20px] text-teal-700">{{
+                          wayIcon()
+                        }}</mat-icon>
+                        {{ wayLabel() }}
+                      </span>
+                    </mat-select-trigger>
                     @for (o of wayOptions(); track o.id) {
-                      <option [value]="o.id" [selected]="o.id === way()" [disabled]="o.disabled">
-                        {{ o.label }}
-                      </option>
+                      <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
+                        <span class="flex items-center gap-3">
+                          <mat-icon class="text-gray-500">{{ o.icon }}</mat-icon>
+                          <span>
+                            <span class="block leading-tight">{{ o.label }}</span>
+                            <span class="block text-xs leading-tight text-gray-500">{{
+                              o.hint
+                            }}</span>
+                          </span>
+                        </span>
+                      </mat-option>
                     }
-                  </select>
+                  </mat-select>
                 </div>
                 @switch (way()) {
                   @case ('invoice') {
@@ -1835,6 +1853,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     this.setDiscText(this.discText());
   }
 
+  readonly wayIcon = computed(() => this.wayOptions().find((o) => o.id === this.way())?.icon ?? '');
   readonly wayLabel = computed(
     () => this.wayOptions().find((o) => o.id === this.way())?.label ?? '',
   );
