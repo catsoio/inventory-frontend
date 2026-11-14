@@ -7,7 +7,8 @@ import { appLocale } from '../../core/i18n/locale';
 import { PaymentMethod, paymentLabel } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
-import { InvoiceItem, loadInvoices, onlyReceipts } from './invoices';
+import { Pricing } from '../../core/pricing';
+import { InvoiceItem, loadInvoices, paidAtCounter } from './invoices';
 
 const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
@@ -43,8 +44,9 @@ type MethodFilter = 'all' | PaymentMethod;
 /**
  * Kvitton: försäljning som betalades på stället (kort, kontant eller Swish). Ett kvitto är ett eget
  * dokument med en egen nummerserie (KV-), betalt när det utfärdas, och är aldrig en fordran: det
- * står alltså inte bland fakturorna. Överst syns vad som kommit in i kassan. Klick öppnar säljkortet
- * (eller det äldre kvittot) bakom.
+ * står alltså inte bland fakturorna. Kontantfakturor (fakturor betalda vid disken) står här också,
+ * så att dagen går att stämma av mot kortterminalen; de finns dessutom bland fakturorna. Överst syns
+ * vad som kommit in i kassan. Klick öppnar säljkortet (eller det äldre kvittot) bakom.
  */
 @Component({
   selector: 'app-receipt-list',
@@ -78,10 +80,10 @@ type MethodFilter = 'all' | PaymentMethod;
         [rows]="shown()"
         [loading]="loading()"
         newLink="/sales/new"
-        [newQuery]="{ kind: 'receipt' }"
-        newLabel="Nytt kvitto"
+        [newQuery]="pricing.value().alwaysInvoice ? {} : { kind: 'receipt' }"
+        [newLabel]="pricing.value().alwaysInvoice ? 'Ny försäljning' : 'Nytt kvitto'"
         [newFab]="false"
-        emptyText="Inga kvitton. De skapas när ett säljkort bokförs som kvitto."
+        emptyText="Inget betalt vid disken än. Kvitton och kontantfakturor hamnar här när ett säljkort bokförs som betalt."
         searchPlaceholder="Sök nummer, kund eller regnr…"
         (search)="query.set($event)"
         (rowClick)="open($event)"
@@ -140,13 +142,14 @@ type MethodFilter = 'all' | PaymentMethod;
 export class ReceiptList {
   private readonly api = inject(WorkOrderApi);
   private readonly cardsApi = inject(SalesCardApi);
+  readonly pricing = inject(Pricing);
   readonly router = inject(Router);
   readonly cols = COLS;
   readonly money = (ore: number) => kr.transform(ore);
   readonly dateOf = (o: InvoiceItem) => day(o.invoicedAt);
   readonly methodText = (o: InvoiceItem) =>
     o.paymentMethod ? paymentLabel('receipt', o.paymentMethod) : '–';
-  readonly count = (n: number) => `${n} ${n === 1 ? 'kvitto' : 'kvitton'}`;
+  readonly count = (n: number) => `${n} ${n === 1 ? 'betalning' : 'betalningar'}`;
 
   private readonly items = signal<InvoiceItem[]>([]);
   readonly loading = signal(true);
@@ -185,7 +188,7 @@ export class ReceiptList {
   constructor() {
     loadInvoices(this.api, this.cardsApi).subscribe({
       next: (l) => {
-        this.items.set(onlyReceipts(l));
+        this.items.set(paidAtCounter(l));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

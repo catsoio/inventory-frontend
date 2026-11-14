@@ -1,4 +1,13 @@
-import { Component, DestroyRef, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin, switchMap, takeWhile, timer } from 'rxjs';
 import { PaymentApi } from '../../core/api/payment-api';
@@ -7,8 +16,9 @@ import { PaymentReader, PaymentRow } from '../../core/models';
 /**
  * Kort på kortläsare: skickar kortets belopp till läsaren, väntar på att kunden knackar eller
  * sätter i kortet och säger till när betalningen är bokförd. Ett utkast blir ett kvitto (via
- * kassaregistret) och en obetald faktura markeras betald. Syns bara när Stripe är kopplat och en
- * läsare är registrerad.
+ * kassaregistret) eller, med `document="invoice"` och alltid där allt faktureras, en
+ * kontantfaktura. En obetald faktura markeras betald. Medan läsaren väntar går kortet inte att
+ * ändra eller bokföra på annat sätt. Syns bara när Stripe är kopplat och en läsare är registrerad.
  */
 @Component({
   selector: 'app-reader-payment',
@@ -20,7 +30,9 @@ import { PaymentReader, PaymentRow } from '../../core/models';
           <mat-icon class="text-gray-500">contactless</mat-icon>
           <span class="font-medium">Kort på läsare</span>
           @if (waiting(); as p) {
-            <span class="text-sm text-gray-600">Väntar på kunden… be dem knacka eller sätta i kortet.</span>
+            <span class="text-sm text-gray-600"
+              >Väntar på kunden… be dem knacka eller sätta i kortet.</span
+            >
             <button mat-stroked-button type="button" (click)="cancel(p)">Avbryt</button>
           } @else {
             @if (readers().length > 1) {
@@ -28,7 +40,9 @@ import { PaymentReader, PaymentRow } from '../../core/models';
                 <mat-label>Läsare</mat-label>
                 <mat-select [value]="readerId()" (selectionChange)="readerId.set($event.value)">
                   @for (r of readers(); track r.id) {
-                    <mat-option [value]="r.id">{{ r.label }}{{ r.status === 'online' ? '' : ' (offline)' }}</mat-option>
+                    <mat-option [value]="r.id"
+                      >{{ r.label }}{{ r.status === 'online' ? '' : ' (offline)' }}</mat-option
+                    >
                   }
                 </mat-select>
               </mat-form-field>
@@ -43,7 +57,7 @@ import { PaymentReader, PaymentRow } from '../../core/models';
               Ta betalt på läsaren
             </button>
             @if (disabled) {
-              <span class="text-sm text-gray-500">Spara ändringarna först.</span>
+              <span class="text-sm text-gray-500">{{ disabledHint }}</span>
             }
           }
         </div>
@@ -52,7 +66,8 @@ import { PaymentReader, PaymentRow } from '../../core/models';
         }
         @if (unbooked(); as u) {
           <p class="mt-2 text-sm text-red-700">
-            Betalningen är mottagen men kunde inte bokföras: {{ u.receiptError }}
+            Betalningen på {{ u.amount | kr }} är mottagen men kunde inte bokföras:
+            {{ u.receiptError }}
             <button mat-button type="button" (click)="retry(u)">Försök igen</button>
           </p>
         }
@@ -65,10 +80,16 @@ export class ReaderPayment implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   @Input({ required: true }) cardId!: string;
-  /** Kortet har osparade ändringar: beloppet på läsaren skulle bli fel. */
+  /** Kortet har osparade ändringar (beloppet på läsaren skulle bli fel) eller kan inte bokföras än. */
   @Input() disabled = false;
+  /** Varför knappen är avstängd. */
+  @Input() disabledHint = 'Spara ändringarna först.';
+  /** Vad ett utkast blir när kunden betalat: kvitto eller kontantfaktura. Utan värde avgör servern. */
+  @Input() document?: 'invoice' | 'receipt';
   /** Kortet är bokfört: sidan ska läsa om det. */
   @Output() booked = new EventEmitter<void>();
+  /** En betalning väntar på läsaren (sant) eller är klar (falskt): kortet ska inte ändras under tiden. */
+  @Output() waitingChange = new EventEmitter<boolean>();
 
   readonly ready = signal(false);
   readonly readers = signal<PaymentReader[]>([]);
@@ -99,7 +120,7 @@ export class ReaderPayment implements OnInit {
   start() {
     this.busy.set(true);
     this.error.set('');
-    this.api.startReader(this.cardId, this.readerId()).subscribe({
+    this.api.startReader(this.cardId, this.readerId(), this.document).subscribe({
       next: () => {
         this.busy.set(false);
         this.watch();
@@ -126,7 +147,9 @@ export class ReaderPayment implements OnInit {
         switchMap(() => this.api.forCard(this.cardId)),
         takeWhile((rows) => {
           this.payments.set(rows);
-          return rows.some((p) => p.channel === 'reader' && p.status === 'pending');
+          const waiting = rows.some((p) => p.channel === 'reader' && p.status === 'pending');
+          this.waitingChange.emit(waiting);
+          return waiting;
         }, true),
         takeUntilDestroyed(this.destroyRef),
       )

@@ -35,9 +35,19 @@ export class PaymentApi {
     return this.http.get<PaymentRow[]>(`${this.base}/cards/${cardId}`);
   }
 
-  /** Skickar kortets belopp till läsaren. Ett utkast blir kvitto när kunden betalat. */
-  startReader(cardId: string, readerId: string): Observable<PaymentRow> {
-    return this.http.post<PaymentRow>(`${this.base}/cards/${cardId}/reader`, { readerId });
+  /**
+   * Skickar kortets belopp till läsaren. Ett utkast blir ett kvitto, eller en kontantfaktura
+   * (`document: 'invoice'`, och alltid där allt faktureras), när kunden betalat.
+   */
+  startReader(
+    cardId: string,
+    readerId: string,
+    document?: 'invoice' | 'receipt',
+  ): Observable<PaymentRow> {
+    return this.http.post<PaymentRow>(`${this.base}/cards/${cardId}/reader`, {
+      readerId,
+      ...(document ? { document } : {}),
+    });
   }
 
   cancel(paymentId: string): Observable<PaymentRow> {

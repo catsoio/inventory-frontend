@@ -8,9 +8,18 @@ import { InvoiceCard } from './invoice-card';
 import { InvoiceList } from './invoice-list';
 import { ReceiptList } from './receipt-list';
 import { RegisterPage } from './register-page';
+import { TillPanel } from './till-panel';
 
 @NgModule({
-  declarations: [FinanceOverview, InvoiceList, ReceiptList, RegisterPage, InvoiceCard, InvoiceNew],
+  declarations: [
+    FinanceOverview,
+    InvoiceList,
+    ReceiptList,
+    RegisterPage,
+    TillPanel,
+    InvoiceCard,
+    InvoiceNew,
+  ],
   imports: [
     SharedModule,
     RouterModule.forChild([

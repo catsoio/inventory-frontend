@@ -6,12 +6,14 @@ import { Observable, map, of, switchMap } from 'rxjs';
 import { BlocketImportApi } from '../../../core/api/car-api';
 import { SupplierCatalogApi } from '../../../core/api/supplier-catalog-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
+import { ZettleApi } from '../../../core/api/zettle-api';
 import { Billing } from '../../../core/billing/billing';
 import type {
   BlocketAccessStatus,
   BlocketStatus,
   CarInfoStatus,
   GummigrossenStatus,
+  ZettleStatus,
 } from '../../../core/models';
 import { Confirm } from '../../../shared/confirm';
 
@@ -73,6 +75,34 @@ import { Confirm } from '../../../shared/confirm';
           <mat-icon class="text-gray-500">add</mat-icon>
         }
       </button>
+      @if (hasTill()) {
+        <button
+          type="button"
+          class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 text-left hover:bg-gray-50"
+          (click)="openZettle()"
+        >
+          <span
+            class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#003087] text-white"
+          >
+            <mat-icon>point_of_sale</mat-icon>
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block font-semibold">PayPal-kassan (Zettle)</span>
+            <span class="block text-sm text-gray-500">
+              {{
+                zettle()?.connected
+                  ? 'Köpen läses in till lager och Ekonomi → Kassa'
+                  : 'Ta betalt av kunder som inte vill ha faktura, med en godkänd kassa'
+              }}
+            </span>
+          </span>
+          @if (zettle()?.connected) {
+            <app-pill tone="green">Ansluten</app-pill>
+          } @else {
+            <mat-icon class="text-gray-500">add</mat-icon>
+          }
+        </button>
+      }
       @if (hasCars()) {
         <button
           type="button"
@@ -115,11 +145,27 @@ export class SettingsConnections implements OnInit {
   private readonly catalogApi = inject(SupplierCatalogApi);
   /** Blocket gäller bilhandeln, så kortet visas bara för ett garage som har den. */
   readonly hasCars = () => this.billing.allows('bilhandel');
+  readonly zettle = signal<ZettleStatus | null>(null);
+  private readonly zettleApi = inject(ZettleApi);
+  /** Kassan hör till Ekonomi (modulen bokföring). */
+  readonly hasTill = () => this.billing.allows('bokforing');
 
   ngOnInit() {
     this.api.carInfo().subscribe((s) => this.status.set(s));
     this.catalogApi.settings().subscribe((s) => this.gummigrossen.set(s));
     if (this.hasCars()) this.api.blocket().subscribe((s) => this.blocket.set(s));
+    if (this.hasTill()) this.zettleApi.status().subscribe((s) => this.zettle.set(s));
+  }
+
+  openZettle() {
+    this.dialog
+      .open<ZettleConnectionDialog, ZettleStatus | null, ZettleStatus>(ZettleConnectionDialog, {
+        data: this.zettle(),
+        width: '520px',
+        maxWidth: '95vw',
+      })
+      .afterClosed()
+      .subscribe((s) => s && this.zettle.set(s));
   }
 
   openGummigrossen() {
@@ -566,6 +612,141 @@ export class GummigrossenConnectionDialog {
         if (!ok) return;
         this.busy.set(true);
         this.api.clear().subscribe({
+          next: (s) => this.ref.close(s),
+          error: () => this.busy.set(false),
+        });
+      });
+  }
+}
+
+/**
+ * PayPal-kassan (PayPal Point of Sale, tidigare Zettle): ägaren skapar en API-nyckel hos PayPal och
+ * klistrar in klient-id och nyckel här. Kassan är kassaregistret för köp utan faktura; Axle läser in
+ * köpen och skickar artiklarna till kassans produktlista.
+ */
+@Component({
+  selector: 'app-zettle-connection-dialog',
+  standalone: false,
+  template: `
+    <h2 mat-dialog-title>PayPal-kassan (Zettle)</h2>
+    <form (submit)="$event.preventDefault(); save()" autocomplete="off">
+      <mat-dialog-content class="!flex flex-col gap-1 !pt-2">
+        @if (current?.connected) {
+          <p class="mb-2 text-sm text-gray-600">
+            Ansluten sedan {{ day(current?.connectedAt) }}. Köp från och med
+            {{ day(current?.since) }} läses in av sig självt med några minuters mellanrum och drar
+            lagret. Byt nyckel genom att klistra in en ny.
+          </p>
+        } @else {
+          <p class="mb-2 text-sm text-gray-600">
+            För kunder som köper vid disken utan faktura (anonyma köp). Köpet slås in i PayPals
+            kassaapp, som är ett godkänt kassaregister, och Axle läser in det: lagret dras och köpet
+            syns under Ekonomi → Kassa och i momsrapporten. Era artiklar skickas till kassans
+            produktlista, så personalen trycker på varan i stället för att skriva.
+          </p>
+          <ol class="mb-3 list-decimal space-y-1 pl-5 text-sm text-gray-600">
+            <li>Aktivera kassaregistret i PayPal-appen och anmäl det hos Skatteverket.</li>
+            <li>
+              <a
+                class="font-medium text-teal-700 underline"
+                [href]="link"
+                target="_blank"
+                rel="noopener"
+                >Skapa en API-nyckel hos PayPal</a
+              >
+              (logga in som kontots ägare; namn och behörigheter är ifyllda).
+            </li>
+            <li>Klistra in klient-id och API-nyckel nedan.</li>
+          </ol>
+        }
+        <mat-form-field>
+          <mat-label>Klient-id</mat-label>
+          <input matInput [formControl]="clientId" autocomplete="off" spellcheck="false" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>API-nyckel</mat-label>
+          <textarea
+            matInput
+            rows="3"
+            [formControl]="apiKey"
+            autocomplete="off"
+            spellcheck="false"
+            class="font-mono text-xs"
+          ></textarea>
+          <mat-hint>Visas bara en gång hos PayPal. Sparas krypterad och visas aldrig här.</mat-hint>
+        </mat-form-field>
+      </mat-dialog-content>
+      @if (busy()) {
+        <mat-progress-bar mode="indeterminate" />
+      }
+      <mat-dialog-actions>
+        @if (current?.connected) {
+          <button mat-button type="button" color="warn" [disabled]="busy()" (click)="remove()">
+            Koppla bort
+          </button>
+        }
+        <span class="flex-1"></span>
+        <button mat-button type="button" mat-dialog-close>Avbryt</button>
+        <button
+          mat-flat-button
+          color="primary"
+          [disabled]="busy() || clientId.invalid || apiKey.invalid"
+        >
+          {{ busy() ? 'Testar…' : 'Testa anslutning' }}
+        </button>
+      </mat-dialog-actions>
+    </form>
+  `,
+})
+export class ZettleConnectionDialog {
+  private readonly api = inject(ZettleApi);
+  private readonly snack = inject(MatSnackBar);
+  private readonly confirm = inject(Confirm);
+  private readonly ref = inject<MatDialogRef<ZettleConnectionDialog, ZettleStatus>>(MatDialogRef);
+  readonly current = inject<ZettleStatus | null>(MAT_DIALOG_DATA);
+  readonly link =
+    this.current?.apiKeyLink ??
+    'https://my.zettle.com/apps/api-keys?name=Axle&scopes=READ:PURCHASE%20READ:PRODUCT%20WRITE:PRODUCT';
+
+  readonly busy = signal(false);
+  readonly clientId = new FormControl(this.current?.clientId ?? '', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.pattern(/^\s*[A-Za-z0-9-]{8,80}\s*$/)],
+  });
+  readonly apiKey = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.minLength(20)],
+  });
+
+  day(iso: string | null | undefined) {
+    return iso ? iso.slice(0, 10) : '–';
+  }
+
+  save() {
+    if (this.clientId.invalid || this.apiKey.invalid) return;
+    this.busy.set(true);
+    this.api.connect(this.clientId.value.trim(), this.apiKey.value.trim()).subscribe({
+      next: (s) => {
+        this.snack.open('PayPal-kassan är ansluten', 'OK', { duration: 4000 });
+        this.ref.close(s);
+      },
+      error: () => this.busy.set(false),
+    });
+  }
+
+  remove() {
+    this.confirm
+      .ask({
+        title: 'Koppla bort PayPal-kassan?',
+        message:
+          'Inga nya köp läses in och lagret dras inte längre för det som säljs i kassan. Köp som redan är inlästa och varorna i kassans produktlista ligger kvar.',
+        confirmText: 'Koppla bort',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.busy.set(true);
+        this.api.disconnect().subscribe({
           next: (s) => this.ref.close(s),
           error: () => this.busy.set(false),
         });

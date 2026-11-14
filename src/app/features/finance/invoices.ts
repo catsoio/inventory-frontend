@@ -25,6 +25,8 @@ export interface InvoiceItem {
   /** Kreditfakturans datum när fakturan krediterats: den väntar då på ingen betalning. */
   creditedAt?: string | null;
   paymentMethod: PaymentMethod | null;
+  /** En kontantfaktura: en faktura som betalades vid disken när den utfärdades. */
+  paidOnIssue?: boolean;
   customerName: string;
   regNo: string;
   /** SK-00042 eller AO-00042. */
@@ -45,6 +47,13 @@ export const onlyInvoices = (items: InvoiceItem[]) => items.filter((o) => o.kind
 
 /** Kvittona: försäljning som betalades på stället. */
 export const onlyReceipts = (items: InvoiceItem[]) => items.filter((o) => o.kind === 'receipt');
+
+/**
+ * Allt som betalades vid disken: kvitton och kontantfakturor (fakturor betalda när de utfärdades).
+ * Det är det dagens kortterminal, Swish och kassalåda stäms av mot.
+ */
+export const paidAtCounter = (items: InvoiceItem[]) =>
+  items.filter((o) => o.kind === 'receipt' || !!o.paidOnIssue);
 
 export function invoiceFigures(
   items: InvoiceItem[],
@@ -80,35 +89,37 @@ export function invoiceFigures(
 /** Alla utfärdade fakturor och kvitton (säljkort och äldre arbetsorder), nyast först. */
 export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observable<InvoiceItem[]> {
   const PAGE = 100;
-  const fromOrders = orders.list({ status: 'done', withImported: true, limit: PAGE, offset: 0 }).pipe(
-    expand((p) => {
-      const next = p.pagination.offset + p.pagination.limit;
-      return next < p.pagination.total && next < 1000
-        ? orders.list({ status: 'done', withImported: true, limit: PAGE, offset: next })
-        : EMPTY;
-    }),
-    reduce((all, p) => all.concat(p.items), [] as WorkOrder[]),
-    map((all) =>
-      all
-        .filter((o) => !!o.invoiceCode)
-        .map((o): InvoiceItem => ({
-          id: o.id,
-          source: 'order',
-          product: 'axle',
-          // Äldre svar saknar typen: en faktura är det som har ett förfallodatum.
-          kind: o.invoiceKind ?? (o.invoiceDueAt ? 'invoice' : 'receipt'),
-          code: o.invoiceCode!,
-          invoicedAt: o.invoicedAt ?? null,
-          dueAt: o.invoiceDueAt ?? null,
-          paidAt: o.paidAt ?? null,
-          paymentMethod: o.paymentMethod ?? null,
-          customerName: o.customerName,
-          regNo: o.regNo,
-          ref: o.code,
-          total: o.invoiceTotal ?? o.price ?? 0,
-        })),
-    ),
-  );
+  const fromOrders = orders
+    .list({ status: 'done', withImported: true, limit: PAGE, offset: 0 })
+    .pipe(
+      expand((p) => {
+        const next = p.pagination.offset + p.pagination.limit;
+        return next < p.pagination.total && next < 1000
+          ? orders.list({ status: 'done', withImported: true, limit: PAGE, offset: next })
+          : EMPTY;
+      }),
+      reduce((all, p) => all.concat(p.items), [] as WorkOrder[]),
+      map((all) =>
+        all
+          .filter((o) => !!o.invoiceCode)
+          .map((o): InvoiceItem => ({
+            id: o.id,
+            source: 'order',
+            product: 'axle',
+            // Äldre svar saknar typen: en faktura är det som har ett förfallodatum.
+            kind: o.invoiceKind ?? (o.invoiceDueAt ? 'invoice' : 'receipt'),
+            code: o.invoiceCode!,
+            invoicedAt: o.invoicedAt ?? null,
+            dueAt: o.invoiceDueAt ?? null,
+            paidAt: o.paidAt ?? null,
+            paymentMethod: o.paymentMethod ?? null,
+            customerName: o.customerName,
+            regNo: o.regNo,
+            ref: o.code,
+            total: o.invoiceTotal ?? o.price ?? 0,
+          })),
+      ),
+    );
   const fromCards = cards.list({ status: 'posted', limit: PAGE, offset: 0 }).pipe(
     expand((p) => {
       const next = p.pagination.offset + p.pagination.limit;
@@ -129,6 +140,7 @@ export function loadInvoices(orders: WorkOrderApi, cards: SalesCardApi): Observa
         paidAt: c.paidAt,
         creditedAt: c.creditedAt ?? null,
         paymentMethod: c.paymentMethod ?? null,
+        paidOnIssue: !!c.paidOnIssue,
         customerName: c.customerName ?? 'Kontantkund',
         regNo: c.regNo ?? '',
         ref: c.code,

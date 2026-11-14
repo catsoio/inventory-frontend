@@ -71,9 +71,19 @@ export class SalesCardApi {
     return this.http.post<SalesCardDetail>(`${this.base}/${id}/return`, { reason });
   }
 
-  /** Krediterar hela fakturan eller kvittot med en kreditfaktura (ägaren). Originalet ändras aldrig. */
-  credit(id: string, reason: string, restock: boolean): Observable<SalesCardDetail> {
-    return this.http.post<SalesCardDetail>(`${this.base}/${id}/credit`, { reason, restock });
+  /**
+   * Krediterar hela fakturan eller kvittot med en kreditfaktura (ägaren). Originalet ändras aldrig.
+   * Med `refund` betalas kortbetalningar som gick genom Stripe tillbaka till kunden.
+   */
+  credit(
+    id: string,
+    reason: string,
+    restock: boolean,
+    refund = false,
+  ): Observable<SalesCardDetail & { refunds?: { status: 'done' | 'failed'; error?: string }[] }> {
+    return this.http.post<
+      SalesCardDetail & { refunds?: { status: 'done' | 'failed'; error?: string }[] }
+    >(`${this.base}/${id}/credit`, { reason, restock, ...(refund ? { refund } : {}) });
   }
 
   get(id: string): Observable<SalesCardDetail> {

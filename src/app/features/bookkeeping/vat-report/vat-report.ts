@@ -19,8 +19,9 @@ const ymd = (d: Date) =>
       <h2 class="text-base font-semibold">Momsrapport (utgående moms)</h2>
       <p class="mb-3 max-w-3xl text-sm text-gray-600">
         Moms ni tagit ut av kunderna under perioden, per momssats. Fakturor och kvitton räknas den
-        dag de utfärdades, däckhotell den dag avgiften betalades och lagerförsäljning utanför
-        arbetsorder den dag den bokades. Ingående moms (på inköp) ingår inte.
+        dag de utfärdades, däckhotell den dag avgiften betalades, lagerförsäljning utanför
+        arbetsorder den dag den bokades och köp i PayPal-kassan när de slogs in (returer drar av).
+        Ingående moms (på inköp) ingår inte.
       </p>
       <form [formGroup]="form" (ngSubmit)="load()" class="flex flex-wrap items-center gap-3">
         <mat-form-field subscriptSizing="dynamic">
@@ -131,6 +132,10 @@ export class VatReportPanel {
       ['Kvitton (betalt på stället)', r.receipts],
       ['Lagerförsäljning utanför arbetsorder', r.stockSales],
       ['Däckhotell (betalda avgifter)', r.hotel],
+      // Visas bara när PayPal-kassan har sålt något under perioden.
+      ...(r.till && (r.till.count > 0 || r.till.vat !== 0)
+        ? ([['PayPal-kassan (köp vid disken)', r.till]] as [string, VatSource][])
+        : []),
     ];
   }
 

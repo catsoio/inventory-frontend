@@ -383,8 +383,13 @@ export interface DocumentChoice {
   kind?: InvoiceKind;
   /** Dagar till förfallodatum på en faktura. Standard: betalningsvillkoren under Företaget. */
   paymentTermsDays?: number;
-  /** Hur ett kvitto betalades; ett kvitto är betalt direkt. En faktura betalas senare. */
+  /**
+   * Hur ett kvitto, eller en faktura som betalas på stället (`paidOnIssue`), betalades. En vanlig
+   * faktura betalas senare.
+   */
   paymentMethod?: PaymentMethod;
+  /** Kontantfaktura: fakturan betalas nu vid disken och utfärdas betald, utan betalningsvillkor. */
+  paidOnIssue?: boolean;
 }
 export type StorageContents = 'tyres' | 'rims' | 'complete_wheels';
 export type StorageAccessory = 'hubcaps' | 'locking_nuts' | 'wheel_bolts' | 'tpms';
@@ -1313,6 +1318,11 @@ export interface PricingSettings {
   stockOut: 'work_order_done' | 'sales_card_posted';
   /** Moms på inköp, %. Inköpspriser skrivs och visas inkl. den, lagras utan. */
   purchaseVatRate: number;
+  /**
+   * Allt faktureras: varje försäljning blir en faktura, också den som betalas vid disken
+   * (kontantfaktura), och inga kvitton (KV-) utfärdas.
+   */
+  alwaysInvoice: boolean;
 }
 
 // --- Arbetsorder ---
@@ -1425,6 +1435,14 @@ export interface WorkOrderInvoice {
   orders?: InvoiceDocOrder[];
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+  /**
+   * Kontantfaktura: en faktura som betalades vid disken när den utfärdades. Den säger när och hur
+   * den betalades och ber inte om något. Betalningen går inte att ångra; ett fel rättas genom att
+   * kortet återöppnas eller krediteras.
+   */
+  paidOnIssue?: boolean;
+  /** Betalleverantörens id när dokumentet betalades genom den (kort på läsare, betallänk). */
+  paymentReference?: string;
   /** Satt när kvittot är registrerat i kassaregistret: dess nummer, kontrollkod och kassa. */
   register?: RegisteredReceiptRef;
 }
@@ -1521,6 +1539,8 @@ export interface VatReport {
   receipts: VatSource;
   stockSales: VatSource;
   hotel: VatSource;
+  /** Köp i PayPal-kassan bredvid Axle; saknas i svar från äldre servrar. */
+  till?: VatSource;
   /** Bilar sålda med vinstmarginalbeskattning: momsen på vinsten, aldrig på fakturan. */
   margin: { count: number; sales: number; purchase: number; base: number; vat: number };
   total: { net: number; vat: number; gross: number; byRate: VatBucket[] };
@@ -1894,6 +1914,8 @@ export interface SalesCardItem {
   dueAt: string | null;
   paidAt: string | null;
   paymentMethod: PaymentMethod | null;
+  /** En kontantfaktura: betald vid disken när den utfärdades. */
+  paidOnIssue?: boolean;
   /** Kreditfakturans nummer (KRE-…) och datum när dokumentet har krediterats. */
   creditCode?: string | null;
   creditedAt?: string | null;
@@ -2376,7 +2398,8 @@ export interface PaymentReader {
 export interface PaymentRow {
   id: string;
   cardId: string;
-  purpose: 'invoice' | 'receipt';
+  /** `counter_invoice` = försäljning vid disken som blir en kontantfaktura när kunden betalat. */
+  purpose: 'invoice' | 'receipt' | 'counter_invoice';
   channel: 'checkout' | 'reader';
   amount: number;
   applicationFee: number;
@@ -2734,4 +2757,77 @@ export interface ScreenView {
   at: string;
   orders: ScreenOrder[];
   hidden: number;
+}
+
+// --- PayPal-kassan (PayPal Point of Sale, tidigare Zettle) bredvid Axle ---
+
+/** Kopplingen till verkstadens PayPal-kassa; nyckeln visas aldrig. */
+export interface ZettleStatus {
+  connected: boolean;
+  clientId: string | null;
+  connectedAt: string | null;
+  /** Köp från och med den här tiden läses in; äldre rör aldrig lagret. */
+  since: string | null;
+  lastSyncAt: string | null;
+  lastSyncError: string | null;
+  lastSyncCount: number;
+  /** Sidan hos PayPal/Zettle där ägaren skapar nyckeln, med Axles namn och behörigheter ifyllda. */
+  apiKeyLink: string;
+}
+
+export interface ZettleSyncResult {
+  imported: number;
+  stockMissing: number;
+  failed: number;
+}
+
+export type PosStockState = 'booked' | 'missing' | 'none' | 'failed';
+
+export interface PosSaleRow {
+  name: string;
+  variant: string | null;
+  quantity: number;
+  unitPrice: number;
+  /** Vad raden blev efter rabatt, öre inkl. moms. */
+  amount: number;
+  vatRate: number;
+  sku: string | null;
+  barcode: string | null;
+  articleId: string | null;
+  stock: PosStockState;
+  stockNote: string | null;
+}
+
+/** Ett köp som slogs in i PayPal-kassan och lästes in i Axle. Belopp i öre inkl. moms, alltid positiva. */
+export interface PosSale {
+  id: string;
+  source: 'zettle';
+  externalId: string;
+  number: number | null;
+  soldAt: string;
+  amount: number;
+  vat: number;
+  byRate: VatBucket[];
+  rows: PosSaleRow[];
+  payments: { method: 'card' | 'cash' | 'swish' | 'other'; label: string | null; amount: number }[];
+  /** En retur: pengarna och varorna gick tillbaka. */
+  refund: boolean;
+  refundsExternalId: string | null;
+  seller: string | null;
+  /** Referensen på lagerrörelserna (KASSA-1042). */
+  stockReference: string | null;
+  stockError: string | null;
+  importedAt: string;
+}
+
+/** En artikel som ligger i PayPal-kassans produktlista. */
+export interface PosProduct {
+  articleId: string;
+  code: string | null;
+  label: string;
+  sellPrice: number;
+  quantity: number;
+  state: 'pending' | 'ok' | 'error';
+  message: string | null;
+  updatedAt: string;
 }

@@ -23,6 +23,7 @@ export const PRICING_DEFAULTS: PricingSettings = {
   internalHourlyCost: null,
   stockOut: 'work_order_done',
   purchaseVatRate: 25,
+  alwaysInvoice: false,
 };
 
 /**

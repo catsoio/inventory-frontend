@@ -31,6 +31,7 @@ import { Nav } from '../../core/layout/nav';
 import { carEconomy } from '../../shared/car-economy';
 import { environment } from '../../../environments/environment';
 import { SalesCardApi } from '../../core/api/sales-card-api';
+import { PaymentApi } from '../../core/api/payment-api';
 import { SalesSendDialog } from './sales-send-dialog';
 import { TyreFinderDialog } from './tyre-finder';
 import { Auth } from '../../core/auth/auth';
@@ -236,7 +237,14 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
       @if (card()?.status === 'posted') {
         <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
           <b
-            >Bokfört som {{ card()!.kind === 'invoice' ? 'faktura' : 'kvitto' }}
+            >Bokfört som
+            {{
+              card()!.kind === 'invoice'
+                ? card()!.paidOnIssue
+                  ? 'kontantfaktura'
+                  : 'faktura'
+                : 'kvitto'
+            }}
             {{ card()!.documentCode }}.</b
           >
           Kortet är låst: rader, priser och rabatt kan inte ändras (ett utfärdat dokument får inte
@@ -1189,30 +1197,82 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               </p>
             }
             <mat-radio-group
-              class="mb-4 grid gap-3 sm:grid-cols-2"
+              [class]="
+                receiptsAllowed()
+                  ? 'mb-4 grid gap-3 sm:grid-cols-3'
+                  : 'mb-4 grid gap-3 sm:grid-cols-2'
+              "
               aria-label="Vad kunden får"
-              [value]="kind()"
-              [disabled]="!!c.reservedKind"
-              (change)="docKind.set($event.value)"
+              [value]="docOption()"
+              [disabled]="readerWaiting()"
+              (change)="chooseDoc($event.value)"
             >
-              <label class="choice" [class.is-on]="kind() === 'invoice'">
-                <mat-radio-button value="invoice" class="font-medium">Faktura</mat-radio-button>
+              <label class="choice" [class.is-on]="docOption() === 'invoice'">
+                <mat-radio-button
+                  value="invoice"
+                  class="font-medium"
+                  [disabled]="!!c.reservedKind && c.reservedKind !== 'invoice'"
+                  >Faktura</mat-radio-button
+                >
                 <span class="choice-text">{{
                   hall()
                     ? 'Köparen betalar inom betalningsvillkoren, oftast med banköverföring. Det vanliga för en bil. Får ett fakturanummer (FAK-) och hamnar under Fakturor.'
                     : 'Kunden betalar senare, inom betalningsvillkoren. Får ett fakturanummer (FAK-) och hamnar under Fakturor. Passar företag och större jobb.'
                 }}</span>
               </label>
-              <label class="choice" [class.is-on]="kind() === 'receipt'">
-                <mat-radio-button value="receipt" class="font-medium">Kvitto</mat-radio-button>
-                <span class="choice-text">{{
-                  hall()
-                    ? 'Köparen betalar nu med kort eller Swish. Går inte om bilen säljs med vinstmarginalbeskattning (VMB).'
-                    : 'Kunden betalar nu. Får ett kvittonummer (KV-) och hamnar under Kvitton, inte bland fakturorna.'
-                }}</span>
-              </label>
+              <!-- Kontantfakturan erbjuds först när ägaren slagit på Allt faktureras (revisorn ska ha sett den). -->
+              @if (alwaysInvoice()) {
+                <label class="choice" [class.is-on]="docOption() === 'cash_invoice'">
+                  <mat-radio-button
+                    value="cash_invoice"
+                    class="font-medium"
+                    [disabled]="!!c.reservedKind && c.reservedKind !== 'invoice'"
+                    >Betald nu (kontantfaktura)</mat-radio-button
+                  >
+                  <span class="choice-text"
+                    >Kunden betalar nu vid disken med kort, Swish eller kontant. Blir en faktura
+                    (FAK-) som är betald direkt, utan förfallodatum. Kräver kund med namn och
+                    adress.</span
+                  >
+                </label>
+              }
+              @if (receiptsAllowed()) {
+                <label class="choice" [class.is-on]="docOption() === 'receipt'">
+                  <mat-radio-button
+                    value="receipt"
+                    class="font-medium"
+                    [disabled]="!!c.reservedKind && c.reservedKind !== 'receipt'"
+                    >Kvitto</mat-radio-button
+                  >
+                  <span class="choice-text">{{
+                    hall()
+                      ? 'Köparen betalar nu med kort eller Swish. Går inte om bilen säljs med vinstmarginalbeskattning (VMB).'
+                      : 'Kunden betalar nu. Får ett kvittonummer (KV-) och hamnar under Kvitton, inte bland fakturorna.'
+                  }}</span>
+                </label>
+              }
             </mat-radio-group>
-            @if (kind() === 'invoice') {
+            @if (alwaysInvoice()) {
+              <p class="mb-3 text-sm text-gray-600">
+                <b>Allt faktureras här</b> (Inställningar → Betalning och kassa): varje försäljning
+                blir en faktura, också den som betalas vid disken. Sälj aldrig något utan faktura –
+                då krävs ett kassaregister.
+              </p>
+            }
+            @if (docOption() === 'cash_invoice') {
+              <mat-form-field class="w-56" subscriptSizing="dynamic">
+                <mat-label>Betalsätt</mat-label>
+                <mat-select
+                  [value]="receiptMethod()"
+                  (selectionChange)="receiptMethod.set($event.value)"
+                >
+                  @for (m of receiptMethods; track m[0]) {
+                    <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Så som kunden betalade vid disken</mat-hint>
+              </mat-form-field>
+            } @else if (kind() === 'invoice') {
               <div class="flex flex-wrap items-start gap-3">
                 <mat-form-field class="w-56" subscriptSizing="dynamic">
                   <mat-label>Betalningsvillkor (dagar)</mat-label>
@@ -1257,11 +1317,19 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 mat-flat-button
                 color="primary"
                 type="button"
-                [disabled]="dirty() || busy() || !rows().length || !!blocker()"
+                [disabled]="dirty() || busy() || readerWaiting() || !rows().length || !!blocker()"
                 (click)="post()"
               >
                 <mat-icon>receipt_long</mat-icon>
-                {{ kind() === 'invoice' ? 'Bokför som faktura' : 'Bokför som kvitto' }}
+                {{
+                  docOption() === 'cash_invoice'
+                    ? 'Bokför som betald (' +
+                      payLabel('receipt', receiptMethod()).toLowerCase() +
+                      ')'
+                    : kind() === 'invoice'
+                      ? 'Bokför som faktura'
+                      : 'Bokför som kvitto'
+                }}
               </button>
               <a
                 mat-stroked-button
@@ -1272,8 +1340,18 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 <mat-icon>visibility</mat-icon> Förhandsgranska utkast
               </a>
             </div>
-            @if (kind() === 'receipt') {
-              <app-reader-payment [cardId]="c.id" [disabled]="dirty()" (booked)="load(c.id)" />
+            @if (docOption() !== 'invoice') {
+              <!-- Kort på läsaren: kortet bokförs av sig självt när kunden har betalat. -->
+              <app-reader-payment
+                [cardId]="c.id"
+                [disabled]="dirty() || !!blocker()"
+                [disabledHint]="
+                  dirty() ? 'Spara ändringarna först.' : 'Rätta det som står ovan först.'
+                "
+                [document]="kind()"
+                (waitingChange)="readerWaiting.set($event)"
+                (booked)="readerWaiting.set(false); load(c.id)"
+              />
             }
           </section>
         } @else if (c.document; as inv) {
@@ -1319,10 +1397,28 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
               <p class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                 Krediterad med <b>{{ cr.code }}</b> {{ cr.issuedAt | date: 'yyyy-MM-dd' }}:
                 {{ cr.reason }}. {{ cr.restocked ? 'Delarna är tillbaka i lagret.' : '' }}
-                @if (inv.paidAt) {
-                  Fakturan var markerad betald: betala tillbaka kunden själv.
+                @if (inv.paidAt && !inv.paymentReference) {
+                  Kunden hade betalat: betala tillbaka kunden själv.
                 }
               </p>
+            } @else if (inv.paidOnIssue) {
+              <!-- Kontantfaktura: betald vid disken när den utfärdades; betalningen går inte att ångra. -->
+              <div class="flex flex-wrap items-center gap-3">
+                <app-pill tone="green"
+                  >Betald {{ inv.paidAt | date: 'yyyy-MM-dd' }}
+                  @if (inv.paymentMethod) {
+                    · {{ payLabel('receipt', inv.paymentMethod) }}
+                  }
+                </app-pill>
+                <span class="text-sm text-gray-600"
+                  >Kontantfaktura: betald vid disken när den utfärdades.
+                  {{
+                    inv.paymentReference
+                      ? 'Blev det fel: kreditera den, så kan pengarna gå tillbaka till kortet.'
+                      : 'Blev det fel: återöppna kortet, eller kreditera det om det redan skickats.'
+                  }}</span
+                >
+              </div>
             } @else {
               @if (inv.dueAt) {
                 <p class="mb-3 text-sm text-gray-600">
@@ -1342,7 +1438,15 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                       · {{ payLabel(inv.kind, inv.paymentMethod) }}
                     }
                   </app-pill>
-                  <button mat-button type="button" (click)="setPaid(false)">Ångra betalning</button>
+                  @if (inv.paymentReference) {
+                    <span class="text-sm text-gray-600"
+                      >Betald med kort via Stripe. Ska pengarna tillbaka: kreditera fakturan.</span
+                    >
+                  } @else {
+                    <button mat-button type="button" (click)="setPaid(false)">
+                      Ångra betalning
+                    </button>
+                  }
                 } @else {
                   <mat-form-field subscriptSizing="dynamic" class="w-48">
                     <mat-label>Betalsätt</mat-label>
@@ -1368,7 +1472,11 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
                 }
               </div>
               @if (!inv.paidAt) {
-                <app-reader-payment [cardId]="c.id" (booked)="load(c.id)" />
+                <app-reader-payment
+                  [cardId]="c.id"
+                  (waitingChange)="readerWaiting.set($event)"
+                  (booked)="readerWaiting.set(false); load(c.id)"
+                />
               }
             }
           </section>
@@ -1422,6 +1530,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
 })
 export class SalesCardPage implements OnInit, HasUnsaved {
   private readonly api = inject(SalesCardApi);
+  private readonly payments = inject(PaymentApi);
   private readonly inventory = inject(AxleApi);
   private readonly storage = inject(StorageApi);
   private readonly workshop = inject(WorkshopApi);
@@ -1530,15 +1639,46 @@ export class SalesCardPage implements OnInit, HasUnsaved {
    * Fakturor börjar med faktura (`?kind=invoice`).
    */
   readonly docKind = signal<InvoiceKind | null>(null);
-  readonly kind = computed<InvoiceKind>(
-    () =>
-      this.card()?.kind ??
-      // Ett återöppnat kort är samma dokument igen: numret hör till dess serie.
-      this.card()?.reservedKind ??
+  /**
+   * Allt faktureras (Inställningar → Betalning och kassa): inga kvitton, en försäljning som betalas
+   * vid disken blir en kontantfaktura. Ett återöppnat kvitto bokförs ändå som det kvitto det var.
+   */
+  readonly alwaysInvoice = computed(() => this.pricing.value().alwaysInvoice);
+  readonly receiptsAllowed = computed(
+    () => !this.alwaysInvoice() || this.card()?.reservedKind === 'receipt',
+  );
+  readonly kind = computed<InvoiceKind>(() => {
+    const reserved = this.card()?.kind ?? this.card()?.reservedKind;
+    // Ett återöppnat kort är samma dokument igen: numret hör till dess serie.
+    if (reserved) return reserved;
+    if (this.alwaysInvoice()) return 'invoice';
+    return (
       this.docKind() ??
       // En bil betalas nästan alltid mot faktura; ett kvitto är ett val.
-      (this.hall() || this.customer()?.type === 'company' ? 'invoice' : 'receipt'),
-  );
+      (this.hall() || this.customer()?.type === 'company' ? 'invoice' : 'receipt')
+    );
+  });
+  /** Vald för hand: en faktura som betalas nu vid disken (kontantfaktura) eller senare. */
+  private readonly paidNowChoice = signal<boolean | null>(null);
+  /**
+   * Faktura, kontantfaktura eller kvitto. Där allt faktureras blir en privatperson en kontantfaktura
+   * (betalar vid disken) och ett företag en vanlig faktura, tills man väljer annat.
+   */
+  readonly docOption = computed<'invoice' | 'cash_invoice' | 'receipt'>(() => {
+    if (this.kind() === 'receipt') return 'receipt';
+    // Bara där allt faktureras; annars finns valet inte.
+    if (!this.alwaysInvoice()) return 'invoice';
+    const paidNow =
+      this.paidNowChoice() ?? (!this.hall() && this.customer()?.type !== 'company');
+    return paidNow ? 'cash_invoice' : 'invoice';
+  });
+  /** En betalning väntar på läsaren: kortet ändras och bokförs inte under tiden. */
+  readonly readerWaiting = signal(false);
+
+  chooseDoc(option: 'invoice' | 'cash_invoice' | 'receipt') {
+    this.docKind.set(option === 'receipt' ? 'receipt' : 'invoice');
+    this.paidNowChoice.set(option === 'cash_invoice');
+  }
   /** Betalningsvillkoren som verkstaden har ställt in (Företaget), tills man skriver egna dagar. */
   private readonly defaultTerms = signal(30);
   readonly termsDays = signal<number | null>(null);
@@ -1553,12 +1693,16 @@ export class SalesCardPage implements OnInit, HasUnsaved {
 
   /** Verkstadens egna uppgifter (Inställningar → Företaget): varje faktura och kvitto bär dem. */
   private readonly seller = signal<SellerDetails | null>(null);
-  /** Valet som löser en faktura som inte går att skriva: ett kvitto kräver varken kund eller adress. */
+  /**
+   * Valet som löser en faktura som inte går att skriva: ett kvitto kräver varken kund eller adress.
+   * Finns inte där allt faktureras.
+   */
   private readonly receiptFix = {
     label: 'Bokför som kvitto',
     icon: 'receipt',
-    click: () => this.docKind.set('receipt'),
+    click: () => this.chooseDoc('receipt'),
   };
+  private readonly receiptFixes = () => (this.receiptsAllowed() ? [this.receiptFix] : []);
 
   /**
    * Det som hindrar bokföring just nu, med en knapp dit det rättas. Först verkstadens egna uppgifter
@@ -1579,22 +1723,25 @@ export class SalesCardPage implements OnInit, HasUnsaved {
         cu.type === 'company' && !cu.orgNo && 'organisationsnummer',
         !(cu.address && cu.postalCode && cu.city) && 'adress',
       ].filter(Boolean);
+      const orReceipt = this.receiptsAllowed() ? ', eller bokför som kvitto' : '';
       return missing.length
         ? {
-            text: `Köparen saknar ${missing.join(' och ')}. Fyll i det under Köpare och spara, eller bokför som kvitto.`,
-            fixes: [this.receiptFix],
+            text: `Köparen saknar ${missing.join(' och ')}. Fyll i det under Köpare och spara${orReceipt}.`,
+            fixes: this.receiptFixes(),
           }
         : null;
     }
     if (this.kind() !== 'invoice') return null;
     if (!l?.customerId && !l?.pending?.customerId && !l?.pending?.customerName) {
       return {
-        text: 'En faktura behöver en kund. Välj kund högst upp, eller bokför som kvitto.',
-        fixes: [this.receiptFix],
+        text: this.receiptsAllowed()
+          ? 'En faktura behöver en kund. Välj kund högst upp, eller bokför som kvitto.'
+          : 'Allt faktureras här, så varje försäljning behöver en kund med namn och adress. Välj kund högst upp.',
+        fixes: this.receiptFixes(),
       };
     }
     const gap = invoiceGap(this.customer());
-    return gap && { ...gap, fixes: [...gap.fixes, this.receiptFix] };
+    return gap && { ...gap, fixes: [...gap.fixes, ...this.receiptFixes()] };
   });
 
   /** Öppnar Inställningar → Företaget och läser om uppgifterna när man stänger. */
@@ -1624,7 +1771,7 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   readonly unbilled = signal<UnbilledOrder[]>([]);
   readonly ordersHint = signal('Välj en kund först för att se kundens klara arbetsorder.');
 
-  readonly readOnly = computed(() => this.card()?.status === 'posted');
+  readonly readOnly = computed(() => this.card()?.status === 'posted' || this.readerWaiting());
   readonly title = computed(() => {
     const c = this.card();
     if (!c) return '';
@@ -2388,9 +2535,14 @@ export class SalesCardPage implements OnInit, HasUnsaved {
 
   /** Valet som skickas med när kortet bokförs eller förhandsgranskas. */
   private choice(): DocumentChoice {
-    return this.kind() === 'invoice'
-      ? { kind: 'invoice', paymentTermsDays: this.terms() }
-      : { kind: 'receipt', paymentMethod: this.receiptMethod() };
+    switch (this.docOption()) {
+      case 'cash_invoice':
+        return { kind: 'invoice', paidOnIssue: true, paymentMethod: this.receiptMethod() };
+      case 'invoice':
+        return { kind: 'invoice', paymentTermsDays: this.terms() };
+      default:
+        return { kind: 'receipt', paymentMethod: this.receiptMethod() };
+    }
   }
 
   /** Samma val som adressparametrar, för förhandsgranskningen. */
@@ -2401,13 +2553,18 @@ export class SalesCardPage implements OnInit, HasUnsaved {
   post() {
     const c = this.card();
     if (!c) return;
-    const invoice = this.kind() === 'invoice';
-    const gets = invoice
-      ? `en faktura som förfaller ${this.dueDate()} (${this.terms()} dagar), i fakturaserien (FAK-)`
-      : `ett kvitto, betalt ${paidWith('receipt', this.receiptMethod())}, i kvittoserien (KV-)`;
+    const option = this.docOption();
+    const gets =
+      option === 'cash_invoice'
+        ? `en kontantfaktura, betald ${paidWith('receipt', this.receiptMethod())} i dag, i fakturaserien (FAK-)`
+        : option === 'invoice'
+          ? `en faktura som förfaller ${this.dueDate()} (${this.terms()} dagar), i fakturaserien (FAK-)`
+          : `ett kvitto, betalt ${paidWith('receipt', this.receiptMethod())}, i kvittoserien (KV-)`;
+    const noun =
+      option === 'cash_invoice' ? 'kontantfaktura' : option === 'invoice' ? 'faktura' : 'kvitto';
     this.confirm
       .ask({
-        title: `Bokför ${c.code} som ${invoice ? 'faktura' : 'kvitto'}?`,
+        title: `Bokför ${c.code} som ${noun}?`,
         message: this.hall()
           ? `Köparen får ${gets}. Bilen sätts som såld och låses, och dokumentet får sitt nummer. Därefter går varken affären eller dokumentet att ändra.`
           : `Kunden får ${gets}. Lagret minskas för artiklarna på raderna och dokumentet får sitt nummer. Därefter går varken kortet eller dokumentet att ändra.`,
@@ -2478,24 +2635,29 @@ export class SalesCardPage implements OnInit, HasUnsaved {
     if (c.sends?.length) {
       return 'Dokumentet har skickats till kunden och kan inte återöppnas.';
     }
-    return c.document?.paidAt && c.document.kind === 'invoice'
+    if (c.document?.paymentReference) {
+      return 'Betalt med kort via Stripe. Kreditera i stället, så kan pengarna gå tillbaka till kortet.';
+    }
+    return c.document?.paidAt && c.document.kind === 'invoice' && !c.document.paidOnIssue
       ? 'Fakturan är betald. Markera den obetald först.'
       : '';
   }
 
   /**
-   * Återöppnar ett bokfört kort så att ett fel kan rättas. Ett kvitto var betalt på stället och går
-   * tillbaka med affären; en betald faktura får ägaren först markera obetald, med flit.
+   * Återöppnar ett bokfört kort så att ett fel kan rättas. Ett kvitto och en kontantfaktura var
+   * betalda på stället och går tillbaka med affären; en betald faktura får ägaren först markera
+   * obetald, med flit.
    */
   reopen() {
     const c = this.card();
     if (!c?.document) return;
     const receipt = c.document.kind === 'receipt';
+    const paidOnTheSpot = receipt || !!c.document.paidOnIssue;
     this.confirm
       .ask({
         title: `Återöppna ${c.documentCode}?`,
         message:
-          `Kortet blir ett utkast igen${receipt ? ' och betalningen på kvittot tas bort' : ''}. ` +
+          `Kortet blir ett utkast igen${paidOnTheSpot ? ' och betalningen på dokumentet tas bort' : ''}. ` +
           `Delar som lämnade lagret läggs tillbaka, och numret ${c.documentCode} sparas så att det ` +
           `används igen när du bokför som ${receipt ? 'kvitto' : 'faktura'}. Har dokumentet redan ` +
           'gått till kunden ska det i stället krediteras.',
@@ -2519,36 +2681,61 @@ export class SalesCardPage implements OnInit, HasUnsaved {
       });
   }
 
-  /** Krediterar hela fakturan eller kvittot: originalet står kvar, en kreditfaktura upphäver det. */
+  /**
+   * Krediterar hela fakturan eller kvittot: originalet står kvar, en kreditfaktura upphäver det.
+   * Betalade kunden med kort genom Stripe kan pengarna gå tillbaka till kortet i samma steg.
+   */
   credit() {
     const c = this.card();
     if (!c?.document) return;
-    this.dialog
-      .open(CreditDialog, {
-        data: {
-          code: c.documentCode,
-          total: c.totals.total,
-          paid: !!c.document.paidAt && c.document.kind === 'invoice',
-          hasParts: c.lines.some((l) => l.stockBooked),
-        },
-        width: '440px',
-      })
-      .afterClosed()
-      .subscribe((res?: CreditResult) => {
-        if (!res) return;
-        this.busy.set(true);
-        this.api.credit(c.id, res.reason, res.restock).subscribe({
-          next: (r) => {
-            this.busy.set(false);
-            this.apply(r);
-            this.snack.open(`Krediterad med ${r.credit?.code}`, 'OK', { duration: 4000 });
-          },
-          error: () => {
-            this.busy.set(false);
-            this.load(c.id);
-          },
-        });
+    const doc = c.document;
+    this.payments
+      .forCard(c.id)
+      .pipe(catchError(() => of([])))
+      .subscribe((rows) => {
+        const refundable = rows
+          .filter((p) => p.status === 'succeeded' && !p.refundedAt)
+          .reduce((sum, p) => sum + p.amount, 0);
+        this.dialog
+          .open(CreditDialog, {
+            data: {
+              code: c.documentCode,
+              total: c.totals.total,
+              paid: !!doc.paidAt,
+              hasParts: c.lines.some((l) => l.stockBooked),
+              refundable,
+            },
+            width: '440px',
+          })
+          .afterClosed()
+          .subscribe((res?: CreditResult) => {
+            if (res) this.sendCredit(c.id, res);
+          });
       });
+  }
+
+  private sendCredit(id: string, res: CreditResult) {
+    this.busy.set(true);
+    this.api.credit(id, res.reason, res.restock, res.refund).subscribe({
+      next: (r) => {
+        this.busy.set(false);
+        this.apply(r);
+        const failed = (r.refunds ?? []).filter((x) => x.status === 'failed');
+        this.snack.open(
+          failed.length
+            ? `Krediterad med ${r.credit?.code}, men återbetalningen gick inte: ${failed[0].error}. Betala tillbaka i Stripe.`
+            : r.refunds?.length
+              ? `Krediterad med ${r.credit?.code}. Pengarna går tillbaka till kortet.`
+              : `Krediterad med ${r.credit?.code}`,
+          'OK',
+          { duration: failed.length ? 10000 : 4000 },
+        );
+      },
+      error: () => {
+        this.busy.set(false);
+        this.load(id);
+      },
+    });
   }
 
   /** Tar ett registrerat kvitto tillbaka: ett returkvitto i kassaregistret, lagret tillbaka, kortbetalningen återbetald. */

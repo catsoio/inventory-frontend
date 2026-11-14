@@ -118,6 +118,7 @@ export interface SettingsGroup {
               <app-settings-hotel />
             }
             @case ('betalningar') {
+              <app-settings-counter />
               <app-settings-payments />
               <app-settings-register />
             }

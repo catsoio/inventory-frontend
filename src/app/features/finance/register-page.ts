@@ -20,8 +20,9 @@ const KIND: Record<RegisterEntry['kind'], string> = {
 const MEANS: Record<string, string> = { card: 'Kort', swish: 'Swish', cash: 'Kontant' };
 
 /**
- * Kassan: dagens X-rapport, Z-rapporten som stänger dagen, journalen (allt som registrerats, i
- * ordning) och exporten som Skatteverket kan be om. Bara ägaren; att stänga dagen går inte att ångra.
+ * Kassan. Har garaget Axles eget kassaregister: dagens X-rapport, Z-rapporten som stänger dagen, journalen (allt som registrerats, i
+ * ordning) och exporten som Skatteverket kan be om; att stänga dagen går inte att ångra. Annars
+ * PayPal-kassan bredvid Axle (`app-till-panel`). Bara ägaren.
  */
 @Component({
   selector: 'app-register-page',
@@ -31,12 +32,8 @@ const MEANS: Record<string, string> = { card: 'Kort', swish: 'Swish', cash: 'Kon
     <app-finance-tabs />
     @if (status(); as s) {
       @if (!s.configured) {
-        <div class="rounded-xl bg-white p-6 shadow-sm">
-          <h2 class="text-base font-semibold">Kassaregistret är inte skapat</h2>
-          <p class="mt-1 text-sm text-gray-600">
-            Skapa det under Inställningar → Kassaregister. Då går kvitton genom registret och rapporterna visas här.
-          </p>
-        </div>
+        <!-- Utan Axles eget kassaregister är kassan PayPal-kassan bredvid Axle. -->
+        <app-till-panel />
       } @else {
         @if (s.unit && !s.unit.control.certified) {
           <p class="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-900">

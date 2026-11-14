@@ -39,7 +39,15 @@ const sameText = (a: string | null | undefined, b: string | null | undefined) =>
           </div>
           <div class="text-right">
             <h1 class="text-3xl font-bold">
-              {{ inv.credit ? 'Kreditfaktura' : inv.kind === 'invoice' ? 'Faktura' : 'Kvitto' }}
+              {{
+                inv.credit
+                  ? 'Kreditfaktura'
+                  : inv.kind === 'invoice'
+                    ? inv.paidOnIssue
+                      ? 'Kontantfaktura'
+                      : 'Faktura'
+                    : 'Kvitto'
+              }}
             </h1>
             @if (inv.draft) {
               <div class="mt-1 inline-block border-2 border-[#4b5563] px-2 font-bold uppercase">
@@ -84,7 +92,11 @@ const sameText = (a: string | null | undefined, b: string | null | undefined) =>
               <dt class="text-gray-600">Er referens</dt>
               <dd>{{ inv.reference }}</dd>
             }
-            @if (inv.kind === 'invoice' && inv.dueAt) {
+            @if (inv.kind === 'invoice' && inv.paidOnIssue) {
+              <!-- Kontantfaktura: betald vid disken, ber inte om något. -->
+              <dt class="text-gray-600">Betalningsvillkor</dt>
+              <dd>Kontant</dd>
+            } @else if (inv.kind === 'invoice' && inv.dueAt) {
               <dt class="text-gray-600">Förfallodatum</dt>
               <dd class="font-bold tabular-nums">{{ day(inv.dueAt) }}</dd>
               <dt class="text-gray-600">Betalningsvillkor</dt>
@@ -279,6 +291,15 @@ const sameText = (a: string | null | undefined, b: string | null | undefined) =>
         <section class="mt-10 text-xs">
           @if (inv.credit) {
             <p>Kreditfakturan upphäver {{ inv.credit.credits }} i sin helhet.</p>
+          } @else if (inv.kind === 'invoice' && inv.paidOnIssue) {
+            <p class="text-sm font-bold">
+              @if (inv.paidAt) {
+                Betald {{ day(inv.paidAt)
+                }}{{ inv.paymentMethod ? ' ' + paidText(inv.kind, inv.paymentMethod) : '' }}.
+              } @else {
+                Betalas vid disken.
+              }
+            </p>
           } @else if (inv.kind === 'invoice') {
             @if (payTo(inv.seller)) {
               <p>
@@ -349,8 +370,8 @@ const sameText = (a: string | null | undefined, b: string | null | undefined) =>
             }
           </div>
           <div>
-            <!-- Betalningsuppgifter hör till en faktura; ett kvitto är redan betalt. -->
-            @if (inv.kind === 'invoice') {
+            <!-- Betalningsuppgifter hör till en faktura; ett kvitto och en kontantfaktura är redan betalda. -->
+            @if (inv.kind === 'invoice' && !inv.paidOnIssue) {
               @if (inv.seller.bankgiro) {
                 <div>Bankgiro {{ inv.seller.bankgiro }}</div>
               }
@@ -381,9 +402,13 @@ export class InvoiceDocument {
     return inv.dueAt ? differenceInCalendarDays(new Date(inv.dueAt), new Date(inv.issuedAt)) : 0;
   }
 
-  /** Summaraden: en faktura ber om pengar, ett kvitto visar vad som betalats. */
+  /** Summaraden: en faktura ber om pengar, ett kvitto och en kontantfaktura visar vad som betalats. */
   totalLabel(inv: WorkOrderInvoice) {
-    const label = inv.credit ? 'Att krediteras' : inv.kind === 'invoice' ? 'Att betala' : 'Totalt';
+    const label = inv.credit
+      ? 'Att krediteras'
+      : inv.kind === 'invoice' && !inv.paidOnIssue
+        ? 'Att betala'
+        : 'Totalt';
     return inv.draft ? `${label} (utkast)` : label;
   }
 

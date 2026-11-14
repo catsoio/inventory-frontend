@@ -9,12 +9,17 @@ import {
   SettingsWebsite,
 } from './sections/company-sections';
 import { SettingsPassword, SettingsView } from './sections/personal-sections';
-import { SettingsPayments, SettingsRegister } from './sections/payment-sections';
+import {
+  SettingsCounterSales,
+  SettingsPayments,
+  SettingsRegister,
+} from './sections/payment-sections';
 import {
   BlocketConnectionDialog,
   CarInfoConnectionDialog,
   GummigrossenConnectionDialog,
   SettingsConnections,
+  ZettleConnectionDialog,
 } from './sections/connections-section';
 import { SettingsHotel, SettingsPricing, SettingsStock } from './sections/workflow-sections';
 import { SettingsScreen } from './sections/screen-setting';
@@ -41,12 +46,14 @@ export { SettingsPage };
     SettingsScreen,
     SettingsStock,
     SettingsHotel,
+    SettingsCounterSales,
     SettingsPayments,
     SettingsRegister,
     SettingsConnections,
     CarInfoConnectionDialog,
     GummigrossenConnectionDialog,
     BlocketConnectionDialog,
+    ZettleConnectionDialog,
     ResetPasswordDialog,
     FeaturesDialog,
   ],

@@ -1195,4 +1195,60 @@ export const EN: Record<string, string> = {
   'Bilarna skickas alltid först som utkast, dolda hos Blocket. Du publicerar varje bil från bilkortet när du är redo.':
     'Cars are always sent as drafts first, hidden at Blocket. You publish each car from its card when you are ready.',
   'Utkast hos Blocket': 'Draft at Blocket',
+
+  // Kontantfaktura: en faktura som betalas vid disken
+  'Betald nu (kontantfaktura)': 'Paid now (cash invoice)',
+  'Kunden betalar nu vid disken med kort, Swish eller kontant. Blir en faktura (FAK-) som är betald direkt, utan förfallodatum. Kräver kund med namn och adress.':
+    'The customer pays now at the counter by card, Swish or cash. Becomes an invoice (FAK-) that is paid at once, with no due date. Needs a customer with name and address.',
+  'Så som kunden betalade vid disken': 'As the customer paid at the counter',
+  Kontantfaktura: 'Cash invoice',
+  'Betalas vid disken.': 'Paid at the counter.',
+  'Försäljning vid disken': 'Sales at the counter',
+  'Hur en försäljning som betalas på plats bokförs.': 'How a sale paid on the spot is booked.',
+  'Allt faktureras (kontantfaktura)': 'Invoice everything (cash invoice)',
+  'Varje försäljning blir en faktura på en kund med namn och adress, också den som betalas vid disken med kort, Swish eller kontant: en kontantfaktura som är betald direkt. Inga kvitton (KV-) utfärdas. Fakturerad försäljning behöver inget kassaregister, men bara om ni aldrig säljer något utan faktura. Fråga er revisor om ni är osäkra.':
+    'Every sale becomes an invoice to a customer with name and address, also one paid at the counter by card, Swish or cash: a cash invoice that is paid at once. No receipts (KV-) are issued. Invoiced sales need no cash register, but only if you never sell anything without an invoice. Ask your accountant if you are unsure.',
+  'Inget betalt vid disken än. Kvitton och kontantfakturor hamnar här när ett säljkort bokförs som betalt.':
+    'Nothing paid at the counter yet. Receipts and cash invoices land here when a sales card is posted as paid.',
+  'Kunden betalade med kort via Stripe. Pengarna går tillbaka till samma kort, oftast inom några bankdagar.':
+    'The customer paid by card through Stripe. The money goes back to the same card, usually within a few banking days.',
+  'Betald med kort via Stripe. Ska pengarna tillbaka: kreditera fakturan.':
+    'Paid by card through Stripe. To give the money back: credit the invoice.',
+  'Rätta det som står ovan först.': 'Fix what is shown above first.',
+  // PayPal-kassan (Zettle)
+  'PayPal-kassan (Zettle)': 'PayPal till (Zettle)',
+  'Köpen läses in till lager och Ekonomi → Kassa': 'Sales are read into stock and Finance → Till',
+  'Ta betalt av kunder som inte vill ha faktura, med en godkänd kassa':
+    'Take payment from customers who want no invoice, with an approved till',
+  'Klient-id': 'Client ID',
+  'API-nyckel': 'API key',
+  'Visas bara en gång hos PayPal. Sparas krypterad och visas aldrig här.':
+    'Shown only once at PayPal. Stored encrypted and never shown here.',
+  'Koppla bort': 'Disconnect',
+  'Testar…': 'Testing…',
+  'Skapa en API-nyckel hos PayPal': 'Create an API key at PayPal',
+  'Aktivera kassaregistret i PayPal-appen och anmäl det hos Skatteverket.':
+    'Turn on the cash register in the PayPal app and register it with the Swedish Tax Agency.',
+  'Klistra in klient-id och API-nyckel nedan.': 'Paste the client ID and API key below.',
+  'Koppla bort PayPal-kassan?': 'Disconnect the PayPal till?',
+  'PayPal-kassan är ansluten': 'The PayPal till is connected',
+  'Ingen kassa är kopplad': 'No till is connected',
+  'Koppla PayPal-kassan': 'Connect the PayPal till',
+  'Hämta köp nu': 'Fetch sales now',
+  'Sålt (inkl. moms)': 'Sold (incl. VAT)',
+  'Varav moms': 'Of which VAT',
+  'Köp i kassan': 'Sales in the till',
+  Varor: 'Goods',
+  Draget: 'Taken from stock',
+  'Inga köp i kassan under perioden.': 'No sales in the till during the period.',
+  'Varor i kassan': 'Goods in the till',
+  'Skicka alla igen': 'Send all again',
+  'Lägg till artikel i kassan': 'Add article to the till',
+  'I kassan': 'In the till',
+  Fel: 'Error',
+  Skickas: 'Sending',
+  Testköp: 'Test sale',
+  'Ta bort ur kassan': 'Remove from the till',
+  'Ta bort ur kassan?': 'Remove from the till?',
+  'PayPal-kassan (köp vid disken)': 'PayPal till (counter sales)',
 };

@@ -3,8 +3,59 @@ import { FormControl, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { PaymentApi } from '../../../core/api/payment-api';
 import { RegisterApi } from '../../../core/api/register-api';
+import { Auth } from '../../../core/auth/auth';
+import { Pricing } from '../../../core/pricing';
 import { PaymentAccount, PaymentReader, RegisterChain, RegisterStatus } from '../../../core/models';
 import { Confirm } from '../../../shared/confirm';
+
+/**
+ * Försäljning vid disken: allt faktureras (kontantfaktura) eller kvitto. Fakturerad försäljning
+ * omfattas inte av kravet på kassaregister, men bara när varje försäljning faktureras. Sparas direkt.
+ */
+@Component({
+  selector: 'app-settings-counter',
+  standalone: false,
+  template: `
+    <app-setting-group
+      title="Försäljning vid disken"
+      text="Hur en försäljning som betalas på plats bokförs."
+    >
+      <app-setting-row
+        label="Allt faktureras (kontantfaktura)"
+        hint="Varje försäljning blir en faktura på en kund med namn och adress, också den som betalas vid disken med kort, Swish eller kontant: en kontantfaktura som är betald direkt. Inga kvitton (KV-) utfärdas. Fakturerad försäljning behöver inget kassaregister, men bara om ni aldrig säljer något utan faktura. Fråga er revisor om ni är osäkra."
+      >
+        <mat-slide-toggle
+          [checked]="pricing.value().alwaysInvoice"
+          [disabled]="busy() || !isOwner"
+          (change)="setAlwaysInvoice($event.checked)"
+          aria-label="Allt faktureras"
+        />
+      </app-setting-row>
+    </app-setting-group>
+  `,
+})
+export class SettingsCounterSales {
+  readonly pricing = inject(Pricing);
+  private readonly snack = inject(MatSnackBar);
+  private readonly auth = inject(Auth);
+  readonly isOwner = this.auth.isAdmin() || this.auth.isSuperAdmin();
+  readonly busy = signal(false);
+
+  setAlwaysInvoice(on: boolean) {
+    this.busy.set(true);
+    this.pricing.save({ alwaysInvoice: on }).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.snack.open(
+          on ? 'Allt faktureras nu: inga kvitton utfärdas' : 'Kvitton går att utfärda igen',
+          'OK',
+          { duration: 4000 },
+        );
+      },
+      error: () => this.busy.set(false),
+    });
+  }
+}
 
 /**
  * Betalningar via Stripe: verkstadens eget Stripe-konto (pengarna går direkt dit), Swish och
