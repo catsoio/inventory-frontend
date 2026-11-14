@@ -1129,13 +1129,37 @@ interface PayWayOption {
               } @else {
                 <span class="flex items-center gap-2">
                   <input
-                    class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
+                    class="h-8 w-20 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
                     inputmode="decimal"
-                    placeholder="10% / kr"
-                    aria-label="Rabatt i procent eller kronor"
+                    placeholder="0"
+                    aria-label="Rabatt"
                     [value]="discText()"
                     (input)="setDiscText($any($event.target).value)"
                   />
+                  <span
+                    class="inline-flex h-8 overflow-hidden rounded-md border border-gray-300 text-sm"
+                    role="group"
+                    aria-label="Procent eller kronor"
+                  >
+                    <button
+                      type="button"
+                      class="w-8"
+                      [class.bg-teal-700]="discType() === 'percent'"
+                      [class.text-white]="discType() === 'percent'"
+                      (click)="setDiscType('percent')"
+                    >
+                      %
+                    </button>
+                    <button
+                      type="button"
+                      class="w-8 border-l border-gray-300"
+                      [class.bg-teal-700]="discType() === 'amount'"
+                      [class.text-white]="discType() === 'amount'"
+                      (click)="setDiscType('amount')"
+                    >
+                      kr
+                    </button>
+                  </span>
                 </span>
               }
             </div>
@@ -1782,15 +1806,21 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
 
   setDiscText(raw: string) {
     this.discText.set(raw);
-    const t = raw.trim().replace(/\s/g, '').replace(/,/g, '.');
-    const pct = t.endsWith('%');
-    const parts = (pct ? t.slice(0, -1) : t).split('+').filter((x) => x !== '');
+    // Kronor eller procent väljs bredvid fältet; "100+50" räknas ihop.
+    const parts = raw
+      .replace(/\s/g, '')
+      .replace(/,/g, '.')
+      .split('+')
+      .filter((x) => x !== '');
     const nums = parts.map((x) => (/^\d*\.?\d+$/.test(x) ? Number(x) : NaN));
-    const ok = nums.every((n) => !Number.isNaN(n));
-    const sum = ok ? nums.reduce((a, b) => a + b, 0) : 0;
-    this.discType.set(pct ? 'percent' : 'amount');
-    this.discValue.set(ok ? Math.min(pct ? 100 : sum, sum) : 0);
+    const sum = nums.every((n) => !Number.isNaN(n)) ? nums.reduce((x, y) => x + y, 0) : 0;
+    this.discValue.set(this.discType() === 'percent' ? Math.min(sum, 100) : sum);
     this.touch();
+  }
+
+  setDiscType(type: 'percent' | 'amount') {
+    this.discType.set(type);
+    this.setDiscText(this.discText());
   }
 
   readonly wayLabel = computed(
