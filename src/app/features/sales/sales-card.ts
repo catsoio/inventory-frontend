@@ -1224,25 +1224,87 @@ interface PayWayOption {
                   aria-label="Hur betalar kunden?"
                 >
                   @for (o of wayOptions(); track o.id) {
-                    <button
-                      type="button"
-                      role="radio"
-                      class="flex items-center gap-3 rounded-lg px-3 py-2 text-left disabled:opacity-40"
-                      [attr.aria-checked]="way() === o.id"
-                      [class.bg-teal-50]="way() === o.id"
-                      [class.text-teal-900]="way() === o.id"
-                      [class.hover:bg-gray-50]="way() !== o.id"
-                      [disabled]="readerWaiting() || o.disabled"
-                      (click)="chooseWay(o.id)"
-                    >
-                      <mat-icon [class.text-teal-700]="way() === o.id" class="text-gray-500">{{
-                        o.icon
-                      }}</mat-icon>
-                      <span>
-                        <span class="block text-sm font-medium leading-tight">{{ o.label }}</span>
-                        <span class="block text-xs leading-tight text-gray-500">{{ o.hint }}</span>
-                      </span>
-                    </button>
+                    <div>
+                      <button
+                        type="button"
+                        role="radio"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2 text-left disabled:opacity-40"
+                        [attr.aria-checked]="way() === o.id"
+                        [class.bg-teal-50]="way() === o.id"
+                        [class.text-teal-900]="way() === o.id"
+                        [class.hover:bg-gray-50]="way() !== o.id"
+                        [disabled]="readerWaiting() || o.disabled"
+                        (click)="chooseWay(o.id)"
+                      >
+                        <mat-icon [class.text-teal-700]="way() === o.id" class="text-gray-500">{{
+                          o.icon
+                        }}</mat-icon>
+                        <span>
+                          <span class="block text-sm font-medium leading-tight">{{ o.label }}</span>
+                          <span class="block text-xs leading-tight text-gray-500">{{
+                            o.hint
+                          }}</span>
+                        </span>
+                      </button>
+                      @if (way() === o.id) {
+                        @switch (o.id) {
+                          @case ('invoice') {
+                            <div class="mb-1 ml-12 mr-3 mt-1 text-xs text-gray-600">
+                              <label class="flex items-center gap-2">
+                                Betalningsvillkor
+                                <input
+                                  class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-16 text-right"
+                                  type="number"
+                                  min="0"
+                                  max="365"
+                                  aria-label="Betalningsvillkor i dagar"
+                                  [value]="terms()"
+                                  (input)="termsDays.set($any($event.target).valueAsNumber)"
+                                />
+                                dagar
+                              </label>
+                              <p class="mt-1 text-gray-500">Förfaller {{ dueDate() }}</p>
+                            </div>
+                          }
+                          @case ('cash_invoice') {
+                            <label
+                              class="mb-1 ml-12 mr-3 mt-1 flex items-center gap-2 text-xs text-gray-600"
+                            >
+                              Betalsätt
+                              <select
+                                class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700"
+                                aria-label="Betalsätt"
+                                (change)="receiptMethod.set($any($event.target).value)"
+                              >
+                                @for (m of receiptMethods; track m[0]) {
+                                  <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
+                                    {{ m[1] }}
+                                  </option>
+                                }
+                              </select>
+                            </label>
+                          }
+                          @case ('receipt') {
+                            <label
+                              class="mb-1 ml-12 mr-3 mt-1 flex items-center gap-2 text-xs text-gray-600"
+                            >
+                              Betalsätt
+                              <select
+                                class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700"
+                                aria-label="Betalsätt"
+                                (change)="receiptMethod.set($any($event.target).value)"
+                              >
+                                @for (m of receiptMethods; track m[0]) {
+                                  <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
+                                    {{ m[1] }}
+                                  </option>
+                                }
+                              </select>
+                            </label>
+                          }
+                        }
+                      }
+                    </div>
                   }
                 </nav>
                 <div
@@ -1250,63 +1312,6 @@ interface PayWayOption {
                 >
                   <ng-container *ngTemplateOutlet="summaryBlock" />
                   <div class="my-4 border-t border-gray-200"></div>
-                  <div class="min-h-20 text-sm">
-                    @switch (way()) {
-                      @case ('invoice') {
-                        <div class="flex items-center justify-between gap-4 py-1">
-                          <span class="text-gray-600">Betalningsvillkor</span>
-                          <span class="flex items-center gap-2 text-gray-500">
-                            <input
-                              class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-20 text-right"
-                              type="number"
-                              min="0"
-                              max="365"
-                              aria-label="Betalningsvillkor i dagar"
-                              [value]="terms()"
-                              (input)="termsDays.set($any($event.target).valueAsNumber)"
-                            />
-                            dagar
-                          </span>
-                        </div>
-                        <div class="flex items-center justify-between gap-4 py-1 text-gray-600">
-                          <span>Förfaller</span>
-                          <span class="tabular-nums">{{ dueDate() }}</span>
-                        </div>
-                      }
-                      @case ('cash_invoice') {
-                        <div class="flex items-center justify-between gap-4 py-1">
-                          <span class="text-gray-600">Betalsätt</span>
-                          <select
-                            class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
-                            aria-label="Betalsätt"
-                            (change)="receiptMethod.set($any($event.target).value)"
-                          >
-                            @for (m of receiptMethods; track m[0]) {
-                              <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
-                                {{ m[1] }}
-                              </option>
-                            }
-                          </select>
-                        </div>
-                      }
-                      @case ('receipt') {
-                        <div class="flex items-center justify-between gap-4 py-1">
-                          <span class="text-gray-600">Betalsätt</span>
-                          <select
-                            class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
-                            aria-label="Betalsätt"
-                            (change)="receiptMethod.set($any($event.target).value)"
-                          >
-                            @for (m of receiptMethods; track m[0]) {
-                              <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
-                                {{ m[1] }}
-                              </option>
-                            }
-                          </select>
-                        </div>
-                      }
-                    }
-                  </div>
                   @if (way() === 'reader') {
                     <app-reader-payment
                       [cardId]="c.id"
