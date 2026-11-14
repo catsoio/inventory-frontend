@@ -1101,8 +1101,8 @@ interface PayWayOption {
         </section>
       }
 
-      <div class="flex justify-end">
-        <section class="w-full rounded-xl bg-white p-5 shadow-sm md:max-w-md">
+      <ng-template #summaryBlock>
+        <section class="rounded-xl bg-white p-5 shadow-sm">
           <div class="text-sm">
             <div class="flex items-center justify-between py-1 text-gray-600">
               <span>Summa exkl. moms</span><span class="tabular-nums">{{ totals().net | kr }}</span>
@@ -1148,7 +1148,14 @@ interface PayWayOption {
             <p class="mt-1 text-right text-xs text-gray-400">inkl. moms</p>
           </div>
         </section>
-      </div>
+      </ng-template>
+      @if (card()?.status !== 'draft') {
+        <div class="flex justify-end">
+          <div class="w-full md:max-w-md">
+            <ng-container *ngTemplateOutlet="summaryBlock" />
+          </div>
+        </div>
+      }
 
       <ng-template #textBlock>
         <section class="rounded-xl bg-white p-5 shadow-sm">
@@ -1214,96 +1221,99 @@ interface PayWayOption {
       }
       @if (card(); as c) {
         @if (c.status === 'draft') {
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-1 text-base font-semibold">Betalning</h2>
-            <p class="mb-4 text-sm text-gray-500">
-              {{
-                hall()
-                  ? 'Vid bokföring sätts bilen som såld och dokumentet får sitt nummer.'
-                  : 'Vid bokföring minskar lagret och dokumentet får sitt nummer.'
-              }}
-              Därefter går kortet inte att ändra.
-            </p>
-            <div class="flex flex-wrap items-start gap-4">
-              <mat-form-field class="w-80" subscriptSizing="dynamic">
-                <mat-label>Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</mat-label>
-                <mat-select
-                  [value]="way()"
-                  [disabled]="readerWaiting()"
-                  (selectionChange)="chooseWay($event.value)"
-                >
-                  <mat-select-trigger>{{ wayLabel() }}</mat-select-trigger>
-                  @for (o of wayOptions(); track o.id) {
-                    <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
-                      <span class="block leading-tight">{{ o.label }}</span>
-                      <span class="block text-xs leading-tight text-gray-500">{{ o.hint }}</span>
-                    </mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-              @switch (way()) {
-                @case ('invoice') {
-                  <mat-form-field class="w-56" subscriptSizing="dynamic">
-                    <mat-label>Betalningsvillkor (dagar)</mat-label>
-                    <input
-                      matInput
-                      type="number"
-                      min="0"
-                      max="365"
-                      [value]="terms()"
-                      (input)="termsDays.set($any($event.target).valueAsNumber)"
-                    />
-                    <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
-                  </mat-form-field>
-                }
-                @case ('cash_invoice') {
-                  <mat-form-field class="w-56" subscriptSizing="dynamic">
-                    <mat-label>Betalsätt</mat-label>
-                    <mat-select
-                      [value]="receiptMethod()"
-                      (selectionChange)="receiptMethod.set($event.value)"
-                    >
-                      @for (m of receiptMethods; track m[0]) {
-                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                }
-                @case ('receipt') {
-                  <mat-form-field class="w-56" subscriptSizing="dynamic">
-                    <mat-label>Betalsätt</mat-label>
-                    <mat-select
-                      [value]="receiptMethod()"
-                      (selectionChange)="receiptMethod.set($event.value)"
-                    >
-                      @for (m of receiptMethods; track m[0]) {
-                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                }
-              }
-            </div>
-            @if (way() === 'receipt') {
-              <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
-                kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
-                prisbasbelopp inkl. moms (236 800 kr för 2026). Axle är inget kassaregister: ta
-                betalt i PayPal-kassan eller kontrollera med Skatteverket eller er revisor.
+          <div class="grid items-start gap-4 lg:grid-cols-[1fr_24rem]">
+            <section class="rounded-xl bg-white p-5 shadow-sm">
+              <h2 class="mb-1 text-base font-semibold">Betalning</h2>
+              <p class="mb-4 text-sm text-gray-500">
+                {{
+                  hall()
+                    ? 'Vid bokföring sätts bilen som såld och dokumentet får sitt nummer.'
+                    : 'Vid bokföring minskar lagret och dokumentet får sitt nummer.'
+                }}
+                Därefter går kortet inte att ändra.
               </p>
-            }
-            @if (way() === 'reader') {
-              <app-reader-payment
-                [cardId]="c.id"
-                [showStart]="false"
-                (waitingChange)="readerWaiting.set($event)"
-                (booked)="readerWaiting.set(false); load(c.id)"
-              />
-            }
-            @if (blocker(); as b) {
-              <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
-            }
-          </section>
+              <div class="flex flex-wrap items-start gap-4">
+                <mat-form-field class="w-80" subscriptSizing="dynamic">
+                  <mat-label>Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</mat-label>
+                  <mat-select
+                    [value]="way()"
+                    [disabled]="readerWaiting()"
+                    (selectionChange)="chooseWay($event.value)"
+                  >
+                    <mat-select-trigger>{{ wayLabel() }}</mat-select-trigger>
+                    @for (o of wayOptions(); track o.id) {
+                      <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
+                        <span class="block leading-tight">{{ o.label }}</span>
+                        <span class="block text-xs leading-tight text-gray-500">{{ o.hint }}</span>
+                      </mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                @switch (way()) {
+                  @case ('invoice') {
+                    <mat-form-field class="w-56" subscriptSizing="dynamic">
+                      <mat-label>Betalningsvillkor (dagar)</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        min="0"
+                        max="365"
+                        [value]="terms()"
+                        (input)="termsDays.set($any($event.target).valueAsNumber)"
+                      />
+                      <mat-hint>Förfaller {{ dueDate() }}</mat-hint>
+                    </mat-form-field>
+                  }
+                  @case ('cash_invoice') {
+                    <mat-form-field class="w-56" subscriptSizing="dynamic">
+                      <mat-label>Betalsätt</mat-label>
+                      <mat-select
+                        [value]="receiptMethod()"
+                        (selectionChange)="receiptMethod.set($event.value)"
+                      >
+                        @for (m of receiptMethods; track m[0]) {
+                          <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  }
+                  @case ('receipt') {
+                    <mat-form-field class="w-56" subscriptSizing="dynamic">
+                      <mat-label>Betalsätt</mat-label>
+                      <mat-select
+                        [value]="receiptMethod()"
+                        (selectionChange)="receiptMethod.set($event.value)"
+                      >
+                        @for (m of receiptMethods; track m[0]) {
+                          <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  }
+                }
+              </div>
+              @if (way() === 'receipt') {
+                <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                  <b>Kassaregister:</b> kontant-, kort- och Swish-försäljning till privatpersoner
+                  kräver ett certifierat kassaregister, om försäljningen över ett år överstiger fyra
+                  prisbasbelopp inkl. moms (236 800 kr för 2026). Axle är inget kassaregister: ta
+                  betalt i PayPal-kassan eller kontrollera med Skatteverket eller er revisor.
+                </p>
+              }
+              @if (way() === 'reader') {
+                <app-reader-payment
+                  [cardId]="c.id"
+                  [showStart]="false"
+                  (waitingChange)="readerWaiting.set($event)"
+                  (booked)="readerWaiting.set(false); load(c.id)"
+                />
+              }
+              @if (blocker(); as b) {
+                <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
+              }
+            </section>
+            <ng-container *ngTemplateOutlet="summaryBlock" />
+          </div>
         } @else if (c.document; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold">
