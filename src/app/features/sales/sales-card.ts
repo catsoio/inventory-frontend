@@ -1153,18 +1153,7 @@ interface PayWayOption {
 
       <ng-template #textBlock>
         <section class="rounded-xl bg-white p-5 shadow-sm">
-          <button
-            type="button"
-            class="flex w-full items-center justify-between text-left"
-            [attr.aria-expanded]="showText()"
-            (click)="showText.set(!showText())"
-          >
-            <span class="text-base font-semibold">Text och anteckning</span>
-            <span class="flex items-center gap-1 text-sm text-gray-500">
-              {{ hasText() ? 'Ifylld' : 'Valfritt' }}
-              <mat-icon>{{ showText() ? 'expand_less' : 'expand_more' }}</mat-icon>
-            </span>
-          </button>
+          <h2 class="mb-1 text-base font-semibold">Text och anteckning</h2>
           @if (showText()) {
             <div class="mt-3">
               <div class="grid gap-x-4 sm:grid-cols-2">
@@ -1215,7 +1204,8 @@ interface PayWayOption {
       }
       @if (card(); as c) {
         @if (c.status === 'draft') {
-          <div>
+          <div class="grid items-start gap-4 lg:grid-cols-[1fr_42rem]">
+            <ng-container *ngTemplateOutlet="textBlock" />
             <section class="rounded-xl bg-white p-5 shadow-sm">
               <div class="grid gap-5 sm:grid-cols-[16rem_1fr] sm:gap-0">
                 <nav
@@ -1490,7 +1480,9 @@ interface PayWayOption {
           </section>
         }
 
-        <ng-container *ngTemplateOutlet="textBlock" />
+        @if (c.status !== 'draft') {
+          <ng-container *ngTemplateOutlet="textBlock" />
+        }
 
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <h2 class="mb-2 text-base font-semibold">Hör ihop med</h2>
@@ -1854,7 +1846,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   );
 
   /** Text och anteckning är hopfälld tills något står där (eller man öppnar den). */
-  readonly showText = signal(false);
+  readonly showText = signal(true);
   readonly hasText = () =>
     !!(this.performed().trim() || this.warranty().trim() || this.note().trim());
 
