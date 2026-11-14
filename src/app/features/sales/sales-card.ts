@@ -1094,51 +1094,45 @@ interface PayWayOption {
               <span class="tabular-nums">{{ totals().rounding! | kr }}</span>
             </div>
           }
-          <!-- Rabatten är en rad i summan: skriv 10% eller ett belopp i kronor. -->
-          <div class="flex items-center justify-between gap-4 py-1">
-            <span class="flex items-center gap-2 text-gray-600">
-              Rabatt
-              @if (!readOnly()) {
-                <span
-                  class="inline-flex h-8 overflow-hidden rounded-md border border-gray-300 text-sm"
-                  role="group"
-                  aria-label="Procent eller kronor"
-                >
-                  <button
-                    type="button"
-                    class="w-8"
-                    [class.bg-teal-700]="discType() === 'percent'"
-                    [class.text-white]="discType() === 'percent'"
-                    (click)="setDiscType('percent')"
-                  >
-                    %
-                  </button>
-                  <button
-                    type="button"
-                    class="w-8 border-l border-gray-300"
-                    [class.bg-teal-700]="discType() === 'amount'"
-                    [class.text-white]="discType() === 'amount'"
-                    (click)="setDiscType('amount')"
-                  >
-                    kr
-                  </button>
-                </span>
-              }
-            </span>
+          <!-- Rabatten är en rad i summan: ett fält med enheten inbyggd. -->
+          <div class="flex h-9 items-center justify-between gap-4">
+            <span class="text-gray-600">Rabatt</span>
             @if (readOnly()) {
               <span class="tabular-nums text-green-700">
                 {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
               </span>
             } @else {
-              <span class="flex items-center">
+              <span
+                class="inline-flex h-8 items-center overflow-hidden rounded-md border border-gray-300 text-sm focus-within:border-teal-700"
+              >
                 <input
-                  class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
+                  class="h-full w-16 bg-transparent px-2 text-right outline-none"
                   inputmode="decimal"
                   placeholder="0"
                   aria-label="Rabatt"
                   [value]="discText()"
                   (input)="setDiscText($any($event.target).value)"
                 />
+                <button
+                  type="button"
+                  class="h-full w-8 border-l border-gray-300"
+                  aria-label="Procent"
+                  [class.bg-teal-700]="discType() === 'percent'"
+                  [class.text-white]="discType() === 'percent'"
+                  (click)="setDiscType('percent')"
+                >
+                  %
+                </button>
+                <button
+                  type="button"
+                  class="h-full w-8 border-l border-gray-300"
+                  aria-label="Kronor"
+                  [class.bg-teal-700]="discType() === 'amount'"
+                  [class.text-white]="discType() === 'amount'"
+                  (click)="setDiscType('amount')"
+                >
+                  kr
+                </button>
               </span>
             }
           </div>
@@ -1256,7 +1250,7 @@ interface PayWayOption {
                 >
                   <ng-container *ngTemplateOutlet="summaryBlock" />
                   <div class="my-4 border-t border-gray-200"></div>
-                  <div class="text-sm">
+                  <div class="min-h-20 text-sm">
                     @switch (way()) {
                       @case ('invoice') {
                         <div class="flex items-center justify-between gap-4 py-1">
@@ -1328,16 +1322,17 @@ interface PayWayOption {
                   <div
                     class="mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4"
                   >
-                    @if (way() !== 'till' && way() !== 'reader') {
-                      <a
-                        mat-stroked-button
-                        [routerLink]="['/sales', c.id, 'invoice']"
-                        [queryParams]="choiceParams()"
-                        [class.pointer-events-none]="dirty() || !rows().length"
-                      >
-                        <mat-icon>visibility</mat-icon> Förhandsgranska
-                      </a>
-                    }
+                    <a
+                      mat-stroked-button
+                      [routerLink]="['/sales', c.id, 'invoice']"
+                      [queryParams]="choiceParams()"
+                      [class.pointer-events-none]="
+                        dirty() || !rows().length || way() === 'till' || way() === 'reader'
+                      "
+                      [class.opacity-40]="way() === 'till' || way() === 'reader'"
+                    >
+                      <mat-icon>visibility</mat-icon> Förhandsgranska
+                    </a>
                     @if (primary(); as pr) {
                       <button
                         mat-flat-button
