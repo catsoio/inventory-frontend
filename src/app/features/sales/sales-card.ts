@@ -171,7 +171,7 @@ interface PayWayOption {
       [title]="title()"
       [code]="card()?.code ?? null"
     >
-      <div actions class="flex items-center gap-2">
+      <div actions class="flex items-center gap-3">
         @if (card(); as c) {
           @if (c.status === 'draft') {
             <button
@@ -185,12 +185,14 @@ interface PayWayOption {
             </button>
             @if (way() !== 'till' && way() !== 'reader') {
               <a
-                mat-stroked-button
+                mat-icon-button
+                aria-label="Förhandsgranska utkast"
+                matTooltip="Förhandsgranska utkast"
                 [routerLink]="['/sales', c.id, 'invoice']"
                 [queryParams]="choiceParams()"
                 [class.pointer-events-none]="dirty() || !rows().length"
               >
-                <mat-icon>visibility</mat-icon> Förhandsgranska
+                <mat-icon>visibility</mat-icon>
               </a>
             }
             @if (primary(); as pr) {
@@ -263,7 +265,9 @@ interface PayWayOption {
             </button>
           } @else {
             <!-- Ett utkast sparar sig självt en liten stund efter sista ändringen. -->
-            <span class="text-sm text-gray-500" aria-live="polite">{{ saveState() }}</span>
+            <span class="ml-1 hidden text-xs text-gray-400 sm:inline" aria-live="polite">{{
+              saveState()
+            }}</span>
           }
         }
       </div>
@@ -1114,40 +1118,28 @@ interface PayWayOption {
               </p>
             } @else {
               <div class="flex flex-wrap items-start gap-3">
-                <mat-button-toggle-group
-                  hideSingleSelectionIndicator
-                  [value]="discType()"
-                  (change)="discType.set($event.value); touch()"
-                  aria-label="Typ av rabatt"
-                >
-                  <mat-button-toggle value="percent">%</mat-button-toggle>
-                  <mat-button-toggle value="amount">kr</mat-button-toggle>
-                </mat-button-toggle-group>
-                <mat-form-field subscriptSizing="dynamic" class="w-36">
-                  <mat-label>{{ discType() === 'percent' ? 'Procent' : 'Kronor' }}</mat-label>
+                <mat-form-field subscriptSizing="dynamic" class="w-44">
+                  <mat-label>Rabatt</mat-label>
                   <input
                     matInput
-                    type="number"
-                    min="0"
-                    [value]="discValue() || ''"
-                    (input)="discValue.set($any($event.target).valueAsNumber || 0); touch()"
+                    inputmode="decimal"
+                    placeholder="10% eller 500"
+                    [value]="discText()"
+                    (input)="setDiscText($any($event.target).value)"
                   />
+                  <mat-hint>{{ discHint() }}</mat-hint>
                 </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic" class="min-w-52 flex-1">
-                  <mat-label>{{
-                    hall()
-                      ? 'Anledning (syns inte på fakturan)'
-                      : 'Anledning (syns inte på kvittot)'
-                  }}</mat-label>
-                  <input
-                    matInput
-                    [value]="discReason()"
-                    (input)="discReason.set($any($event.target).value); touch()"
-                    [placeholder]="
-                      hall() ? 't.ex. kampanj eller inbytesbonus' : 't.ex. 4 bilar på däckhotell'
-                    "
-                  />
-                </mat-form-field>
+                @if (discValue() > 0) {
+                  <mat-form-field subscriptSizing="dynamic" class="w-44">
+                    <mat-label>Anledning</mat-label>
+                    <input
+                      matInput
+                      [value]="discReason()"
+                      (input)="discReason.set($any($event.target).value); touch()"
+                    />
+                    <mat-hint>Syns inte på {{ hall() ? 'fakturan' : 'kvittot' }}</mat-hint>
+                  </mat-form-field>
+                }
               </div>
             }
           </div>
@@ -1801,6 +1793,29 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
       .subscribe((ok) => ok && this.load(c.id));
   }
 
+  /** Rabatten skrivs som ett fält: "10%" är procent, annars kronor; "100+50" räknas ihop. */
+  readonly discText = signal('');
+  readonly discHint = computed(() =>
+    this.discValue() > 0
+      ? this.discType() === 'percent'
+        ? `${this.discValue()} % av summan`
+        : `${this.discValue()} kr av summan`
+      : 'Procent (10%) eller kronor',
+  );
+
+  setDiscText(raw: string) {
+    this.discText.set(raw);
+    const t = raw.trim().replace(/\s/g, '').replace(/,/g, '.');
+    const pct = t.endsWith('%');
+    const parts = (pct ? t.slice(0, -1) : t).split('+').filter((x) => x !== '');
+    const nums = parts.map((x) => (/^\d*\.?\d+$/.test(x) ? Number(x) : NaN));
+    const ok = nums.every((n) => !Number.isNaN(n));
+    const sum = ok ? nums.reduce((a, b) => a + b, 0) : 0;
+    this.discType.set(pct ? 'percent' : 'amount');
+    this.discValue.set(ok ? Math.min(pct ? 100 : sum, sum) : 0);
+    this.touch();
+  }
+
   readonly wayLabel = computed(
     () => this.wayOptions().find((o) => o.id === this.way())?.label ?? '',
   );
@@ -2379,6 +2394,13 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
       c.discount ? (c.discount.type === 'amount' ? c.discount.value / 100 : c.discount.value) : 0,
     );
     this.discReason.set(c.discount?.reason ?? '');
+    this.discText.set(
+      c.discount
+        ? c.discount.type === 'percent'
+          ? `${c.discount.value}%`
+          : String(this.discValue())
+        : '',
+    );
     this.note.set(c.note ?? '');
     this.performed.set(c.performed ?? '');
     this.warranty.set(c.document?.warranty ?? '');
