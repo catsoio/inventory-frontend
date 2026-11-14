@@ -1102,7 +1102,7 @@ interface PayWayOption {
       }
 
       <ng-template #summaryBlock>
-        <section class="rounded-xl bg-white p-5 shadow-sm">
+        <section class="h-full rounded-xl bg-white p-5 shadow-sm">
           <div class="text-sm">
             <div class="flex items-center justify-between py-1 text-gray-600">
               <span>Summa exkl. moms</span><span class="tabular-nums">{{ totals().net | kr }}</span>
@@ -1221,17 +1221,10 @@ interface PayWayOption {
       }
       @if (card(); as c) {
         @if (c.status === 'draft') {
-          <div class="grid items-start gap-4 lg:grid-cols-[1fr_24rem]">
+          <div class="grid gap-4 lg:grid-cols-[1fr_24rem]">
             <section class="rounded-xl bg-white p-5 shadow-sm">
-              <h2 class="mb-1 text-base font-semibold">Betalning</h2>
-              <p class="mb-4 text-sm text-gray-500">
-                {{
-                  hall()
-                    ? 'Vid bokföring sätts bilen som såld och dokumentet får sitt nummer.'
-                    : 'Vid bokföring minskar lagret och dokumentet får sitt nummer.'
-                }}
-                Därefter går kortet inte att ändra.
-              </p>
+              <h2 class="mb-3 text-base font-semibold">Betalning</h2>
+
               <div class="flex flex-wrap items-start gap-4">
                 <mat-form-field class="w-80" subscriptSizing="dynamic">
                   <mat-label>Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</mat-label>
