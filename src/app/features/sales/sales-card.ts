@@ -1226,139 +1226,129 @@ interface PayWayOption {
       @if (card(); as c) {
         @if (c.status === 'draft') {
           <div class="grid gap-4 lg:grid-cols-[1fr_24rem]">
-            <section class="flex flex-col rounded-xl bg-white p-5 shadow-sm">
-              <div class="text-sm">
-                <div class="flex items-center justify-between gap-4 py-1">
-                  <span class="text-gray-600"
-                    >Hur betalar {{ hall() ? 'köparen' : 'kunden' }}?</span
-                  >
-                  <div class="w-64 shrink-0">
-                    <mat-select
-                      class="!flex h-9 w-full items-center rounded-md border border-gray-300 bg-white px-3 text-sm focus-within:border-teal-700"
-                      aria-label="Hur betalar kunden?"
-                      panelWidth="22rem"
-                      [value]="way()"
-                      [disabled]="readerWaiting()"
-                      (selectionChange)="chooseWay($event.value)"
+            <section class="rounded-xl bg-white p-5 shadow-sm">
+              <div class="grid gap-6 sm:grid-cols-[15rem_1fr]">
+                <nav class="flex flex-col gap-1" role="radiogroup" aria-label="Hur betalar kunden?">
+                  @for (o of wayOptions(); track o.id) {
+                    <button
+                      type="button"
+                      role="radio"
+                      class="flex items-center gap-3 rounded-lg px-3 py-2 text-left disabled:opacity-40"
+                      [attr.aria-checked]="way() === o.id"
+                      [class.bg-teal-50]="way() === o.id"
+                      [class.text-teal-900]="way() === o.id"
+                      [class.hover:bg-gray-50]="way() !== o.id"
+                      [disabled]="readerWaiting() || o.disabled"
+                      (click)="chooseWay(o.id)"
                     >
-                      <mat-select-trigger>
-                        <span class="flex items-center gap-2">
-                          <mat-icon class="!h-5 !w-5 !text-[20px] text-teal-700">{{
-                            wayIcon()
-                          }}</mat-icon>
-                          {{ wayLabel() }}
-                        </span>
-                      </mat-select-trigger>
-                      @for (o of wayOptions(); track o.id) {
-                        <mat-option [value]="o.id" [disabled]="o.disabled" class="!h-auto !py-2">
-                          <span class="flex items-center gap-3">
-                            <mat-icon class="text-gray-500">{{ o.icon }}</mat-icon>
-                            <span>
-                              <span class="block leading-tight">{{ o.label }}</span>
-                              <span class="block text-xs leading-tight text-gray-500">{{
-                                o.hint
-                              }}</span>
-                            </span>
+                      <mat-icon [class.text-teal-700]="way() === o.id" class="text-gray-500">{{
+                        o.icon
+                      }}</mat-icon>
+                      <span>
+                        <span class="block text-sm font-medium leading-tight">{{ o.label }}</span>
+                        <span class="block text-xs leading-tight text-gray-500">{{ o.hint }}</span>
+                      </span>
+                    </button>
+                  }
+                </nav>
+                <div class="flex flex-col">
+                  <div class="text-sm">
+                    @switch (way()) {
+                      @case ('invoice') {
+                        <div class="flex items-center justify-between gap-4 py-1">
+                          <span class="text-gray-600">Betalningsvillkor</span>
+                          <span class="flex items-center gap-2 text-gray-500">
+                            <input
+                              class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-20 text-right"
+                              type="number"
+                              min="0"
+                              max="365"
+                              aria-label="Betalningsvillkor i dagar"
+                              [value]="terms()"
+                              (input)="termsDays.set($any($event.target).valueAsNumber)"
+                            />
+                            dagar
                           </span>
-                        </mat-option>
+                        </div>
+                        <div class="flex items-center justify-between gap-4 py-1 text-gray-600">
+                          <span>Förfaller</span>
+                          <span class="tabular-nums">{{ dueDate() }}</span>
+                        </div>
                       }
-                    </mat-select>
+                      @case ('cash_invoice') {
+                        <div class="flex items-center justify-between gap-4 py-1">
+                          <span class="text-gray-600">Betalsätt</span>
+                          <select
+                            class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
+                            aria-label="Betalsätt"
+                            (change)="receiptMethod.set($any($event.target).value)"
+                          >
+                            @for (m of receiptMethods; track m[0]) {
+                              <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
+                                {{ m[1] }}
+                              </option>
+                            }
+                          </select>
+                        </div>
+                      }
+                      @case ('receipt') {
+                        <div class="flex items-center justify-between gap-4 py-1">
+                          <span class="text-gray-600">Betalsätt</span>
+                          <select
+                            class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
+                            aria-label="Betalsätt"
+                            (change)="receiptMethod.set($any($event.target).value)"
+                          >
+                            @for (m of receiptMethods; track m[0]) {
+                              <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
+                                {{ m[1] }}
+                              </option>
+                            }
+                          </select>
+                        </div>
+                      }
+                    }
+                  </div>
+                  @if (way() === 'reader') {
+                    <app-reader-payment
+                      [cardId]="c.id"
+                      [showStart]="false"
+                      (waitingChange)="readerWaiting.set($event)"
+                      (booked)="readerWaiting.set(false); load(c.id)"
+                    />
+                  }
+                  @if (blocker(); as b) {
+                    <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
+                  }
+                  <!-- Knapparna ligger alltid längst ned, samma som i kortets huvud. -->
+                  <div
+                    class="mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4"
+                  >
+                    @if (way() !== 'till' && way() !== 'reader') {
+                      <a
+                        mat-stroked-button
+                        [routerLink]="['/sales', c.id, 'invoice']"
+                        [queryParams]="choiceParams()"
+                        [class.pointer-events-none]="dirty() || !rows().length"
+                      >
+                        <mat-icon>visibility</mat-icon> Förhandsgranska
+                      </a>
+                    }
+                    @if (primary(); as pr) {
+                      <button
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        [disabled]="
+                          dirty() || busy() || readerWaiting() || !rows().length || !!blocker()
+                        "
+                        (click)="pr.run()"
+                      >
+                        <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
+                      </button>
+                    }
                   </div>
                 </div>
-                @switch (way()) {
-                  @case ('invoice') {
-                    <div class="flex items-center justify-between gap-4 py-1">
-                      <span class="text-gray-600">Betalningsvillkor</span>
-                      <span class="flex items-center gap-2 text-gray-500">
-                        <input
-                          class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-20 text-right"
-                          type="number"
-                          min="0"
-                          max="365"
-                          aria-label="Betalningsvillkor i dagar"
-                          [value]="terms()"
-                          (input)="termsDays.set($any($event.target).valueAsNumber)"
-                        />
-                        dagar
-                      </span>
-                    </div>
-                    <div class="flex items-center justify-between gap-4 py-1 text-gray-600">
-                      <span>Förfaller</span>
-                      <span class="tabular-nums">{{ dueDate() }}</span>
-                    </div>
-                  }
-                  @case ('cash_invoice') {
-                    <div class="flex items-center justify-between gap-4 py-1">
-                      <span class="text-gray-600">Betalsätt</span>
-                      <select
-                        class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
-                        aria-label="Betalsätt"
-                        (change)="receiptMethod.set($any($event.target).value)"
-                      >
-                        @for (m of receiptMethods; track m[0]) {
-                          <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
-                            {{ m[1] }}
-                          </option>
-                        }
-                      </select>
-                    </div>
-                  }
-                  @case ('receipt') {
-                    <div class="flex items-center justify-between gap-4 py-1">
-                      <span class="text-gray-600">Betalsätt</span>
-                      <select
-                        class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm outline-none focus:border-teal-700 w-56"
-                        aria-label="Betalsätt"
-                        (change)="receiptMethod.set($any($event.target).value)"
-                      >
-                        @for (m of receiptMethods; track m[0]) {
-                          <option [value]="m[0]" [selected]="m[0] === receiptMethod()">
-                            {{ m[1] }}
-                          </option>
-                        }
-                      </select>
-                    </div>
-                  }
-                }
-              </div>
-              @if (way() === 'reader') {
-                <app-reader-payment
-                  [cardId]="c.id"
-                  [showStart]="false"
-                  (waitingChange)="readerWaiting.set($event)"
-                  (booked)="readerWaiting.set(false); load(c.id)"
-                />
-              }
-              @if (blocker(); as b) {
-                <app-callout class="mt-3" [fixes]="b.fixes">{{ b.text }}</app-callout>
-              }
-              <!-- Knapparna ligger alltid längst ned, samma som i kortets huvud. -->
-              <div
-                class="mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4"
-              >
-                @if (way() !== 'till' && way() !== 'reader') {
-                  <a
-                    mat-stroked-button
-                    [routerLink]="['/sales', c.id, 'invoice']"
-                    [queryParams]="choiceParams()"
-                    [class.pointer-events-none]="dirty() || !rows().length"
-                  >
-                    <mat-icon>visibility</mat-icon> Förhandsgranska
-                  </a>
-                }
-                @if (primary(); as pr) {
-                  <button
-                    mat-flat-button
-                    color="primary"
-                    type="button"
-                    [disabled]="
-                      dirty() || busy() || readerWaiting() || !rows().length || !!blocker()
-                    "
-                    (click)="pr.run()"
-                  >
-                    <mat-icon>{{ pr.icon }}</mat-icon> {{ pr.label }}
-                  </button>
-                }
               </div>
             </section>
             <ng-container *ngTemplateOutlet="summaryBlock" />
