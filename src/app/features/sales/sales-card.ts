@@ -1101,64 +1101,54 @@ interface PayWayOption {
         </section>
       }
 
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="ml-auto max-w-md text-sm">
-          <div class="flex items-center justify-between py-1 text-gray-600">
-            <span>Summa exkl. moms</span><span class="tabular-nums">{{ totals().net | kr }}</span>
-          </div>
-          @for (b of totals().byRate; track b.rate) {
+      <div class="flex justify-end">
+        <section class="w-full rounded-xl bg-white p-5 shadow-sm md:max-w-md">
+          <div class="text-sm">
             <div class="flex items-center justify-between py-1 text-gray-600">
-              <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span>
-              <span class="tabular-nums">{{ b.vat | kr }}</span>
+              <span>Summa exkl. moms</span><span class="tabular-nums">{{ totals().net | kr }}</span>
             </div>
-          }
-          @if (totals().rounding) {
-            <div class="flex items-center justify-between py-1 text-gray-600">
-              <span>Öresutjämning</span>
-              <span class="tabular-nums">{{ totals().rounding! | kr }}</span>
-            </div>
-          }
-          <!-- Rabatten är en rad i summan: skriv 10% eller ett belopp i kronor. -->
-          <div class="flex items-center justify-between gap-4 py-1">
-            <span class="text-gray-600">Rabatt</span>
-            @if (readOnly()) {
-              <span class="tabular-nums text-green-700">
-                {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
-              </span>
-            } @else {
-              <span class="flex items-center gap-2">
-                @if (totals().discount > 0) {
-                  <span class="tabular-nums text-green-700">−{{ totals().discount | kr }}</span>
-                }
-                <input
-                  class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
-                  inputmode="decimal"
-                  placeholder="10% / kr"
-                  aria-label="Rabatt i procent eller kronor"
-                  [value]="discText()"
-                  (input)="setDiscText($any($event.target).value)"
-                />
-              </span>
+            @for (b of totals().byRate; track b.rate) {
+              <div class="flex items-center justify-between py-1 text-gray-600">
+                <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span>
+                <span class="tabular-nums">{{ b.vat | kr }}</span>
+              </div>
             }
+            @if (totals().rounding) {
+              <div class="flex items-center justify-between py-1 text-gray-600">
+                <span>Öresutjämning</span>
+                <span class="tabular-nums">{{ totals().rounding! | kr }}</span>
+              </div>
+            }
+            <!-- Rabatten är en rad i summan: skriv 10% eller ett belopp i kronor. -->
+            <div class="flex items-center justify-between gap-4 py-1">
+              <span class="text-gray-600">Rabatt</span>
+              @if (readOnly()) {
+                <span class="tabular-nums text-green-700">
+                  {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
+                </span>
+              } @else {
+                <span class="flex items-center gap-2">
+                  <input
+                    class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
+                    inputmode="decimal"
+                    placeholder="10% / kr"
+                    aria-label="Rabatt i procent eller kronor"
+                    [value]="discText()"
+                    (input)="setDiscText($any($event.target).value)"
+                  />
+                </span>
+              }
+            </div>
+            <div
+              class="mt-2 flex items-baseline justify-between gap-6 border-t border-gray-200 pt-3"
+            >
+              <span class="text-base font-semibold">Att betala</span>
+              <span class="text-xl font-semibold tabular-nums">{{ totals().total | kr }}</span>
+            </div>
+            <p class="mt-1 text-right text-xs text-gray-400">inkl. moms</p>
           </div>
-          @if (!readOnly() && discValue() > 0) {
-            <input
-              class="mb-1 h-8 w-full rounded-md border border-gray-300 px-2 text-sm outline-none focus:border-teal-700"
-              [placeholder]="'Anledning (syns inte på ' + (hall() ? 'fakturan' : 'kvittot') + ')'"
-              aria-label="Anledning till rabatten"
-              [value]="discReason()"
-              (input)="discReason.set($any($event.target).value); touch()"
-            />
-          } @else if (readOnly() && card()?.discount?.reason) {
-            <p class="mb-1 text-xs text-gray-500">{{ card()!.discount!.reason }}</p>
-          }
-          <div class="mt-2 flex items-baseline justify-between gap-6 border-t border-gray-200 pt-3">
-            <span class="text-base font-semibold">Att betala</span>
-            <span class="text-xl font-semibold tabular-nums">{{ totals().total | kr }}</span>
-          </div>
-          <p class="mt-1 text-right text-xs text-gray-400">inkl. moms</p>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <ng-template #textBlock>
         <section class="rounded-xl bg-white p-5 shadow-sm">
