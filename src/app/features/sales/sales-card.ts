@@ -1078,86 +1078,82 @@ interface PayWayOption {
       }
 
       <ng-template #summaryBlock>
-        <section class="h-full rounded-xl bg-white p-5 shadow-sm">
-          <div class="text-sm">
+        <div class="text-sm">
+          <div class="flex items-center justify-between py-1 text-gray-600">
+            <span>Summa exkl. moms</span><span class="tabular-nums">{{ totals().net | kr }}</span>
+          </div>
+          @for (b of totals().byRate; track b.rate) {
             <div class="flex items-center justify-between py-1 text-gray-600">
-              <span>Summa exkl. moms</span><span class="tabular-nums">{{ totals().net | kr }}</span>
+              <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span>
+              <span class="tabular-nums">{{ b.vat | kr }}</span>
             </div>
-            @for (b of totals().byRate; track b.rate) {
-              <div class="flex items-center justify-between py-1 text-gray-600">
-                <span>{{ incl() ? 'Varav moms' : 'Moms' }} {{ b.rate }} %</span>
-                <span class="tabular-nums">{{ b.vat | kr }}</span>
-              </div>
-            }
-            @if (totals().rounding) {
-              <div class="flex items-center justify-between py-1 text-gray-600">
-                <span>Öresutjämning</span>
-                <span class="tabular-nums">{{ totals().rounding! | kr }}</span>
-              </div>
-            }
-            <!-- Rabatten är en rad i summan: skriv 10% eller ett belopp i kronor. -->
-            <div class="flex items-center justify-between gap-4 py-1">
-              <span class="flex items-center gap-2 text-gray-600">
-                Rabatt
-                @if (!readOnly()) {
-                  <span
-                    class="inline-flex h-8 overflow-hidden rounded-md border border-gray-300 text-sm"
-                    role="group"
-                    aria-label="Procent eller kronor"
+          }
+          @if (totals().rounding) {
+            <div class="flex items-center justify-between py-1 text-gray-600">
+              <span>Öresutjämning</span>
+              <span class="tabular-nums">{{ totals().rounding! | kr }}</span>
+            </div>
+          }
+          <!-- Rabatten är en rad i summan: skriv 10% eller ett belopp i kronor. -->
+          <div class="flex items-center justify-between gap-4 py-1">
+            <span class="flex items-center gap-2 text-gray-600">
+              Rabatt
+              @if (!readOnly()) {
+                <span
+                  class="inline-flex h-8 overflow-hidden rounded-md border border-gray-300 text-sm"
+                  role="group"
+                  aria-label="Procent eller kronor"
+                >
+                  <button
+                    type="button"
+                    class="w-8"
+                    [class.bg-teal-700]="discType() === 'percent'"
+                    [class.text-white]="discType() === 'percent'"
+                    (click)="setDiscType('percent')"
                   >
-                    <button
-                      type="button"
-                      class="w-8"
-                      [class.bg-teal-700]="discType() === 'percent'"
-                      [class.text-white]="discType() === 'percent'"
-                      (click)="setDiscType('percent')"
-                    >
-                      %
-                    </button>
-                    <button
-                      type="button"
-                      class="w-8 border-l border-gray-300"
-                      [class.bg-teal-700]="discType() === 'amount'"
-                      [class.text-white]="discType() === 'amount'"
-                      (click)="setDiscType('amount')"
-                    >
-                      kr
-                    </button>
-                  </span>
-                }
-              </span>
-              @if (readOnly()) {
-                <span class="tabular-nums text-green-700">
-                  {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
-                </span>
-              } @else {
-                <span class="flex items-center">
-                  <input
-                    class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
-                    inputmode="decimal"
-                    placeholder="0"
-                    aria-label="Rabatt"
-                    [value]="discText()"
-                    (input)="setDiscText($any($event.target).value)"
-                  />
+                    %
+                  </button>
+                  <button
+                    type="button"
+                    class="w-8 border-l border-gray-300"
+                    [class.bg-teal-700]="discType() === 'amount'"
+                    [class.text-white]="discType() === 'amount'"
+                    (click)="setDiscType('amount')"
+                  >
+                    kr
+                  </button>
                 </span>
               }
-            </div>
-            <div
-              class="mt-2 flex items-baseline justify-between gap-6 border-t border-gray-200 pt-3"
-            >
-              <span class="text-base font-semibold">Att betala</span>
-              <span class="text-xl font-semibold tabular-nums">{{ totals().total | kr }}</span>
-            </div>
-            <p class="mt-1 text-right text-xs text-gray-400">inkl. moms</p>
+            </span>
+            @if (readOnly()) {
+              <span class="tabular-nums text-green-700">
+                {{ totals().discount > 0 ? '−' + (totals().discount | kr) : '–' }}
+              </span>
+            } @else {
+              <span class="flex items-center">
+                <input
+                  class="h-8 w-24 rounded-md border border-gray-300 px-2 text-right text-sm outline-none focus:border-teal-700"
+                  inputmode="decimal"
+                  placeholder="0"
+                  aria-label="Rabatt"
+                  [value]="discText()"
+                  (input)="setDiscText($any($event.target).value)"
+                />
+              </span>
+            }
           </div>
-        </section>
+          <div class="mt-2 flex items-baseline justify-between gap-6 border-t border-gray-200 pt-3">
+            <span class="text-base font-semibold">Att betala</span>
+            <span class="text-xl font-semibold tabular-nums">{{ totals().total | kr }}</span>
+          </div>
+          <p class="mt-1 text-right text-xs text-gray-400">inkl. moms</p>
+        </div>
       </ng-template>
       @if (card()?.status !== 'draft') {
         <div class="flex justify-end">
-          <div class="w-full md:max-w-md">
+          <section class="w-full rounded-xl bg-white p-5 shadow-sm md:max-w-md">
             <ng-container *ngTemplateOutlet="summaryBlock" />
-          </div>
+          </section>
         </div>
       }
 
@@ -1225,10 +1221,14 @@ interface PayWayOption {
       }
       @if (card(); as c) {
         @if (c.status === 'draft') {
-          <div class="grid gap-4 lg:grid-cols-[1fr_24rem]">
+          <div>
             <section class="rounded-xl bg-white p-5 shadow-sm">
-              <div class="grid gap-6 sm:grid-cols-[15rem_1fr]">
-                <nav class="flex flex-col gap-1" role="radiogroup" aria-label="Hur betalar kunden?">
+              <div class="grid gap-5 sm:grid-cols-[16rem_1fr] sm:gap-0">
+                <nav
+                  class="flex flex-col gap-1 sm:pr-5"
+                  role="radiogroup"
+                  aria-label="Hur betalar kunden?"
+                >
                   @for (o of wayOptions(); track o.id) {
                     <button
                       type="button"
@@ -1251,7 +1251,11 @@ interface PayWayOption {
                     </button>
                   }
                 </nav>
-                <div class="flex flex-col">
+                <div
+                  class="flex flex-col border-t border-gray-200 pt-5 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"
+                >
+                  <ng-container *ngTemplateOutlet="summaryBlock" />
+                  <div class="my-4 border-t border-gray-200"></div>
                   <div class="text-sm">
                     @switch (way()) {
                       @case ('invoice') {
@@ -1351,7 +1355,6 @@ interface PayWayOption {
                 </div>
               </div>
             </section>
-            <ng-container *ngTemplateOutlet="summaryBlock" />
           </div>
         } @else if (c.document; as inv) {
           <section class="rounded-xl bg-white p-5 shadow-sm">
