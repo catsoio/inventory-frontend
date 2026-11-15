@@ -1,3 +1,4 @@
+import { Scanner } from '../../core/scan/scanner';
 import { CreditDialog, type CreditResult } from './credit-dialog';
 import { ReturnDialog } from './return-dialog';
 import { TillPayDialog, type TillPayData } from './till-pay';
@@ -1576,6 +1577,8 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   private readonly auth = inject(Auth);
   private readonly carApi = inject(CarApi);
   private readonly nav = inject(Nav);
+  private readonly scanner = inject(Scanner);
+  private releaseScan: (() => void) | null = null;
   /**
    * En bilaffär (Hall) och inte en verkstadsaffär: ett sparat kort säger det själv (det har en
    * bilrad), ett nytt kort följer produkten man kom från. Hall visar bara köparen, bilen och
@@ -2145,6 +2148,8 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   }
 
   ngOnInit() {
+    // En skannad vara läggs på kortet så länge det är ett utkast.
+    this.releaseScan = this.scanner.capture((code) => void this.onScan(code));
     this.workshop.serviceTypes().subscribe((l) => this.serviceTypes.set(l));
     this.loadSeller();
     this.zettleApi.status().subscribe({
@@ -2393,6 +2398,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   }
 
   ngOnDestroy() {
+    this.releaseScan?.();
     // Ett utkast som öppnades men aldrig fick något innehåll lämnas inte kvar som ett tomt kort.
     const c = this.card();
     if (!c || c.status !== 'draft' || !this.id || this.id === 'new' || c.reservedDocumentCode)
@@ -2538,6 +2544,21 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     this.search.setValue('', { emitEvent: false });
     this.results.set([]);
     this.pickingArticle.set(false);
+  }
+
+  private async onScan(code: string) {
+    const c = this.card();
+    if (c && c.status !== 'draft') return this.scanner.openCode(code);
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    if (hit.kind === 'article') {
+      this.inventory.article(hit.id).subscribe((a) => {
+        this.scanner.beep(true);
+        this.addArticle(a);
+      });
+    } else {
+      this.scanner.open(hit);
+    }
   }
 
   addFirst() {

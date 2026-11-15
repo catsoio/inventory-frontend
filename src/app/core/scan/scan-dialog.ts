@@ -1,0 +1,140 @@
+import { Component, ElementRef, OnDestroy, inject, signal, viewChild } from '@angular/core';
+import { MatDialogRef } from '@angular/material/dialog';
+import { SharedModule } from '../../shared/shared-module';
+import { Scanner } from './scanner';
+
+interface Detector {
+  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
+}
+
+/** Skanna med läsaren (skriv eller skanna i fältet) eller med telefonens kamera. */
+@Component({
+  selector: 'app-scan-dialog',
+  standalone: true,
+  imports: [SharedModule],
+  template: `
+    <h2 mat-dialog-title>Skanna</h2>
+    <mat-dialog-content class="flex flex-col gap-3">
+      <p class="text-sm text-gray-600">
+        Skanna en etikett med läsaren, eller skriv koden: DH-nummer, artikelnummer, streckkod,
+        AO-/SK-/KF-nummer eller regnr.
+      </p>
+      <input
+        #field
+        class="h-12 w-full rounded-xl border border-gray-300 px-3 text-lg"
+        placeholder="Skanna eller skriv…"
+        autocomplete="off"
+        autocapitalize="characters"
+        autofocus
+        (keydown.enter)="submit(field.value)"
+      />
+      @if (canCamera) {
+        @if (camera()) {
+          <video
+            #video
+            class="aspect-video w-full rounded-xl bg-black object-cover"
+            playsinline
+            muted
+          ></video>
+          <button mat-stroked-button type="button" (click)="stopCamera()">
+            <mat-icon>videocam_off</mat-icon> Stäng kameran
+          </button>
+        } @else {
+          <button mat-stroked-button type="button" (click)="startCamera()">
+            <mat-icon>photo_camera</mat-icon> Använd kameran
+          </button>
+        }
+      }
+      @if (error()) {
+        <p class="text-sm text-red-700">{{ error() }}</p>
+      }
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" mat-dialog-close>Stäng</button>
+      <button mat-flat-button type="button" (click)="submit(field.value)" [disabled]="busy()">
+        Öppna
+      </button>
+    </mat-dialog-actions>
+  `,
+})
+export class ScanDialog implements OnDestroy {
+  private readonly scanner = inject(Scanner);
+  private readonly ref = inject(MatDialogRef<ScanDialog>);
+  private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
+
+  readonly busy = signal(false);
+  readonly error = signal('');
+  readonly camera = signal(false);
+  /** Kameraläsning kräver webbläsarens BarcodeDetector (Chrome, Edge, Safari på nyare iOS). */
+  readonly canCamera =
+    typeof window !== 'undefined' && 'BarcodeDetector' in window && !!navigator.mediaDevices;
+
+  private stream: MediaStream | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  async submit(value: string) {
+    const code = value.trim();
+    if (!code || this.busy()) return;
+    this.busy.set(true);
+    this.error.set('');
+    const hit = await this.scanner.resolve(code);
+    this.busy.set(false);
+    if (!hit) return;
+    if (hit.kind === 'none') {
+      this.error.set(`Hittar ingen träff på ${code}.`);
+      this.scanner.beep(false);
+      return;
+    }
+    this.stopCamera();
+    this.ref.close();
+    this.scanner.open(hit);
+  }
+
+  async startCamera() {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      this.camera.set(true);
+      // Videoelementet finns först efter nästa rendering.
+      setTimeout(() => this.attach(), 0);
+    } catch {
+      this.error.set('Kameran gick inte att öppna. Tillåt kameran i webbläsaren.');
+    }
+  }
+
+  private attach() {
+    const el = this.video()?.nativeElement;
+    if (!el || !this.stream) return;
+    el.srcObject = this.stream;
+    void el.play();
+    const Ctor = (window as unknown as { BarcodeDetector: new (o?: object) => Detector })
+      .BarcodeDetector;
+    const detector = new Ctor();
+    let busy = false;
+    this.timer = setInterval(async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const found = await detector.detect(el);
+        if (found[0]?.rawValue) void this.submit(found[0].rawValue);
+      } catch {
+        // En bildruta utan kod är normalt.
+      } finally {
+        busy = false;
+      }
+    }, 350);
+  }
+
+  stopCamera() {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    this.camera.set(false);
+  }
+
+  ngOnDestroy() {
+    this.stopCamera();
+  }
+}

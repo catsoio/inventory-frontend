@@ -569,6 +569,16 @@ export class StorageForm {
       }
     });
 
+    // Från en arbetsorder: kunden och bilen (och ordern) följer med, så inlämningen är bara några klick.
+    const qp = inject(ActivatedRoute).snapshot.queryParamMap;
+    const fromCustomer = qp.get('customerId');
+    const fromVehicle = qp.get('vehicleId');
+    if (!this.id && fromCustomer && fromVehicle) {
+      c.link.setValue({ customerId: fromCustomer, vehicleId: fromVehicle });
+    }
+    const fromOrder = qp.get('orderCode');
+    if (!this.id && fromOrder) c.notes.setValue(`Från ${fromOrder}`);
+
     if (this.id) {
       this.api.deposit(this.id).subscribe((d) => {
         if (!d.customerId || !d.vehicleId) {
@@ -769,7 +779,12 @@ export class StorageForm {
         }),
       )
       .subscribe({
-        next: (d) => this.router.navigate(['/storage', d.id]),
+        // En ny inlämning går vidare till etikett och hylla: skriv ut, sätt på setet, skanna hyllan.
+        next: (d) =>
+          this.router.navigate(
+            ['/storage', d.id],
+            this.id ? undefined : { queryParams: { placera: 1 } },
+          ),
         error: () => this.busy.set(false),
       });
   }

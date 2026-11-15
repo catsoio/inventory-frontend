@@ -16,11 +16,12 @@ function season(a: Article): string {
   return t ? SEASON_LABELS[t.season] + (t.studded ? ' dubb' : '') : '';
 }
 
-function label(a: Article): string {
+function label(a: Article, qr: string): string {
   const t = a.tyre;
   const load = t ? `${t.loadIndex ?? ''}${t.speedIndex ?? ''}` : '';
   const name = [a.brand, a.model].filter(Boolean).join(' ');
   return `<div class="l">
+  ${qr ? `<div class="qr" role="img" aria-label="QR-kod till ${esc(a.code ?? '')}">${qr}</div>` : ''}
   <div class="size">${esc(a.sizeLabel || a.label)}${load ? ` <small>${esc(load)}</small>` : ''}</div>
   <div class="name">${esc(name)}</div>
   <div class="row"><span class="tag">${esc(season(a))}</span><span class="code">${esc(a.code ?? '')}</span></div>
@@ -37,7 +38,9 @@ const BASE_CSS = `
 const LABELS_CSS = `${BASE_CSS}
   .sheet { display: grid; grid-template-columns: repeat(${LABEL_COLS}, 1fr); grid-template-rows: repeat(${LABEL_ROWS}, 1fr); height: 281mm; break-after: page; }
   .sheet:last-child { break-after: auto; }
-  .l { border: 0.3mm dashed ${LINE}; padding: 3.5mm 4.5mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; min-width: 0; }
+  .l { position: relative; border: 0.3mm dashed ${LINE}; padding: 3.5mm 4.5mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; min-width: 0; }
+  .qr { position: absolute; top: 3.5mm; right: 4.5mm; width: 15mm; height: 15mm; }
+  .qr svg { display: block; width: 100%; height: 100%; }
   .size { font-size: 26pt; font-weight: 700; line-height: 1.05; white-space: nowrap; }
   .size small { font-size: 15pt; font-weight: 500; }
   .name { font-size: 14pt; line-height: 1.15; max-height: 2.3em; overflow: hidden; }
@@ -61,14 +64,14 @@ const LIST_CSS = `${BASE_CSS}
   .head b { font-size: 11pt; }
 `;
 
-function labelsHtml(list: Article[]): string {
+function labelsHtml(list: Article[], qrs: Map<string, string>): string {
   const per = LABEL_COLS * LABEL_ROWS;
   const sheets: string[] = [];
   for (let i = 0; i < list.length; i += per) {
     sheets.push(
       `<div class="sheet">${list
         .slice(i, i + per)
-        .map(label)
+        .map((a) => label(a, qrs.get(a.id) ?? ''))
         .join('')}</div>`,
     );
   }
@@ -100,10 +103,31 @@ function listHtml(list: Article[]): string {
  * Skriver ut däck på A4 i ett eget dolt dokument (så att resten av sidan inte påverkar utskriften).
  * Artiklar som inte är däck hoppas över.
  */
-export function printTyres(articles: Article[], layout: TyrePrintLayout = 'labels'): void {
+export async function printTyres(
+  articles: Article[],
+  layout: TyrePrintLayout = 'labels',
+): Promise<void> {
   const tyres = articles.filter((a) => a.tyre);
   if (!tyres.length) return;
-  const body = layout === 'labels' ? labelsHtml(tyres) : listHtml(tyres);
+  // Etiketten bär artikelnumret som QR-kod: en skanning öppnar artikeln eller räknar den vid inventering.
+  const qrs = new Map<string, string>();
+  if (layout === 'labels') {
+    const mod = await import('qrcode');
+    const toString = (mod as unknown as { default?: typeof mod }).default?.toString ?? mod.toString;
+    for (const a of tyres) {
+      if (!a.code) continue;
+      qrs.set(
+        a.id,
+        await toString(a.code, {
+          type: 'svg',
+          margin: 0,
+          errorCorrectionLevel: 'M',
+          color: { dark: INK, light: '#ffffff' },
+        }),
+      );
+    }
+  }
+  const body = layout === 'labels' ? labelsHtml(tyres, qrs) : listHtml(tyres);
   const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><title>Däck</title></head><body>${body}</body></html>`;
 
   printHtml(html);

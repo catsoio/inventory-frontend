@@ -1,3 +1,4 @@
+import { Billing } from '../../../core/billing/billing';
 import { ChangeDetectorRef, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -176,6 +177,22 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
               [matTooltip]="form.dirty ? 'Spara först' : 'Följesedel att lämna med bilen'"
             >
               <mat-icon>assignment_turned_in</mat-icon> Följesedel
+            </a>
+          }
+          @if (billing.allows('dackhotell') && c.vehicleId) {
+            <!-- Kundens hjul som tagits av går vidare till hotellet: kund och bil följer med. -->
+            <a
+              mat-stroked-button
+              routerLink="/storage/new"
+              [queryParams]="{
+                customerId: c.customerId,
+                vehicleId: c.vehicleId,
+                orderCode: c.code,
+              }"
+              [disabled]="form.dirty"
+              [matTooltip]="form.dirty ? 'Spara först' : 'Lämna in kundens hjul på däckhotellet'"
+            >
+              <mat-icon>inventory_2</mat-icon> Till däckhotell
             </a>
           }
           <a
@@ -922,6 +939,7 @@ export class WorkOrderCard implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly cdr = inject(ChangeDetectorRef);
+  readonly billing = inject(Billing);
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
 
   readonly statuses: [WorkOrderStatus, string][] = [

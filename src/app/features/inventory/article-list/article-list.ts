@@ -824,7 +824,7 @@ export class ArticleList implements OnInit {
   }
 
   print(layout: TyrePrintLayout) {
-    printTyres(this.printable(), layout);
+    void printTyres(this.printable(), layout);
   }
 
   toggleCol(key: string) {

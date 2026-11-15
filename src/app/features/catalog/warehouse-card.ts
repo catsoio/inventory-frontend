@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,6 +7,7 @@ import { CatalogApi } from '../../core/api/catalog-api';
 import { WAREHOUSE_KIND_LABELS, Warehouse, WarehouseKind } from '../../core/models';
 import { Confirm } from '../../shared/confirm';
 import { ensureValid } from '../../shared/form-guard';
+import { printShelfLabels } from '../../shared/location-print';
 
 /**
  * Kortet för ett lager: namn, om det är eget lager eller kundgods, och dess platser (hyllor,
@@ -30,14 +31,14 @@ import { ensureValid } from '../../shared/form-guard';
           @if (admin) {
             @if (c.active) {
               <button
- mat-icon-button
- class="!text-red-700"
- aria-label="Ta bort"
- matTooltip="Ta bort"
- (click)="remove()"
- >
- <mat-icon>delete_outline</mat-icon>
- </button>
+                mat-icon-button
+                class="!text-red-700"
+                aria-label="Ta bort"
+                matTooltip="Ta bort"
+                (click)="remove()"
+              >
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             } @else {
               <button mat-stroked-button (click)="restore()">Återställ</button>
             }
@@ -80,6 +81,16 @@ import { ensureValid } from '../../shared/form-guard';
         <section class="rounded-xl bg-white p-5 shadow-sm">
           <div class="mb-2 flex items-center gap-2">
             <h2 class="flex-1 text-base font-semibold">Platser</h2>
+            @if (savedPlaces().length) {
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="printShelves()"
+                matTooltip="Etiketter med QR-kod att sätta på hyllorna, så att de går att skanna"
+              >
+                <mat-icon>print</mat-icon> Hylletiketter
+              </button>
+            }
             @if (admin) {
               <button mat-stroked-button type="button" (click)="addPlace()">
                 <mat-icon>add</mat-icon> Ny plats
@@ -151,6 +162,8 @@ export class WarehouseCard implements OnInit {
   readonly card = signal<Warehouse | null>(null);
 
   readonly places = this.fb.array<FormGroup>([]);
+  /** Platserna som är sparade (de har fått ett id), alltså de som går att skanna. */
+  readonly savedPlaces = computed(() => this.card()?.locations ?? []);
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
     kind: ['own' as WarehouseKind],
@@ -165,6 +178,11 @@ export class WarehouseCard implements OnInit {
 
   private place(id: string | null = null, name = '') {
     return this.fb.nonNullable.group({ id: [id], name: [name, Validators.required] });
+  }
+
+  printShelves() {
+    const w = this.card();
+    if (w) void printShelfLabels(w, w.locations);
   }
 
   addPlace() {

@@ -1,4 +1,12 @@
-import { Component, computed, inject, signal, ElementRef, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+  ElementRef,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
@@ -11,6 +19,7 @@ import { PurchaseCardApi } from '../../core/api/purchase-card-api';
 import { SupplierCatalogApi } from '../../core/api/supplier-catalog-api';
 import { Article, CatalogHit, PurchaseCard, itemKind } from '../../core/models';
 import { Pricing } from '../../core/pricing';
+import { Scanner } from '../../core/scan/scanner';
 import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
 import { QuickArticleDialog } from '../../shared/quick-article-dialog/quick-article-dialog';
@@ -421,6 +430,7 @@ export class PurchaseCardPage implements HasUnsaved {
   private readonly confirm = inject(Confirm);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly scanner = inject(Scanner);
   private readonly searchEl = viewChild<ElementRef<HTMLInputElement>>('searchEl');
   private readonly id = this.route.snapshot.paramMap.get('id');
 
@@ -456,6 +466,9 @@ export class PurchaseCardPage implements HasUnsaved {
   readonly valid = computed(() => this.rows().every((r) => this.qtyOk(r) && r.price >= 0));
 
   constructor() {
+    // En skannad vara läggs till som en rad (en gång till = ett till); en okänd vara blir en ny artikel.
+    const release = this.scanner.capture((code) => void this.onScan(code));
+    inject(DestroyRef).onDestroy(release);
     this.supplierCtl.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.touch());
     this.search.valueChanges
       .pipe(
@@ -511,6 +524,26 @@ export class PurchaseCardPage implements HasUnsaved {
 
   hasUnsaved() {
     return this.dirty();
+  }
+
+  /** Ett inköp tar emot varor: skanningen gäller artikeln. Är kortet bokfört öppnas bara det som skannades. */
+  private async onScan(code: string) {
+    if (this.readOnly()) return this.scanner.openCode(code);
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    if (hit.kind === 'article') {
+      this.api.article(hit.id).subscribe((a) => {
+        this.scanner.beep(true);
+        this.add(a);
+      });
+    } else if (hit.kind === 'none') {
+      // Okänd streckkod: en ny artikel, med koden som namn att ändra.
+      this.scanner.beep(false);
+      this.search.setValue(hit.code);
+      this.newArticle();
+    } else {
+      this.scanner.open(hit);
+    }
   }
 
   touch() {

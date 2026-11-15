@@ -16,6 +16,7 @@ import { Pricing } from '../../pricing';
 import { Billing } from '../../billing/billing';
 import { quickGroupsOf, type QuickAction } from '../../search/quick-actions';
 import { GlobalSearch } from '../../search/global-search';
+import { Scanner } from '../../scan/scanner';
 import { Settings } from '../../settings';
 import { Todo } from '../../todo';
 import { Nav } from '../nav';
@@ -213,6 +214,17 @@ import { Nav } from '../nav';
           >
             <mat-icon>search</mat-icon>
           </button>
+          @if (!auth.isMechanic()) {
+            <button
+              type="button"
+              class="hdr-btn grid place-items-center"
+              (click)="scanner.openDialog()"
+              aria-label="Skanna"
+              matTooltip="Skanna en etikett eller streckkod"
+            >
+              <mat-icon>qr_code_scanner</mat-icon>
+            </button>
+          }
         }
       </div>
     </header>
@@ -232,6 +244,7 @@ export class Shell implements OnDestroy {
   readonly auth = inject(Auth);
   readonly nav = inject(Nav);
   readonly search = inject(GlobalSearch);
+  readonly scanner = inject(Scanner);
   private readonly billing = inject(Billing);
   private readonly todo = inject(Todo);
   /** Det mest brådskande som väntar i varje produkt, för pricken på produktfliken. */
@@ -322,6 +335,7 @@ export class Shell implements OnDestroy {
   /** `/` eller Ctrl/Cmd+K öppnar sökningen, om man inte redan skriver i ett fält. */
   @HostListener('document:keydown', ['$event'])
   onKey(e: KeyboardEvent) {
+    this.scanner.onKey(e);
     const t = e.target as HTMLElement | null;
     const typing = !!t && (/^(input|textarea|select)$/i.test(t.tagName) || t.isContentEditable);
     if (

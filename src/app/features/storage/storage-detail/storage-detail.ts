@@ -1,11 +1,12 @@
 import { vatIn } from '../../../shared/vat';
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { StorageApi } from '../../../core/api/storage-api';
 import { Auth } from '../../../core/auth/auth';
 import { PageTitle } from '../../../core/page-title';
+import { Scanner } from '../../../core/scan/scanner';
 import {
   ACCESSORY_LABELS,
   DEPOSIT_CONDITION_LABELS,
@@ -47,6 +48,36 @@ type Field = [label: string, value: string | number];
         }}</app-pill>
       </div>
 
+      @if (d.status === 'stored' && (placing() || fresh)) {
+        <div class="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-4" role="status">
+          <div class="font-semibold">
+            {{ placing() ? 'Skanna hyllans etikett' : 'Inlämningen är sparad' }}
+          </div>
+          <p class="mt-1 text-sm text-gray-700">
+            @if (placing()) {
+              Håll läsaren mot etiketten på hyllan där setet ska stå. Nu står det:
+              <b>{{ d.location || 'ingen plats' }}</b
+              >.
+            } @else {
+              Nästa steg: skriv ut etiketten och sätt den på hjulsetet. Skanna sedan hyllan där det
+              ställs.
+            }
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button mat-flat-button type="button" (click)="print()">
+              <mat-icon>print</mat-icon> Skriv ut etikett
+            </button>
+            @if (placing()) {
+              <button mat-stroked-button type="button" (click)="stopPlacing()">Klar</button>
+            } @else {
+              <button mat-stroked-button type="button" (click)="startPlacing()">
+                <mat-icon>qr_code_scanner</mat-icon> Skanna hylla
+              </button>
+            }
+          </div>
+        </div>
+      }
+
       <div
         class="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-white shadow-sm p-2"
       >
@@ -67,6 +98,11 @@ type Field = [label: string, value: string | number];
         <button mat-stroked-button (click)="print()">
           <mat-icon>print</mat-icon> Skriv ut etikett
         </button>
+        @if (d.status === 'stored') {
+          <button mat-stroked-button (click)="startPlacing()">
+            <mat-icon>qr_code_scanner</mat-icon> Skanna hylla
+          </button>
+        }
         <span class="mx-1 hidden h-6 border-l sm:block"></span>
         <a mat-button routerLink="edit"><mat-icon>edit</mat-icon> Ändra</a>
         @if (d.paymentStatus === 'unpaid') {
@@ -111,7 +147,7 @@ type Field = [label: string, value: string | number];
     }
   `,
 })
-export class StorageDetail {
+export class StorageDetail implements OnDestroy {
   private readonly api = inject(StorageApi);
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
   private readonly dialog = inject(MatDialog);
@@ -119,6 +155,12 @@ export class StorageDetail {
   private readonly snack = inject(MatSnackBar);
   private readonly kr = new KrPipe();
   private readonly pageTitle = inject(PageTitle);
+  private readonly scanner = inject(Scanner);
+  private release: (() => void) | null = null;
+
+  /** Kommer rakt från en ny inlämning: visar vägen vidare till etikett och hylla. */
+  readonly fresh = inject(ActivatedRoute).snapshot.queryParamMap.has('placera');
+  readonly placing = signal(false);
 
   readonly admin = inject(Auth).isAdmin();
   readonly d = signal<StorageDeposit | null>(null);
@@ -132,6 +174,43 @@ export class StorageDetail {
       this.d.set(x);
       this.pageTitle.page.set(`${x.vehicle.regNo} · ${x.customer.name}`);
     });
+  }
+
+  /** Nästa skanning är en hylla: setet placeras där. */
+  startPlacing() {
+    if (this.release) return;
+    this.placing.set(true);
+    this.release = this.scanner.capture((code) => void this.place(code));
+  }
+
+  stopPlacing() {
+    this.release?.();
+    this.release = null;
+    this.placing.set(false);
+  }
+
+  ngOnDestroy() {
+    this.release?.();
+  }
+
+  private async place(code: string) {
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    if (hit.kind !== 'location' || hit.warehouseKind !== 'customer') {
+      this.scanner.beep(false);
+      this.snack.open('Det där är inte en hylla i däckhotellet.', undefined, { duration: 3500 });
+      return;
+    }
+    this.api
+      .update(this.id, { warehouseId: hit.warehouseId, locationId: hit.locationId })
+      .subscribe({
+        next: (x) => {
+          this.d.set(x);
+          this.scanner.beep(true);
+          this.snack.open(`Placerad på ${hit.label}`, undefined, { duration: 3000 });
+        },
+        error: () => this.scanner.beep(false),
+      });
   }
 
   sections(d: StorageDeposit): { title: string; fields: Field[] }[] {

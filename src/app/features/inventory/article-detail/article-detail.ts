@@ -183,7 +183,7 @@ export class ArticleDetail {
   }
 
   printLabel(a: Article) {
-    printTyres([a], 'labels');
+    void printTyres([a], 'labels');
   }
 
   fill(a: Article) {
