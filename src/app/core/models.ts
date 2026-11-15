@@ -1731,6 +1731,8 @@ export interface WorkOrder {
   doneAt?: string | null;
   /** Ett överenskommet pris för hela ordern, öre i orderns prisläge. Syns aldrig på arbetsbladet. */
   price: number | null;
+  /** Rabatt på hela ordern: procent eller öre. Syns aldrig på arbetsbladet. */
+  discount?: { type: 'percent' | 'amount'; value: number } | null;
   priceNote: string | null;
   /** Priserna på ordern är inkl. moms (standard) eller exkl. moms. */
   pricesIncludeVat?: boolean;
@@ -1823,6 +1825,7 @@ export interface WorkOrderInput {
   receivedAt: string;
   pickupAt: string | null;
   price: number | null;
+  discount?: { type: 'percent' | 'amount'; value: number } | null;
   priceNote: string | null;
   performed: string | null;
   warranty: string | null;

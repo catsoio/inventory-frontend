@@ -670,6 +670,44 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                 }
               </div>
               <div class="ml-auto w-full max-w-sm text-sm">
+                <div class="flex items-center justify-between gap-3 py-1 text-gray-600">
+                  <span>Rabatt på ordern</span>
+                  <span
+                    class="inline-flex h-8 items-center overflow-hidden rounded-md border border-gray-300 text-sm focus-within:border-teal-700"
+                  >
+                    <input
+                      class="h-full w-20 bg-transparent px-2 text-right outline-none"
+                      type="number"
+                      inputmode="decimal"
+                      min="0"
+                      placeholder="0"
+                      aria-label="Rabatt på hela ordern"
+                      formControlName="discountValue"
+                    />
+                    <button
+                      type="button"
+                      class="h-full w-8 border-l border-gray-300"
+                      aria-label="Kronor"
+                      [disabled]="locked()"
+                      [class.bg-teal-700]="form.controls.discountType.value === 'amount'"
+                      [class.text-white]="form.controls.discountType.value === 'amount'"
+                      (click)="setDiscountType('amount')"
+                    >
+                      kr
+                    </button>
+                    <button
+                      type="button"
+                      class="h-full w-8 border-l border-gray-300"
+                      aria-label="Procent"
+                      [disabled]="locked()"
+                      [class.bg-teal-700]="form.controls.discountType.value === 'percent'"
+                      [class.text-white]="form.controls.discountType.value === 'percent'"
+                      (click)="setDiscountType('percent')"
+                    >
+                      %
+                    </button>
+                  </span>
+                </div>
                 @if (live().totals.discount !== 0) {
                   <div class="flex justify-between py-0.5 text-gray-600">
                     <span>Före rabatt</span><span>{{ live().totals.gross | kr }}</span>
@@ -1033,6 +1071,8 @@ export class WorkOrderCard implements OnInit {
       status: ['open' as WorkOrderStatus],
       ...whenValue(nextHour(), new Date(nextHour().getTime() + 3600_000)),
       price: [null as number | null, Validators.min(0)],
+      discountValue: [null as number | null, Validators.min(0)],
+      discountType: ['amount' as 'amount' | 'percent'],
       priceNote: [''],
       performed: [''],
       warranty: [''],
@@ -1066,6 +1106,21 @@ export class WorkOrderCard implements OnInit {
     this.version();
     return ore(this.form.controls.price.value);
   });
+
+  /** Rabatt på hela ordern: kronor (öre) eller procent, eller null. */
+  private readonly orderDiscount = computed(() => {
+    this.version();
+    const v = this.form.controls.discountValue.value;
+    if (!v || v <= 0) return null;
+    return this.form.controls.discountType.value === 'percent'
+      ? { type: 'percent' as const, value: Math.min(v, 100) }
+      : { type: 'amount' as const, value: ore(v) ?? 0 };
+  });
+
+  setDiscountType(type: 'amount' | 'percent') {
+    this.form.patchValue({ discountType: type });
+    this.form.markAsDirty();
+  }
 
   /**
    * Priset medan man skriver, med samma motor som backend: radernas rabatt, jobbens fasta
@@ -1108,7 +1163,8 @@ export class WorkOrderCard implements OnInit {
         index = [];
       }
     }
-    const list = rowAmounts(rows, null, groups);
+    const discount = this.orderDiscount();
+    const list = rowAmounts(rows, discount, groups);
     const amounts: Record<number, number> = {};
     index.forEach((i, k) => (amounts[i] = list[k]));
     const jobTotals: Record<string, number> = {};
@@ -1119,7 +1175,7 @@ export class WorkOrderCard implements OnInit {
       amounts,
       jobTotals,
       fee,
-      totals: totalsOf(rows, null, {
+      totals: totalsOf(rows, discount, {
         pricesIncludeVat: incl,
         roundToKrona: this.card()?.roundToKrona ?? s.roundToKrona,
         groups,
@@ -1706,6 +1762,12 @@ export class WorkOrderCard implements OnInit {
           o.pickupAt ? new Date(o.pickupAt) : new Date(new Date(o.receivedAt).getTime() + 3600_000),
         ),
         price: kr(o.price),
+        discountValue: o.discount
+          ? o.discount.type === 'amount'
+            ? o.discount.value / 100
+            : o.discount.value
+          : null,
+        discountType: o.discount?.type ?? 'amount',
         priceNote: o.priceNote ?? '',
         performed: o.performed ?? '',
         warranty: o.warranty ?? '',
@@ -1759,6 +1821,7 @@ export class WorkOrderCard implements OnInit {
       receivedAt: whenRange(v)!.start.toISOString(),
       pickupAt: whenRange(v)!.end.toISOString(),
       price: ore(v.price),
+      discount: this.orderDiscount(),
       priceNote: v.priceNote || null,
       performed: v.performed || null,
       warranty: v.warranty || null,

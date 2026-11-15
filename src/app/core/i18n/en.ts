@@ -303,6 +303,7 @@ export const EN: Record<string, string> = {
   'Ta bort raden': 'Delete line',
   'Ta bort rad': 'Delete line',
   'Före rabatt': 'Before discount',
+  'Rabatt på ordern': 'Order discount',
   'Moms räknas per momssats på summan av raderna och avrundas till hela ören.':
     'VAT is calculated per rate on the sum of the lines and rounded to whole öre.',
   'inkl. moms': 'incl. VAT',
