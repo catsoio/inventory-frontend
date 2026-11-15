@@ -45,8 +45,14 @@ export interface ToInvoiceSummary {
   amount: number;
 }
 
+/** Det som behövs av en kund med order att fakturera (hela `UnbilledCustomer` eller en förminskad version). */
+export interface ToInvoiceInput {
+  customer: Pick<UnbilledCustomer['customer'], 'collectiveInvoice'>;
+  orders: (Pick<UnbilledOrder, 'doneAt' | 'total'> & { card: object | null })[];
+}
+
 export function toInvoiceSummary(
-  customers: UnbilledCustomer[],
+  customers: ToInvoiceInput[],
   today: Date = new Date(),
 ): ToInvoiceSummary {
   const out: ToInvoiceSummary = { due: 0, late: 0, amount: 0 };

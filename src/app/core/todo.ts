@@ -1,20 +1,15 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { catchError, of } from 'rxjs';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { debounceTime, filter, finalize, fromEvent, throttleTime } from 'rxjs';
 import { kronor } from '../shared/chart/chart-kit';
 import { CarTodo, carTodo } from '../shared/car-stock';
 import { invoiceStatus } from '../shared/invoice-status';
 import { type ToInvoiceSummary, toInvoiceSummary } from '../shared/to-invoice';
-import { AxleApi } from './api/axle-api';
-import { BookingApi } from './api/booking-api';
-import { CarApi } from './api/car-api';
-import { QuoteApi } from './api/quote-api';
-import { SalesCardApi } from './api/sales-card-api';
-import { StorageApi } from './api/storage-api';
-import { WorkOrderApi } from './api/work-order-api';
+import { ApiCache } from './api/api-cache';
+import { TodoApi } from './api/todo-api';
 import { Auth } from './auth/auth';
 import type { Product } from './layout/products';
-import { StorageSummary, Summary } from './models';
-import { environment } from '../../environments/environment';
+import { StorageSummary, Summary, TodoSnapshot, UnpaidSnapshot } from './models';
 
 /**
  * Hur brådskande något är. Det är hela färgskalan i appen:
@@ -398,50 +393,94 @@ export function todoBadges(items: TodoItem[]): Record<string, Badge> {
   return out;
 }
 
+/** Obetalda fakturor ur det servern skickar: hur många som förfallit avgörs här, som överallt. */
+export function unpaidOf(x: UnpaidSnapshot, today = new Date()): UnpaidInvoices {
+  return {
+    unpaid: x.total,
+    overdue: x.items.filter(
+      (c) =>
+        invoiceStatus({ kind: c.kind ?? 'invoice', dueAt: c.dueAt, paidAt: c.paidAt }, today) ===
+        'overdue',
+    ).length,
+    amount: x.items.reduce((t, c) => t + c.total, 0),
+    more: x.total > x.items.length,
+  };
+}
+
 /**
- * Hämtar det som väntar och håller listan (`items`). Används av menyn och av Hem. Siffrorna som kräver
- * rättigheter hämtas bara för dem som får se dem (personal får 403 på ägarens), och mekanikern har
- * inga.
+ * Det servern samlat, som `buildTodo` läser det. En del som servern inte gett (`null`: modulen är av eller
+ * rollen saknar rätt) blir tom och visar ingenting.
+ */
+export function todoInputOf(s: TodoSnapshot, today = new Date()): TodoInput {
+  return {
+    stock: s.stock,
+    hotel: s.hotel,
+    drafts: s.drafts ?? 0,
+    toInvoice: s.toInvoice ? toInvoiceSummary(s.toInvoice.customers, today) : null,
+    invoices: s.invoices ? unpaidOf(s.invoices, today) : null,
+    partsOrders: s.partsOrders ?? 0,
+    quotes: s.quotes ?? { approved: 0, waiting: 0 },
+    requests: s.requests ?? 0,
+    cars: s.cars ? carTodo(s.cars, today) : undefined,
+    hallDrafts: s.hallDrafts ?? 0,
+    hallInvoices: s.hallInvoices ? unpaidOf(s.hallInvoices, today) : null,
+  };
+}
+
+/** Så gammal får listan vara när man byter sida innan den hämtas om. */
+const STALE_AFTER = 30_000;
+/** Och när man kommer tillbaka till fliken. */
+const STALE_ON_FOCUS = 60_000;
+
+/**
+ * Håller det som väntar (`items`) och hämtar det i ETT anrop (`GET inventory/todo`). Används av menyn och av
+ * Hem. Mekanikern har inga siffror (servern svarar 403), och ägarens pengar kommer bara till ägaren.
+ *
+ * Hämtas om: när garaget byts, när man byter sida och listan är äldre än en halv minut, när man kommer
+ * tillbaka till fliken, och en liten stund efter att något ändrats härifrån (så siffran följer det man
+ * just gjort). Misslyckas ett anrop står den senaste listan kvar.
  */
 @Injectable({ providedIn: 'root' })
 export class Todo {
   private readonly auth = inject(Auth);
-  private readonly inventory = inject(AxleApi);
-  private readonly storage = inject(StorageApi);
-  private readonly orders = inject(WorkOrderApi);
-  private readonly cards = inject(SalesCardApi);
-  private readonly quoteApi = inject(QuoteApi);
-  private readonly bookingApi = inject(BookingApi);
-  private readonly carApi = inject(CarApi);
+  private readonly api = inject(TodoApi);
 
-  private readonly stock = signal<Summary | null>(null);
-  private readonly hotel = signal<StorageSummary | null>(null);
-  private readonly drafts = signal(0);
-  private readonly toInvoice = signal<ToInvoiceSummary | null>(null);
-  private readonly partsOrders = signal(0);
-  private readonly approved = signal(0);
-  private readonly waiting = signal(0);
-  private readonly requests = signal(0);
-  private readonly cars = signal<CarTodo | undefined>(undefined);
-  private readonly hallDrafts = signal(0);
-  private readonly invoices = signal<TodoInput['invoices']>(null);
-  private readonly hallInvoices = signal<TodoInput['hallInvoices']>(null);
-
-  readonly items = computed(() =>
-    buildTodo({
-      stock: this.stock(),
-      hotel: this.hotel(),
-      drafts: this.drafts(),
-      toInvoice: this.toInvoice(),
-      invoices: this.invoices(),
-      partsOrders: this.partsOrders(),
-      quotes: { approved: this.approved(), waiting: this.waiting() },
-      requests: this.requests(),
-      cars: this.cars(),
-      hallDrafts: this.hallDrafts(),
-      hallInvoices: this.hallInvoices(),
-    }),
+  private readonly state = signal<{ snapshot: TodoSnapshot; at: number; input: TodoInput } | null>(
+    null,
   );
+  private inflight = false;
+  private again = false;
+
+  constructor() {
+    const destroyed = inject(DestroyRef);
+    // Efter en ändring härifrån: en omräkning efter en kort paus, högst en var tionde sekund.
+    inject(ApiCache)
+      .writes$.pipe(
+        filter((path) => !path.startsWith('inventory/todo')),
+        debounceTime(800),
+        throttleTime(10_000, undefined, { leading: true, trailing: true }),
+        takeUntilDestroyed(destroyed),
+      )
+      .subscribe(() => this.refresh());
+    fromEvent(document, 'visibilitychange')
+      .pipe(
+        filter(() => document.visibilityState === 'visible'),
+        takeUntilDestroyed(destroyed),
+      )
+      .subscribe(() => this.refreshIfStale(STALE_ON_FOCUS));
+  }
+
+  readonly items = computed(() => {
+    const s = this.state();
+    return s ? buildTodo(s.input) : [];
+  });
+
+  // Delar av svaret som Hem visar som egna nyckeltal, så att de inte hämtas en gång till.
+  readonly stock = computed(() => this.state()?.snapshot.stock ?? null);
+  readonly hotel = computed(() => this.state()?.snapshot.hotel ?? null);
+  readonly drafts = computed(() => this.state()?.input.drafts ?? 0);
+  readonly invoices = computed(() => this.state()?.input.invoices ?? null);
+  readonly hallInvoices = computed(() => this.state()?.input.hallInvoices ?? null);
 
   /** Det som väntar i en produkt. Menyn och Hem visar bara den produktens saker. */
   itemsFor(product: Product): TodoItem[] {
@@ -460,92 +499,42 @@ export class Todo {
     return { axle: worst('axle'), hall: worst('hall') };
   });
 
-  /** Lager och hotell hämtade, så att "Allt under kontroll" inte visas innan svaret kommit. */
-  readonly ready = computed(() => this.stock() !== null && this.hotel() !== null);
+  /** Listan har hämtats, så att "Allt under kontroll" inte visas innan svaret kommit. */
+  readonly ready = computed(() => this.state() !== null);
 
-  private get admin(): boolean {
-    return this.auth.isAdmin() || this.auth.isSuperAdmin();
-  }
-
-  /**
-   * `hall` = garaget har bilhandel (modulen är påslagen). Todo känner inte till abonnemanget, så den
-   * som anropar säger det; utan bilhandel hämtas inga bilar och inga bilaffärer.
-   */
-  refresh(hall = false): void {
+  /** Hämtar listan nu. Ett anrop i taget: kommer en ny fråga medan en pågår tas den efteråt. */
+  refresh(): void {
     // Mekanikern har inga lager- eller hotellsiffror att visa (och skulle få 403).
     if (this.auth.isMechanic() || !this.auth.garage()) return;
-    this.inventory
-      .summary()
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.stock.set(x));
-    this.storage
-      .summary()
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.hotel.set(x));
-    this.cards
-      .list({ status: 'draft', product: 'axle', limit: 1 })
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.drafts.set(x?.pagination.total ?? 0));
-    // Förfrågningar från bokningssidan, de närmaste två månaderna (så långt kalendern läser åt gången).
-    const now = new Date();
-    this.bookingApi
-      .between(now, new Date(now.getTime() + 60 * 24 * 3600 * 1000))
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.requests.set(x?.filter((b) => b.status === 'requested').length ?? 0));
-    // Bilhandeln: utan modulen svarar servern 402 (tyst) och inget av det här visas.
-    if (hall) {
-      this.carApi
-        .list()
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => this.cars.set(x ? carTodo(x) : undefined));
-      this.cards
-        .list({ status: 'draft', product: 'hall', limit: 1 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => this.hallDrafts.set(x?.pagination.total ?? 0));
+    if (this.inflight) {
+      this.again = true;
+      return;
     }
-    if (environment.workOrders) {
-      // Levererat ej fakturerat: klara order som ingen faktura är påbörjad för.
-      this.cards
-        .toInvoice()
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => this.toInvoice.set(x ? toInvoiceSummary(x.customers) : null));
-      this.orders
-        .list({ needsAction: true, limit: 1 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => this.partsOrders.set(x?.pagination.total ?? 0));
-      const quotes = (status: 'given' | 'approved') =>
-        this.quoteApi.list({ status, limit: 100 }).pipe(catchError(() => of(null)));
-      // Ett lämnat förslag efter sista giltighetsdag (`expired`) väntar inte längre på svar.
-      quotes('given').subscribe((x) =>
-        this.waiting.set(x?.items.filter((q) => q.shownStatus === 'given').length ?? 0),
-      );
-      quotes('approved').subscribe((x) =>
-        this.approved.set(x?.items.filter((q) => !q.workOrderId).length ?? 0),
-      );
-    }
-    if (!this.admin) return;
-    // Pengarna är bara för ägare.
-    const unpaid = (product: 'axle' | 'hall', set: (v: UnpaidInvoices | null) => void) =>
-      this.cards
-        .list({ status: 'posted', paid: false, product, limit: 100 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) => {
-          if (!x) return set(null);
-          const today = new Date();
-          set({
-            unpaid: x.pagination.total,
-            overdue: x.items.filter(
-              (c) =>
-                invoiceStatus(
-                  { kind: c.kind ?? 'invoice', dueAt: c.dueAt, paidAt: c.paidAt },
-                  today,
-                ) === 'overdue',
-            ).length,
-            amount: x.items.reduce((t, c) => t + c.total, 0),
-            more: x.pagination.total > x.items.length,
-          });
-        });
-    unpaid('axle', (v) => this.invoices.set(v));
-    if (hall) unpaid('hall', (v) => this.hallInvoices.set(v));
+    this.inflight = true;
+    this.api
+      .snapshot()
+      .pipe(
+        finalize(() => {
+          this.inflight = false;
+          if (this.again) {
+            this.again = false;
+            this.refresh();
+          }
+        }),
+      )
+      .subscribe({
+        next: (snapshot) => {
+          const now = Date.now();
+          this.state.set({ snapshot, at: now, input: todoInputOf(snapshot, new Date(now)) });
+        },
+        // Det som redan visas står kvar.
+        error: () => {},
+      });
+  }
+
+  /** Hämtar om listan om den är äldre än `maxAge` ms (eller inte hämtats alls). */
+  refreshIfStale(maxAge = STALE_AFTER): void {
+    const s = this.state();
+    if (!s || Date.now() - s.at > maxAge) this.refresh();
   }
 }

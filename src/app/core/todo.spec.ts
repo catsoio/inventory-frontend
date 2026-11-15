@@ -1,5 +1,5 @@
-import { buildTodo, todoBadges, type TodoInput } from './todo';
-import type { StorageSummary, Summary } from './models';
+import { buildTodo, todoBadges, todoInputOf, type TodoInput } from './todo';
+import type { StorageSummary, Summary, TodoSnapshot } from './models';
 import type { CarTodo } from '../shared/car-stock';
 
 const hotel = (over: Partial<StorageSummary> = {}): StorageSummary => ({
@@ -231,5 +231,113 @@ describe('att fakturera (levererat ej fakturerat)', () => {
 
   it('inget när allt som är klart antingen är fakturerat eller väntar på månadens samlingsfaktura', () => {
     expect(todoBadges(buildTodo(input({ toInvoice: { due: 0, late: 0, amount: 0 } })))).toEqual({});
+  });
+});
+
+describe('serverns svar blir listan', () => {
+  const today = new Date('2026-11-15T10:00:00');
+  const empty: TodoSnapshot = {
+    stock: null,
+    hotel: null,
+    drafts: null,
+    requests: null,
+    partsOrders: null,
+    quotes: null,
+    toInvoice: null,
+    cars: null,
+    hallDrafts: null,
+    invoices: null,
+    hallInvoices: null,
+  };
+
+  it('en del som servern inte gett (modulen är av) ger inget i menyn', () => {
+    expect(todoBadges(buildTodo(todoInputOf(empty, today)))).toEqual({});
+  });
+
+  it('förfallna fakturor räknas här, av förfallodatumet, inte av servern', () => {
+    const input = todoInputOf(
+      {
+        ...empty,
+        invoices: {
+          total: 3,
+          items: [
+            { kind: 'invoice', dueAt: '2026-11-01', paidAt: null, total: 100000 },
+            { kind: 'invoice', dueAt: '2026-11-30', paidAt: null, total: 50000 },
+            { kind: 'invoice', dueAt: '2026-10-01', paidAt: null, total: 25000 },
+          ],
+        },
+      },
+      today,
+    );
+    expect(input.invoices).toEqual({ unpaid: 3, overdue: 2, amount: 175000, more: false });
+    expect(todoBadges(buildTodo(input))['/finance/invoices'].text).toBe('2 förfallna');
+  });
+
+  it('"+" när fler fakturor finns än de hundra som skickas', () => {
+    const items = Array.from({ length: 100 }, () => ({
+      kind: 'invoice' as const,
+      dueAt: '2026-12-01',
+      paidAt: null,
+      total: 1,
+    }));
+    expect(todoInputOf({ ...empty, invoices: { total: 130, items } }, today).invoices?.more).toBe(
+      true,
+    );
+  });
+
+  it('order att fakturera: samlingskunden väntar på månadens slut, de andra ska faktureras nu', () => {
+    const input = todoInputOf(
+      {
+        ...empty,
+        toInvoice: {
+          customers: [
+            {
+              customer: { collectiveInvoice: true },
+              orders: [{ doneAt: '2026-11-05T09:00:00', total: 100, card: null }],
+            },
+            {
+              customer: { collectiveInvoice: false },
+              orders: [
+                { doneAt: '2026-11-05T09:00:00', total: 200, card: null },
+                // Ligger redan på ett utkast: räknas som utkast, inte här.
+                { doneAt: '2026-11-05T09:00:00', total: 400, card: { id: 'c1' } },
+              ],
+            },
+          ],
+        },
+      },
+      today,
+    );
+    expect(input.toInvoice).toEqual({ due: 1, late: 0, amount: 200 });
+  });
+
+  it('bilflaggorna räknas ur de få fält servern skickar', () => {
+    const input = todoInputOf(
+      {
+        ...empty,
+        cars: [
+          {
+            status: 'draft',
+            createdAt: '2026-10-01T00:00:00.000Z',
+            soldAt: null,
+            inspectionDue: null,
+            // Köpt utan moms och utan uppgift om säljaren (VMB), och inte utlagd på mer än 14 dagar.
+            purchase: { vatRate: 0, date: '2026-10-01', seller: null, sellerId: null },
+          },
+        ],
+      },
+      today,
+    );
+    expect(input.cars).toEqual({ sellersMissing: 1, idle: 0, inspectionSoon: 0, unlisted: 1 });
+  });
+
+  it('utkast, förfrågningar och order som väntar på del kommer med', () => {
+    const items = buildTodo(
+      todoInputOf({ ...empty, drafts: 2, requests: 1, partsOrders: 3, hallDrafts: 1 }, today),
+    );
+    const keys = items.map((i) => i.key);
+    expect(keys).toEqual(
+      expect.arrayContaining(['drafts', 'booking-requests', 'parts', 'hall-drafts']),
+    );
   });
 });

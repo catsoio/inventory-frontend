@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import type { CarListing, ListingInquiry } from '../core/models';
+import type { CarFlagFacts, CarListing, ListingInquiry } from '../core/models';
 
 /** Över så här många dagar i lager vill bilhandlaren göra något åt bilen (sänka priset, annonsera om). */
 export const IDLE_DAYS = 90;
@@ -24,14 +24,14 @@ export const ageBand = (days: number): AgeBand =>
   days >= IDLE_DAYS ? 'stale' : days >= WATCH_DAYS ? 'old' : days >= 30 ? 'normal' : 'fresh';
 
 /** Bilen finns kvar hos handlaren (inköpt, till salu eller reserverad). */
-export const inStock = (c: Pick<CarListing, 'status'>) => c.status !== 'sold';
+export const inStock = (c: Pick<CarFlagFacts, 'status'>) => c.status !== 'sold';
 
 /**
  * Dagar i lager (standtid): från dagen bilen köptes in (annars dagen den lades in) till idag, eller
  * till dagen den såldes. Kalenderdagar, aldrig millisekunder delat på 24 timmar.
  */
 export function daysInStock(
-  c: Pick<CarListing, 'status' | 'purchase' | 'createdAt' | 'soldAt'>,
+  c: Pick<CarFlagFacts, 'status' | 'purchase' | 'createdAt' | 'soldAt'>,
   today = new Date(),
 ): number {
   const from = parseISO(c.purchase?.date ?? c.createdAt);
@@ -140,7 +140,7 @@ export const CAR_FLAGS: Record<CarFlag, string> = {
   unlisted: `är inköpta men inte utlagda till salu på ${UNLISTED_DAYS} dagar`,
 };
 
-export function matchesFlag(flag: CarFlag, c: CarListing, today = new Date()): boolean {
+export function matchesFlag(flag: CarFlag, c: CarFlagFacts, today = new Date()): boolean {
   switch (flag) {
     // Köpt utan moms (VMB): namn och nummer på säljaren måste finnas.
     case 'sellers':
@@ -168,7 +168,7 @@ export type CarTodo = {
   unlisted: number;
 };
 
-export function carTodo(cars: CarListing[], today = new Date()): CarTodo {
+export function carTodo(cars: CarFlagFacts[], today = new Date()): CarTodo {
   const n = (flag: CarFlag) => cars.filter((c) => matchesFlag(flag, c, today)).length;
   return {
     sellersMissing: n('sellers'),

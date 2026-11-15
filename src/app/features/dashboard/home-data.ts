@@ -1,10 +1,8 @@
-import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, of } from 'rxjs';
 import { BookingApi } from '../../core/api/booking-api';
 import { AxleApi } from '../../core/api/axle-api';
-import { SalesCardApi } from '../../core/api/sales-card-api';
-import { StorageApi } from '../../core/api/storage-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { Auth } from '../../core/auth/auth';
@@ -49,8 +47,6 @@ export class HomeData {
   private readonly auth = inject(Auth);
   private readonly bookingApi = inject(BookingApi);
   private readonly inventory = inject(AxleApi);
-  private readonly storage = inject(StorageApi);
-  private readonly cards = inject(SalesCardApi);
   private readonly orderApi = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly insights = inject(Insights);
@@ -66,16 +62,20 @@ export class HomeData {
   /** Klockan, uppdaterad varje minut så att "kvar" och "nästa" följer dagen. */
   readonly now = signal(Date.now());
 
-  readonly summary = signal<Summary | null>(null);
-  readonly hotel = signal<StorageSummary | null>(null);
+  // Lager, hotell, utkast och obetalt kommer ur samma svar som menyns siffror (`Todo`): inget eget anrop.
+  readonly summary: Signal<Summary | null> = this.todo.stock;
+  readonly hotel: Signal<StorageSummary | null> = this.todo.hotel;
   readonly deposits = signal<StorageDeposit[]>([]);
   readonly depositsLoaded = signal(false);
   readonly resources = signal<Resource[]>([]);
   /** Alla bokningar från idag och 14 dagar framåt (inte avbokade). */
   readonly bookings = signal<Booking[]>([]);
   readonly bookingsLoaded = signal(false);
-  readonly drafts = signal(0);
-  readonly unpaid = signal<{ count: number; amount: number; more: boolean } | null>(null);
+  readonly drafts: Signal<number> = this.todo.drafts;
+  readonly unpaid = computed(() => {
+    const i = this.todo.invoices();
+    return i ? { count: i.unpaid, amount: i.amount, more: i.more } : null;
+  });
 
   // Bara datorvyn
   readonly orders = signal<WorkOrder[]>([]);
@@ -176,14 +176,6 @@ export class HomeData {
   // --- hämtning ---
 
   private loadCore() {
-    this.inventory
-      .summary()
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.summary.set(x));
-    this.storage
-      .summary()
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.hotel.set(x));
     this.insights
       .storedDeposits()
       .pipe(catchError(() => of([] as StorageDeposit[])))
@@ -196,26 +188,6 @@ export class HomeData {
       .pipe(catchError(() => of([] as Resource[])))
       .subscribe((x) => this.resources.set(x));
     this.loadBookings();
-    this.cards
-      .list({ status: 'draft', product: 'axle', limit: 1 })
-      .pipe(catchError(() => of(null)))
-      .subscribe((x) => this.drafts.set(x?.pagination.total ?? 0));
-    if (this.admin) {
-      this.cards
-        .list({ status: 'posted', paid: false, product: 'axle', limit: 100 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) =>
-          this.unpaid.set(
-            x
-              ? {
-                  count: x.pagination.total,
-                  amount: x.items.reduce((t, c) => t + c.total, 0),
-                  more: x.pagination.total > x.items.length,
-                }
-              : null,
-          ),
-        );
-    }
   }
 
   /** Arbetsorder och pengar: bara datorvyn behöver dem. */

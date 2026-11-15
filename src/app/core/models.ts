@@ -597,6 +597,37 @@ export interface StorageSummary {
   overdue: number;
 }
 
+/** Obetalda fakturor: hur många det finns och de 100 första med det som behövs för att bedöma dem. */
+export interface UnpaidSnapshot {
+  total: number;
+  items: { kind: InvoiceKind | null; dueAt: string | null; paidAt: string | null; total: number }[];
+}
+
+/**
+ * Allt "Att göra" och menyns siffror räknas av, i ett svar (`GET inventory/todo`). Servern samlar
+ * bara; vad som är sent eller väntar avgörs i `core/todo.ts`. `null` = garaget får inte använda
+ * delen (modulen är av, eller rollen saknar rätt) och inget visas för den.
+ */
+export interface TodoSnapshot {
+  stock: Summary | null;
+  hotel: StorageSummary | null;
+  drafts: number | null;
+  requests: number | null;
+  partsOrders: number | null;
+  quotes: { approved: number; waiting: number } | null;
+  toInvoice: {
+    customers: {
+      customer: { collectiveInvoice: boolean };
+      orders: { doneAt: string; total: number; card: { id: string } | null }[];
+    }[];
+  } | null;
+  /** Bilhandelns bilar, bara det flaggorna läses ur (`CarFlagFacts`). */
+  cars: CarFlagFacts[] | null;
+  hallDrafts: number | null;
+  invoices: UnpaidSnapshot | null;
+  hallInvoices: UnpaidSnapshot | null;
+}
+
 // --- Bokföring (periodstängning) ---
 
 export type ClosingKind = 'period' | 'reset';
@@ -2509,6 +2540,11 @@ export interface CarEconomy {
   marginPercent: number | null;
   markupPercent: number | null;
 }
+
+/** Det en bil behöver för att man ska se vilka flaggor den bär (`matchesFlag`); resten behövs inte. */
+export type CarFlagFacts = Pick<CarListing, 'status' | 'createdAt' | 'soldAt' | 'inspectionDue'> & {
+  purchase: Pick<CarPurchase, 'vatRate' | 'date' | 'seller' | 'sellerId'> | null;
+};
 
 /** En bil till salu, som personalen ser den. Priset är öre; null = pris på förfrågan. */
 export interface CarListing {

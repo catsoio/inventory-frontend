@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { ApiCache } from './api-cache';
 import {
   BlocketStatus,
   CarInfoStatus,
@@ -38,6 +39,7 @@ function toParams(obj: object): HttpParams {
 @Injectable({ providedIn: 'root' })
 export class WorkshopApi {
   private readonly http = inject(HttpClient);
+  private readonly cache = inject(ApiCache);
   private readonly base = `${environment.apiUrl}/inventory`;
 
   // --- kunder ---
@@ -171,10 +173,16 @@ export class WorkshopApi {
 
   // --- mekaniker och platser ---
 
+  /** Delas mellan alla som frågar: mekaniker och platser ändras sällan men läses överallt. */
   resources(includeArchived = false): Observable<Resource[]> {
-    return this.http.get<Resource[]>(`${this.base}/resources`, {
-      params: toParams({ includeArchived }),
-    });
+    return this.cache.get(
+      `resources:${includeArchived}`,
+      () =>
+        this.http.get<Resource[]>(`${this.base}/resources`, {
+          params: toParams({ includeArchived }),
+        }),
+      { tags: ['inventory/resources'] },
+    );
   }
 
   createResource(body: Partial<Resource>): Observable<Resource> {
@@ -192,9 +200,14 @@ export class WorkshopApi {
   // --- åtgärder ---
 
   serviceTypes(includeArchived = false): Observable<ServiceType[]> {
-    return this.http.get<ServiceType[]>(`${this.base}/service-types`, {
-      params: toParams({ includeArchived }),
-    });
+    return this.cache.get(
+      `service-types:${includeArchived}`,
+      () =>
+        this.http.get<ServiceType[]>(`${this.base}/service-types`, {
+          params: toParams({ includeArchived }),
+        }),
+      { tags: ['inventory/service-types'] },
+    );
   }
 
   createServiceType(body: Partial<ServiceType>): Observable<ServiceType> {

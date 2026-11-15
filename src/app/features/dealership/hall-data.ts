@@ -2,7 +2,6 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { format, startOfMonth } from 'date-fns';
 import { catchError, of } from 'rxjs';
 import { CarApi } from '../../core/api/car-api';
-import { SalesCardApi } from '../../core/api/sales-card-api';
 import { Auth } from '../../core/auth/auth';
 import { CarListing } from '../../core/models';
 import { Todo } from '../../core/todo';
@@ -26,7 +25,6 @@ import type { Attention } from '../dashboard/home-data';
 @Injectable()
 export class HallData {
   private readonly api = inject(CarApi);
-  private readonly cards = inject(SalesCardApi);
   private readonly todo = inject(Todo);
   private readonly auth = inject(Auth);
 
@@ -35,7 +33,11 @@ export class HallData {
 
   readonly cars = signal<CarListing[]>([]);
   readonly loaded = signal(false);
-  readonly unpaid = signal<{ count: number; amount: number; more: boolean } | null>(null);
+  /** Obetalda bilaffärer: samma svar som menyns siffror (`Todo`). */
+  readonly unpaid = computed(() => {
+    const i = this.todo.hallInvoices();
+    return i ? { count: i.unpaid, amount: i.amount, more: i.more } : null;
+  });
 
   private readonly today = new Date();
 
@@ -101,21 +103,5 @@ export class HallData {
         this.cars.set(l);
         this.loaded.set(true);
       });
-    if (this.admin) {
-      this.cards
-        .list({ status: 'posted', paid: false, product: 'hall', limit: 100 })
-        .pipe(catchError(() => of(null)))
-        .subscribe((x) =>
-          this.unpaid.set(
-            x
-              ? {
-                  count: x.pagination.total,
-                  amount: x.items.reduce((t, c) => t + c.total, 0),
-                  more: x.pagination.total > x.items.length,
-                }
-              : null,
-          ),
-        );
-    }
   }
 }

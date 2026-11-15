@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { ApiCache } from './api-cache';
 import {
   PricingSettings,
   StorageDefaults,
@@ -55,16 +56,23 @@ export interface CompanySettings {
 @Injectable({ providedIn: 'root' })
 export class AxleApi {
   private readonly http = inject(HttpClient);
+  private readonly cache = inject(ApiCache);
   private readonly base = `${API_URL}/inventory`;
 
   /** Verkstadens uppgifter på faktura och kvitto. */
   seller(): Observable<SellerDetails> {
-    return this.http.get<SellerDetails>(`${this.base}/seller`);
+    return this.cache.get('seller', () => this.http.get<SellerDetails>(`${this.base}/seller`), {
+      tags: ['inventory/seller'],
+    });
   }
 
   /** Företagets gemensamma standardvärden (gäller alla användare). */
   companySettings(): Observable<CompanySettings> {
-    return this.http.get<CompanySettings>(`${this.base}/settings`);
+    return this.cache.get(
+      'settings',
+      () => this.http.get<CompanySettings>(`${this.base}/settings`),
+      { tags: ['inventory/settings'] },
+    );
   }
 
   saveCompanySettings(body: Partial<CompanySettings>): Observable<CompanySettings> {
@@ -73,7 +81,11 @@ export class AxleApi {
 
   /** Vad en ny däckhotellsinlämning börjar med. */
   storageDefaults(): Observable<StorageDefaults> {
-    return this.http.get<StorageDefaults>(`${this.base}/settings/storage`);
+    return this.cache.get(
+      'settings/storage',
+      () => this.http.get<StorageDefaults>(`${this.base}/settings/storage`),
+      { tags: ['inventory/settings'] },
+    );
   }
 
   saveStorageDefaults(body: Partial<StorageDefaults>): Observable<StorageDefaults> {
@@ -82,7 +94,11 @@ export class AxleApi {
 
   /** Hur företaget prissätter och skriver ut (Prissättning). */
   pricingSettings(): Observable<PricingSettings> {
-    return this.http.get<PricingSettings>(`${this.base}/settings/pricing`);
+    return this.cache.get(
+      'settings/pricing',
+      () => this.http.get<PricingSettings>(`${this.base}/settings/pricing`),
+      { tags: ['inventory/settings'] },
+    );
   }
 
   /** Ägaren ändrar prissättningen; fält som utelämnas behåller sitt värde. */

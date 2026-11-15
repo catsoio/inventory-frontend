@@ -1,7 +1,7 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
-import { debounceTime, filter, merge, throttleTime } from 'rxjs';
+import { debounceTime, filter } from 'rxjs';
 import { Auth } from '../auth/auth';
 import { Billing } from '../billing/billing';
 import { productOf, toInternal, type Product } from './products';
@@ -414,21 +414,19 @@ export class Nav {
         }
       }
     });
-    // Siffrorna uppdateras när garaget byts och efter varje sidbyte (t.ex. efter en försäljning),
-    // ett anrop per omgång även om flera händer samtidigt.
     // Vad garaget får använda hämtas när garaget byts (banderollen gör det bara för vanliga användare).
-    toObservable(computed(() => this.auth.garage()?.id))
+    const garageId$ = toObservable(computed(() => this.auth.garage()?.id));
+    garageId$
       .pipe(takeUntilDestroyed(inject(DestroyRef)))
       .subscribe((id) => id && !this.auth.isSuperAdmin() && this.billing.refresh());
-    // Högst en omgång per 15 s (först och sist): en omgång är ett tiotal anrop, så snabba sidbyten
-    // annars körde in i backendens hastighetsgräns (429) och listorna blev tomma.
-    merge(toObservable(computed(() => this.auth.garage()?.id)), done$)
-      .pipe(
-        debounceTime(400),
-        throttleTime(15_000, undefined, { leading: true, trailing: true }),
-        takeUntilDestroyed(inject(DestroyRef)),
-      )
-      .subscribe(() => this.refresh());
+    // Siffrorna är ett anrop (`Todo`). Ett nytt garage hämtas direkt; vid sidbyte bara om listan är
+    // gammal, och efter en ändring härifrån räknar `Todo` om själv.
+    garageId$
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe((id) => id && this.todo.refresh());
+    done$
+      .pipe(debounceTime(400), takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe(() => this.todo.refreshIfStale());
   }
 
   private initialProduct(): Product {
@@ -503,9 +501,5 @@ export class Nav {
     const hit = (p: string) => u === p || u.startsWith(p + '/');
     if (item.exact) return u === item.path;
     return (item.match ?? [item.path]).some(hit);
-  }
-
-  private refresh() {
-    this.todo.refresh(this.billing.allows('bilhandel'));
   }
 }

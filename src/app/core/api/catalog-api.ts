@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { ApiCache } from './api-cache';
 import { ArticleType, Warehouse } from '../models';
 
 interface Archived {
@@ -12,6 +13,7 @@ interface Archived {
 @Injectable({ providedIn: 'root' })
 export class CatalogApi {
   private readonly http = inject(HttpClient);
+  private readonly cache = inject(ApiCache);
   private readonly base = `${environment.apiUrl}/inventory`;
 
   private flag(includeArchived: boolean) {
@@ -19,9 +21,14 @@ export class CatalogApi {
   }
 
   articleTypes(includeArchived = false): Observable<ArticleType[]> {
-    return this.http.get<ArticleType[]>(`${this.base}/article-types`, {
-      params: this.flag(includeArchived),
-    });
+    return this.cache.get(
+      `article-types:${includeArchived}`,
+      () =>
+        this.http.get<ArticleType[]>(`${this.base}/article-types`, {
+          params: this.flag(includeArchived),
+        }),
+      { tags: ['inventory/article-types'] },
+    );
   }
 
   createArticleType(body: Partial<ArticleType>): Observable<ArticleType> {
@@ -37,9 +44,14 @@ export class CatalogApi {
   }
 
   warehouses(includeArchived = false): Observable<Warehouse[]> {
-    return this.http.get<Warehouse[]>(`${this.base}/warehouses`, {
-      params: this.flag(includeArchived),
-    });
+    return this.cache.get(
+      `warehouses:${includeArchived}`,
+      () =>
+        this.http.get<Warehouse[]>(`${this.base}/warehouses`, {
+          params: this.flag(includeArchived),
+        }),
+      { tags: ['inventory/warehouses'] },
+    );
   }
 
   createWarehouse(body: Partial<Warehouse>): Observable<Warehouse> {

@@ -20,6 +20,7 @@ import { appIdInterceptor } from './core/http/app-id-interceptor';
 import { authTokenInterceptor } from './core/http/auth-token-interceptor';
 import { envelopeInterceptor } from './core/http/envelope-interceptor';
 import { errorInterceptor } from './core/http/error-interceptor';
+import { apiCacheInterceptor } from './core/api/api-cache';
 import { garageHeaderInterceptor } from './core/http/garage-header-interceptor';
 import { appLocale } from './core/i18n/locale';
 import { UrlSerializer } from '@angular/router';
@@ -41,9 +42,11 @@ registerLocaleData(localeEnGb);
     { provide: LOCALE_ID, useFactory: appLocale },
     { provide: MAT_DATE_LOCALE, useFactory: appLocale },
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline' } },
-    // Ordning: svar passerar authToken (refresh/retry) -> error (mappning) -> envelope (uppackning).
+    // Ordning: svar passerar authToken (refresh/retry) -> error (mappning) -> envelope (uppackning) ->
+    // apiCache (ser det färdiga svaret på en ändring och tömmer det den rör).
     provideHttpClient(
       withInterceptors([
+        apiCacheInterceptor,
         appIdInterceptor,
         garageHeaderInterceptor,
         envelopeInterceptor,
