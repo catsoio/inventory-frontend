@@ -35,6 +35,35 @@ html[data-product='hall'] {
   --mat-sys-surface-tint: #2a4a9c;
 }
 
+/* Däck (däckhotellet) är lila. */
+html[data-product='dack'] {
+  --mat-sys-primary: #6b3fa0;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #ede4fb;
+  --mat-sys-on-primary-container: #2d1456;
+  --mat-sys-surface-tint: #6b3fa0;
+}
+
+/* Bärgning (bärgning och vägassistans) är orange: en tredje färg bredvid Axles teal och Halls blå. */
+html[data-product='towing'] {
+  --mat-sys-primary: #b45309;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #ffedd5;
+  --mat-sys-on-primary-container: #5a2a05;
+  --mat-sys-surface-tint: #b45309;
+}
+
+/*
+ * Ikonen ligger mitt i sin ruta. Tailwinds text-xl, text-sm och liknande sätter också en radhöjd
+ * (t.ex. 28 px på en ikon som är 20 px), som trycker ner symbolen i cirklar och märken. Regeln ligger i
+ * basskiktet med !important, som före utilities-skiktets !important, så den gäller överallt.
+ */
+@layer base {
+  .mat-icon {
+    line-height: 1 !important;
+  }
+}
+
 /* Utskrift (t.ex. en bokföring som PDF): bara innehållet, inga menyer. */
 body {
   font-feature-settings: 'cv11', 'ss01';

@@ -19,6 +19,8 @@ export interface NavItem {
   module?: string;
   /** Dold tills funktionen är påslagen. */
   hidden?: boolean;
+  /** Markeras inte på de här adresserna, även om de ligger under `path` (en Hem-sida under produktens lista). */
+  exclude?: string[];
   /** Visas bara på dator eller bara på mobil. */
   only?: 'desktop' | 'mobile';
   /** Markeras också när någon av de här adresserna är öppen (avsnittets flikar och undersidor). */
@@ -41,9 +43,9 @@ export interface NavSection {
 }
 
 /**
- * Axles ekonomi. Hall har en egen översikt (`/dealership/finance`). Fakturor och de andra
- * ekonomisidorna är undermenyn här. Mobilen har ingen sidomeny och visar dem som flikar
- * (`FinanceTabs`).
+ * Axles ekonomi: ett enda menyval. Översikt, Fakturor, Kvitton, Kassaregister och Moms och
+ * bokföring är flikar i sidhuvudet (`FinanceTabs`), på dator och mobil. Siffran för obetalda
+ * och förfallna fakturor ligger på menyvalet. Hall har en egen översikt (`/dealership/finance`).
  */
 const FINANCE_NAV: NavItem = {
   path: '/finance',
@@ -52,12 +54,24 @@ const FINANCE_NAV: NavItem = {
   module: 'bokforing',
   adminOnly: true,
   match: ['/finance', '/bookkeeping'],
-  children: [
-    { path: '/finance', label: 'Översikt', icon: 'monitoring', exact: true, badge: 'none' },
-    { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
-    { path: '/finance/receipts', label: 'Kvitton', icon: 'receipt' },
-    { path: '/finance/register', label: 'Kassa', icon: 'point_of_sale' },
-    { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
+};
+
+/**
+ * Varor: försäljning, artiklar och inköp, allt som rör varor och pengarna för dem. Delas av
+ * Verkstad och Däck (samma sidor, man stannar i den produkt man kom från). Säljkort och Att
+ * fakturera är flikar under Försäljning, Översikt, Lagerlogg och Inventering under Artiklar.
+ */
+const VAROR_NAV: NavSection = {
+  title: 'Varor',
+  items: [
+    { path: '/sales', label: 'Försäljning', icon: 'point_of_sale' },
+    {
+      path: '/inventory',
+      label: 'Artiklar',
+      icon: 'inventory_2',
+      match: ['/inventory', '/reports'],
+    },
+    { path: '/purchases', label: 'Inköp', icon: 'shopping_cart_checkout' },
   ],
 };
 
@@ -72,17 +86,17 @@ export const NAV_AXLE: NavSection[] = [
     items: [{ path: '/dashboard', label: 'Hem', icon: 'home', exact: true }],
   },
   {
+    // Flödet från samtal till jobb: tid, offert och arbetsorder. Fakturan skapas under Varor.
     title: 'Arbete',
     items: [
       { path: '/bookings', label: 'Tidsbokning', icon: 'calendar_month', module: 'tidsbokning' },
-      // Kundens egen bokningssida; ägaren formar den här, Catso sätter adressen.
+      // Offerten är säljdokumentet som kommer före arbetsordern (som Sales Quote i ett affärssystem).
       {
-        path: '/online-booking',
-        label: 'Onlinebokning',
-        icon: 'language',
-        module: 'onlinebokning',
-        adminOnly: true,
-        only: 'desktop',
+        path: '/quotes',
+        label: 'Offert',
+        icon: 'request_quote',
+        module: 'arbetsorder',
+        hidden: !environment.workOrders,
       },
       {
         path: '/workorders',
@@ -93,23 +107,17 @@ export const NAV_AXLE: NavSection[] = [
       },
     ],
   },
+  VAROR_NAV,
   {
-    title: 'Däck och lager',
+    title: 'Kunder',
     items: [
-      { path: '/storage', label: 'Däckhotell', icon: 'warehouse', module: 'dackhotell' },
-      // Översikt och Lagerlogg är flikar här.
-      {
-        path: '/inventory',
-        label: 'Artiklar',
-        icon: 'inventory_2',
-        match: ['/inventory', '/reports'],
-      },
-      { path: '/purchases', label: 'Inköp', icon: 'shopping_cart_checkout' },
+      { path: '/customers', label: 'Kunder', icon: 'groups' },
+      { path: '/vehicles', label: 'Kundbilar', icon: 'directions_car' },
     ],
   },
   {
-    // Det verkstaden ställer in: vem som jobbar, vilka platser som finns och vad man utför.
-    title: 'Verkstad',
+    // Det verkstaden ställer in: vem som jobbar, vilka platser som finns och vad man utför och tar betalt för.
+    title: 'Personal och tjänster',
     items: [
       {
         path: '/resources',
@@ -120,6 +128,35 @@ export const NAV_AXLE: NavSection[] = [
       { path: '/service-types', label: 'Åtgärder', icon: 'build', only: 'desktop' },
     ],
   },
+  // Bara ägaren; bolagets pengar, inte det dagliga arbetet.
+  { title: 'Ekonomi', items: [FINANCE_NAV] },
+];
+
+/**
+ * Däck (däckhotellet): kundernas däckset, med samma varor, kunder och ekonomi som Verkstad. Inlämningar,
+ * Översikt och Inventering är flikar under Däckhotell.
+ */
+export const NAV_DACK: NavSection[] = [
+  {
+    title: '',
+    items: [
+      { path: '/storage/home', label: 'Hem', icon: 'home', exact: true, module: 'dackhotell' },
+    ],
+  },
+  {
+    title: 'Däckhotell',
+    items: [
+      {
+        path: '/storage',
+        label: 'Inlämningar',
+        icon: 'warehouse',
+        module: 'dackhotell',
+        match: ['/storage'],
+        exclude: ['/storage/home'],
+      },
+    ],
+  },
+  VAROR_NAV,
   {
     title: 'Kunder',
     items: [
@@ -127,31 +164,13 @@ export const NAV_AXLE: NavSection[] = [
       { path: '/vehicles', label: 'Kundbilar', icon: 'directions_car' },
     ],
   },
-  {
-    title: 'Försäljning och ekonomi',
-    items: [
-      // Offerten är säljdokumentet som kommer före affären (som Sales Quote i ett affärssystem),
-      // därför står den över Försäljning.
-      {
-        path: '/quotes',
-        label: 'Offert',
-        icon: 'request_quote',
-        module: 'arbetsorder',
-        hidden: !environment.workOrders,
-      },
-      {
-        path: '/sales',
-        label: 'Försäljning',
-        icon: 'point_of_sale',
-      },
-      FINANCE_NAV,
-    ],
-  },
+  { title: 'Ekonomi', items: [FINANCE_NAV] },
 ];
 
 /**
  * Halls ekonomi: egen översikt (vinst per bil, lager, moms på bilarna), medan Fakturor och Moms och
- * bokföring är samma sidor som i Axle, med Hall förvalt (`app-product-filter`). Fakturanummer, moms
+ * bokföring är samma sidor som i Axle, med Hall förvalt (`app-product-filter`); de är flikar på
+ * sidan (`FinanceTabs`), inte en undermeny. Fakturanummer, moms
  * och bokföring gäller bolaget, inte en produkt.
  */
 const HALL_FINANCE_NAV: NavItem = {
@@ -161,17 +180,6 @@ const HALL_FINANCE_NAV: NavItem = {
   module: 'bilhandel',
   adminOnly: true,
   match: ['/dealership/finance', '/finance', '/bookkeeping'],
-  children: [
-    {
-      path: '/dealership/finance',
-      label: 'Översikt',
-      icon: 'monitoring',
-      exact: true,
-      badge: 'none',
-    },
-    { path: '/finance/invoices', label: 'Fakturor', icon: 'receipt_long' },
-    { path: '/bookkeeping', label: 'Moms och bokföring', icon: 'account_balance' },
-  ],
 };
 
 /**
@@ -230,6 +238,31 @@ export const NAV_HALL: NavSection[] = [
   { title: 'Ekonomi', items: [HALL_FINANCE_NAV] },
 ];
 
+/**
+ * Bärgning (bärgning och vägassistans) är en egen produkt bredvid Verkstad och Bilhandel, för
+ * verkstäder som kör ut och hämtar bilar. Än så länge bara uppdragen och kunderna.
+ */
+export const NAV_TOWING: NavSection[] = [
+  {
+    title: '',
+    items: [{ path: '/towing/home', label: 'Hem', icon: 'home', exact: true, module: 'bargning' }],
+  },
+  {
+    title: 'Bärgning',
+    items: [
+      {
+        path: '/towing',
+        label: 'Uppdrag',
+        icon: 'local_shipping',
+        module: 'bargning',
+        match: ['/towing'],
+        exclude: ['/towing/home'],
+      },
+    ],
+  },
+  { title: 'Kunder', items: [{ path: '/customers', label: 'Kunder', icon: 'groups' }] },
+];
+
 /** Längst ned i sidomenyn: sådant som ställs in en gång. Bara ägaren, bara på dator. */
 export const FOOTER_NAV: NavItem[] = [
   {
@@ -252,8 +285,34 @@ const MECHANIC_NAV: NavSection[] = [
 export const MOBILE_TABS: NavItem[] = [
   { path: '/dashboard', label: 'Hem', icon: 'home', exact: true },
   { path: '/bookings', label: 'Tider', icon: 'calendar_month', module: 'tidsbokning' },
-  { path: '/storage', label: 'Hotell', icon: 'warehouse', module: 'dackhotell' },
   { path: '/inventory', label: 'Lager', icon: 'inventory_2', match: ['/inventory', '/reports'] },
+];
+
+/** Mobilens flikar i Däck: hitta ett däckset, kolla lagret, ringa kunden. */
+export const MOBILE_TABS_DACK: NavItem[] = [
+  { path: '/storage/home', label: 'Hem', icon: 'home', exact: true, module: 'dackhotell' },
+  {
+    path: '/storage',
+    label: 'Hotell',
+    icon: 'warehouse',
+    module: 'dackhotell',
+    exclude: ['/storage/home'],
+  },
+  { path: '/inventory', label: 'Lager', icon: 'inventory_2', match: ['/inventory', '/reports'] },
+  { path: '/customers', label: 'Kunder', icon: 'groups' },
+];
+
+/** "Mer" i Däck. */
+export const MOBILE_MORE_DACK: NavItem[] = [
+  { path: '/sales', label: 'Försäljning', icon: 'point_of_sale' },
+  { path: '/purchases', label: 'Inköp', icon: 'shopping_cart_checkout' },
+  {
+    path: '/finance',
+    label: 'Ekonomi',
+    icon: 'account_balance_wallet',
+    adminOnly: true,
+    match: ['/finance', '/bookkeeping'],
+  },
 ];
 
 /**
@@ -263,6 +322,19 @@ export const MOBILE_TABS: NavItem[] = [
 export const MOBILE_TABS_HALL: NavItem[] = [
   { path: '/dealership', label: 'Hem', icon: 'home', exact: true, module: 'bilhandel' },
   { path: '/dealership/cars', label: 'Bilar', icon: 'directions_car', module: 'bilhandel' },
+  { path: '/customers', label: 'Kunder', icon: 'groups' },
+];
+
+/** Mobilens flikar i Bärgning: uppdragen och kunderna att ringa. */
+export const MOBILE_TABS_TOWING: NavItem[] = [
+  { path: '/towing/home', label: 'Hem', icon: 'home', exact: true, module: 'bargning' },
+  {
+    path: '/towing',
+    label: 'Uppdrag',
+    icon: 'local_shipping',
+    module: 'bargning',
+    exclude: ['/towing/home'],
+  },
   { path: '/customers', label: 'Kunder', icon: 'groups' },
 ];
 
@@ -339,6 +411,8 @@ export class Nav {
    * öppen när någon av dess sidor är det. Valet sparas per webbläsare.
    */
   private readonly groups = signal<Record<string, boolean>>(this.storedGroups());
+  /** Hopfällda sektionskort i sidomenyn (rubriken → sant = hopfälld). Valet sparas per webbläsare. */
+  private readonly closedSections = signal<Record<string, boolean>>(this.storedSections());
 
   /**
    * Siffrorna i menyn: det som väntar på någon, ett antal med ett ord ("1 utkast"), röd när något är
@@ -364,7 +438,7 @@ export class Nav {
     if (this.auth.isMechanic()) return MECHANIC_NAV;
     const shown = (i: NavItem): NavItem =>
       i.children ? { ...i, children: i.children.filter((c) => this.visible(c, false)) } : i;
-    return (this.product() === 'hall' ? NAV_HALL : NAV_AXLE)
+    return this.navOf(this.product())
       .map((s) => ({
         ...s,
         items: s.items
@@ -377,7 +451,7 @@ export class Nav {
 
   readonly footer = computed<NavItem[]>(() =>
     // Registret (artikeltyper, lager, aktivitetslogg) hör till Axle.
-    this.auth.isMechanic() || this.product() !== 'axle'
+    this.auth.isMechanic() || !['axle', 'dack'].includes(this.product())
       ? []
       : FOOTER_NAV.filter((i) => this.visible(i, false)),
   );
@@ -386,16 +460,10 @@ export class Nav {
   readonly tabs = computed<NavItem[]>(() =>
     this.auth.isMechanic()
       ? [{ path: '/workorders/mine', label: 'Order', icon: 'handyman' }]
-      : (this.product() === 'hall' ? MOBILE_TABS_HALL : MOBILE_TABS).filter((i) =>
-          this.billing.allows(i.module),
-        ),
+      : this.tabsOf(this.product()).filter((i) => this.billing.allows(i.module)),
   );
   readonly more = computed<NavItem[]>(() =>
-    this.auth.isMechanic()
-      ? []
-      : (this.product() === 'hall' ? MOBILE_MORE_HALL : MOBILE_MORE).filter((i) =>
-          this.visible(i, true),
-        ),
+    this.auth.isMechanic() ? [] : this.moreOf(this.product()).filter((i) => this.visible(i, true)),
   );
 
   constructor() {
@@ -406,12 +474,17 @@ export class Nav {
       const product = productOf(url);
       if (product && product !== this.product()) this.setProduct(product);
       // Kommer man in i en grupp (t.ex. via en länk på Hem) fälls den ut, även om man stängt den förut.
-      for (const s of [...NAV_AXLE, ...NAV_HALL]) {
+      for (const s of [...NAV_AXLE, ...NAV_DACK, ...NAV_HALL, ...NAV_TOWING]) {
         for (const i of s.items) {
           if (i.children && this.matches(i) && this.groups()[i.path] === false) {
             this.setGroup(i.path, true);
           }
         }
+        // Kommer man in i en hopfälld sektion (en länk någon annanstans) fälls den ut.
+        const here = s.items.some(
+          (i) => this.matches(i) || i.children?.some((c) => this.matches(c)),
+        );
+        if (s.title && here && !this.isSectionOpen(s.title)) this.setSection(s.title, true);
       }
     });
     // Vad garaget får använda hämtas när garaget byts (banderollen gör det bara för vanliga användare).
@@ -439,7 +512,25 @@ export class Nav {
       }
       return fromUrl;
     }
-    return this.stored('garagestock.product') === 'hall' ? 'hall' : 'axle';
+    const stored = this.stored('garagestock.product');
+    return stored === 'hall' || stored === 'dack' || stored === 'towing' ? stored : 'axle';
+  }
+
+  private navOf(p: Product): NavSection[] {
+    return { axle: NAV_AXLE, dack: NAV_DACK, hall: NAV_HALL, towing: NAV_TOWING }[p];
+  }
+
+  private tabsOf(p: Product): NavItem[] {
+    return {
+      axle: MOBILE_TABS,
+      dack: MOBILE_TABS_DACK,
+      hall: MOBILE_TABS_HALL,
+      towing: MOBILE_TABS_TOWING,
+    }[p];
+  }
+
+  private moreOf(p: Product): NavItem[] {
+    return { axle: MOBILE_MORE, dack: MOBILE_MORE_DACK, hall: MOBILE_MORE_HALL, towing: [] }[p];
   }
 
   private setProduct(p: Product) {
@@ -469,6 +560,33 @@ export class Nav {
   }
 
   /** Är undermenyn utfälld? */
+  /** Sektionskortet är utfällt. Alla är det från början. */
+  isSectionOpen(title: string): boolean {
+    return !this.closedSections()[title];
+  }
+
+  toggleSection(title: string) {
+    this.setSection(title, !this.isSectionOpen(title));
+  }
+
+  private setSection(title: string, open: boolean) {
+    this.closedSections.update((c) => ({ ...c, [title]: !open }));
+    try {
+      localStorage.setItem('garagestock.navSections', JSON.stringify(this.closedSections()));
+    } catch {
+      /* sparas bara som bekvämlighet */
+    }
+  }
+
+  private storedSections(): Record<string, boolean> {
+    try {
+      const raw = JSON.parse(this.stored('garagestock.navSections') ?? '{}');
+      return raw && typeof raw === 'object' ? raw : {};
+    } catch {
+      return {};
+    }
+  }
+
   isOpen(item: NavItem): boolean {
     return this.groups()[item.path] ?? this.matches(item);
   }
@@ -500,6 +618,7 @@ export class Nav {
     const u = this.url();
     const hit = (p: string) => u === p || u.startsWith(p + '/');
     if (item.exact) return u === item.path;
+    if (item.exclude?.some(hit)) return false;
     return (item.match ?? [item.path]).some(hit);
   }
 }

@@ -53,7 +53,19 @@ type MethodFilter = 'all' | PaymentMethod;
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-finance-tabs />
+    <app-finance-tabs>
+      <a
+        actions
+        mat-flat-button
+        color="primary"
+        routerLink="/sales/new"
+        [queryParams]="pricing.value().alwaysInvoice ? {} : { kind: 'receipt' }"
+        class="max-md:!hidden"
+      >
+        <mat-icon>add</mat-icon>
+        {{ pricing.value().alwaysInvoice ? 'Ny försäljning' : 'Nytt kvitto' }}
+      </a>
+    </app-finance-tabs>
     <div class="mb-4 grid shrink-0 grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
       <app-stat
         label="Idag"
@@ -75,14 +87,9 @@ type MethodFilter = 'all' | PaymentMethod;
     </div>
     <div class="min-h-0 flex-1">
       <app-list-page
-        title="Kvitton"
         [columns]="cols"
         [rows]="shown()"
         [loading]="loading()"
-        newLink="/sales/new"
-        [newQuery]="pricing.value().alwaysInvoice ? {} : { kind: 'receipt' }"
-        [newLabel]="pricing.value().alwaysInvoice ? 'Ny försäljning' : 'Nytt kvitto'"
-        [newFab]="false"
         emptyText="Inget betalt vid disken än. Kvitton och kontantfakturor hamnar här när ett säljkort bokförs som betalt."
         searchPlaceholder="Sök nummer, kund eller regnr…"
         (search)="query.set($event)"

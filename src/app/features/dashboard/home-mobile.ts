@@ -6,7 +6,6 @@ import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { columns, kronor } from '../../shared/chart/chart-kit';
 import { ACCENT, OTHER, STATUS } from '../../shared/chart/chart-theme';
 import { delta } from '../../shared/stat/stat';
-import { shortLabel } from '../../core/insights/hotel';
 import { HomeData } from './home-data';
 
 const hhmm = (iso: string) =>
@@ -17,7 +16,7 @@ const MAX_COMING = 6;
 
 /**
  * Hem på mobil: det man gör i farten. Sök direkt, fyra genvägar, dagens tider med en knapp för att
- * checka in bilen, det som väntar och när däckseten ska hämtas. Inga tabeller och ingen planering.
+ * checka in bilen och det som väntar. Inga tabeller och ingen planering.
  */
 @Component({
   selector: 'app-home-mobile',
@@ -30,7 +29,7 @@ const MAX_COMING = 6;
       (click)="search.open()"
     >
       <mat-icon class="text-gray-400">search</mat-icon>
-      <span class="truncate text-[15px]">Sök regnr, kund eller plats…</span>
+      <span class="truncate text-[15px]">Sök regnr, kund eller order…</span>
     </button>
 
     <div class="grid grid-cols-2 gap-2.5">
@@ -179,20 +178,6 @@ const MAX_COMING = 6;
         />
       </div>
     }
-
-    <app-panel
-      title="Hämtas per vecka"
-      subtitle="Inlagrade däckset"
-      [empty]="data.depositsLoaded() && !data.deposits().length"
-      emptyText="Inga inlagrade set."
-    >
-      <div class="h-36">
-        <app-chart [config]="pickupChart()" label="Däckset som ska hämtas per vecka" />
-      </div>
-      <a routerLink="/storage" class="mt-2 inline-block text-xs font-medium text-brand">
-        Visa alla {{ data.hotel()?.stored ?? '' }} set
-      </a>
-    </app-panel>
   `,
   styles: `
     .action {
@@ -231,7 +216,7 @@ export class HomeMobile {
     link: string | null;
     params?: Record<string, string | number>;
   }[] = [
-    { label: 'Ny inlämning', icon: 'add_box', link: '/storage/new' },
+    { label: 'Ny arbetsorder', icon: 'handyman', link: '/workorders/new' },
     { label: 'Ny bokning', icon: 'event', link: null },
     { label: 'Ny försäljning', icon: 'point_of_sale', link: '/sales/new' },
     { label: 'Sök däck i lager', icon: 'tire_repair', link: '/inventory', params: { focus: 1 } },
@@ -277,23 +262,4 @@ export class HomeMobile {
     return w ? delta(w.sold[w.sold.length - 1], w.sold[w.sold.length - 2]) : null;
   });
   readonly weekTrend = computed(() => this.data.week()?.sold.slice(-8) ?? []);
-
-  /** Korta etiketter, så att alla veckor ryms på en telefon. */
-  readonly pickupChart = computed(() => {
-    const b = this.data.forecast().buckets;
-    return columns({
-      labels: b.map(shortLabel),
-      title: (i) => b[i].title,
-      series: [
-        {
-          label: 'Set',
-          data: b.map((x) => x.sets),
-          color: ACCENT,
-          colors: b.map((x) => (x.overdue ? STATUS.critical : x.key === 'later' ? OTHER : ACCENT)),
-        },
-      ],
-      format: (v) => `${v} set`,
-      footer: (i) => [`${b[i].units} däck och fälgar`],
-    });
-  });
 }

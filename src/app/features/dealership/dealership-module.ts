@@ -27,7 +27,7 @@ import { TemplatePreview } from './template-preview';
   imports: [
     SharedModule,
     RouterModule.forChild([
-      { path: '', title: 'Bilhandel', component: HallHome },
+      { path: '', title: 'Bilhandel', component: HallHome, data: { reuse: true } },
       { path: 'cars', title: 'Bilar till salu', component: CarList, data: { stage: 'sales' } },
       { path: 'cars/all', title: 'Alla bilar', component: CarList, data: { stage: 'all' } },
       {

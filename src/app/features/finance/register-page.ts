@@ -37,14 +37,26 @@ const MEANS: Record<string, string> = { card: 'Kort', swish: 'Swish', cash: 'Kon
       } @else {
         @if (s.unit && !s.unit.control.certified) {
           <p class="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-900">
-            <b>Utvecklingsläge.</b> Kontrollsystemet är inte certifierat: rapporter och kvitton här är inte giltiga.
+            <b>Utvecklingsläge.</b> Kontrollsystemet är inte certifierat: rapporter och kvitton här
+            är inte giltiga.
           </p>
         }
         <div class="mb-4 flex flex-wrap items-center gap-2">
-          <button mat-flat-button color="primary" type="button" [disabled]="busy() || s.unit?.status !== 'active'" (click)="x()">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="busy() || s.unit?.status !== 'active'"
+            (click)="x()"
+          >
             <mat-icon>summarize</mat-icon> X-rapport
           </button>
-          <button mat-stroked-button type="button" [disabled]="busy() || s.unit?.status !== 'active'" (click)="z()">
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="busy() || s.unit?.status !== 'active'"
+            (click)="z()"
+          >
             <mat-icon>lock_clock</mat-icon> Z-rapport (stäng dagen)
           </button>
           <span class="text-sm text-gray-500">{{ s.unit?.label }} · version {{ s.version }}</span>
@@ -56,24 +68,37 @@ const MEANS: Record<string, string> = { card: 'Kort', swish: 'Swish', cash: 'Kon
               <h2 class="text-base font-semibold">
                 {{ r.kind === 'Z' ? 'Z-rapport ' + r.number : 'X-rapport' }} · {{ time(r.to) }}
               </h2>
-              <button mat-icon-button type="button" aria-label="Stäng" (click)="report.set(null)"><mat-icon>close</mat-icon></button>
+              <button mat-icon-button type="button" aria-label="Stäng" (click)="report.set(null)">
+                <mat-icon>close</mat-icon>
+              </button>
             </div>
             <dl class="grid max-w-3xl grid-cols-[14rem_1fr] gap-x-4 gap-y-1 text-sm">
-              <dt class="text-gray-500">Försäljning (inkl. moms)</dt><dd class="tabular-nums">{{ r.totalSales | kr }}</dd>
-              <dt class="text-gray-500">Antal kvitton</dt><dd>{{ r.receipts }}</dd>
-              <dt class="text-gray-500">Sålda varor / tjänster</dt><dd>{{ r.goodsSold }} / {{ r.servicesSold }}</dd>
-              <dt class="text-gray-500">Rabatter</dt><dd class="tabular-nums">{{ r.discounts | kr }}</dd>
-              <dt class="text-gray-500">Returer</dt><dd>{{ r.returns }} st · {{ r.returnsAmount | kr }}</dd>
-              <dt class="text-gray-500">Kvittokopior</dt><dd>{{ r.copies }} st</dd>
+              <dt class="text-gray-500">Försäljning (inkl. moms)</dt>
+              <dd class="tabular-nums">{{ r.totalSales | kr }}</dd>
+              <dt class="text-gray-500">Antal kvitton</dt>
+              <dd>{{ r.receipts }}</dd>
+              <dt class="text-gray-500">Sålda varor / tjänster</dt>
+              <dd>{{ r.goodsSold }} / {{ r.servicesSold }}</dd>
+              <dt class="text-gray-500">Rabatter</dt>
+              <dd class="tabular-nums">{{ r.discounts | kr }}</dd>
+              <dt class="text-gray-500">Returer</dt>
+              <dd>{{ r.returns }} st · {{ r.returnsAmount | kr }}</dd>
+              <dt class="text-gray-500">Kvittokopior</dt>
+              <dd>{{ r.copies }} st</dd>
               @for (v of r.vat; track v.rate) {
-                <dt class="text-gray-500">Moms {{ v.rate }} %</dt><dd class="tabular-nums">{{ v.vat | kr }}</dd>
+                <dt class="text-gray-500">Moms {{ v.rate }} %</dt>
+                <dd class="tabular-nums">{{ v.vat | kr }}</dd>
               }
               @for (p of r.payments; track p.means) {
-                <dt class="text-gray-500">{{ means(p.means) }}</dt><dd class="tabular-nums">{{ p.amount | kr }}</dd>
+                <dt class="text-gray-500">{{ means(p.means) }}</dt>
+                <dd class="tabular-nums">{{ p.amount | kr }}</dd>
               }
-              <dt class="text-gray-500">Grand total försäljning</dt><dd class="tabular-nums">{{ r.grandTotalSales | kr }}</dd>
-              <dt class="text-gray-500">Grand total retur</dt><dd class="tabular-nums">{{ r.grandTotalReturns | kr }}</dd>
-              <dt class="text-gray-500">Grand total netto</dt><dd class="tabular-nums">{{ r.grandTotalNet | kr }}</dd>
+              <dt class="text-gray-500">Grand total försäljning</dt>
+              <dd class="tabular-nums">{{ r.grandTotalSales | kr }}</dd>
+              <dt class="text-gray-500">Grand total retur</dt>
+              <dd class="tabular-nums">{{ r.grandTotalReturns | kr }}</dd>
+              <dt class="text-gray-500">Grand total netto</dt>
+              <dd class="tabular-nums">{{ r.grandTotalNet | kr }}</dd>
             </dl>
           </section>
         }
@@ -92,42 +117,77 @@ const MEANS: Record<string, string> = { card: 'Kort', swish: 'Swish', cash: 'Kon
             <button mat-stroked-button type="button" [disabled]="busy()" (click)="export()">
               <mat-icon>download</mat-icon> Exportera XML
             </button>
-            <button mat-button type="button" [disabled]="busy()" (click)="verify()">Kontrollera journalen</button>
+            <button mat-button type="button" [disabled]="busy()" (click)="verify()">
+              Kontrollera journalen
+            </button>
           </div>
           @if (chain(); as ch) {
             @if (ch.ok) {
-              <p class="mb-2 text-sm text-teal-800">Journalen är hel ({{ ch.entries }} rader): inget är ändrat eller borttaget.</p>
+              <p class="mb-2 text-sm text-teal-800">
+                Journalen är hel ({{ ch.entries }} rader): inget är ändrat eller borttaget.
+              </p>
             } @else {
-              <p class="mb-2 text-sm font-medium text-red-700">Journalen stämmer inte vid rad {{ ch.brokenAtSeq }}: {{ ch.reason }}</p>
+              <p class="mb-2 text-sm font-medium text-red-700">
+                Journalen stämmer inte vid rad {{ ch.brokenAtSeq }}: {{ ch.reason }}
+              </p>
             }
           }
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
               <thead class="border-b text-xs text-gray-500 uppercase">
-                <tr><th class="sticky left-0 bg-white py-2 pr-3">Nr</th><th class="pr-3">Typ</th><th class="pr-3">Tid</th><th class="pr-3 text-right">Belopp</th><th class="pr-3">Betalning</th><th></th></tr>
+                <tr>
+                  <th class="sticky left-0 bg-white py-2 pr-3">Nr</th>
+                  <th class="pr-3">Typ</th>
+                  <th class="pr-3">Tid</th>
+                  <th class="pr-3 text-right">Belopp</th>
+                  <th class="pr-3">Betalning</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody>
                 @for (e of entries(); track e.seq) {
                   <tr class="border-b border-gray-100">
-                    <td class="sticky left-0 bg-white py-2 pr-3 tabular-nums">{{ e.code ?? e.seq }}</td>
-                    <td class="pr-3">{{ kind(e) }}@if (e.returnOf) { <span class="text-gray-500"> av {{ e.returnOf }}</span> }</td>
+                    <td class="sticky left-0 bg-white py-2 pr-3 tabular-nums">
+                      {{ e.code ?? e.seq }}
+                    </td>
+                    <td class="pr-3">
+                      {{ kind(e) }}
+                      @if (e.returnOf) {
+                        <span class="text-gray-500"> av {{ e.returnOf }}</span>
+                      }
+                    </td>
                     <td class="pr-3 whitespace-nowrap">{{ time(e.occurredAt) }}</td>
                     <td class="pr-3 text-right tabular-nums">
-                      @if (e.receipt) { {{ (e.kind === 'return' ? -e.receipt.total : e.receipt.total) | kr }} }
-                      @else if (e.report) { {{ e.report.totalSales | kr }} }
+                      @if (e.receipt) {
+                        {{ (e.kind === 'return' ? -e.receipt.total : e.receipt.total) | kr }}
+                      } @else if (e.report) {
+                        {{ e.report.totalSales | kr }}
+                      }
                     </td>
-                    <td class="pr-3">@if (e.receipt) { {{ paid(e) }} }</td>
+                    <td class="pr-3">
+                      @if (e.receipt) {
+                        {{ paid(e) }}
+                      }
+                    </td>
                     <td class="text-right">
                       @if (e.kind === 'sale' && e.receiptNumber) {
-                        <button mat-button type="button" [disabled]="busy()" (click)="copy(e)">Kopia</button>
+                        <button mat-button type="button" [disabled]="busy()" (click)="copy(e)">
+                          Kopia
+                        </button>
                       }
                       @if (e.report) {
-                        <button mat-button type="button" (click)="report.set(e.report)">Visa</button>
+                        <button mat-button type="button" (click)="report.set(e.report)">
+                          Visa
+                        </button>
                       }
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="6" class="py-6 text-center text-gray-500">Inget registrerat under perioden.</td></tr>
+                  <tr>
+                    <td colspan="6" class="py-6 text-center text-gray-500">
+                      Inget registrerat under perioden.
+                    </td>
+                  </tr>
                 }
               </tbody>
             </table>
@@ -160,7 +220,9 @@ export class RegisterPage implements OnInit {
   }
 
   loadJournal() {
-    this.api.journal({ from: this.from.value, to: this.to.value }).subscribe((rows) => this.entries.set(rows));
+    this.api
+      .journal({ from: this.from.value, to: this.to.value })
+      .subscribe((rows) => this.entries.set(rows));
   }
 
   x() {
@@ -224,7 +286,11 @@ export class RegisterPage implements OnInit {
     this.api.copy(e.receiptNumber).subscribe({
       next: () => {
         this.busy.set(false);
-        this.snack.open(`Kopia av kvitto ${e.receiptNumber} är registrerad. Ett kvitto får bara en kopia.`, 'OK', { duration: 5000 });
+        this.snack.open(
+          `Kopia av kvitto ${e.receiptNumber} är registrerad. Ett kvitto får bara en kopia.`,
+          'OK',
+          { duration: 5000 },
+        );
         this.loadJournal();
       },
       error: () => this.busy.set(false),

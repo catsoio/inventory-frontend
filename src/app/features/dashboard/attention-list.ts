@@ -47,6 +47,7 @@ export class AttentionList {
   readonly tones: Record<Attention['tone'], string> = {
     bad: 'bg-red-50 text-red-700',
     warn: 'bg-amber-50 text-amber-800',
+    good: 'bg-green-50 text-green-800',
     info: 'bg-sky-50 text-sky-800',
   };
 }

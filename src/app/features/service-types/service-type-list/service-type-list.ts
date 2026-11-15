@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Auth } from '../../../core/auth/auth';
+import { Billing } from '../../../core/billing/billing';
+import { serviceTabs } from '../../../shared/page-header/tabs';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import { ServiceType } from '../../../core/models';
 import { DtCol } from '../../../shared/data-table/data-table';
@@ -48,6 +50,7 @@ const COLS: DtCol<ServiceType>[] = [
   template: `
     <app-list-page
       title="Åtgärder"
+      [tabs]="tabs"
       [columns]="cols"
       [rows]="shown()"
       [loading]="loading()"
@@ -75,6 +78,8 @@ export class ServiceTypeList {
   /** Bara ägare lägger till och ändrar. */
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   private readonly api = inject(WorkshopApi);
+  /** Ägaren ser fliken Onlinebokning när garaget har den delen. */
+  readonly tabs = serviceTabs(this.admin && inject(Billing).allows('onlinebokning'));
   private readonly router = inject(Router);
 
   readonly cols = COLS;

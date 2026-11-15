@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Nav } from '../nav';
+import { Nav, type NavSection } from '../nav';
 
 /** Sidomenyn på dator: ett val per avsnitt, hopfällbar till bara ikoner. */
 @Component({
@@ -7,7 +7,7 @@ import { Nav } from '../nav';
   standalone: false,
   host: {
     class:
-      'hidden shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 md:flex',
+      'group relative z-10 hidden shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 md:flex',
     '[style.width.px]': 'nav.collapsed() ? 72 : 288',
   },
   styles: `
@@ -87,6 +87,38 @@ import { Nav } from '../nav';
       color: var(--mat-sys-primary);
       font-weight: 600;
       background: var(--color-brand-soft);
+    }
+    /* Varje sektion är ett kort: rubriken och posterna ligger på en egen yta. */
+    .nav-card {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 14px;
+      background: #f6f7f9;
+    }
+    .nav-card .nav-link:hover {
+      background: #fff;
+    }
+    .nav-card .nav-link.is-active {
+      background: #fff;
+    }
+    .nav-card .nav-link.is-active::before,
+    .nav-card .nav-group.has-active::before {
+      left: -8px;
+    }
+    .nav-card .nav-title {
+      margin: 2px 0 4px;
+    }
+    button.nav-title {
+      cursor: pointer;
+      background: none;
+      border: 0;
+    }
+    button.nav-title:hover {
+      color: #6b7280;
+    }
+    button.nav-title .nav-chevron {
+      color: inherit;
+      transition: transform 0.15s;
     }
     .nav-title {
       margin: 18px 0 4px;
@@ -195,48 +227,93 @@ import { Nav } from '../nav';
 
     <nav class="flex-1 overflow-x-hidden overflow-y-auto p-3" aria-label="Huvudmeny">
       @for (sec of nav.sections(); track sec.title) {
-        @if (sec.title) {
-          @if (nav.collapsed()) {
-            <div class="mx-3 my-3 h-px bg-gray-100"></div>
-          } @else {
-            <div class="nav-title">{{ sec.title }}</div>
+        <!-- Sektioner med rubrik är kort. Hem står fritt, och i den hopfällda menyn (bara ikoner) skiljer en linje sektionerna. -->
+        <section
+          [class.nav-card]="!nav.collapsed() && !!sec.title"
+          [class.mb-2.5]="!nav.collapsed() && !sec.title"
+        >
+          @if (sec.title) {
+            @if (nav.collapsed()) {
+              <div class="mx-3 my-3 h-px bg-gray-100"></div>
+            } @else {
+              <!-- Rubriken fäller kortet ihop och ut. Hopfälld visar en prick om något väntar där eller om sidan man är på ligger i det. -->
+              <button
+                type="button"
+                class="nav-title flex w-full items-center gap-2 text-left"
+                [attr.aria-expanded]="nav.isSectionOpen(sec.title)"
+                (click)="nav.toggleSection(sec.title)"
+              >
+                <span class="flex-1">{{ sec.title }}</span>
+                @if (!nav.isSectionOpen(sec.title)) {
+                  @let h = hint(sec);
+                  @if (h.dot) {
+                    <span class="h-2 w-2 rounded-full" [class]="h.dot" aria-hidden="true"></span>
+                  }
+                  @if (h.active) {
+                    <span
+                      class="h-2 w-2 rounded-full bg-[var(--mat-sys-primary)]"
+                      aria-hidden="true"
+                    ></span>
+                  }
+                }
+                <mat-icon
+                  class="nav-chevron !h-4 !w-4 !text-base"
+                  [style.transform]="nav.isSectionOpen(sec.title) ? 'rotate(180deg)' : null"
+                  >expand_more</mat-icon
+                >
+              </button>
+            }
           }
-        }
-        @for (l of sec.items; track l.path) {
-          @if (l.children) {
-            <ng-container *ngTemplateOutlet="group; context: { $implicit: l }" />
-          } @else {
-            <ng-container *ngTemplateOutlet="link; context: { $implicit: l }" />
+          @if (!sec.title || nav.collapsed() || nav.isSectionOpen(sec.title)) {
+            @for (l of sec.items; track l.path) {
+              @if (l.children) {
+                <ng-container *ngTemplateOutlet="group; context: { $implicit: l }" />
+              } @else {
+                <ng-container *ngTemplateOutlet="link; context: { $implicit: l }" />
+              }
+            }
           }
-        }
+        </section>
       }
     </nav>
 
-    <div class="border-t border-gray-100 p-3">
-      @for (l of nav.footer(); track l.path) {
-        <ng-container *ngTemplateOutlet="link; context: { $implicit: l }" />
-      }
-      <button
-        type="button"
-        class="nav-link w-full"
-        [class.justify-center]="nav.collapsed()"
-        [class.!px-0]="nav.collapsed()"
-        (click)="nav.toggle()"
-        [matTooltip]="nav.collapsed() ? 'Visa menyn' : ''"
-        matTooltipPosition="right"
-        [attr.aria-label]="nav.collapsed() ? 'Visa menyn' : 'Dölj menyn'"
-        [attr.aria-expanded]="!nav.collapsed()"
-      >
-        <mat-icon>{{
-          nav.collapsed() ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left'
-        }}</mat-icon>
-        @if (!nav.collapsed()) {
-          <span>Dölj menyn</span>
+    @if (nav.footer().length) {
+      <div class="border-t border-gray-100 p-3">
+        @for (l of nav.footer(); track l.path) {
+          <ng-container *ngTemplateOutlet="link; context: { $implicit: l }" />
         }
-      </button>
-    </div>
+      </div>
+    }
+
+    <!-- Dölj och visa menyn: en liten knapp på kanten uppe, som syns när musen är över menyn. -->
+    <button
+      type="button"
+      class="absolute top-3.5 -right-3 z-20 grid h-6 w-6 place-items-center rounded-full border border-gray-200 bg-white text-gray-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-gray-900 focus-visible:opacity-100"
+      (click)="nav.toggle()"
+      [matTooltip]="nav.collapsed() ? 'Visa menyn' : 'Dölj menyn'"
+      matTooltipPosition="right"
+      [attr.aria-label]="nav.collapsed() ? 'Visa menyn' : 'Dölj menyn'"
+      [attr.aria-expanded]="!nav.collapsed()"
+    >
+      <mat-icon class="!h-4 !w-4 !text-base !leading-4">{{
+        nav.collapsed() ? 'chevron_right' : 'chevron_left'
+      }}</mat-icon>
+    </button>
   `,
 })
 export class Sidebar {
   readonly nav = inject(Nav);
+
+  /** Vad en hopfälld sektion ska visa: om sidan man är på ligger i den, och den mest brådskande prickens färg. */
+  hint(sec: NavSection): { active: boolean; dot: string | null } {
+    const items = sec.items.flatMap((i) => (i.children ? [i, ...i.children] : [i]));
+    const dots = items.map((i) => this.nav.badges()[i.badge ?? i.path]?.dot);
+    return {
+      active: items.some((i) => this.nav.matches(i)),
+      dot:
+        ['bg-red-500', 'bg-amber-500', 'bg-green-500', 'bg-gray-400'].find((d) =>
+          dots.includes(d),
+        ) ?? null,
+    };
+  }
 }

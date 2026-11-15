@@ -21,7 +21,14 @@ import { StorageRecallDialog } from './storage-recall-dialog/storage-recall-dial
     SharedModule,
     RouterModule.forChild([
       { path: '', component: StorageList },
-      { path: 'overview', title: 'Däckhotell: översikt', component: StorageOverview },
+      // Hem är översikten med det som väntar; den gamla adressen leder dit.
+      {
+        path: 'home',
+        title: 'Däckhotell: hem',
+        component: StorageOverview,
+        data: { reuse: true },
+      },
+      { path: 'overview', redirectTo: 'home', pathMatch: 'full' },
       { path: 'new', title: 'Ny inlämning', component: StorageForm },
       { path: ':id', title: 'Inlämning', component: StorageDetail },
       { path: ':id/edit', title: 'Ändra inlämning', component: StorageForm },

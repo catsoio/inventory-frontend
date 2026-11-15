@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { SalesCardApi } from '../../core/api/sales-card-api';
 import { Nav } from '../../core/layout/nav';
-import { ProductScope, inScope } from '../../core/layout/products';
+import { ProductScope, inScope, scopeOf } from '../../core/layout/products';
 import { paymentLabel } from '../../core/models';
 import { DtCol } from '../../shared/data-table/data-table';
 import { KrPipe } from '../../shared/kr-pipe';
@@ -68,7 +68,18 @@ type StatusFilter = 'all' | 'unpaid' | 'overdue' | 'paid';
   standalone: false,
   host: { class: 'flex h-full flex-col' },
   template: `
-    <app-finance-tabs />
+    <app-finance-tabs>
+      <a
+        actions
+        mat-flat-button
+        color="primary"
+        routerLink="/sales/new"
+        [queryParams]="{ kind: 'invoice' }"
+        class="max-md:!hidden"
+      >
+        <mat-icon>add</mat-icon> Ny faktura
+      </a>
+    </app-finance-tabs>
     <div class="mb-4 grid shrink-0 grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
       <button type="button" class="block min-w-0 text-left" (click)="status.set('unpaid')">
         <app-stat
@@ -100,14 +111,9 @@ type StatusFilter = 'all' | 'unpaid' | 'overdue' | 'paid';
     </div>
     <div class="min-h-0 flex-1">
       <app-list-page
-        title="Fakturor"
         [columns]="cols"
         [rows]="shown()"
         [loading]="loading()"
-        newLink="/sales/new"
-        [newQuery]="{ kind: 'invoice' }"
-        newLabel="Ny faktura"
-        [newFab]="false"
         emptyText="Inga fakturor. De skapas när ett säljkort bokförs som faktura."
         searchPlaceholder="Sök nummer, kund eller regnr…"
         (search)="query.set($event)"
@@ -217,7 +223,7 @@ export class InvoiceList {
    * Fakturorna gäller bolaget, inte en produkt: sidan visar den produkt man kom från, och "Alla"
    * visar hela fordran. Ägaren med både verkstad och bilhandel ser alltså aldrig bara halva.
    */
-  readonly scope = signal<ProductScope>(inject(Nav).product());
+  readonly scope = signal<ProductScope>(scopeOf(inject(Nav).product()));
   private readonly items = computed(() =>
     this.all().filter((o) => inScope(this.scope(), o.product)),
   );

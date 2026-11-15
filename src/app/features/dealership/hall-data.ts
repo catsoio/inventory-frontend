@@ -4,7 +4,7 @@ import { catchError, of } from 'rxjs';
 import { CarApi } from '../../core/api/car-api';
 import { Auth } from '../../core/auth/auth';
 import { CarListing } from '../../core/models';
-import { Todo } from '../../core/todo';
+import { Todo, toneOf } from '../../core/todo';
 import {
   askingValue,
   inStock,
@@ -78,14 +78,13 @@ export class HallData {
 
   /** "Att göra": Halls del av samma lista som menyns siffror (`core/todo.ts`). */
   attention(desktop: boolean): Attention[] {
-    const tone = { urgent: 'bad', wait: 'warn', info: 'info' } as const;
     return this.todo
       .itemsFor('hall')
       .filter((t) => !t.desktopOnly || desktop)
       .map((t) => ({
         key: t.key,
         icon: t.icon,
-        tone: tone[t.urgency],
+        tone: toneOf(t),
         text: t.text,
         link: t.link,
         params: t.params,

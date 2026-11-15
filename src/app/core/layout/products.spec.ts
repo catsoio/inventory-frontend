@@ -7,8 +7,9 @@ describe('produktadresser', () => {
     expect(toExternal('/dealership/sales')).toBe('/hall/sales');
     expect(toExternal('/dealership')).toBe('/hall');
     expect(toExternal('/customers/1')).toBe('/customers/1');
-    expect(toExternal('/finance')).toBe('/axle/finance');
-    expect(toExternal('/sales')).toBe('/axle/sales');
+    expect(toExternal('/finance')).toBe('/finance');
+    expect(toExternal('/sales')).toBe('/sales');
+    expect(toExternal('/storage')).toBe('/storage');
     expect(toExternal('/dealership/finance')).toBe('/hall/finance');
     expect(toExternal('/suppliers')).toBe('/suppliers');
   });
@@ -22,9 +23,11 @@ describe('produktadresser', () => {
     expect(productOf('/sales/new')).toBeNull();
     expect(productOf('/finance/invoices?status=unpaid')).toBeNull();
     expect(productOf('/bookkeeping')).toBeNull();
-    // Listan och översikten är Axles.
-    expect(productOf('/sales')).toBe('axle');
-    expect(productOf('/finance')).toBe('axle');
+    // Försäljningslistan och ekonomiöversikten delas av Axle och Däck.
+    expect(productOf('/sales')).toBeNull();
+    expect(productOf('/finance')).toBeNull();
+    expect(productOf('/inventory')).toBeNull();
+    expect(productOf('/purchases')).toBeNull();
   });
 
   it('tar bort det igen', () => {
@@ -34,6 +37,9 @@ describe('produktadresser', () => {
     expect(toInternal('/hall/site')).toBe('/dealership/site');
     expect(toInternal('/hall/finance')).toBe('/dealership/finance');
     expect(toInternal('/axle/finance/receipts')).toBe('/finance/receipts');
+    // Äldre adresser med prefix fungerar fortfarande.
+    expect(toInternal('/axle/storage')).toBe('/storage');
+    expect(toInternal('/axle/inventory')).toBe('/inventory');
     expect(toInternal('/finance/receipts')).toBe('/finance/receipts');
     expect(toInternal('/customers')).toBe('/customers');
     expect(toInternal('/q/abc')).toBe('/q/abc');
@@ -55,7 +61,8 @@ describe('produktadresser', () => {
   });
 
   it('vet vilken produkt en sida hör till', () => {
-    expect(productOf('/storage')).toBe('axle');
+    expect(productOf('/storage')).toBe('dack');
+    expect(productOf('/bookings')).toBe('axle');
     expect(productOf('/dealership/sales?x=1')).toBe('hall');
     expect(productOf('/customers')).toBeNull();
   });

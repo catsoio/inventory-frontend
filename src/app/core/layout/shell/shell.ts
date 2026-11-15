@@ -1,3 +1,4 @@
+import { Refresh } from '../../refresh';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -25,6 +26,14 @@ import { Nav } from '../nav';
  * Skalet: topbar, sidomenyn på dator och flikfältet på mobil. På dator är sökningen alltid
  * en klick (eller `/`) bort; på mobil är den en ikon i topbaren och ett stort fält på Hem.
  */
+/** Modulen som måste vara påslagen för att produktens flik ska visas (Verkstad: alltid). */
+const MODULE_OF = {
+  axle: undefined,
+  dack: 'dackhotell',
+  hall: 'bilhandel',
+  towing: 'bargning',
+} as const;
+
 @Component({
   selector: 'app-shell',
   standalone: false,
@@ -44,7 +53,7 @@ import { Nav } from '../nav';
   template: `
     <app-garage-menu #gm="garageMenu" />
 
-    <!-- Överst (dator): loggan, Catso Garage med flikarna Axle och Hall, och garaget och kontot till höger. -->
+    <!-- Överst (dator): loggan, Catso Garage med flikarna Verkstad, Däck, Bilhandel och Bärgning, och garaget och kontot till höger. -->
     <nav
       class="hidden h-14 shrink-0 items-center gap-2 border-b border-white/15 bg-brand px-4 text-white md:flex"
       aria-label="Produkt"
@@ -58,33 +67,36 @@ import { Nav } from '../nav';
       </a>
       <span class="mr-3 ml-1 text-[15px] font-semibold tracking-tight">Catso Axle</span>
       @if (!auth.isMechanic()) {
-        <div class="flex items-center gap-1 rounded-xl bg-black/20 p-1">
-          @for (p of products(); track p.id) {
-            <a
-              [routerLink]="p.link"
-              class="product-tab flex h-9 items-center relative w-36 justify-center gap-2 rounded-lg px-6 text-sm font-medium transition-colors"
-              [class]="
-                nav.product() === p.id
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/75 hover:bg-white/10 hover:text-white'
-              "
-              [attr.aria-current]="nav.product() === p.id ? 'page' : null"
-            >
-              <mat-icon class="!h-5 !w-5 !text-[20px] !leading-5">{{ p.icon }}</mat-icon>
-              {{ p.label }}
-              @if (nav.product() !== p.id && waiting()[p.id]; as u) {
-                <!-- Något väntar i den andra produkten: röd = brådskande, gul = väntar på dig. -->
-                <span
-                  class="absolute top-1.5 right-2 h-2.5 w-2.5 rounded-full ring-2 ring-white/40"
-                  [class]="u === 'urgent' ? 'bg-red-400' : 'bg-amber-300'"
-                  [matTooltip]="u === 'urgent' ? 'Något är försenat här' : 'Något väntar här'"
-                  role="img"
-                  [attr.aria-label]="u === 'urgent' ? 'Något är försenat' : 'Något väntar'"
-                ></span>
-              }
-            </a>
-          }
-        </div>
+        <!-- Verkstad och Däckhotell, Bilhandel och Bärgning är tre olika verksamheter: var sin ruta. -->
+        @for (group of productGroups(); track $index) {
+          <div class="flex items-center gap-1 rounded-xl bg-black/20 p-1">
+            @for (p of group; track p.id) {
+              <a
+                [routerLink]="p.link"
+                class="product-tab flex h-9 items-center relative min-w-36 justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors"
+                [class]="
+                  nav.product() === p.id
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/75 hover:bg-white/10 hover:text-white'
+                "
+                [attr.aria-current]="nav.product() === p.id ? 'page' : null"
+              >
+                <mat-icon class="!h-5 !w-5 !text-[20px] !leading-5">{{ p.icon }}</mat-icon>
+                {{ p.label }}
+                @if (nav.product() !== p.id && waiting()[p.id]; as u) {
+                  <!-- Något väntar i den andra produkten: röd = brådskande, gul = väntar på dig. -->
+                  <span
+                    class="absolute top-1.5 right-2 h-2.5 w-2.5 rounded-full ring-2 ring-white/40"
+                    [class]="u === 'urgent' ? 'bg-red-400' : 'bg-amber-300'"
+                    [matTooltip]="u === 'urgent' ? 'Något är försenat här' : 'Något väntar här'"
+                    role="img"
+                    [attr.aria-label]="u === 'urgent' ? 'Något är försenat' : 'Något väntar'"
+                  ></span>
+                }
+              </a>
+            }
+          </div>
+        }
       }
       <div class="min-w-0 flex-1"></div>
       @if (auth.isSuperAdmin()) {
@@ -149,11 +161,14 @@ import { Nav } from '../nav';
                     : 'text-white/85 active:bg-white/15'
                 "
                 [attr.aria-selected]="nav.product() === p.id"
+                [attr.aria-label]="p.label"
               >
                 <mat-icon class="!h-[18px] !w-[18px] !text-[18px] !leading-[18px]">{{
                   p.icon
                 }}</mat-icon>
-                {{ p.label }}
+                @if (nav.product() === p.id || products().length <= 2) {
+                  {{ p.label }}
+                }
                 @if (nav.product() !== p.id && waiting()[p.id]; as u) {
                   <span
                     class="absolute top-1 right-1 h-2 w-2 rounded-full"
@@ -202,7 +217,9 @@ import { Nav } from '../nav';
             <span class="min-w-0 flex-1 truncate">{{
               nav.product() === 'hall'
                 ? 'Sök regnr, bil eller kund…'
-                : 'Sök regnr, kund eller plats…'
+                : nav.product() === 'dack'
+                  ? 'Sök regnr, kund eller plats…'
+                  : 'Sök regnr, kund eller order…'
             }}</span>
             <kbd class="rounded bg-white/20 px-1.5 py-0.5 text-xs">/</kbd>
           </button>
@@ -213,6 +230,15 @@ import { Nav } from '../nav';
             aria-label="Sök"
           >
             <mat-icon>search</mat-icon>
+          </button>
+          <button
+            type="button"
+            class="hdr-btn grid place-items-center"
+            (click)="refresh.run()"
+            aria-label="Uppdatera"
+            matTooltip="Uppdatera sidan"
+          >
+            <mat-icon [class.animate-spin]="refresh.busy()">refresh</mat-icon>
           </button>
           @if (!auth.isMechanic()) {
             <button
@@ -245,6 +271,7 @@ export class Shell implements OnDestroy {
   readonly nav = inject(Nav);
   readonly search = inject(GlobalSearch);
   readonly scanner = inject(Scanner);
+  readonly refresh = inject(Refresh);
   private readonly billing = inject(Billing);
   private readonly todo = inject(Todo);
   /** Det mest brådskande som väntar i varje produkt, för pricken på produktfliken. */
@@ -258,15 +285,47 @@ export class Shell implements OnDestroy {
       }))
       .filter((g) => g.actions.length),
   );
-  /** Produkterna man kan växla mellan; Hall bara när garaget har bilhandel. */
+  /** Produkterna man kan växla mellan; varje utom Verkstad bara när garaget har dess modul. */
   readonly products = computed(() =>
     [
-      { id: 'axle' as const, label: 'Verkstad', icon: 'build', link: '/dashboard' },
-      { id: 'hall' as const, label: 'Bilhandel', icon: 'directions_car', link: '/dealership' },
-    ].filter((p) => p.id === 'axle' || this.billing.allows('bilhandel')),
+      { id: 'axle' as const, label: 'Verkstad', icon: 'build', link: '/dashboard', group: 1 },
+      {
+        id: 'dack' as const,
+        label: 'Däckhotell',
+        icon: 'warehouse',
+        link: '/storage/home',
+        group: 1,
+      },
+      {
+        id: 'hall' as const,
+        label: 'Bilhandel',
+        icon: 'directions_car',
+        link: '/dealership',
+        group: 2,
+      },
+      {
+        id: 'towing' as const,
+        label: 'Bärgning',
+        icon: 'local_shipping',
+        link: '/towing/home',
+        group: 3,
+      },
+    ].filter((p) => this.billing.allows(MODULE_OF[p.id])),
   );
+  /** Flikarna i grupper (Verkstad och Däckhotell, Bilhandel, Bärgning), var grupp i en egen ruta. */
+  readonly productGroups = computed(() => {
+    const all = this.products();
+    return [1, 2, 3].map((g) => all.filter((p) => p.group === g)).filter((g) => g.length);
+  });
   /** Startsidan i produkten man är i. */
-  readonly home = computed(() => (this.nav.product() === 'hall' ? '/dealership' : '/dashboard'));
+  readonly home = computed(() => {
+    return {
+      axle: '/dashboard',
+      dack: '/storage/home',
+      hall: '/dealership',
+      towing: '/towing/home',
+    }[this.nav.product()];
+  });
   run(a: QuickAction) {
     if (a.go) void this.router.navigate(a.go);
     else {

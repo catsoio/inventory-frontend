@@ -16,8 +16,8 @@ import { Pricing } from '../../../core/pricing';
 /**
  * Följesedeln (Business Centrals bokförda serviceutleverans): det som lämnas med bilen när den
  * hämtas och arbetet betalas senare mot faktura, t.ex. ett företags chaufför. Den säger vad som
- * gjorts på bilen och vem som tog emot den, men är ingen faktura: inga priser som standard, ingen
- * moms och inga betalningsuppgifter. Den som hämtar skriver under; verkstaden behåller ett ex.
+ * gjorts på bilen, men är ingen faktura: ingen moms och inga betalningsuppgifter. Beloppen visas
+ * från början och kan döljas före utskrift. Ingen underskriftsruta.
  */
 @Component({
   selector: 'app-work-order-delivery-note',
@@ -155,17 +155,6 @@ import { Pricing } from '../../../core/pricing';
           }
         </p>
 
-        <section class="mt-10">
-          <div class="text-xs font-bold tracking-widest text-gray-600 uppercase">
-            Fordonet och arbetet ovan mottaget
-          </div>
-          <div class="mt-10 grid grid-cols-3 gap-8 text-xs text-gray-600">
-            <div class="border-t border-[#4b5563] pt-1">Underskrift</div>
-            <div class="border-t border-[#4b5563] pt-1">Namnförtydligande</div>
-            <div class="border-t border-[#4b5563] pt-1">Datum</div>
-          </div>
-        </section>
-
         @if (seller(); as s) {
           <footer class="mt-12 border-t border-[#9ca3af] pt-2 text-[11px] text-[#4b5563]">
             {{ s.name }} · Org.nr {{ s.orgNo }}
@@ -189,8 +178,8 @@ export class WorkOrderDeliveryNote implements OnInit {
   readonly order = signal<WorkOrderDetail | null>(null);
   readonly customer = signal<CustomerDetail | null>(null);
   readonly seller = signal<SellerDetails | null>(null);
-  /** Priser hör till fakturan; följesedeln visar dem bara när verkstaden vill. */
-  readonly showAmounts = signal(false);
+  /** Beloppen visas från början; reglaget "Visa belopp" döljer dem före utskrift. */
+  readonly showAmounts = signal(true);
 
   ngOnInit() {
     this.api.get(this.id).subscribe((o) => {

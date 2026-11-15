@@ -3,25 +3,26 @@ import { FormArray, FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { serviceTabs } from '../../shared/page-header/tabs';
 import { OnlineBookingApi } from '../../core/api/online-booking-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { OnlineBookingSettings, ServiceType } from '../../core/models';
 import { HasUnsaved } from '../../core/unsaved-guard';
 
 /**
- * Onlinebokning: ägaren formar verkstadens bokningssida för kunder: välkomsttext, hur långt fram man
- * kan boka och vilka åtgärder som visas, med text och bild. Adressen och på/av sätter Catso
- * (Inställningar → Onlinebokning, superadmin). Åtgärderna är samma som i registret; priset skrivs
- * aldrig här utan kommer från åtgärdens prisrader, så sidan och säljkortet visar samma pris.
+ * Fliken Onlinebokning under Åtgärder: bokningssidans egna inställningar (välkomsttext, hur långt
+ * fram man kan boka), vilka åtgärder som visas och i vilken ordning. Rubrik, text och bild per
+ * åtgärd ändras på åtgärdens kort. Adressen och på/av sätter Catso (Inställningar → Onlinebokning,
+ * superadmin). Priset skrivs aldrig här utan kommer från åtgärdens prisrader.
  */
 @Component({
   selector: 'app-online-booking-page',
   standalone: false,
   template: `
-    <div class="mx-auto max-w-5xl space-y-4 p-4">
+    <app-page-header [tabs]="tabs" label="Åtgärder" />
+    <div class="mx-auto max-w-5xl space-y-4 pt-4">
       <header>
-        <h1 class="text-xl font-semibold">Onlinebokning</h1>
-        <p class="mt-1 text-sm text-gray-600">
+        <p class="text-sm text-gray-600">
           Låt kunderna boka själva. De skriver regnumret, ser vad åtgärderna kostar för deras bil
           och skickar en förfrågan. Den dyker upp i kalendern som <b>Förfrågan</b> (lila) och ni
           bekräftar en tid. Sidan finns som <b>Boka tid</b> på er webbplats.
@@ -95,74 +96,41 @@ import { HasUnsaved } from '../../core/unsaved-guard';
       <section class="rounded-xl bg-white p-5 shadow-sm">
         <h2 class="mb-1 text-base font-semibold">Åtgärder på sidan</h2>
         <p class="mb-3 text-sm text-gray-600">
-          Välj vilka åtgärder kunden kan be om. Rubrik och text är valfria: utan dem används
-          åtgärdens namn. Priset kommer från åtgärdens prisrader (visas som "från" tills kunden
-          skrivit sitt regnummer) och ändras på åtgärden.
+          Välj vilka åtgärder kunden kan be om och i vilken ordning de visas. Rubrik, text och bild
+          ändrar du på själva åtgärden. Priset visas som "från" tills kunden skrivit sitt regnummer
+          och kommer från åtgärdens prisrader.
         </p>
         <div [formGroup]="rowsForm">
           <div formArrayName="rows" class="flex flex-col">
             @for (row of rows.controls; track row; let i = $index) {
               <div
                 [formGroupName]="i"
-                class="flex flex-wrap items-start gap-2 border-t border-gray-100 py-3"
+                class="flex flex-wrap items-center gap-3 border-t border-gray-100 py-2"
               >
-                <mat-checkbox formControlName="published" class="mt-1">Visa</mat-checkbox>
+                <mat-slide-toggle formControlName="published" [aria-label]="'Visa ' + row.value.name" />
                 <div class="min-w-48 flex-1">
-                  <div class="text-sm font-medium">{{ row.value.name }}</div>
+                  <div class="text-sm font-medium">
+                    {{ row.value.name }}
+                    @if (row.value.title) {
+                      <span class="font-normal text-gray-500">· visas som "{{ row.value.title }}"</span>
+                    }
+                  </div>
                   <div class="text-xs text-gray-500">
                     @if (row.value.from) {
                       från {{ row.value.from.total | kr }}
                     } @else {
                       Inget pris
                     }
-                    ·
-                    <a class="underline" [routerLink]="['/service-types', row.value.id]"
-                      >Ändra pris</a
-                    >
                   </div>
                 </div>
-                <span class="flex items-center gap-1">
-                  @if (row.value.image) {
-                    <img
-                      [src]="imageSrc(row.value.image)"
-                      alt=""
-                      class="h-10 w-14 rounded-md object-cover"
-                    />
-                    <button
-                      mat-icon-button
-                      type="button"
-                      (click)="clearImage(row)"
-                      aria-label="Ta bort bilden"
-                    >
-                      <mat-icon>close</mat-icon>
-                    </button>
-                  } @else {
-                    <button mat-stroked-button type="button" (click)="file.click()">
-                      <mat-icon>add_photo_alternate</mat-icon> Bild
-                    </button>
-                  }
-                  <input
-                    #file
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    class="hidden"
-                    (change)="pickImage(row, file)"
+                @if (row.value.image) {
+                  <img
+                    [src]="imageSrc(row.value.image)"
+                    alt=""
+                    class="h-10 w-14 rounded-md object-cover"
                   />
-                </span>
-                <input
-                  formControlName="title"
-                  [placeholder]="row.value.name"
-                  maxlength="80"
-                  aria-label="Rubrik på sidan"
-                  class="h-10 w-56 px-2 text-sm text-gray-900 field"
-                />
-                <input
-                  formControlName="description"
-                  placeholder="Kort text (valfri)"
-                  maxlength="300"
-                  aria-label="Text på sidan"
-                  class="h-10 min-w-48 flex-1 px-2 text-sm text-gray-900 field"
-                />
+                }
+                <a mat-stroked-button [routerLink]="['/service-types', row.value.id]">Ändra</a>
                 <span class="flex">
                   <button
                     mat-icon-button
@@ -213,6 +181,7 @@ export class OnlineBookingPage implements OnInit, HasUnsaved {
 
   /** Appens adress, så länken man delar är hel. */
   readonly origin = globalThis.location?.origin ?? '';
+  readonly tabs = serviceTabs(true);
   readonly busy = signal(false);
   readonly saved = signal<OnlineBookingSettings | null>(null);
 
@@ -337,40 +306,5 @@ export class OnlineBookingPage implements OnInit, HasUnsaved {
   /** Adressen till en uppladdad bild, för förhandsvisningen. */
   imageSrc(name: string) {
     return `${environment.apiUrl}${this.saved()?.mediaPath}/${name}`;
-  }
-
-  /** Laddar upp den valda bilden direkt; namnet sparas på åtgärden när man sparar åtgärderna. */
-  pickImage(row: FormGroup, input: HTMLInputElement) {
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      this.snack.open('Bilden får vara högst 5 MB', undefined, { duration: 3000 });
-      return;
-    }
-    this.busy.set(true);
-    this.api.uploadImage(file).subscribe({
-      next: (r) => {
-        this.busy.set(false);
-        row.controls['image'].setValue(r.image);
-        this.rowsForm.markAsDirty();
-      },
-      error: (e: { status?: number; error?: { error?: { message?: string } } }) => {
-        this.busy.set(false);
-        // Servern förklarar bildfel (400); allt annat är ett serverfel, inte bildens fel.
-        this.snack.open(
-          e.status === 400
-            ? (e.error?.error?.message ?? 'Bilden måste vara JPEG, PNG eller WebP')
-            : 'Bilden kunde inte sparas just nu. Försök igen senare.',
-          undefined,
-          { duration: 4000 },
-        );
-      },
-    });
-  }
-
-  clearImage(row: FormGroup) {
-    row.controls['image'].setValue(null);
-    this.rowsForm.markAsDirty();
   }
 }

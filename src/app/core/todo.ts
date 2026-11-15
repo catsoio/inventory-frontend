@@ -12,14 +12,34 @@ import type { Product } from './layout/products';
 import { StorageSummary, Summary, TodoSnapshot, UnpaidSnapshot } from './models';
 
 /**
- * Hur brådskande något är. Det är hela färgskalan i appen:
- *  - `urgent` (röd): ett datum har passerat eller något går inte att sälja (försenat däckset,
- *    förfallen faktura, slut i lagret).
- *  - `wait` (gul): något väntar på att du gör något, men ingenting är sent (utkast, att beställa,
- *    obetald faktura inom tiden).
+ * Hur brådskande något är. Det styr ordningen, vilken siffra ett menyval visar och pricken på
+ * produktfliken:
+ *  - `urgent`: ett datum har passerat eller något går inte att sälja (försenat däckset, förfallen
+ *    faktura, slut i lagret).
+ *  - `wait`: något väntar på att du gör något, men ingenting är sent.
  *  - `info`: bra att veta. Blir aldrig en siffra i menyn.
  */
 export type Urgency = 'urgent' | 'wait' | 'info';
+
+/**
+ * Färgen på en siffra följer vad den betyder, inte bara hur brådskande den är:
+ *  - röd: något är sent eller går inte att sälja (`urgent`),
+ *  - gul: bör åtgärdas, ett problem på väg (att beställa, obetald faktura, del saknas),
+ *  - grön: goda nyheter som väntar på nästa steg (`tone: 'good'`, godkänd offert),
+ *  - grå: vanligt jobb att ta tag i, inget fel (`tone: 'neutral'`, utkast och förfrågningar).
+ */
+export type TodoTone = 'good' | 'neutral';
+export type ToneName = 'bad' | 'warn' | 'good' | 'info';
+
+/** Färgen på en rad under "Att göra" på Hem (grått jobb visas som blå information). */
+export const toneOf = (t: Pick<TodoItem, 'urgency' | 'tone'>): ToneName =>
+  t.urgency === 'urgent'
+    ? 'bad'
+    : t.urgency === 'info' || t.tone === 'neutral'
+      ? 'info'
+      : t.tone === 'good'
+        ? 'good'
+        : 'warn';
 
 /** Siffra bredvid ett menyval så att man ser läget utan att öppna sidan. */
 export interface Badge {
@@ -34,9 +54,11 @@ export interface Badge {
 /** En sak som väntar på någon. Hem ("Att göra") och menyns siffror läser samma lista. */
 export interface TodoItem {
   key: string;
-  /** Vilken produkt det väntar i: Axle (verkstaden) eller Hall (bilhandeln). */
+  /** Vilken produkt det väntar i: Axle (verkstaden), Däck (hotellet), Hall (bilhandeln) eller Bärgning. */
   product: Product;
   urgency: Urgency;
+  /** Färgen när den inte är gul (se `TodoTone`); utan val följer den urgency. */
+  tone?: TodoTone;
   /** Menyvalen (adresser i `NAV`) som visar siffran. Tomt = bara på Hem. */
   menus: string[];
   /** Siffran och ordet i menyn: "1 utkast", "2 förfallna". */
@@ -83,10 +105,13 @@ export interface TodoInput {
 
 const RANK: Record<Urgency, number> = { urgent: 0, wait: 1, info: 2 };
 
-const TONES: Record<Exclude<Urgency, 'info'>, { tone: string; dot: string }> = {
+/** Siffrans färger (`TodoTone`). Grå prickar visas inte på mobilens flikar: inget är fel. */
+const TONES = {
   urgent: { tone: 'bg-red-100 text-red-800', dot: 'bg-red-500' },
   wait: { tone: 'bg-amber-100 text-amber-800', dot: 'bg-amber-500' },
-};
+  good: { tone: 'bg-green-100 text-green-800', dot: 'bg-green-500' },
+  neutral: { tone: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' },
+} as const;
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
@@ -205,7 +230,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (h && h.overdue > 0) {
     out.push({
       key: 'late-sets',
-      product: 'axle',
+      product: 'dack',
       urgency: 'urgent',
       menus: ['/storage'],
       badgeCount: h.overdue,
@@ -219,7 +244,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
   if (h && h.unpaid > 0) {
     out.push({
       key: 'unpaid-sets',
-      product: 'axle',
+      product: 'dack',
       urgency: 'wait',
       menus: ['/storage'],
       badgeCount: h.unpaid,
@@ -268,6 +293,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       key: 'booking-requests',
       product: 'axle',
       urgency: 'wait',
+      tone: 'neutral',
       menus: ['/bookings'],
       badgeCount: n,
       badgeNoun: ['förfrågan', 'förfrågningar'],
@@ -285,6 +311,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       key: 'quotes-approved',
       product: 'axle',
       urgency: 'wait',
+      tone: 'good',
       menus: ['/quotes'],
       badgeCount: n,
       badgeNoun: ['godkänd', 'godkända'],
@@ -316,6 +343,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       key: 'drafts',
       product: 'axle',
       urgency: 'wait',
+      tone: 'neutral',
       menus: ['/sales'],
       badgeCount: i.drafts,
       badgeNoun: ['utkast', 'utkast'],
@@ -331,6 +359,7 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       key: 'hall-drafts',
       product: 'hall',
       urgency: 'wait',
+      tone: 'neutral',
       menus: ['/dealership/deals'],
       badgeCount: n,
       badgeNoun: ['utkast', 'utkast'],
@@ -386,7 +415,7 @@ export function todoBadges(items: TodoItem[]): Record<string, Badge> {
     if (!head || head.urgency === 'info') continue;
     out[menu] = {
       text: `${head.badgeCount} ${plural(head.badgeCount, ...head.badgeNoun)}`,
-      ...TONES[head.urgency],
+      ...TONES[head.urgency === 'urgent' ? 'urgent' : (head.tone ?? 'wait')],
       hint: mine.map((i) => i.text).join(' · '),
     };
   }
@@ -482,9 +511,15 @@ export class Todo {
   readonly invoices = computed(() => this.state()?.input.invoices ?? null);
   readonly hallInvoices = computed(() => this.state()?.input.hallInvoices ?? null);
 
-  /** Det som väntar i en produkt. Menyn och Hem visar bara den produktens saker. */
+  /**
+   * Det som väntar i en produkt. Menyn visar bara den produktens saker. Verkstad och Däck delar
+   * Varor och Ekonomi, så de ser varandras siffror (menyval som saknas i den andras meny syns inte).
+   */
   itemsFor(product: Product): TodoItem[] {
-    return this.items().filter((t) => t.product === product);
+    const shared = (p: Product) => p === 'axle' || p === 'dack';
+    return this.items().filter((t) =>
+      shared(product) ? shared(t.product) : t.product === product,
+    );
   }
 
   /**
@@ -496,7 +531,12 @@ export class Todo {
       const mine = this.items().filter((t) => t.product === p && t.urgency !== 'info');
       return mine.some((t) => t.urgency === 'urgent') ? 'urgent' : mine.length ? 'wait' : null;
     };
-    return { axle: worst('axle'), hall: worst('hall') };
+    return {
+      axle: worst('axle'),
+      dack: worst('dack'),
+      hall: worst('hall'),
+      towing: worst('towing'),
+    };
   });
 
   /** Listan har hämtats, så att "Allt under kontroll" inte visas innan svaret kommit. */

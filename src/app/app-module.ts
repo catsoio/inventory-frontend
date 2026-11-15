@@ -23,7 +23,8 @@ import { errorInterceptor } from './core/http/error-interceptor';
 import { apiCacheInterceptor } from './core/api/api-cache';
 import { garageHeaderInterceptor } from './core/http/garage-header-interceptor';
 import { appLocale } from './core/i18n/locale';
-import { UrlSerializer } from '@angular/router';
+import { RouteReuseStrategy, UrlSerializer } from '@angular/router';
+import { PageReuseStrategy } from './core/layout/page-reuse';
 import { ProductUrlSerializer } from './core/layout/products';
 import { SharedModule } from './shared/shared-module';
 
@@ -37,6 +38,7 @@ registerLocaleData(localeEnGb);
     provideBrowserGlobalErrorListeners(),
     // Adresserna får produktens prefix: /axle/… och /hall/… (se core/layout/products.ts).
     { provide: UrlSerializer, useClass: ProductUrlSerializer },
+    { provide: RouteReuseStrategy, useExisting: PageReuseStrategy },
     { provide: TitleStrategy, useClass: AppTitleStrategy },
     // Språket läses vid start; byts språk laddas appen om (se I18n.set).
     { provide: LOCALE_ID, useFactory: appLocale },

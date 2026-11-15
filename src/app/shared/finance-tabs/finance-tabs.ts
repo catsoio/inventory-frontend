@@ -4,15 +4,19 @@ import { Nav } from '../../core/layout/nav';
 import type { SectionTab } from '../page-header/page-header';
 
 /**
- * Flikraden för Ekonomi, bara på mobil. På dator är Översikt, Fakturor och Moms och bokföring
- * undermenyn till Ekonomi i sidomenyn, och en flikrad vore en dubblett. Mobilen har ingen sidomeny
- * och öppnar Ekonomi från "Mer".
+ * Sidhuvudet för Ekonomi, på dator och mobil: Översikt, Fakturor, Kvitton, Kassaregister och Moms
+ * och bokföring är flikar här, och Ekonomi är ett enda menyval i sidomenyn. Sidans åtgärd (en
+ * "Ny …"-knapp) läggs i `[actions]` och hamnar till höger i samma rad.
  */
 @Component({
   selector: 'app-finance-tabs',
   standalone: false,
   host: { class: 'block' },
-  template: `<app-page-header [tabs]="tabs" label="Ekonomi" [mobileOnly]="true" />`,
+  template: `
+    <app-page-header [tabs]="tabs" label="Ekonomi">
+      <div actions class="contents"><ng-content select="[actions]" /></div>
+    </app-page-header>
+  `,
 })
 export class FinanceTabs {
   private readonly auth = inject(Auth);
@@ -32,7 +36,7 @@ export class FinanceTabs {
         { path: '/finance', label: 'Översikt', exact: true },
         { path: '/finance/invoices', label: 'Fakturor' },
         { path: '/finance/receipts', label: 'Kvitton' },
-        { path: '/finance/register', label: 'Kassa' },
+        { path: '/finance/register', label: 'Kassaregister' },
         { path: '/bookkeeping', label: 'Moms och bokföring' },
       ]
   ).filter(() => this.admin);

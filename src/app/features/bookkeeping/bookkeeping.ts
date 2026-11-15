@@ -22,7 +22,7 @@ const statusText = (c: Closing) =>
   template: `
     <app-finance-tabs />
     <div class="mx-auto max-w-[1400px]">
-      <h1 class="mb-1 text-2xl font-semibold">Bokföring</h1>
+      <h1 class="mb-1 text-2xl font-semibold md:sr-only">Bokföring</h1>
       <p class="mb-4 max-w-3xl text-sm text-gray-600">
         Bokför en period för att arkivera dess siffror, lagersaldon och händelser och låsa den. Allt
         går att granska i efterhand. Garagets ägare och Catso-superadmin kan bokföra.

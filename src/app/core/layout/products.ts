@@ -1,7 +1,8 @@
 import { DefaultUrlSerializer, UrlSerializer, UrlTree } from '@angular/router';
 
 /**
- * Catso Garage har två produkter: Axle (verkstaden) och Hall (bilhandeln). Adressen säger vilken:
+ * Catso Garage har fyra produkter: Axle (verkstaden), Däck (däckhotellet), Hall (bilhandeln) och
+ * Bärgning. Axle och Hall har ett prefix i adressen, de andra två inget. Adressen säger vilken:
  * `/axle/workorders`, `/hall/cars`. Varje produkt har sin egen startsida och sin egen
  * ekonomiöversikt (`/axle/finance`, `/hall/finance`). Det som hör till båda ligger utan prefix, så
  * att man stannar i den produkt man kom från: kunder, fordon, leverantörer och dokumenten
@@ -9,33 +10,37 @@ import { DefaultUrlSerializer, UrlSerializer, UrlTree } from '@angular/router';
  * rutterna (`/workorders`, `/dealership`); `ProductUrlSerializer` lägger till och tar bort
  * prefixet i webbläsarens adress, så ingen länk i koden behöver veta om det.
  */
-export type Product = 'axle' | 'hall';
+export type Product = 'axle' | 'hall' | 'dack' | 'towing';
 
-/** En lista över bolagets dokument kan visa en produkt eller båda. */
-export type ProductScope = 'all' | Product;
+/**
+ * En lista över bolagets dokument kan visa en produkt eller båda. Bärgning har inga egna
+ * dokumentlistor än: dess sidor delar Axles.
+ */
+export type ProductScope = 'all' | 'axle' | 'hall';
 
 export const inScope = (scope: ProductScope, product: Product) =>
   scope === 'all' || scope === product;
 
-/** Första ledet i de interna adresser som hör till Axle. `dashboard` är Axles startsida (`/axle`). */
+/** Dokumentlistornas val när man kommer från en produkt: Däck och Bärgning har ingen egen och ser allt. */
+export const scopeOf = (product: Product): ProductScope =>
+  product === 'axle' || product === 'hall' ? product : 'all';
+
+/**
+ * Första ledet i de interna adresser som hör till Axle. `dashboard` är Axles startsida (`/axle`).
+ * Varorna (Försäljning, Artiklar, Inköp, Lagerlogg) och Ekonomi ligger inte här: de delas av Axle
+ * och Däck, så man stannar i den produkt man kom från (Halls ekonomi är `/hall/finance`).
+ */
 const AXLE_ROUTES = new Set([
   'dashboard',
-  'inventory',
-  'storage',
   'bookings',
   'workorders',
   'quotes',
-  'sales',
-  'purchases',
   'service-types',
   'resources',
-  'online-booking',
-  'reports',
-  'article-types',
-  'warehouses',
-  // Ekonomiöversikten är en per produkt: Axles ligger här, Halls under `/hall/finance`.
-  'finance',
 ]);
+
+/** Däckhotellet är en egen produkt (`/storage`); adressen har inget prefix. */
+const DACK_ROUTES = new Set(['storage']);
 
 /**
  * Sidor under ett Axle-avsnitt som delas av båda produkterna: ett säljkort är lika mycket en
@@ -49,6 +54,9 @@ const isShared = (path: string) => SHARED_PREFIXES.some((p) => path.startsWith(p
 /** Halls interna rutt är `dealership`; i adressen heter den `hall`. */
 const HALL_ROUTE = 'dealership';
 
+/** Bärgning är en egen produkt (`/towing`); adressen har inget prefix, rutten är redan produktens. */
+const TOWING_ROUTE = 'towing';
+
 const split = (url: string): [path: string, rest: string] => {
   const i = url.search(/[?#]/);
   return i < 0 ? [url, ''] : [url.slice(0, i), url.slice(i)];
@@ -60,7 +68,9 @@ export function productOf(internal: string): Product | null {
   if (isShared(path)) return null;
   const first = path.split('/')[1] ?? '';
   if (AXLE_ROUTES.has(first)) return 'axle';
-  return first === HALL_ROUTE ? 'hall' : null;
+  if (first === HALL_ROUTE) return 'hall';
+  if (DACK_ROUTES.has(first)) return 'dack';
+  return first === TOWING_ROUTE ? 'towing' : null;
 }
 
 /** Den interna adressen som den står i webbläsaren: `/workorders/3` blir `/axle/workorders/3`. */

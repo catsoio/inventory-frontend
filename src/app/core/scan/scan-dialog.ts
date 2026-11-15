@@ -1,4 +1,12 @@
-import { Component, ElementRef, OnDestroy, inject, signal, viewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  OnDestroy,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { SharedModule } from '../../shared/shared-module';
 import { Scanner } from './scanner';
@@ -15,21 +23,26 @@ interface Detector {
   template: `
     <h2 mat-dialog-title>Skanna</h2>
     <mat-dialog-content class="flex flex-col gap-3">
-      <p class="text-sm text-gray-600">
+      <p class="order-1 text-sm text-gray-600">
         Skanna en etikett med läsaren, eller skriv koden: DH-nummer, artikelnummer, streckkod,
         AO-/SK-/KF-nummer eller regnr.
       </p>
       <input
         #field
-        class="h-12 w-full rounded-xl border border-gray-300 px-3 text-lg"
+        class="order-3 h-12 w-full rounded-xl border border-gray-300 px-3 text-lg md:order-2"
         placeholder="Skanna eller skriv…"
         autocomplete="off"
         autocapitalize="characters"
-        autofocus
         (keydown.enter)="submit(field.value)"
       />
-      @if (canCamera) {
-        @if (camera()) {
+      <!-- På mobil är kameran det vanliga sättet, så den ligger över fältet och syns utan att rulla. -->
+      <div class="order-2 flex flex-col gap-3 md:order-3">
+        @if (!canCamera) {
+          <p class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+            Kameran kan inte läsa koder i den här webbläsaren. Använd en streckkodsläsare, skriv
+            koden, eller öppna Axle i Chrome.
+          </p>
+        } @else if (camera()) {
           <video
             #video
             class="aspect-video w-full rounded-xl bg-black object-cover"
@@ -44,9 +57,9 @@ interface Detector {
             <mat-icon>photo_camera</mat-icon> Använd kameran
           </button>
         }
-      }
+      </div>
       @if (error()) {
-        <p class="text-sm text-red-700">{{ error() }}</p>
+        <p class="order-4 text-sm text-red-700">{{ error() }}</p>
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -57,20 +70,29 @@ interface Detector {
     </mat-dialog-actions>
   `,
 })
-export class ScanDialog implements OnDestroy {
+export class ScanDialog implements AfterViewInit, OnDestroy {
   private readonly scanner = inject(Scanner);
   private readonly ref = inject(MatDialogRef<ScanDialog>);
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
+  private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
 
   readonly busy = signal(false);
   readonly error = signal('');
   readonly camera = signal(false);
-  /** Kameraläsning kräver webbläsarens BarcodeDetector (Chrome, Edge, Safari på nyare iOS). */
+  /**
+   * Kameraläsning kräver webbläsarens BarcodeDetector (Chrome och Edge; inte Safari på iPhone eller
+   * Firefox) och en säker anslutning (https). Saknas den visar dialogen en förklaring i stället för knappen.
+   */
   readonly canCamera =
     typeof window !== 'undefined' && 'BarcodeDetector' in window && !!navigator.mediaDevices;
 
   private stream: MediaStream | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+
+  /** Fältet får fokus på dator, där en läsare skriver in koden. På mobil öppnar fokus bara tangentbordet. */
+  ngAfterViewInit() {
+    if (window.matchMedia('(pointer: fine)').matches) this.field()?.nativeElement.focus();
+  }
 
   async submit(value: string) {
     const code = value.trim();

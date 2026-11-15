@@ -93,11 +93,16 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
               class="mb-3 flex flex-wrap gap-x-6"
               aria-label="Priserna på den gamla fakturan"
             >
-              <mat-radio-button value="excl">Priserna är exkl. moms (som på den gamla fakturan)</mat-radio-button>
+              <mat-radio-button value="excl"
+                >Priserna är exkl. moms (som på den gamla fakturan)</mat-radio-button
+              >
               <mat-radio-button value="incl">Priserna är inkl. moms</mat-radio-button>
             </mat-radio-group>
-            <div class="mb-1 hidden grid-cols-[1fr_5rem_8rem_7rem_2.5rem] gap-2 text-xs text-gray-500 sm:grid">
-              <span>Text</span><span>Antal</span><span>{{ excl() ? 'À-pris exkl. moms' : 'À-pris inkl. moms' }}</span>
+            <div
+              class="mb-1 hidden grid-cols-[1fr_5rem_8rem_7rem_2.5rem] gap-2 text-xs text-gray-500 sm:grid"
+            >
+              <span>Text</span><span>Antal</span
+              ><span>{{ excl() ? 'À-pris exkl. moms' : 'À-pris inkl. moms' }}</span>
               <span class="text-right">Summa</span><span></span>
             </div>
             @for (r of rows.controls; track r; let i = $index) {
@@ -107,15 +112,31 @@ import type { PickerValue } from '../../shared/customer-vehicle-picker/customer-
               >
                 <mat-form-field class="col-span-3 sm:col-span-1" subscriptSizing="dynamic">
                   <mat-label class="sm:hidden">Text</mat-label>
-                  <input matInput formControlName="description" placeholder="Vad såldes eller gjordes" />
+                  <input
+                    matInput
+                    formControlName="description"
+                    placeholder="Vad såldes eller gjordes"
+                  />
                 </mat-form-field>
                 <mat-form-field subscriptSizing="dynamic">
                   <mat-label class="sm:hidden">Antal</mat-label>
-                  <input matInput type="number" inputmode="decimal" min="0" formControlName="quantity" />
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    formControlName="quantity"
+                  />
                 </mat-form-field>
                 <mat-form-field subscriptSizing="dynamic">
                   <mat-label class="sm:hidden">À-pris</mat-label>
-                  <input matInput type="number" inputmode="decimal" min="0" formControlName="unitPrice" />
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    formControlName="unitPrice"
+                  />
                 </mat-form-field>
                 <div class="flex h-11 items-center justify-end text-sm font-medium">
                   {{ rowTotal(r) | kr }}
@@ -243,7 +264,9 @@ export class InvoiceNew implements HasUnsaved {
     return Math.round((Number(v.quantity) || 0) * (Number(v.unitPrice) || 0) * 100);
   }
 
-  private readonly vatMode = toSignal(this.form.controls.vat.valueChanges, { initialValue: 'excl' });
+  private readonly vatMode = toSignal(this.form.controls.vat.valueChanges, {
+    initialValue: 'excl',
+  });
   readonly excl = computed(() => this.vatMode() === 'excl');
   /** Att betala, och momsen i den, i öre; priserna kan vara skrivna exkl. eller inkl. moms. */
   readonly gross = computed(() => (this.excl() ? Math.round(this.total() * 1.25) : this.total()));
@@ -345,7 +368,11 @@ export class InvoiceNew implements HasUnsaved {
             vehicleId: link.vehicleId || undefined,
             date: v.date,
             rows: this.rows.controls.map((r) => {
-              const x = r.getRawValue() as { description: string; quantity: number; unitPrice: number };
+              const x = r.getRawValue() as {
+                description: string;
+                quantity: number;
+                unitPrice: number;
+              };
               return {
                 description: x.description.trim(),
                 quantity: Number(x.quantity),

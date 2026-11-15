@@ -54,7 +54,8 @@ describe('menyns siffror', () => {
     expect(b['/storage'].hint).toContain('4 obetalda hotellavgifter');
     expect(b['/inventory'].text).toBe('1 slut');
     expect(b['/inventory'].hint).toContain('3 artiklar att beställa');
-    expect(b['/sales']).toMatchObject({ text: '1 utkast', dot: 'bg-amber-500' });
+    // Ett utkast är vanligt jobb, inget fel: grått.
+    expect(b['/sales']).toMatchObject({ text: '1 utkast', dot: 'bg-gray-400' });
   });
 
   it('gul tills något är sent: obetalda hotellavgifter ensamma blir "4 obetalda"', () => {
@@ -115,16 +116,18 @@ describe('menyns siffror', () => {
     expect(todoBadges(items)).toEqual({});
   });
 
-  it('godkända offerter och arbetsorder som väntar på del får var sin gula siffra', () => {
+  it('godkända offerter är en grön siffra och arbetsorder som väntar på del en gul', () => {
     const b = todoBadges(buildTodo(input({ quotes: { approved: 2, waiting: 0 }, partsOrders: 1 })));
     expect(b['/quotes'].text).toBe('2 godkända');
+    expect(b['/quotes'].tone).toContain('green');
     expect(b['/workorders'].text).toBe('1 väntar på del');
+    expect(b['/workorders'].tone).toContain('amber');
   });
 
-  it('bokningsförfrågningar från bokningssidan är en gul siffra på Tidsbokning', () => {
+  it('bokningsförfrågningar från bokningssidan är en grå siffra på Tidsbokning', () => {
     const b = todoBadges(buildTodo(input({ requests: 3 })));
     expect(b['/bookings'].text).toBe('3 förfrågningar');
-    expect(b['/bookings'].tone).toContain('amber');
+    expect(b['/bookings'].tone).toContain('gray');
     expect(todoBadges(buildTodo(input({ requests: 1 })))['/bookings'].text).toBe('1 förfrågan');
     expect(todoBadges(buildTodo(input({ requests: 0 })))).toEqual({});
   });

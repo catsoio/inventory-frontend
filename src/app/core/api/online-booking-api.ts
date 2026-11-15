@@ -6,7 +6,7 @@ import { OnlineBookingSettings } from '../models';
 
 /**
  * Verkstadens publika bokningssida. På/av sätter plattformens operatör (Inställningar →
- * Onlinebokning), ägaren formar sidan under Onlinebokning i menyn. Kunden bokar på verkstadens
+ * Onlinebokning), ägaren formar sidan under Åtgärder → Onlinebokning. Kunden bokar på verkstadens
  * webbplats (`/boka`), som `catso-sites` renderar.
  */
 @Injectable({ providedIn: 'root' })
@@ -20,9 +20,7 @@ export class OnlineBookingApi {
 
   /** Ändrar det som skickas med; resten behålls. */
   saveSettings(
-    body: Partial<
-      Pick<OnlineBookingSettings, 'enabled' | 'intro' | 'leadDays' | 'horizonDays'>
-    >,
+    body: Partial<Pick<OnlineBookingSettings, 'enabled' | 'intro' | 'leadDays' | 'horizonDays'>>,
   ): Observable<OnlineBookingSettings> {
     return this.http.put<OnlineBookingSettings>(this.settingsUrl, body);
   }

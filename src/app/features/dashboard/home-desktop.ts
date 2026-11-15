@@ -1,7 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Booking } from '../../core/models';
-import { shortLabel } from '../../core/insights/hotel';
 import { addDays, startOfDay } from '../../core/insights/dates';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
 import { columns, fmtKr, kronor, tickKr } from '../../shared/chart/chart-kit';
@@ -30,20 +29,13 @@ const WORK_HOURS = 8;
   template: `
     <div
       class="grid gap-4 sm:grid-cols-2"
-      [class]="data.admin ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+      [class]="data.admin ? 'xl:grid-cols-4' : 'xl:grid-cols-3'"
     >
       <app-stat
         label="Bokningar idag"
         [value]="data.bookingsLoaded() ? data.today().length : '–'"
         [hint]="data.bookingsLoaded() ? data.left() + ' kvar' : ''"
         link="/bookings"
-      />
-      <app-stat
-        label="Däckhotell"
-        [value]="data.hotel()?.stored ?? '–'"
-        [hint]="hotelHint()"
-        [status]="data.hotel()?.overdue ? 'bad' : 'none'"
-        link="/storage/overview"
       />
       <app-stat
         label="Behöver beställas"
@@ -150,7 +142,7 @@ const WORK_HOURS = 8;
     <div class="mt-4 grid gap-4 xl:grid-cols-3">
       @if (data.workOrdersOn) {
         <app-panel
-          class="xl:col-span-2"
+          class="xl:col-span-3"
           title="Arbetsorder"
           [subtitle]="activeOrders() + ' pågående. Dra ett kort för att byta status.'"
           icon="handyman"
@@ -161,18 +153,6 @@ const WORK_HOURS = 8;
           <app-order-board />
         </app-panel>
       }
-      <app-panel
-        title="Hämtas per vecka"
-        subtitle="Inlagrade däckset, per veckonummer. Röd stapel: har passerat hämtdatum."
-        [table]="pickupTable()"
-        [empty]="data.depositsLoaded() && !data.deposits().length"
-        emptyText="Inga inlagrade set."
-        [class.xl:col-span-3]="!data.workOrdersOn"
-      >
-        <div class="h-52">
-          <app-chart [config]="pickupChart()" label="Däckset som ska hämtas per vecka" />
-        </div>
-      </app-panel>
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-3">
@@ -222,11 +202,6 @@ export class HomeDesktop {
 
   // --- nyckeltal ---
 
-  readonly hotelHint = computed(() => {
-    const h = this.data.hotel();
-    if (!h) return '';
-    return h.overdue > 0 ? `${h.overdue} har passerat hämtdatum` : `${h.units} däck och fälgar`;
-  });
   readonly stockHint = computed(() => {
     const s = this.data.summary();
     if (!s) return '';
@@ -261,30 +236,6 @@ export class HomeDesktop {
       .filter((b) => (b.status === 'booked' || b.status === 'arrived') && !this.data.past(b))
       .slice(0, 5),
   );
-
-  // --- hämtas per vecka ---
-
-  readonly pickupChart = computed(() => {
-    const b = this.data.forecast().buckets;
-    return columns({
-      labels: b.map(shortLabel),
-      title: (i) => b[i].title,
-      series: [
-        {
-          label: 'Set',
-          data: b.map((x) => x.sets),
-          color: ACCENT,
-          colors: b.map((x) => (x.overdue ? STATUS.critical : x.key === 'later' ? OTHER : ACCENT)),
-        },
-      ],
-      format: (v) => `${v} set`,
-      footer: (i) => [`${b[i].units} däck och fälgar`],
-    });
-  });
-  readonly pickupTable = computed<PanelTable>(() => ({
-    head: ['Vecka', 'Set', 'Däck och fälgar'],
-    rows: this.data.forecast().buckets.map((b) => [b.title, b.sets, b.units]),
-  }));
 
   // --- försäljning och inköp ---
 

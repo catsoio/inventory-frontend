@@ -7,21 +7,11 @@ import { WorkOrderApi } from '../../core/api/work-order-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { Auth } from '../../core/auth/auth';
 import { addDays, startOfDay, ymd } from '../../core/insights/dates';
-import { pickupForecast } from '../../core/insights/hotel';
 import { Insights } from '../../core/insights/insights';
 import { WeeklySeries, weeklySeries } from '../../core/insights/sales';
 import { Settings } from '../../core/settings';
-import { Todo } from '../../core/todo';
-import {
-  Booking,
-  BookingStatus,
-  Report,
-  Resource,
-  StorageDeposit,
-  StorageSummary,
-  Summary,
-  WorkOrder,
-} from '../../core/models';
+import { Todo, toneOf } from '../../core/todo';
+import { Booking, BookingStatus, Report, Resource, Summary, WorkOrder } from '../../core/models';
 import { environment } from '../../../environments/environment';
 
 /** En rad under "Att göra": något som väntar på någon. */
@@ -29,8 +19,8 @@ export interface Attention {
   key: string;
   icon: string;
   text: string;
-  /** bad = brådskande, warn = bör ses över, info = bra att veta. */
-  tone: 'bad' | 'warn' | 'info';
+  /** bad = sent, warn = bör åtgärdas, good = goda nyheter, info = vanligt jobb eller bra att veta. */
+  tone: 'bad' | 'warn' | 'good' | 'info';
   link: string;
   params?: Record<string, string | number | boolean>;
 }
@@ -38,7 +28,7 @@ export interface Attention {
 const LIVE: BookingStatus[] = ['booked', 'arrived', 'done'];
 
 /**
- * Det startsidan visar, hämtat en gång för både dator- och mobilvyn. Bokningar, hotell och
+ * Det startsidan visar, hämtat en gång för både dator- och mobilvyn. Bokningar och
  * lager hämtas alltid; arbetsorder och pengar bara av datorvyn (`loadDesktop`). Alla anrop
  * tål fel var för sig: en sida utan behörighet eller utan nät ger tomma siffror, inte en tom sida.
  */
@@ -62,11 +52,8 @@ export class HomeData {
   /** Klockan, uppdaterad varje minut så att "kvar" och "nästa" följer dagen. */
   readonly now = signal(Date.now());
 
-  // Lager, hotell, utkast och obetalt kommer ur samma svar som menyns siffror (`Todo`): inget eget anrop.
+  // Lager, utkast och obetalt kommer ur samma svar som menyns siffror (`Todo`): inget eget anrop.
   readonly summary: Signal<Summary | null> = this.todo.stock;
-  readonly hotel: Signal<StorageSummary | null> = this.todo.hotel;
-  readonly deposits = signal<StorageDeposit[]>([]);
-  readonly depositsLoaded = signal(false);
   readonly resources = signal<Resource[]>([]);
   /** Alla bokningar från idag och 14 dagar framåt (inte avbokade). */
   readonly bookings = signal<Booking[]>([]);
@@ -132,13 +119,6 @@ export class HomeData {
     );
   });
 
-  // --- hotellet ---
-
-  readonly forecast = computed(() => pickupForecast(this.deposits(), new Date(this.now()), 8));
-
-  /** Set som ska hämtas den här veckan (efter de försenade). */
-  readonly pickupsThisWeek = computed(() => this.forecast().buckets[1]?.sets ?? 0);
-
   // --- det som väntar ---
 
   /**
@@ -146,43 +126,25 @@ export class HomeData {
    * Hem lägger till det som inte är något att göra men bra att veta (hämtas den här veckan).
    */
   readonly attention = computed<Attention[]>(() => {
-    const tone = { urgent: 'bad', wait: 'warn', info: 'info' } as const;
     const out: Attention[] = this.todo
       .items()
       .filter((t) => !t.desktopOnly || this.desktop())
-      // Halls saker hör till Halls startsida, inte till Axles.
+      // Bara verkstadens saker: Halls, Däckhotellets och Bärgnings hör till respektive Hem.
       .filter((t) => t.product === 'axle')
       .map((t) => ({
         key: t.key,
         icon: t.icon,
-        tone: tone[t.urgency],
+        tone: toneOf(t),
         text: t.text,
         link: t.link,
         params: t.params,
       }));
-    const wp = this.pickupsThisWeek();
-    if (wp > 0) {
-      out.push({
-        key: 'pickups',
-        icon: 'warehouse',
-        tone: 'info',
-        text: `${wp} däckset ska hämtas den här veckan`,
-        link: '/storage/overview',
-      });
-    }
     return out;
   });
 
   // --- hämtning ---
 
   private loadCore() {
-    this.insights
-      .storedDeposits()
-      .pipe(catchError(() => of([] as StorageDeposit[])))
-      .subscribe((x) => {
-        this.deposits.set(x);
-        this.depositsLoaded.set(true);
-      });
     this.workshop
       .resources()
       .pipe(catchError(() => of([] as Resource[])))

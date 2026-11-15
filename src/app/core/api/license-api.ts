@@ -17,6 +17,11 @@ export const MODULE_INFO: { id: string; label: string; text: string }[] = [
   { id: 'bokforing', label: 'Ekonomi', text: 'Bokföring, moms, kassaregister och betalningar.' },
   { id: 'onlinebokning', label: 'Onlinebokning', text: 'Kundens egen bokningssida.' },
   { id: 'bilhandel', label: 'Bilhandel', text: 'Bilar till salu och webbplats på egen domän.' },
+  {
+    id: 'bargning',
+    label: 'Bärgning',
+    text: 'Bärgning och vägassistans: uppdrag från samtal till klart.',
+  },
   { id: 'sms', label: 'SMS till kunder', text: 'Texter om offerter, inkallning och bokningar.' },
 ];
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
@@ -17,6 +17,9 @@ import {
 import { fromPrice, today } from '../../../core/service-pricing';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Auth } from '../../../core/auth/auth';
+import { Billing } from '../../../core/billing/billing';
+import { OnlineBookingApi } from '../../../core/api/online-booking-api';
+import { environment } from '../../../../environments/environment';
 
 const toNum = (v: unknown): number | null =>
   v === null || v === undefined || v === '' ? null : Number(v);
@@ -325,6 +328,69 @@ const toOre = (kr: unknown): number | null => {
           }
         </div>
       </section>
+      @if (online()) {
+        <section class="mt-4 rounded-xl bg-white p-5 shadow-sm" [formGroup]="form">
+          <div class="mb-1 flex flex-wrap items-center gap-3">
+            <h2 class="flex-1 text-base font-semibold">Onlinebokning</h2>
+            <mat-slide-toggle formControlName="onlinePublished" aria-label="Visa på bokningssidan"
+              >Visa på bokningssidan</mat-slide-toggle
+            >
+          </div>
+          <p class="mb-3 text-sm text-gray-600">
+            Kunden kan be om den här åtgärden på er bokningssida. Rubrik och text är valfria: utan
+            dem används åtgärdens namn. Priset kommer från prisraderna och visas som "från" tills
+            kunden skrivit sitt regnummer. Ordningen ändrar du under Åtgärder → Onlinebokning.
+          </p>
+          @if (form.controls.onlinePublished.value) {
+            <div class="flex flex-wrap items-start gap-3">
+              <div class="flex min-w-60 flex-1 flex-col gap-2">
+                <input
+                  formControlName="onlineTitle"
+                  [placeholder]="form.controls.name.value || 'Rubrik på sidan'"
+                  maxlength="80"
+                  aria-label="Rubrik på sidan"
+                  class="h-10 px-2 text-sm text-gray-900 field"
+                />
+                <textarea
+                  formControlName="onlineDescription"
+                  rows="2"
+                  maxlength="300"
+                  placeholder="Kort text (valfri)"
+                  aria-label="Text på sidan"
+                  class="px-2 py-2 text-sm text-gray-900 field"
+                ></textarea>
+              </div>
+              <span class="flex items-center gap-1">
+                @if (form.controls.onlineImage.value; as img) {
+                  <img [src]="imageSrc(img)" alt="" class="h-16 w-24 rounded-md object-cover" />
+                  @if (admin) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="clearImage()"
+                      aria-label="Ta bort bilden"
+                    >
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  }
+                } @else if (admin) {
+                  <button mat-stroked-button type="button" (click)="file.click()">
+                    <mat-icon>add_photo_alternate</mat-icon> Bild
+                  </button>
+                }
+                <input
+                  #file
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="hidden"
+                  (change)="pickImage(file)"
+                />
+              </span>
+            </div>
+          }
+        </section>
+      }
+
     </app-card-page>
   `,
 })
@@ -339,6 +405,12 @@ export class ServiceTypeCard implements OnInit {
   private readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
 
   readonly busy = signal(false);
+  private readonly billing = inject(Billing);
+  private readonly onlineApi = inject(OnlineBookingApi);
+  /** Ägaren ställer in åtgärdens plats på bokningssidan när garaget har onlinebokning. */
+  readonly online = computed(() => this.admin && this.billing.allows('onlinebokning'));
+  /** Där verkstadens bilder ligger, från bokningssidans inställningar. */
+  private mediaPath = '';
   readonly card = signal<ServiceType | null>(null);
 
   private readonly fb = inject(FormBuilder);
@@ -367,6 +439,10 @@ export class ServiceTypeCard implements OnInit {
       campaignFrom: [''],
       campaignTo: [''],
       campaignLabel: [''],
+      onlinePublished: [false],
+      onlineTitle: [''],
+      onlineDescription: [''],
+      onlineImage: [null as string | null],
     },
     {
       validators: (g) => {
@@ -465,6 +541,7 @@ export class ServiceTypeCard implements OnInit {
 
   ngOnInit() {
     if (!this.admin) this.form.disable();
+    if (this.online()) this.onlineApi.settings().subscribe((o) => (this.mediaPath = o.mediaPath));
     if (this.id) this.load();
   }
 
@@ -491,6 +568,10 @@ export class ServiceTypeCard implements OnInit {
         campaignFrom: c?.from ?? '',
         campaignTo: c?.to ?? '',
         campaignLabel: c?.label ?? '',
+        onlinePublished: !!t.online?.published,
+        onlineTitle: t.online?.title ?? '',
+        onlineDescription: t.online?.description ?? '',
+        onlineImage: t.online?.image ?? null,
       });
     });
   }
@@ -528,6 +609,18 @@ export class ServiceTypeCard implements OnInit {
       durationMinutes: v.minutes,
       priceFrom: ore(v.priceFrom),
       priceTo: ore(v.priceFrom),
+      // Plats på sidan behålls (ordningen ändras under Onlinebokning); ny åtgärd hamnar sist.
+      ...(this.online()
+        ? {
+            online: {
+              published: v.onlinePublished,
+              title: v.onlineTitle.trim() || null,
+              description: v.onlineDescription.trim() || null,
+              order: this.card()?.online?.order ?? 9000,
+              image: v.onlineImage,
+            },
+          }
+        : {}),
     };
     this.busy.set(true);
     const req = this.id
@@ -543,6 +636,46 @@ export class ServiceTypeCard implements OnInit {
       },
       error: () => this.busy.set(false),
     });
+  }
+
+  /** Adressen till en uppladdad bild, för förhandsvisningen. */
+  imageSrc(name: string) {
+    return `${environment.apiUrl}${this.mediaPath}/${name}`;
+  }
+
+  /** Laddar upp den valda bilden direkt; namnet sparas på åtgärden när man sparar. */
+  pickImage(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      this.snack.open('Bilden får vara högst 5 MB', undefined, { duration: 3000 });
+      return;
+    }
+    this.busy.set(true);
+    this.onlineApi.uploadImage(file).subscribe({
+      next: (r) => {
+        this.busy.set(false);
+        this.form.controls.onlineImage.setValue(r.image);
+        this.form.markAsDirty();
+      },
+      error: (e: { status?: number; error?: { error?: { message?: string } } }) => {
+        this.busy.set(false);
+        // Servern förklarar bildfel (400); allt annat är ett serverfel, inte bildens fel.
+        this.snack.open(
+          e.status === 400
+            ? (e.error?.error?.message ?? 'Bilden måste vara JPEG, PNG eller WebP')
+            : 'Bilden kunde inte sparas just nu. Försök igen senare.',
+          undefined,
+          { duration: 4000 },
+        );
+      },
+    });
+  }
+
+  clearImage() {
+    this.form.controls.onlineImage.setValue(null);
+    this.form.markAsDirty();
   }
 
   remove() {

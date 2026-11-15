@@ -54,13 +54,17 @@ const routes: Routes = [
     canActivateChild: [mechanicGuard],
     children: [
       {
-        // Startsidan är den i produkten man senast arbetade i (Hall bara när garaget har bilhandel).
+        // Startsidan är den i produkten man senast arbetade i (Hall och Bärgning bara när garaget har dem).
         path: '',
         pathMatch: 'full',
-        redirectTo: () =>
-          inject(Nav).product() === 'hall' && inject(Billing).allows('bilhandel')
-            ? '/dealership'
-            : '/dashboard',
+        redirectTo: () => {
+          const product = inject(Nav).product();
+          const billing = inject(Billing);
+          if (product === 'hall' && billing.allows('bilhandel')) return '/dealership';
+          if (product === 'towing' && billing.allows('bargning')) return '/towing/home';
+          if (product === 'dack' && billing.allows('dackhotell')) return '/storage/home';
+          return '/dashboard';
+        },
       },
       {
         path: 'dashboard',
@@ -170,14 +174,13 @@ const routes: Routes = [
           import('./features/dealership/dealership-module').then((m) => m.DealershipModule),
       },
       {
-        path: 'online-booking',
-        title: 'Onlinebokning',
-        canActivate: [adminGuard, moduleGuard('onlinebokning')],
-        loadChildren: () =>
-          import('./features/online-booking/online-booking-module').then(
-            (m) => m.OnlineBookingModule,
-          ),
+        path: 'towing',
+        title: 'Bärgning',
+        canActivate: [moduleGuard('bargning')],
+        loadChildren: () => import('./features/towing/towing-module').then((m) => m.TowingModule),
       },
+      // Onlinebokningen är en flik under Åtgärder; den gamla adressen leder dit.
+      { path: 'online-booking', redirectTo: 'service-types/online', pathMatch: 'full' },
       {
         path: 'activity',
         title: 'Aktivitetslogg',

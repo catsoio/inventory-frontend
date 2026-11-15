@@ -21,7 +21,7 @@ const kr = new KrPipe();
   template: `
     <app-finance-tabs />
     <div class="mb-4 flex flex-wrap items-center gap-3">
-      <h1 class="mr-2 text-2xl font-semibold">Ekonomi</h1>
+      <h1 class="mr-2 text-2xl font-semibold md:sr-only">Ekonomi</h1>
       <label class="flex items-center gap-2 text-sm">
         Från
         <input

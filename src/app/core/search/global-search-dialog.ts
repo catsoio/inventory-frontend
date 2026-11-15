@@ -24,6 +24,7 @@ import { CarApi } from '../api/car-api';
 import { QuoteApi } from '../api/quote-api';
 import { SalesCardApi } from '../api/sales-card-api';
 import { StorageApi } from '../api/storage-api';
+import type { Product } from '../layout/products';
 import { WorkOrderApi } from '../api/work-order-api';
 import { WorkshopApi } from '../api/workshop-api';
 import { environment } from '../../../environments/environment';
@@ -60,6 +61,23 @@ const PER_GROUP = 5;
  * telefonnummer ger kunden; en storlek ger lagret. Tomt fält visar genvägar till det man gör
  * oftast och det man sökte senast.
  */
+/**
+ * Vad man söker i beror på produkten: Verkstad söker order, offerter och artiklar men inte
+ * däckhotellet, Däckhotell söker setet och lagret men inte arbetsorder, Bärgning bara kunder och bilar.
+ */
+const KINDS: Record<Exclude<Product, 'hall'>, HitKind[]> = {
+  axle: ['customer', 'vehicle', 'order', 'quote', 'sale', 'article', 'supplier'],
+  dack: ['storage', 'customer', 'vehicle', 'sale', 'article', 'supplier'],
+  towing: ['customer', 'vehicle'],
+};
+
+/** Grupperna för produkten, i den ordning frågan föreslår. Däckhotell har alltid setet först. */
+const kindsFor = (product: Product, ordered: HitKind[]): HitKind[] => {
+  const allowed = KINDS[product === 'hall' ? 'axle' : product];
+  const kept = ordered.filter((k) => allowed.includes(k));
+  return product === 'dack' ? ['storage', ...kept.filter((k) => k !== 'storage')] : kept;
+};
+
 @Component({
   selector: 'app-global-search',
   standalone: true,
@@ -214,12 +232,16 @@ export class GlobalSearchDialog {
   private readonly cars = inject(CarApi);
 
   readonly icons = KIND_ICONS;
-  readonly placeholder = ((hall: boolean, wide: boolean) =>
-    hall
+  readonly placeholder = ((product: Product, wide: boolean) =>
+    product === 'hall'
       ? 'Sök regnr, märke, kund eller telefon…'
-      : wide
-        ? 'Sök regnr, kund, telefon, plats eller storlek…'
-        : 'Sök regnr, kund, plats…')(inject(Nav).product() === 'hall', window.innerWidth >= 768);
+      : product === 'dack'
+        ? wide
+          ? 'Sök regnr, kund, telefon, plats eller storlek…'
+          : 'Sök regnr, kund, plats…'
+        : wide
+          ? 'Sök regnr, kund, telefon, order eller artikel…'
+          : 'Sök regnr, kund, order…')(inject(Nav).product(), window.innerWidth >= 768);
   readonly tones = {
     gray: 'bg-gray-100 text-gray-700',
     amber: 'bg-amber-100 text-amber-800',
@@ -285,7 +307,7 @@ export class GlobalSearchDialog {
       article: quiet(this.inventory.articles({ q, limit }), articleHit),
       supplier: quiet(this.workshop.suppliers({ q, limit }), supplierHit),
     };
-    const order = hall ? groupOrderHall(q) : groupOrder(q).filter((k) => k !== 'car');
+    const order = hall ? groupOrderHall(q) : kindsFor(this.nav.product(), groupOrder(q));
     return forkJoin(order.map((k) => sources[k])).pipe(
       map((lists) =>
         lists

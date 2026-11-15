@@ -24,14 +24,21 @@ const RECENT_DAYS = 30;
       } @else {
         <mat-form-field subscriptSizing="dynamic">
           <mat-label>Meddelande</mat-label>
-          <textarea matInput rows="4" [value]="message()" (input)="message.set($any($event.target).value)"></textarea>
+          <textarea
+            matInput
+            rows="4"
+            [value]="message()"
+            (input)="message.set($any($event.target).value)"
+          ></textarea>
           <mat-hint>
             {{ message().length }} tecken. {{ '{namn}' }} och {{ '{regnr}' }} byts ut per kund.
           </mat-hint>
         </mat-form-field>
         @if (example(); as e) {
           <div class="rounded-lg bg-gray-50 p-3 text-sm whitespace-pre-line">
-            <div class="mb-1 text-xs font-medium text-gray-500 uppercase">Så ser det ut för {{ e.name }}</div>
+            <div class="mb-1 text-xs font-medium text-gray-500 uppercase">
+              Så ser det ut för {{ e.name }}
+            </div>
             {{ rendered() }}
           </div>
         }
@@ -40,12 +47,19 @@ const RECENT_DAYS = 30;
             <mat-checkbox [checked]="allChecked()" (change)="toggleAll($event.checked)" />
             Välj alla
           </label>
-          <span class="text-gray-600">{{ selected().size }} av {{ preview()!.recipients.length }} valda</span>
+          <span class="text-gray-600"
+            >{{ selected().size }} av {{ preview()!.recipients.length }} valda</span
+          >
         </div>
         <div class="max-h-72 overflow-auto rounded-xl ring-1 ring-gray-200">
           @for (r of preview()!.recipients; track r.phone) {
-            <label class="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0">
-              <mat-checkbox [checked]="selected().has(r.phone)" (change)="toggle(r.phone, $event.checked)" />
+            <label
+              class="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0"
+            >
+              <mat-checkbox
+                [checked]="selected().has(r.phone)"
+                (change)="toggle(r.phone, $event.checked)"
+              />
               <span class="min-w-0 flex-1">
                 <span class="font-medium">{{ r.name }}</span>
                 <span class="text-gray-500"> · {{ r.regNos.join(', ') }}</span>
@@ -68,7 +82,13 @@ const RECENT_DAYS = 30;
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button type="button" mat-dialog-close>Stäng</button>
-      <button mat-flat-button color="primary" type="button" [disabled]="!canSend()" (click)="send()">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="!canSend()"
+        (click)="send()"
+      >
         <mat-icon>sms</mat-icon> Skicka till {{ selected().size }}
       </button>
     </mat-dialog-actions>
@@ -89,16 +109,22 @@ export class StorageRecallDialog implements OnInit {
   readonly message = signal('');
 
   readonly example = computed(
-    () => this.preview()?.recipients.find((r) => this.selected().has(r.phone)) ?? this.preview()?.recipients[0],
+    () =>
+      this.preview()?.recipients.find((r) => this.selected().has(r.phone)) ??
+      this.preview()?.recipients[0],
   );
   readonly rendered = computed(() => {
     const e = this.example();
     return e ? this.render(this.message(), e.name, e.regNos) : '';
   });
   readonly allChecked = computed(
-    () => !!this.preview()?.recipients.length && this.selected().size === this.preview()!.recipients.length,
+    () =>
+      !!this.preview()?.recipients.length &&
+      this.selected().size === this.preview()!.recipients.length,
   );
-  readonly canSend = computed(() => !this.busy() && this.selected().size > 0 && this.message().trim().length > 0);
+  readonly canSend = computed(
+    () => !this.busy() && this.selected().size > 0 && this.message().trim().length > 0,
+  );
 
   ngOnInit() {
     const company = this.auth.companyName();
@@ -148,22 +174,29 @@ export class StorageRecallDialog implements OnInit {
       .subscribe((ok) => {
         if (!ok) return;
         this.busy.set(true);
-        this.api.recallSend(chosen.flatMap((r) => r.depositIds), this.message()).subscribe({
-          next: (res) => {
-            this.busy.set(false);
-            const failed = res.failed.length ? `, ${res.failed.length} misslyckades` : '';
-            this.snack.open(`${res.sent} SMS skickade${failed}`, 'OK', { duration: 5000 });
-            this.ref.close(true);
-          },
-          error: () => {
-            this.busy.set(false);
-            this.snack.open('Kunde inte skicka', 'OK', { duration: 4000 });
-          },
-        });
+        this.api
+          .recallSend(
+            chosen.flatMap((r) => r.depositIds),
+            this.message(),
+          )
+          .subscribe({
+            next: (res) => {
+              this.busy.set(false);
+              const failed = res.failed.length ? `, ${res.failed.length} misslyckades` : '';
+              this.snack.open(`${res.sent} SMS skickade${failed}`, 'OK', { duration: 5000 });
+              this.ref.close(true);
+            },
+            error: () => {
+              this.busy.set(false);
+              this.snack.open('Kunde inte skicka', 'OK', { duration: 4000 });
+            },
+          });
       });
   }
 
   private render(text: string, name: string, regNos: string[]): string {
-    return text.replaceAll('{namn}', name.split(' ')[0] ?? name).replaceAll('{regnr}', regNos.join(', '));
+    return text
+      .replaceAll('{namn}', name.split(' ')[0] ?? name)
+      .replaceAll('{regnr}', regNos.join(', '));
   }
 }

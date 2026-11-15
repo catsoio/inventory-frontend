@@ -1325,4 +1325,25 @@ export const EN: Record<string, string> = {
   'Koppla bort terminalen?': 'Unlink the terminal?',
   'Kort kan inte längre tas betalt på den härifrån. Den kan kopplas igen med en ny kod.':
     'Cards can no longer be charged on it from here. It can be linked again with a new code.',
+  // Bärgning
+  Bärgning: 'Towing',
+  Vägassistans: 'Roadside assistance',
+  Transport: 'Transport',
+  'Nytt uppdrag': 'New job',
+  'Typ av uppdrag': 'Type of job',
+  'Vem ringde': 'Who called',
+  Regnummer: 'Reg. no.',
+  'Bil (märke och modell)': 'Car (make and model)',
+  'Var står bilen': 'Where is the car',
+  'Vart ska den': 'Where is it going',
+  Inkom: 'Received',
+  'Körs till': 'Taken to',
+  'På väg': 'On the way',
+  Avbrutna: 'Cancelled',
+  'Inga uppdrag här. Lägg in ett samtal med knappen.': 'No jobs here. Log a call with the button.',
+  'Sök kund, regnr, telefon eller adress…': 'Search customer, reg. no., phone or address…',
+  'Sök regnr, kund eller order…': 'Search plate, customer or order…',
+  'Sök regnr, kund, telefon, order eller artikel…':
+    'Search plate, customer, phone, order or article…',
+  'Sök regnr, kund, order…': 'Search plate, customer, order…',
 };

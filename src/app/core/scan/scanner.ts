@@ -49,7 +49,13 @@ export class Scanner {
     if (this.auth.isMechanic()) return;
     const { ScanDialog } = await import('./scan-dialog');
     if (this.dialog.openDialogs.some((d) => d.componentInstance instanceof ScanDialog)) return;
-    this.dialog.open(ScanDialog, { width: '460px', maxWidth: '96vw', ariaLabel: 'Skanna' });
+    this.dialog.open(ScanDialog, {
+      width: '460px',
+      maxWidth: '96vw',
+      ariaLabel: 'Skanna',
+      // Fokus sätts av dialogen själv, och bara på dator: på mobil skulle tangentbordet täcka kameran.
+      autoFocus: false,
+    });
   }
 
   /** Skalet matar in varje tangent. Fält tar hand om sin egen text. */

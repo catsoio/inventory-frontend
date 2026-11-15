@@ -47,6 +47,7 @@ import { QuoteHistory } from './quote-history/quote-history';
 import { SalesCardHistory } from './sales-card-history/sales-card-history';
 import { MovementList } from './movement-list/movement-list';
 import { Pill } from './pill/pill';
+import { AttentionList } from '../features/dashboard/attention-list';
 import { PhotoGallery } from './photo-gallery/photo-gallery';
 import { ChartView } from './chart/chart';
 import { FinanceTabs } from './finance-tabs/finance-tabs';
@@ -119,6 +120,7 @@ const MATERIAL = [
     StockBadge,
     MovementList,
     Pill,
+    AttentionList,
     PhotoGallery,
     ChartView,
     FinanceTabs,
@@ -172,6 +174,7 @@ const MATERIAL = [
     StockBadge,
     MovementList,
     Pill,
+    AttentionList,
     PhotoGallery,
     ChartView,
     FinanceTabs,

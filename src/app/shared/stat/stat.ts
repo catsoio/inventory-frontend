@@ -42,7 +42,8 @@ const TONE: Record<Delta['tone'], string> = {
 
 /**
  * Nyckeltal: etikett, värde, en förklarande rad och eventuellt en kurva. Hela rutan är en länk
- * till sidan där man gör något åt siffran. `status` markerar sådant som kräver uppmärksamhet och
+ * till sidan där man gör något åt siffran. Alla nyckeltal har samma höjd (104 px) på alla sidor:
+ * etiketten och förklaringen är en rad var, och kurvan ligger vid sidan av värdet. `status` markerar sådant som kräver uppmärksamhet och
  * följs alltid av en ikon, så färgen aldrig bär betydelsen ensam.
  */
 @Component({
@@ -51,13 +52,20 @@ const TONE: Record<Delta['tone'], string> = {
   host: { class: 'block min-w-0' },
   template: `
     <ng-template #body>
-      <span class="text-xs leading-tight font-medium text-gray-600">{{ label() }}</span>
-      <span class="mt-1.5 block truncate text-[26px] leading-none font-semibold tracking-tight">
+      <span
+        class="block truncate text-xs leading-tight font-medium text-gray-600"
+        [attr.title]="label()"
+        >{{ label() }}</span
+      >
+      <span
+        class="mt-1.5 block truncate text-[26px] leading-none font-semibold tracking-tight"
+        [class.pr-24]="trend().length > 1"
+      >
         {{ value() }}
       </span>
-      <span class="mt-1.5 flex min-h-4 flex-wrap items-center gap-x-1.5 text-xs">
+      <span class="mt-1.5 flex h-4 items-center gap-x-1.5 text-xs">
         @if (delta(); as d) {
-          <span class="inline-flex items-center font-medium" [class]="tones[d.tone]">
+          <span class="inline-flex shrink-0 items-center font-medium" [class]="tones[d.tone]">
             <mat-icon class="!h-4 !w-4 !text-sm !leading-4">{{ d.icon }}</mat-icon
             >{{ d.text }}
           </span>
@@ -68,7 +76,7 @@ const TONE: Record<Delta['tone'], string> = {
           <mat-icon class="!h-4 !w-4 !text-sm !leading-4 text-red-700">error</mat-icon>
         }
         <span
-          class="truncate"
+          class="min-w-0 truncate"
           [class]="
             status() === 'bad'
               ? 'font-medium text-red-700'
@@ -80,7 +88,12 @@ const TONE: Record<Delta['tone'], string> = {
         >
       </span>
       @if (trend().length > 1) {
-        <app-spark class="mt-2" [values]="trend()" [label]="'Utveckling: ' + label()" />
+        <!-- Kurvan ligger vid sidan av värdet, så att den inte gör kortet högre än de andra. -->
+        <app-spark
+          class="!absolute top-[34px] right-4 !w-20"
+          [values]="trend()"
+          [label]="'Utveckling: ' + label()"
+        />
       }
     </ng-template>
 
@@ -88,12 +101,14 @@ const TONE: Record<Delta['tone'], string> = {
       <a
         [routerLink]="l"
         [queryParams]="params()"
-        class="block h-full rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
+        class="relative block h-[104px] overflow-hidden rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
       >
         <ng-container *ngTemplateOutlet="body" />
       </a>
     } @else {
-      <div class="h-full rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+      <div
+        class="relative h-[104px] overflow-hidden rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5"
+      >
         <ng-container *ngTemplateOutlet="body" />
       </div>
     }

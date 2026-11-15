@@ -240,7 +240,7 @@ export class SettingsCompanies {
 
 /**
  * Onlinebokning (bara superadmin): vi slår på bokningssidan åt verkstaden. Den ligger på verkstadens
- * webbplats (`/boka` på dess domän). Verkstaden formar sidan själv under Onlinebokning i menyn
+ * webbplats (`/boka` på dess domän). Verkstaden formar sidan själv under Åtgärder → Onlinebokning
  * (text, åtgärder, bilder), men kan inte slå på eller av den.
  */
 @Component({

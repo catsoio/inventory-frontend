@@ -1,3 +1,5 @@
+import type { Product } from '../layout/products';
+
 export interface QuickAction {
   label: string;
   icon: string;
@@ -35,12 +37,6 @@ export const QUICK_GROUPS_AXLE: QuickGroup[] = [
     ],
   },
   {
-    title: 'Däck och lager',
-    actions: [
-      { label: 'Ny inlämning', icon: 'warehouse', go: ['/storage', 'new'], module: 'dackhotell' },
-    ],
-  },
-  {
     title: 'Kunder',
     actions: [{ label: 'Ny kund', icon: 'person_add', go: ['/customers', 'new'] }],
   },
@@ -74,9 +70,42 @@ export const QUICK_GROUPS_HALL: QuickGroup[] = [
   },
 ];
 
-/** Genvägarna för produkten man är i. */
-export const quickGroupsOf = (product: 'axle' | 'hall'): QuickGroup[] =>
-  product === 'hall' ? QUICK_GROUPS_HALL : QUICK_GROUPS_AXLE;
+/** Däck: en ny inlämning, och sälja något vid disken. */
+export const QUICK_GROUPS_DACK: QuickGroup[] = [
+  {
+    title: 'Däckhotell',
+    actions: [
+      { label: 'Ny inlämning', icon: 'warehouse', go: ['/storage', 'new'], module: 'dackhotell' },
+    ],
+  },
+  {
+    title: 'Försäljning',
+    actions: [{ label: 'Ny försäljning', icon: 'point_of_sale', go: ['/sales', 'new'] }],
+  },
+  {
+    title: 'Kunder',
+    actions: [{ label: 'Ny kund', icon: 'person_add', go: ['/customers', 'new'] }],
+  },
+];
 
-export const quickActionsOf = (product: 'axle' | 'hall'): QuickAction[] =>
+/** Bärgning: ett samtal blir ett uppdrag. */
+export const QUICK_GROUPS_TOWING: QuickGroup[] = [
+  {
+    title: 'Bärgning',
+    actions: [
+      { label: 'Nytt uppdrag', icon: 'local_shipping', go: ['/towing', 'new'], module: 'bargning' },
+    ],
+  },
+];
+
+/** Genvägarna för produkten man är i. */
+export const quickGroupsOf = (product: Product): QuickGroup[] =>
+  ({
+    axle: QUICK_GROUPS_AXLE,
+    dack: QUICK_GROUPS_DACK,
+    hall: QUICK_GROUPS_HALL,
+    towing: QUICK_GROUPS_TOWING,
+  })[product];
+
+export const quickActionsOf = (product: Product): QuickAction[] =>
   quickGroupsOf(product).flatMap((g) => g.actions);
