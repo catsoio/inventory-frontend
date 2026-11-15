@@ -352,7 +352,7 @@ const COLS: Col[] = [
 
         @if (facets(); as f) {
           @for (g of groups(f); track g.key) {
-            @if (showTyreFilters() || g.key === 'rimDiameter' || g.key === 'brand') {
+            @if (showGroup(g.key)) {
               <div class="mt-3 mb-1 text-xs font-semibold text-gray-500 uppercase">
                 {{ g.title }}
               </div>
@@ -632,11 +632,15 @@ export class ArticleList implements OnInit {
           : '';
   });
   readonly group = computed<Category | ''>(() => (this.sel()['category'] as Category) ?? '');
-  /** Säsong, bredd och profil gäller bara däck. */
-  readonly showTyreFilters = computed(() => {
+  /** Säsong, bredd och profil gäller bara däck: under Alla och Delar visas de inte. */
+  readonly showTyreFilters = computed(() => this.sel()['category'] === 'tyre');
+  /** Vilka filtergrupper som hör till vald artikelgrupp: märke alltid, tum för däck och fälgar, resten bara för däck. */
+  showGroup(key: string): boolean {
     const c = this.sel()['category'];
-    return !c || c === 'tyre';
-  });
+    if (key === 'brand') return true;
+    if (key === 'rimDiameter') return c === 'tyre' || c === 'rim';
+    return c === 'tyre';
+  }
   readonly activeCount = computed(
     () => Object.values(this.sel()).filter((v) => v !== undefined).length,
   );
@@ -780,7 +784,7 @@ export class ArticleList implements OnInit {
       season: undefined,
       width: undefined,
       profile: undefined,
-      rimDiameter: c === 'other' ? undefined : s['rimDiameter'],
+      rimDiameter: c === 'tyre' || c === 'rim' ? s['rimDiameter'] : undefined,
     }));
     this.load$.next(0);
   }
