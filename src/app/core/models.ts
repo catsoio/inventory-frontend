@@ -2465,7 +2465,7 @@ export interface PaymentRow {
   cardId: string;
   /** `counter_invoice` = försäljning vid disken som blir en kontantfaktura när kunden betalat. */
   purpose: 'invoice' | 'receipt' | 'counter_invoice';
-  channel: 'checkout' | 'reader';
+  channel: 'checkout' | 'reader' | 'terminal';
   amount: number;
   applicationFee: number;
   method: PaymentMethod | null;
@@ -2478,6 +2478,8 @@ export interface PaymentRow {
   refundError: string | null;
   createdAt: string;
   paidAt: string | null;
+  /** Var en terminalbetalning är, med Zettles ord (`PRESENT_CARD`, `AUTHORIZING` …). */
+  progress?: string | null;
 }
 
 // ---- Bilhandel: bilar till salu och verkstadens publika webbplats ----
@@ -2843,6 +2845,22 @@ export interface ZettleStatus {
   lastSyncCount: number;
   /** Sidan hos PayPal/Zettle där ägaren skapar nyckeln, med Axles namn och behörigheter ifyllda. */
   apiKeyLink: string;
+}
+
+/** En PayPal-terminal som är kopplad till verkstadens Zettle-konto. */
+export interface ZettleTerminalLink {
+  id: string;
+  name: string | null;
+  model: string | null;
+  serialNumber: string | null;
+}
+
+export interface ZettleTerminalStatus {
+  /** Kassans nyckel är sparad: terminaler kan kopplas och användas. */
+  connected: boolean;
+  links: ZettleTerminalLink[];
+  /** Varför listan inte gick att läsa (nyckeln saknar terminalens behörigheter, Zettle nere). */
+  error: string | null;
 }
 
 export interface ZettleSyncResult {

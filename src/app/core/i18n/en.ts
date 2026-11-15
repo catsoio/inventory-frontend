@@ -1294,4 +1294,35 @@ export const EN: Record<string, string> = {
   'Kontrollsiffran stämmer inte. Kontrollera numret.':
     'The check digit does not match. Check the number.',
   'Adress (krävs på faktura)': 'Address (required on invoices)',
+  'PayPal-terminal': 'PayPal terminal',
+  'Kort på terminalen': 'Card on the terminal',
+  'Ta betalt på terminalen': 'Take payment on the terminal',
+  'Faktura, betald': 'Invoice, paid',
+  'Be kunden blippa eller sätta i kortet på terminalen.':
+    'Ask the customer to tap or insert the card on the terminal.',
+  'Godkänner betalningen…': 'Authorising the payment…',
+  'Kunden väljer kort på terminalen.': 'The customer is choosing a card on the terminal.',
+  'Terminalen uppdaterar sig. Det kan ta en stund.':
+    'The terminal is updating. This can take a while.',
+  'Väntar på terminalen…': 'Waiting for the terminal…',
+  Terminal: 'Terminal',
+  'Betalningen avbröts.': 'The payment was canceled.',
+  'Betalningen gick inte igenom.': 'The payment did not go through.',
+  'Test (låtsasterminal):': 'Test (fake terminal):',
+  'Kunden blippar': 'Customer taps',
+  'Banken nekar': 'Bank declines',
+  'Kontakten bryts': 'Connection lost',
+  'Koppla en PayPal-terminal så att kortbetalningar kan startas från säljkortet: beloppet skickas till terminalen och kunden blippar där, utan telefonen. Terminalen behöver wifi.':
+    'Link a PayPal terminal so card payments can be started from the sales card: the amount is sent to the terminal and the customer taps there, no phone needed. The terminal needs wifi.',
+  'Nyckeln behöver också behörigheterna för terminalen: skapa en ny via länken ovan (de är ifyllda) och klistra in den.':
+    'The key also needs the terminal permissions: create a new one with the link above (they are filled in) and paste it in.',
+  'Koppla en till:': 'Link another:',
+  'Slå på terminalen. Den visar en kod på skärmen (8 tecken): skriv den här.':
+    'Switch the terminal on. It shows a code on its screen (8 characters): enter it here.',
+  'Kod på terminalen': 'Code on the terminal',
+  'Koppla terminal': 'Link terminal',
+  'Kopplar…': 'Linking…',
+  'Koppla bort terminalen?': 'Unlink the terminal?',
+  'Kort kan inte längre tas betalt på den härifrån. Den kan kopplas igen med en ny kod.':
+    'Cards can no longer be charged on it from here. It can be linked again with a new code.',
 };

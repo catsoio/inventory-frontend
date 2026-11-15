@@ -14,6 +14,7 @@ import type {
   CarInfoStatus,
   GummigrossenStatus,
   ZettleStatus,
+  ZettleTerminalStatus,
 } from '../../../core/models';
 import { Confirm } from '../../../shared/confirm';
 
@@ -675,6 +676,88 @@ export class GummigrossenConnectionDialog {
           ></textarea>
           <mat-hint>Visas bara en gång hos PayPal. Sparas krypterad och visas aldrig här.</mat-hint>
         </mat-form-field>
+
+        @if (current?.connected) {
+          <div class="mt-5 border-t border-gray-200 pt-4">
+            <h3 class="text-sm font-semibold">PayPal-terminal</h3>
+            <p class="mb-3 mt-1 text-sm text-gray-600">
+              Koppla en PayPal-terminal så att kortbetalningar kan startas från säljkortet: beloppet
+              skickas till terminalen och kunden blippar där, utan telefonen. Terminalen behöver
+              wifi.
+            </p>
+            @if (terminals(); as t) {
+              @if (t.error) {
+                <p class="mb-3 text-sm text-red-700">
+                  {{ t.error }} Nyckeln behöver också behörigheterna för terminalen: skapa en ny via
+                  länken ovan (de är ifyllda) och klistra in den.
+                </p>
+              }
+              @for (l of t.links; track l.id) {
+                <div
+                  class="mb-2 flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                >
+                  <mat-icon class="text-gray-500">credit_card</mat-icon>
+                  <span class="min-w-0 flex-1">
+                    <span class="block font-medium">{{ l.name || 'Terminal' }}</span>
+                    <span class="block truncate text-xs text-gray-500">
+                      {{ l.model || 'PayPal Terminal'
+                      }}{{ l.serialNumber ? ' · ' + l.serialNumber : '' }}
+                    </span>
+                  </span>
+                  <button
+                    mat-button
+                    type="button"
+                    color="warn"
+                    [disabled]="busy() || linking()"
+                    (click)="unlinkTerminal(l.id)"
+                  >
+                    Koppla bort
+                  </button>
+                </div>
+              }
+              @if (!t.error) {
+                <p class="mb-2 text-sm text-gray-600">
+                  {{
+                    t.links.length
+                      ? 'Koppla en till:'
+                      : 'Slå på terminalen. Den visar en kod på skärmen (8 tecken): skriv den här.'
+                  }}
+                </p>
+                <div class="flex flex-wrap items-start gap-3">
+                  <mat-form-field subscriptSizing="dynamic" class="w-40">
+                    <mat-label>Kod på terminalen</mat-label>
+                    <input
+                      matInput
+                      [formControl]="code"
+                      autocomplete="off"
+                      spellcheck="false"
+                      class="uppercase"
+                      (keydown.enter)="$event.preventDefault(); linkTerminal()"
+                    />
+                  </mat-form-field>
+                  <mat-form-field subscriptSizing="dynamic" class="w-40">
+                    <mat-label>Namn</mat-label>
+                    <input
+                      matInput
+                      [formControl]="terminalName"
+                      autocomplete="off"
+                      (keydown.enter)="$event.preventDefault(); linkTerminal()"
+                    />
+                  </mat-form-field>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="mt-1"
+                    [disabled]="busy() || linking() || code.invalid"
+                    (click)="linkTerminal()"
+                  >
+                    <mat-icon>link</mat-icon> {{ linking() ? 'Kopplar…' : 'Koppla terminal' }}
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        }
       </mat-dialog-content>
       @if (busy()) {
         <mat-progress-bar mode="indeterminate" />
@@ -698,7 +781,7 @@ export class GummigrossenConnectionDialog {
     </form>
   `,
 })
-export class ZettleConnectionDialog {
+export class ZettleConnectionDialog implements OnInit {
   private readonly api = inject(ZettleApi);
   private readonly snack = inject(MatSnackBar);
   private readonly confirm = inject(Confirm);
@@ -706,7 +789,7 @@ export class ZettleConnectionDialog {
   readonly current = inject<ZettleStatus | null>(MAT_DIALOG_DATA);
   readonly link =
     this.current?.apiKeyLink ??
-    'https://my.zettle.com/apps/api-keys?name=Axle&scopes=READ:PURCHASE%20READ:PRODUCT%20WRITE:PRODUCT';
+    'https://my.zettle.com/apps/api-keys?name=Axle&scopes=READ:PURCHASE%20READ:PRODUCT%20WRITE:PRODUCT%20READ:PAYMENT%20WRITE:PAYMENT%20READ:USERINFO%20WRITE:USERINFO';
 
   readonly busy = signal(false);
   readonly clientId = new FormControl(this.current?.clientId ?? '', {
@@ -717,6 +800,61 @@ export class ZettleConnectionDialog {
     nonNullable: true,
     validators: [Validators.required, Validators.minLength(20)],
   });
+
+  readonly terminals = signal<ZettleTerminalStatus | null>(null);
+  readonly linking = signal(false);
+  readonly code = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.pattern(/^\s*[A-Za-z0-9 -]{4,20}\s*$/)],
+  });
+  readonly terminalName = new FormControl('Kassa', { nonNullable: true });
+
+  ngOnInit() {
+    if (this.current?.connected) this.loadTerminals();
+  }
+
+  private loadTerminals() {
+    this.api.terminals().subscribe({
+      next: (t) => this.terminals.set(t),
+      error: () => this.terminals.set(null),
+    });
+  }
+
+  linkTerminal() {
+    if (this.code.invalid || this.linking()) return;
+    this.linking.set(true);
+    this.api.linkTerminal(this.code.value.trim(), this.terminalName.value.trim()).subscribe({
+      next: (l) => {
+        this.linking.set(false);
+        this.code.reset('');
+        this.snack.open(`${l.name || 'Terminalen'} är kopplad`, 'OK', { duration: 4000 });
+        this.loadTerminals();
+      },
+      error: () => this.linking.set(false),
+    });
+  }
+
+  unlinkTerminal(linkId: string) {
+    this.confirm
+      .ask({
+        title: 'Koppla bort terminalen?',
+        message:
+          'Kort kan inte längre tas betalt på den härifrån. Den kan kopplas igen med en ny kod.',
+        confirmText: 'Koppla bort',
+        danger: true,
+      })
+      .subscribe((ok) => {
+        if (!ok) return;
+        this.linking.set(true);
+        this.api.unlinkTerminal(linkId).subscribe({
+          next: (t) => {
+            this.linking.set(false);
+            this.terminals.set(t);
+          },
+          error: () => this.linking.set(false),
+        });
+      });
+  }
 
   day(iso: string | null | undefined) {
     return iso ? iso.slice(0, 10) : '–';

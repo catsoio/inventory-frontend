@@ -10,6 +10,7 @@ import { SalesCardPage } from './sales-card';
 import { SalesSendDialog } from './sales-send-dialog';
 import { SalesInvoicePage } from './sales-invoice';
 import { SalesList } from './sales-list';
+import { TerminalPayment } from './terminal-payment';
 import { ToInvoicePage } from './to-invoice';
 import { TyreFinderDialog } from './tyre-finder';
 
@@ -19,6 +20,7 @@ import { TyreFinderDialog } from './tyre-finder';
     SalesInvoicePage,
     SalesSendDialog,
     ReaderPayment,
+    TerminalPayment,
     TillPayDialog,
     ReturnDialog,
     CreditDialog,

@@ -3,6 +3,7 @@ import { CreditDialog, type CreditResult } from './credit-dialog';
 import { ReturnDialog } from './return-dialog';
 import { TillPayDialog, type TillPayData } from './till-pay';
 import { ReaderPayment } from './reader-payment';
+import { TerminalPayment } from './terminal-payment';
 import {
   Component,
   computed,
@@ -151,7 +152,7 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
  * som ett säljkort i ett affärssystem. Ett utkast kan ändras fritt; bokförs kortet minskar
  * lagret och dokumentet får sitt nummer, och därefter går bara betalningen att ändra.
  */
-type PayWay = 'invoice' | 'cash_invoice' | 'till' | 'reader' | 'receipt';
+type PayWay = 'invoice' | 'cash_invoice' | 'till' | 'terminal' | 'reader' | 'receipt';
 interface PayWayOption {
   id: PayWay;
   icon: string;
@@ -1317,6 +1318,15 @@ interface PayWayOption {
                           <span>Kvitto</span><span>Från kassan</span>
                         </div>
                       }
+                      @case ('terminal') {
+                        <div class="flex h-9 items-center justify-between gap-4 text-gray-600">
+                          <span>Betalas</span><span>Kort på terminalen</span>
+                        </div>
+                        <div class="flex h-9 items-center justify-between gap-4 text-gray-600">
+                          <span>Dokument</span
+                          ><span>{{ kind() === 'invoice' ? 'Faktura, betald' : 'Kvitto' }}</span>
+                        </div>
+                      }
                       @case ('reader') {
                         <div class="flex h-9 items-center justify-between gap-4 text-gray-600">
                           <span>Betalas</span><span>Kort på läsaren</span>
@@ -1329,6 +1339,14 @@ interface PayWayOption {
                     }
                   </div>
 
+                  @if (way() === 'terminal') {
+                    <app-terminal-payment
+                      [cardId]="c.id"
+                      [showStart]="false"
+                      (waitingChange)="readerWaiting.set($event)"
+                      (booked)="readerWaiting.set(false); load(c.id)"
+                    />
+                  }
                   @if (way() === 'reader') {
                     <app-reader-payment
                       [cardId]="c.id"
@@ -1348,9 +1366,15 @@ interface PayWayOption {
                       [routerLink]="['/sales', c.id, 'invoice']"
                       [queryParams]="choiceParams()"
                       [class.pointer-events-none]="
-                        dirty() || !rows().length || way() === 'till' || way() === 'reader'
+                        dirty() ||
+                        !rows().length ||
+                        way() === 'till' ||
+                        way() === 'terminal' ||
+                        way() === 'reader'
                       "
-                      [class.opacity-40]="way() === 'till' || way() === 'reader'"
+                      [class.opacity-40]="
+                        way() === 'till' || way() === 'terminal' || way() === 'reader'
+                      "
                     >
                       <mat-icon>visibility</mat-icon> Förhandsgranska
                     </a>
@@ -1498,6 +1522,11 @@ interface PayWayOption {
               </div>
               @if (!inv.paidAt) {
                 <app-reader-payment
+                  [cardId]="c.id"
+                  (waitingChange)="readerWaiting.set($event)"
+                  (booked)="readerWaiting.set(false); load(c.id)"
+                />
+                <app-terminal-payment
                   [cardId]="c.id"
                   (waitingChange)="readerWaiting.set($event)"
                   (booked)="readerWaiting.set(false); load(c.id)"
@@ -1721,8 +1750,10 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   readonly tillOn = signal(false);
   /** Stripe är kopplat och en kortläsare är registrerad. */
   readonly readerOn = signal(false);
-  /** Valt sätt som inte är ett dokumentval: PayPal-kassan eller kortläsaren. */
-  private readonly wayOverride = signal<'till' | 'reader' | null>(null);
+  /** PayPal-kassan är ansluten och en PayPal-terminal är kopplad: kort på terminalen, startat härifrån. */
+  readonly terminalOn = signal(false);
+  /** Valt sätt som inte är ett dokumentval: PayPal-kassan, terminalen eller kortläsaren. */
+  private readonly wayOverride = signal<'till' | 'terminal' | 'reader' | null>(null);
   /**
    * Hur kunden betalar, det enda val som styr resten av rutan. Utan eget val: faktura för ett
    * företag, annars PayPal-kassan när den är ansluten, annars kvitto.
@@ -1730,6 +1761,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   readonly way = computed<PayWay>(() => {
     const o = this.wayOverride();
     if (o === 'till' && this.tillOn() && !this.hall()) return 'till';
+    if (o === 'terminal' && this.terminalOn() && !this.hall()) return 'terminal';
     if (o === 'reader' && this.readerOn()) return 'reader';
     const d = this.docOption();
     if (
@@ -1778,6 +1810,15 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         disabled: noReceipt,
       });
     }
+    if (this.terminalOn() && !this.hall()) {
+      out.push({
+        id: 'terminal',
+        icon: 'credit_card',
+        label: 'PayPal-terminal',
+        hint: 'Kort på terminalen',
+        disabled: noReceipt,
+      });
+    }
     if (this.readerOn()) {
       out.push({
         id: 'reader',
@@ -1814,6 +1855,12 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
         return { label: 'Bokför som kvitto', icon: 'receipt_long', run: () => this.post() };
       case 'till':
         return { label: 'Starta betalning', icon: 'point_of_sale', run: () => this.openTill() };
+      case 'terminal':
+        return {
+          label: 'Ta betalt på terminalen',
+          icon: 'credit_card',
+          run: () => this.terminal?.start(),
+        };
       case 'reader':
         return {
           label: 'Ta betalt på läsaren',
@@ -1824,6 +1871,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   });
 
   @ViewChild(ReaderPayment) private reader?: ReaderPayment;
+  @ViewChild(TerminalPayment) private terminal?: TerminalPayment;
 
   /** Öppnar stegen för PayPal-kassan; dialogen hittar köpet och bokför kortet. */
   openTill() {
@@ -1880,7 +1928,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     !!(this.performed().trim() || this.warranty().trim() || this.note().trim());
 
   chooseWay(id: PayWay) {
-    if (id === 'till' || id === 'reader') {
+    if (id === 'till' || id === 'terminal' || id === 'reader') {
       this.wayOverride.set(id);
       return;
     }
@@ -2154,6 +2202,10 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     this.loadSeller();
     this.zettleApi.status().subscribe({
       next: (z) => this.tillOn.set(z.connected),
+      error: () => undefined,
+    });
+    this.zettleApi.terminals().subscribe({
+      next: (t) => this.terminalOn.set(t.connected && t.links.length > 0),
       error: () => undefined,
     });
     forkJoin({ account: this.payments.account(), readers: this.payments.readers() }).subscribe({
