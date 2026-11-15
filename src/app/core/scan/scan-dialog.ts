@@ -96,12 +96,19 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
 
   async submit(value: string) {
     const code = value.trim();
-    if (!code || this.busy()) return;
+    if (this.busy()) return;
+    if (!code) {
+      this.error.set('Skriv eller skanna en kod först.');
+      return;
+    }
     this.busy.set(true);
     this.error.set('');
     const hit = await this.scanner.resolve(code);
     this.busy.set(false);
-    if (!hit) return;
+    if (!hit) {
+      this.error.set('Det gick inte att slå upp koden just nu. Försök igen.');
+      return;
+    }
     if (hit.kind === 'none') {
       this.error.set(`Hittar ingen träff på ${code}.`);
       this.scanner.beep(false);
