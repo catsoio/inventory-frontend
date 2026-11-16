@@ -141,7 +141,10 @@ const MODULE_OF = {
       </button>
     </nav>
 
-    <header class="flex h-14 shrink-0 items-center bg-brand text-white shadow-sm">
+    <!-- pt/h: på telefonen i appen ligger sidan under statusfältet och Dynamic Island. -->
+    <header
+      class="flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center bg-brand pt-[env(safe-area-inset-top)] text-white shadow-sm"
+    >
       <div class="flex min-w-0 flex-1 items-center gap-2 pr-2 pl-4 md:gap-3 md:px-6">
         <!-- Mobil: produktbytet sitter i toppen, eftersom produktfältet bara finns på dator. -->
         @if (!auth.isMechanic() && products().length > 1) {

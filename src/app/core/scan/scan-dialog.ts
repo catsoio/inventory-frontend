@@ -15,7 +15,7 @@ interface Detector {
   detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
 }
 
-/** Skanna med läsaren (skriv eller skanna i fältet) eller med telefonens kamera. */
+/** Kameraskannern: öppnas från skanna-ikonen, startar kameran direkt och slår upp första koden den ser. */
 @Component({
   selector: 'app-scan-dialog',
   standalone: true,
@@ -23,50 +23,24 @@ interface Detector {
   template: `
     <h2 mat-dialog-title>Skanna</h2>
     <mat-dialog-content class="flex flex-col gap-3">
-      <p class="order-1 text-sm text-gray-600">
-        Skanna en etikett med läsaren, eller skriv koden: DH-nummer, artikelnummer, streckkod,
-        AO-/SK-/KF-nummer eller regnr.
-      </p>
-      <input
-        #field
-        class="order-3 h-12 w-full rounded-xl border border-gray-300 px-3 text-lg md:order-2"
-        placeholder="Skanna eller skriv…"
-        autocomplete="off"
-        autocapitalize="characters"
-        (keydown.enter)="submit(field.value)"
-      />
-      <!-- På mobil är kameran det vanliga sättet, så den ligger över fältet och syns utan att rulla. -->
-      <div class="order-2 flex flex-col gap-3 md:order-3">
-        @if (!canCamera) {
-          <p class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-            Kameran kan inte läsa koder i den här webbläsaren. Använd en streckkodsläsare, skriv
-            koden, eller öppna Axle i Chrome.
-          </p>
-        } @else if (camera()) {
-          <video
-            #video
-            class="aspect-video w-full rounded-xl bg-black object-cover"
-            playsinline
-            muted
-          ></video>
-          <button mat-stroked-button type="button" (click)="stopCamera()">
-            <mat-icon>videocam_off</mat-icon> Stäng kameran
-          </button>
-        } @else {
-          <button mat-stroked-button type="button" (click)="startCamera()">
-            <mat-icon>photo_camera</mat-icon> Använd kameran
-          </button>
-        }
-      </div>
       @if (error()) {
-        <p class="order-4 text-sm text-red-700">{{ error() }}</p>
+        <p class="rounded-xl bg-gray-50 p-3 text-sm text-gray-700">{{ error() }}</p>
+      } @else {
+        <p class="text-sm text-gray-600">Rikta kameran mot streckkoden eller etiketten.</p>
+      }
+      <video
+        #video
+        class="aspect-video w-full rounded-xl bg-black object-cover"
+        [class.hidden]="!camera()"
+        playsinline
+        muted
+      ></video>
+      @if (busy()) {
+        <p class="text-sm text-gray-600">Slår upp koden…</p>
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button type="button" mat-dialog-close>Stäng</button>
-      <button mat-flat-button type="button" (click)="submit(field.value)" [disabled]="busy()">
-        Öppna
-      </button>
+      <button mat-flat-button type="button" mat-dialog-close>Stäng</button>
     </mat-dialog-actions>
   `,
 })
@@ -74,33 +48,32 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
   private readonly scanner = inject(Scanner);
   private readonly ref = inject(MatDialogRef<ScanDialog>);
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
-  private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
 
   readonly busy = signal(false);
   readonly error = signal('');
   readonly camera = signal(false);
   /**
-   * Kameraläsning kräver webbläsarens BarcodeDetector (Chrome och Edge; inte Safari på iPhone eller
-   * Firefox) och en säker anslutning (https). Saknas den visar dialogen en förklaring i stället för knappen.
+   * Kameran startar direkt. Den kräver en säker anslutning (https eller localhost). Webbläsarens egen
+   * BarcodeDetector används där den finns (Chrome, Edge); annars, som i Safari och iPhone-appen,
+   * läser biblioteket barcode-detector (ZXing) bildrutorna. En streckkodsläsare med tangentbordsläge
+   * behöver ingen dialog: Scanner.onKey fångar den var som helst i appen.
    */
-  readonly canCamera =
-    typeof window !== 'undefined' && 'BarcodeDetector' in window && !!navigator.mediaDevices;
-
   private stream: MediaStream | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private lastCode = '';
+  private lastAt = 0;
 
-  /** Fältet får fokus på dator, där en läsare skriver in koden. På mobil öppnar fokus bara tangentbordet. */
   ngAfterViewInit() {
-    if (window.matchMedia('(pointer: fine)').matches) this.field()?.nativeElement.focus();
+    void this.startCamera();
   }
 
   async submit(value: string) {
     const code = value.trim();
-    if (this.busy()) return;
-    if (!code) {
-      this.error.set('Skriv eller skanna en kod först.');
-      return;
-    }
+    if (!code || this.busy()) return;
+    // Kameran ser samma kod i varje bildruta; en miss ska inte slås upp och pipa om och om igen.
+    if (code === this.lastCode && Date.now() - this.lastAt < 3000) return;
+    this.lastCode = code;
+    this.lastAt = Date.now();
     this.busy.set(true);
     this.error.set('');
     const hit = await this.scanner.resolve(code);
@@ -119,26 +92,40 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
     this.scanner.open(hit);
   }
 
-  async startCamera() {
+  private async startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.error.set(
+        window.isSecureContext
+          ? 'Kameran är inte tillgänglig här. Skanna med en streckkodsläsare, den fungerar var du än är i appen.'
+          : 'Kameran kräver en säker anslutning (https) och fungerar inte när appen laddas över http, som med live reload på mobilen. Kör appen med ios:prod för att testa kameran.',
+      );
+      return;
+    }
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
       this.camera.set(true);
-      // Videoelementet finns först efter nästa rendering.
-      setTimeout(() => this.attach(), 0);
+      await this.attach();
     } catch {
-      this.error.set('Kameran gick inte att öppna. Tillåt kameran i webbläsaren.');
+      this.error.set('Kameran gick inte att öppna. Tillåt kameran i inställningarna.');
     }
   }
 
-  private attach() {
+  private async attach() {
     const el = this.video()?.nativeElement;
     if (!el || !this.stream) return;
     el.srcObject = this.stream;
     void el.play();
-    const Ctor = (window as unknown as { BarcodeDetector: new (o?: object) => Detector })
+    const native = (window as unknown as { BarcodeDetector?: new (o?: object) => Detector })
       .BarcodeDetector;
+    const Ctor =
+      native ??
+      ((await import('barcode-detector/ponyfill')).BarcodeDetector as unknown as new (
+        o?: object,
+      ) => Detector);
+    // Kameran kan ha stängts medan biblioteket laddades.
+    if (!this.stream) return;
     const detector = new Ctor();
     let busy = false;
     this.timer = setInterval(async () => {

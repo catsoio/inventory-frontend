@@ -8,6 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "cap:sync": "ng build && cap sync",
+    "ios:live": "scripts/ios-live.sh",
+    "ios:prod": "scripts/ios-prod.sh",
     "cap:add:ios": "cap add ios",
     "cap:add:android": "cap add android"
   },
@@ -39,6 +41,7 @@
     "@schedule-x/events-service": "^4.9.1",
     "@schedule-x/resize": "^3.7.3",
     "@schedule-x/theme-default": "^4.9.1",
+    "barcode-detector": "^3.2.4",
     "chart.js": "^4.5.1",
     "date-fns": "^4.4.0",
     "preact": "^10.29.8",

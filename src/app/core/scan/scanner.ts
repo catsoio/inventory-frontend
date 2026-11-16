@@ -44,7 +44,7 @@ export class Scanner {
     };
   }
 
-  /** Öppnar skannarrutan (skriv eller skanna en kod, eller använd kameran). */
+  /** Öppnar kameraskannern. */
   async openDialog(): Promise<void> {
     if (this.auth.isMechanic()) return;
     const { ScanDialog } = await import('./scan-dialog');
@@ -53,7 +53,6 @@ export class Scanner {
       width: '460px',
       maxWidth: '96vw',
       ariaLabel: 'Skanna',
-      // Fokus sätts av dialogen själv, och bara på dator: på mobil skulle tangentbordet täcka kameran.
       autoFocus: false,
     });
   }

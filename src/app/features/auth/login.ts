@@ -10,8 +10,10 @@ type Mode = 'login' | 'register' | 'verify';
   selector: 'app-login',
   standalone: false,
   template: `
-    <div class="auth-bg flex min-h-screen items-center justify-center p-4">
-      <div class="flex w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+    <div class="auth-bg flex min-h-dvh items-center justify-center sm:p-4">
+      <div
+        class="flex min-h-dvh w-full max-w-5xl overflow-hidden sm:min-h-0 sm:rounded-3xl sm:bg-white sm:shadow-2xl"
+      >
         <aside class="auth-hero hidden flex-1 flex-col justify-between p-10 text-white md:flex">
           <div class="flex items-center gap-3 text-xl font-semibold">
             <img src="axle-logo-white.svg" alt="" class="h-7 w-auto" /> Axle
@@ -35,7 +37,9 @@ type Mode = 'login' | 'register' | 'verify';
           <p class="text-sm text-white/70"></p>
         </aside>
 
-        <div class="w-full p-8 sm:p-12 md:w-[28rem] md:shrink-0">
+        <div
+          class="flex w-full flex-col justify-start px-6 pt-[max(6rem,calc(env(safe-area-inset-top)+3rem))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:justify-center sm:p-12 md:w-[28rem] md:shrink-0"
+        >
           <div class="mb-6 flex items-center gap-2 text-brand md:hidden">
             <img src="axle-logo.svg" alt="" class="h-6 w-auto" />
             <span class="text-lg font-semibold">Axle</span>
