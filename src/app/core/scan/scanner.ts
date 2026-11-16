@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -44,12 +44,17 @@ export class Scanner {
     };
   }
 
+  /** En sida (inventering, hyllplacering) vill ha skanningarna själv. */
+  get capturing(): boolean {
+    return this.captures.length > 0;
+  }
+
   /** Öppnar kameraskannern. */
-  async openDialog(): Promise<void> {
+  async openDialog(): Promise<MatDialogRef<unknown> | undefined> {
     if (this.auth.isMechanic()) return;
     const { ScanDialog } = await import('./scan-dialog');
     if (this.dialog.openDialogs.some((d) => d.componentInstance instanceof ScanDialog)) return;
-    this.dialog.open(ScanDialog, {
+    return this.dialog.open(ScanDialog, {
       width: '460px',
       maxWidth: '96vw',
       ariaLabel: 'Skanna',

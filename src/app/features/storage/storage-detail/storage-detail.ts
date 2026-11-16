@@ -55,7 +55,7 @@ type Field = [label: string, value: string | number];
           </div>
           <p class="mt-1 text-sm text-gray-700">
             @if (placing()) {
-              Håll läsaren mot etiketten på hyllan där setet ska stå. Nu står det:
+              Skanna etiketten på hyllan där setet ska stå. Nu står det:
               <b>{{ d.location || 'ingen plats' }}</b
               >.
             } @else {
@@ -178,10 +178,15 @@ export class StorageDetail implements OnDestroy {
 
   /** Nästa skanning är en hylla: setet placeras där. */
   startPlacing() {
-    if (this.release) return;
-    this.placing.set(true);
-    this.release = this.scanner.capture((code) => void this.place(code));
+    if (!this.release) {
+      this.placing.set(true);
+      this.release = this.scanner.capture((code) => void this.place(code));
+    }
+    // På telefon (ingen läsare) är kameran sättet att skanna hyllan.
+    if (this.touch) void this.scanner.openDialog();
   }
+
+  private readonly touch = window.matchMedia('(pointer: coarse)').matches;
 
   stopPlacing() {
     this.release?.();
@@ -208,6 +213,8 @@ export class StorageDetail implements OnDestroy {
           this.d.set(x);
           this.scanner.beep(true);
           this.snack.open(`Placerad på ${hit.label}`, undefined, { duration: 3000 });
+          // Med kameran är en hylla en skanning; med läsare får man fortsätta tills man trycker Klar.
+          if (this.touch) this.stopPlacing();
         },
         error: () => this.scanner.beep(false),
       });

@@ -27,6 +27,7 @@ import {
   StorageDepositInput,
   Warehouse,
 } from '../../../core/models';
+import { Scanner } from '../../../core/scan/scanner';
 import { Settings } from '../../../core/settings';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
 import { dateInput, dateIso } from '../storage-format';
@@ -305,6 +306,16 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                   }
                 </mat-select>
               </mat-form-field>
+              @if (touch) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="col-span-6 !h-12"
+                  (click)="scanShelf()"
+                >
+                  <mat-icon>qr_code_scanner</mat-icon> Skanna hylla
+                </button>
+              }
               <app-date-field
                 class="col-span-3"
                 subscript="dynamic"
@@ -402,6 +413,9 @@ export class StorageForm {
   private readonly snack = inject(MatSnackBar);
   private readonly fb = inject(FormBuilder);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  private readonly scanner = inject(Scanner);
+  /** På telefon fylls platsen i genom att skanna hyllans etikett med kameran. */
+  readonly touch = window.matchMedia('(pointer: coarse)').matches;
 
   /** Säsongen och avgiften kommer från Inställningar. */
   private readonly settings = inject(Settings);
@@ -504,6 +518,34 @@ export class StorageForm {
       },
     },
   );
+
+  /** Skannar en hylla med kameran och väljer dess lager och plats. */
+  async scanShelf() {
+    let release = () => {};
+    const done = new Promise<string>((resolve) => {
+      release = this.scanner.capture(resolve);
+    });
+    const ref = await this.scanner.openDialog();
+    if (!ref) return release();
+    // Dialogen stängs med eller utan skanning; utan skanning avslutas väntan här.
+    const code = await Promise.race([
+      done,
+      new Promise<null>((r) => ref.afterClosed().subscribe(() => setTimeout(() => r(null), 50))),
+    ]);
+    release();
+    if (!code) return;
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    if (hit.kind !== 'location' || hit.warehouseKind !== 'customer') {
+      this.scanner.beep(false);
+      this.snack.open('Det där är inte en hylla i däckhotellet.', undefined, { duration: 3500 });
+      return;
+    }
+    const c = this.form.controls;
+    c.warehouseId.setValue(hit.warehouseId);
+    c.locationId.setValue(hit.locationId);
+    this.snack.open(`Plats: ${hit.label}`, undefined, { duration: 2500 });
+  }
 
   constructor() {
     const c = this.form.controls;

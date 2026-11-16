@@ -74,6 +74,14 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
     if (code === this.lastCode && Date.now() - this.lastAt < 3000) return;
     this.lastCode = code;
     this.lastAt = Date.now();
+    // En sida som väntar på en skanning (hyllan på ett hjulset, inventeringen) får koden i stället.
+    if (this.scanner.capturing) {
+      this.scanner.beep(true);
+      this.stopCamera();
+      this.ref.close();
+      void this.scanner.handle(code);
+      return;
+    }
     this.busy.set(true);
     this.error.set('');
     const hit = await this.scanner.resolve(code);
