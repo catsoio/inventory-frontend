@@ -11,15 +11,16 @@ import { Scanner } from './scanner';
 const key = (k: string, target: Partial<HTMLElement> = { tagName: 'BODY' }) =>
   ({ key: k, target, preventDefault: vi.fn() }) as unknown as KeyboardEvent;
 
-function setup(hit: ScanHit) {
+function setup(hit: ScanHit, mechanic = false) {
   const navigate = vi.fn();
+  const scan = vi.fn(() => of(hit));
   TestBed.configureTestingModule({
     providers: [
-      { provide: StockCountApi, useValue: { scan: vi.fn(() => of(hit)) } },
+      { provide: StockCountApi, useValue: { scan } },
       { provide: Router, useValue: { navigate } },
       { provide: MatSnackBar, useValue: { open: vi.fn() } },
       { provide: MatDialog, useValue: { open: vi.fn(), openDialogs: [] } },
-      { provide: Auth, useValue: { isMechanic: () => false } },
+      { provide: Auth, useValue: { isMechanic: () => mechanic } },
     ],
   });
   let t = 1000;
@@ -33,7 +34,7 @@ function setup(hit: ScanHit) {
     t += gap;
     s.onKey(key('Enter', target));
   };
-  return { navigate, type, scanner: TestBed.inject(Scanner) };
+  return { navigate, scan, type, scanner: TestBed.inject(Scanner) };
 }
 
 describe('Scanner', () => {
@@ -76,5 +77,29 @@ describe('Scanner', () => {
     release();
     type('7350001', 10);
     await vi.waitFor(() => expect(navigate).toHaveBeenCalled());
+  });
+
+  describe('as a mechanic', () => {
+    const part: ScanHit = { kind: 'article', id: 'a1', code: 'ART-00001', label: 'x' };
+
+    it('does nothing with a scan when no page is waiting for it', async () => {
+      const { navigate, scan, type, scanner } = setup(part, true);
+      type('7350001', 10);
+      await scanner.handle('7350001');
+      await scanner.openCode('7350001');
+      await Promise.resolve();
+      expect(scan).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('hands the code to the page that waits for it (the order they work on)', async () => {
+      const { navigate, type, scanner } = setup(part, true);
+      const got: string[] = [];
+      scanner.capture((c) => got.push(c));
+      type('7350001', 10);
+      await Promise.resolve();
+      expect(got).toEqual(['7350001']);
+      expect(navigate).not.toHaveBeenCalled();
+    });
   });
 });

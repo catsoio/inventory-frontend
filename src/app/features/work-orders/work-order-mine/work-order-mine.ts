@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
+import { Scanner } from '../../../core/scan/scanner';
 import {
   WORK_ORDER_LINE_LABELS,
   WORK_ORDER_STATUS_LABELS,
@@ -88,6 +89,15 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
                 </ul>
 
                 @if (mine()) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="!mt-3 !min-h-12 w-full"
+                    [disabled]="busy()"
+                    (click)="scanner.openDialog()"
+                  >
+                    <mat-icon>qr_code_scanner</mat-icon> Skanna del
+                  </button>
                   <div class="mt-3 flex gap-2">
                     <input
                       #extra
@@ -182,6 +192,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
 export class WorkOrderMine implements OnInit {
   private readonly api = inject(WorkOrderApi);
   private readonly snack = inject(MatSnackBar);
+  readonly scanner = inject(Scanner);
 
   readonly tones = TONES;
   readonly statuses = WORK_ORDER_STATUS_LABELS;
@@ -195,8 +206,44 @@ export class WorkOrderMine implements OnInit {
   /** Uppfälld order är mekanikerns egen (tilldelad), inte en ej tilldelad. */
   readonly mine = signal(true);
 
+  /** Koder som kom medan en annan skanning sparades; ingen ska gå förlorad med en läsare i handen. */
+  private readonly waiting: string[] = [];
+
+  constructor() {
+    // En skannad del läggs på ordern som är uppfälld, utan pris: ägaren prissätter den sedan.
+    const release = this.scanner.capture((code) => void this.onScan(code));
+    inject(DestroyRef).onDestroy(release);
+  }
+
   ngOnInit() {
     this.load();
+  }
+
+  private async onScan(code: string) {
+    const d = this.open();
+    if (!d || !this.mine()) {
+      this.scanner.beep(false);
+      this.snack.open('Öppna en av dina order först och skanna sedan delen', undefined, {
+        duration: 3500,
+      });
+      return;
+    }
+    if (this.busy()) {
+      this.waiting.push(code);
+      return;
+    }
+    // Servern svarar mekanikern bara med artiklar; allt annat är okänt här.
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    if (hit.kind !== 'article') {
+      this.scanner.beep(false);
+      this.snack.open(`Ingen del med koden ${code}`, undefined, { duration: 3500 });
+      return;
+    }
+    this.scanner.beep(true);
+    this.run(d, { add: [{ articleId: hit.id }] }, () =>
+      this.snack.open(`${hit.label} lades till`, undefined, { duration: 2000 }),
+    );
   }
 
   load() {
@@ -267,9 +314,12 @@ export class WorkOrderMine implements OnInit {
         this.open.set(r);
         this.busy.set(false);
         after?.();
+        const next = this.waiting.shift();
+        if (next) void this.onScan(next);
       },
       error: () => {
         this.busy.set(false);
+        this.waiting.length = 0;
         this.snack.open('Kunde inte spara. Försök igen.', undefined, { duration: 3000 });
       },
     });

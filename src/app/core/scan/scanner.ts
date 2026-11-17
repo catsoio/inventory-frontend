@@ -51,7 +51,6 @@ export class Scanner {
 
   /** Öppnar kameraskannern. */
   async openDialog(): Promise<MatDialogRef<unknown> | undefined> {
-    if (this.auth.isMechanic()) return;
     const { ScanDialog } = await import('./scan-dialog');
     if (this.dialog.openDialogs.some((d) => d.componentInstance instanceof ScanDialog)) return;
     return this.dialog.open(ScanDialog, {
@@ -64,8 +63,9 @@ export class Scanner {
 
   /** Skalet matar in varje tangent. Fält tar hand om sin egen text. */
   onKey(e: KeyboardEvent): void {
-    if (this.auth.isMechanic()) return;
-    const t = e.target as HTMLElement | null;
+    // Mekanikern skannar bara delar till en order: utan en sida som väntar på koden händer inget.
+    if (this.auth.isMechanic() && !this.capturing) return;
+    const t =e.target as HTMLElement | null;
     if (t && (/^(input|textarea|select)$/i.test(t.tagName) || t.isContentEditable)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const now = performance.now();
@@ -92,6 +92,8 @@ export class Scanner {
       capture(code);
       return null;
     }
+    // Servern svarar mekanikern bara med artiklar, och det finns ingen artikelsida för rollen.
+    if (this.auth.isMechanic()) return null;
     const hit = await this.resolve(code);
     if (hit) this.open(hit);
     return hit;
@@ -99,6 +101,7 @@ export class Scanner {
 
   /** Slår upp koden och öppnar det den står för, även när en sida annars vill ha skanningarna. */
   async openCode(code: string): Promise<void> {
+    if (this.auth.isMechanic()) return;
     const hit = await this.resolve(code);
     if (hit) this.open(hit);
   }

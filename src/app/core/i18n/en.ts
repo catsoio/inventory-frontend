@@ -1346,4 +1346,5 @@ export const EN: Record<string, string> = {
   'Sök regnr, kund, telefon, order eller artikel…':
     'Search plate, customer, phone, order or article…',
   'Sök regnr, kund, order…': 'Search plate, customer, order…',
+  'Skanna del': 'Scan part',
 };

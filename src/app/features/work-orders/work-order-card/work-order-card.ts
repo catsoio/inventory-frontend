@@ -1,5 +1,13 @@
 import { Billing } from '../../../core/billing/billing';
-import { ChangeDetectorRef, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
@@ -37,6 +45,7 @@ import type { PickerValue } from '../../../shared/customer-vehicle-picker/custom
 import { linkWhen, nextHour, whenOrder, whenRange, whenValue } from '../../../shared/when/when';
 import { BookingApi } from '../../../core/api/booking-api';
 import { Auth } from '../../../core/auth/auth';
+import { Scanner } from '../../../core/scan/scanner';
 import { Pricing } from '../../../core/pricing';
 import type { CalloutFix } from '../../../shared/callout/callout-fix';
 import {
@@ -566,6 +575,14 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                     >
                       <mat-icon>inventory_2</mat-icon> Lägg till del
                     </button>
+                    <button
+                      mat-button
+                      type="button"
+                      [disabled]="locked()"
+                      (click)="scanFor(job.value.id)"
+                    >
+                      <mat-icon>qr_code_scanner</mat-icon> Skanna del
+                    </button>
                   </div>
                 </div>
               </div>
@@ -923,6 +940,7 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
 })
 export class WorkOrderCard implements OnInit {
   private readonly auth = inject(Auth);
+  private readonly scanner = inject(Scanner);
   /** Bara ägare får ta bort och se efterkalkylen. */
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   readonly pricing = inject(Pricing);
@@ -1138,6 +1156,9 @@ export class WorkOrderCard implements OnInit {
   });
 
   constructor() {
+    // En skannad del läggs på ordern: kameran eller en streckkodsläsare, var man än står på kortet.
+    const release = this.scanner.capture((code) => void this.onScan(code));
+    inject(DestroyRef).onDestroy(release);
     const first = nextHour();
     linkWhen(this.form, { start: first, end: new Date(first.getTime() + 3600_000) });
     this.form.valueChanges.subscribe(() => {
@@ -1404,6 +1425,65 @@ export class WorkOrderCard implements OnInit {
       code: v.code || a.sku || '',
       unitPrice: v.unitPrice ?? kr(inMode(a.sellPrice, this.incl())),
       discountPercent: v.discountPercent || this.customer()?.partsDiscount || 0,
+    });
+  }
+
+  /** Jobbet en skannad del hamnar på: det man senast skannat för, annars det sista. */
+  private readonly scanJobId = signal<string | null>(null);
+
+  /** Öppnar kameran för ett jobb. En streckkodsläsare behöver ingen knapp: den läggs på samma jobb. */
+  scanFor(jobId: string) {
+    this.scanJobId.set(jobId);
+    void this.scanner.openDialog();
+  }
+
+  private scanTarget(): string | null {
+    const ids = this.jobs.controls.map((j) => j.value.id as string);
+    const chosen = this.scanJobId();
+    if (chosen && ids.includes(chosen)) return chosen;
+    return ids.length ? ids[ids.length - 1] : null;
+  }
+
+  /**
+   * En skannad kod på ordern: en lagerartikel läggs som del på jobbet (en gång till = ett till
+   * av samma), allt annat öppnas som överallt annars. En låst order lägger inget till.
+   */
+  private async onScan(code: string) {
+    if (this.locked()) return this.scanner.openCode(code);
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    if (hit.kind === 'article') {
+      this.inventory.article(hit.id).subscribe((a) => this.addScanned(a));
+    } else if (hit.kind === 'none') {
+      this.snack.open(`Ingen artikel med koden ${hit.code}`, undefined, { duration: 3500 });
+    } else {
+      this.scanner.open(hit);
+    }
+  }
+
+  private addScanned(a: Article) {
+    let jobId = this.scanTarget();
+    if (!jobId) {
+      this.addJob();
+      jobId = this.scanTarget();
+    }
+    const job = this.jobs.controls.find((j) => j.value.id === jobId);
+    const same = this.lines.controls.find(
+      (l) => l.value.jobId === jobId && l.value.articleId === a.id && !l.value.stockBooked,
+    );
+    if (same) {
+      same.patchValue({ quantity: (Number(same.value.quantity) || 0) + 1 });
+    } else {
+      const row = this.newLine({ type: 'part', jobId });
+      this.lines.push(row);
+      this.linkArticle(row, a);
+    }
+    this.form.markAsDirty();
+    this.settle();
+    this.scanner.beep(true);
+    const where = (job?.value.title as string)?.trim();
+    this.snack.open(`${a.label} lades på ${where ? `“${where}”` : 'jobbet'}`, undefined, {
+      duration: 2500,
     });
   }
 
