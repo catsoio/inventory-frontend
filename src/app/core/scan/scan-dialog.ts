@@ -10,7 +10,7 @@ import {
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { SharedModule } from '../../shared/shared-module';
 import { Auth } from '../auth/auth';
-import { PlateTracker, platesIn } from './plate';
+import { PlateTracker, plateOf, platesIn } from './plate';
 import { plateReaderAvailable, readLines } from './plate-reader';
 import { Scanner } from './scanner';
 
@@ -115,6 +115,14 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
     this.busy.set(false);
     if (!hit) {
       this.error.set('Det gick inte att slå upp koden just nu. Försök igen.');
+      return;
+    }
+    if (hit.kind === 'none' && this.plates && plateOf(code) === code) {
+      // Ett regnummer som ingen känner till: en ny bil har kommit in, fråga vad som ska göras.
+      this.scanner.beep(true);
+      this.stopCamera();
+      this.ref.close();
+      void this.scanner.startForNewCar(code);
       return;
     }
     if (hit.kind === 'none') {

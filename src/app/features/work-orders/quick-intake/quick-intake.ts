@@ -1,7 +1,7 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { catchError, debounceTime, distinctUntilChanged, forkJoin, map, of, switchMap } from 'rxjs';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
@@ -19,6 +19,11 @@ import { LinkResolver } from '../../../shared/customer-vehicle-picker/link-resol
 import { SharedModule } from '../../../shared/shared-module';
 
 /** Vad inlämningen blev: ordern som skapades, eller en befintlig order man ville öppna i stället. */
+/** `regNo`: skylten är redan skannad (en okänd bil i skanningen), så kameran startas inte. */
+export interface QuickIntakeData {
+  regNo?: string;
+}
+
 export interface QuickIntakeResult {
   id: string;
   code: string;
@@ -259,6 +264,7 @@ export class QuickIntake implements OnInit {
   private readonly links = inject(LinkResolver);
   private readonly scanner = inject(Scanner);
   private readonly destroyed = inject(DestroyRef);
+  private readonly data = inject<QuickIntakeData | null>(MAT_DIALOG_DATA, { optional: true });
 
   readonly canScan = plateReaderAvailable();
 
@@ -340,6 +346,10 @@ export class QuickIntake implements OnInit {
       .serviceTypes()
       .pipe(catchError(() => of([] as ServiceType[])))
       .subscribe((list) => this.services.set(list.filter((s) => s.active !== false)));
+    if (this.data?.regNo) {
+      this.regNo.setValue(this.data.regNo);
+      return;
+    }
     // I appen börjar det med kameran: skylten är det första man gör när en bil kommer in.
     if (this.canScan) void this.scan();
   }

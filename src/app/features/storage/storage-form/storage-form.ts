@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, of, switchMap } from 'rxjs';
+import { WorkshopApi } from '../../../core/api/workshop-api';
 import {
   LinkResolver,
   type ResolvedLink,
@@ -407,6 +408,8 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
 })
 export class StorageForm {
   private readonly api = inject(StorageApi);
+  private readonly workshop = inject(WorkshopApi);
+  private lookedUp = '';
   private readonly catalog = inject(CatalogApi);
   private readonly links = inject(LinkResolver);
   private readonly router = inject(Router);
@@ -587,6 +590,7 @@ export class StorageForm {
       if (l?.pending) {
         // Nyskriven kund/bil: ögonblicksbilden fylls i nu, själva posterna skapas vid spar.
         this.form.patchValue({ regNo: l.pending.regNo ?? '', name: l.pending.customerName ?? '' });
+        this.fillFromRegistry(l.pending.regNo ?? '');
         return;
       }
       if (!l?.vehicle || !l.customer) return;
@@ -617,6 +621,10 @@ export class StorageForm {
     const fromVehicle = qp.get('vehicleId');
     if (!this.id && fromCustomer && fromVehicle) {
       c.link.setValue({ customerId: fromCustomer, vehicleId: fromVehicle });
+    }
+    const scanned = qp.get('regNo');
+    if (!this.id && scanned && !fromVehicle) {
+      c.link.setValue({ customerId: '', vehicleId: '', pending: { regNo: scanned } });
     }
     const fromOrder = qp.get('orderCode');
     if (!this.id && fromOrder) c.notes.setValue(`Från ${fromOrder}`);
@@ -683,6 +691,38 @@ export class StorageForm {
   }
 
   /** Förvalt lager och plats (annars det enda lagret) för en ny inlämning; väntar på båda svaren. */
+  /**
+   * En ny bil (skannad eller skriven) som inte finns hos oss: märke, modell och däckdimension hämtas
+   * ur fordonsregistret, så de flesta fälten är ifyllda. Det någon redan skrivit lämnas.
+   */
+  private fillFromRegistry(regNo: string) {
+    const reg = regNo.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, '');
+    if (this.id || reg.length < 6 || reg === this.lookedUp) return;
+    this.lookedUp = reg;
+    this.workshop.lookupVehicle(reg).subscribe({
+      next: (r) => {
+        const info = r.info;
+        if (!info || this.lookedUp !== reg) return;
+        const f = this.form.controls;
+        if (!f.make.value) f.make.setValue(info.make ?? '');
+        if (!f.vehicleModel.value) f.vehicleModel.setValue(info.model ?? '');
+        const size = /(\d{3})\s*\/\s*(\d{2}).*?R?\s*(\d{2})\b/i.exec(info.tyreSize ?? '');
+        const t = f.tyres.controls;
+        if (size && t.width.value == null && t.profile.value == null) {
+          f.tyres.patchValue({
+            width: Number(size[1]),
+            profile: Number(size[2]),
+            rimDiameter: Number(size[3]),
+          });
+        }
+        this.countStored(reg);
+      },
+      error: () => {
+        // Registret kan vara nere: formuläret fylls i för hand som förut.
+      },
+    });
+  }
+
   private applyDefaultPlace() {
     if (this.id) return;
     const c = this.form.controls;

@@ -638,6 +638,12 @@ export class QuoteCard implements OnInit {
         customerId: customerId ?? '',
         vehicleId: vehicleId ?? '',
       });
+    } else if (q.get('regNo')) {
+      this.form.controls.link.setValue({
+        customerId: '',
+        vehicleId: '',
+        pending: { regNo: q.get('regNo') ?? '' },
+      });
     }
   }
 

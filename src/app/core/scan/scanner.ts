@@ -134,6 +134,46 @@ export class Scanner {
     }
   }
 
+  /**
+   * En skyltläsning som inte hör till någon bil hos oss: en ny bil har kommit in. Man väljer vad som
+   * ska göras (arbetsorder, däckhotell, offert) i stället för att få en miss.
+   */
+  async startForNewCar(regNo: string): Promise<void> {
+    const { NewCarDialog } = await import('./new-car-dialog');
+    const choice = await firstValueFrom(
+      this.dialog
+        .open(NewCarDialog, { width: '420px', maxWidth: '96vw', autoFocus: false, data: { regNo } })
+        .afterClosed(),
+    );
+    if (choice === 'storage') return this.go(['/storage/new'], { regNo });
+    if (choice === 'quote') return this.go(['/quotes/new'], { regNo });
+    if (choice === 'order') return this.startOrderFor(regNo);
+  }
+
+  /** Inlämningen (Ny order) med skylten ifylld. */
+  async startOrderFor(regNo: string): Promise<void> {
+    const { QuickIntake } = await import('../../features/work-orders/quick-intake/quick-intake');
+    const r = await firstValueFrom(
+      this.dialog
+        .open(QuickIntake, {
+          width: '520px',
+          maxWidth: '100vw',
+          autoFocus: false,
+          data: { regNo },
+        })
+        .afterClosed(),
+    );
+    if (!r) return;
+    if (r.open) {
+      this.go(['/workorders', r.id]);
+      return;
+    }
+    this.snack
+      .open(`${r.code} skapad`, 'Öppna', { duration: 6000 })
+      .onAction()
+      .subscribe(() => this.go(['/workorders', r.id]));
+  }
+
   /** Öppnar det koden stod för. */
   open(hit: ScanHit): void {
     switch (hit.kind) {
