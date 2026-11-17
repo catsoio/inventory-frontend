@@ -22,6 +22,8 @@ import { SharedModule } from '../../../shared/shared-module';
 /** `regNo`: skylten är redan skannad (en okänd bil i skanningen), så kameran startas inte. */
 export interface QuickIntakeData {
   regNo?: string;
+  /** Åtgärden är redan vald (Däckbyte eller en åtgärd ur skanningens val). */
+  job?: string;
 }
 
 export interface QuickIntakeResult {
@@ -346,6 +348,7 @@ export class QuickIntake implements OnInit {
       .serviceTypes()
       .pipe(catchError(() => of([] as ServiceType[])))
       .subscribe((list) => this.services.set(list.filter((s) => s.active !== false)));
+    if (this.data?.job) this.job.setValue(this.data.job);
     if (this.data?.regNo) {
       this.regNo.setValue(this.data.regNo);
       return;

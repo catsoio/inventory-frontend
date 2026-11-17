@@ -54,7 +54,7 @@ export class Push {
     await plugin.addListener('pushNotificationReceived', (n) => {
       const text = [n.title, n.body].filter(Boolean).join(': ');
       const page = pageOf(n.data);
-      const ref = this.snack.open(text, page ? 'Öppna' : undefined, { duration: 7000 });
+      const ref = this.snack.open(text, page ? 'Öppna' : undefined, { duration: 7000, verticalPosition: 'top' });
       if (page) ref.onAction().subscribe(() => void this.router.navigateByUrl(page));
     });
     // Ett tryck på meddelandet i systemet.

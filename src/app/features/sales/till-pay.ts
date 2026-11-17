@@ -6,6 +6,12 @@ import { catchError, of, switchMap, timer } from 'rxjs';
 import { ZettleApi } from '../../core/api/zettle-api';
 import { appLocale } from '../../core/i18n/locale';
 import { PosSale } from '../../core/models';
+import {
+  PayPalReaderStatus,
+  kronorOf,
+  paypalReader,
+  paypalReaderAvailable,
+} from '../../core/pay/paypal-reader';
 
 export interface TillPayData {
   cardId: string;
@@ -30,6 +36,33 @@ const METHOD: Record<string, string> = { card: 'kort', swish: 'Swish', cash: 'ko
   template: `
     <h2 mat-dialog-title>Betalning i PayPal-kassan</h2>
     <mat-dialog-content class="!flex flex-col gap-3 !pt-2">
+      @if (reader(); as r) {
+        <section class="flex flex-col gap-2 rounded-xl border border-gray-300 p-3">
+          @if (!r.configured) {
+            <p class="text-sm text-gray-700">
+              Kortläsaren är inte inställd i appen än (Client ID från Zettle saknas). Slå in beloppet
+              i PayPal-appen så länge.
+            </p>
+          } @else if (charged()) {
+            <p class="text-sm text-teal-900">
+              Betalt på läsaren. Väntar på att köpet syns i kassan och bokför kortet…
+            </p>
+          } @else if (!r.loggedIn) {
+            <p class="text-sm text-gray-700">Logga in med PayPal-kontot en gång för att använda läsaren.</p>
+            <button mat-flat-button type="button" class="!h-12" [disabled]="charging()" (click)="login()">
+              Logga in på PayPal
+            </button>
+          } @else {
+            <button mat-flat-button type="button" class="!h-12" [disabled]="charging() || booking()" (click)="charge()">
+              Ta betalt {{ data.total | kr }} på läsaren
+            </button>
+            <button mat-button type="button" [disabled]="charging()" (click)="settings()">
+              Kortläsare och konto
+            </button>
+          }
+        </section>
+        <p class="text-xs text-gray-500">Eller slå in beloppet i PayPal-appen:</p>
+      }
       <ol class="list-decimal space-y-1 pl-5 text-sm text-gray-700">
         <li>
           Öppna PayPal-appen och slå in <b>{{ data.total | kr }}</b> (en vara eller ett eget
@@ -84,7 +117,14 @@ export class TillPayDialog implements OnInit {
   readonly booking = signal(false);
   readonly error = signal('');
 
+  /** PayPal Reader via Bluetooth i appen; null i webbläsaren. */
+  readonly reader = signal<PayPalReaderStatus | null>(null);
+  readonly charging = signal(false);
+  /** Läsaren sa att pengarna är dragna: nu väntar vi på köpet i kassan. */
+  readonly charged = signal(false);
+
   ngOnInit() {
+    if (paypalReaderAvailable()) void this.readStatus();
     // Läs in köp och leta matchning var fjärde sekund så länge dialogen är öppen.
     timer(0, 4000)
       .pipe(
@@ -124,6 +164,58 @@ export class TillPayDialog implements OnInit {
         this.error.set('Kortet kunde inte bokföras. Kontrollera meddelandet och försök igen.');
       },
     });
+  }
+
+  private async readStatus() {
+    try {
+      this.reader.set(await paypalReader.status());
+    } catch {
+      this.reader.set(null);
+    }
+  }
+
+  async login() {
+    this.error.set('');
+    try {
+      await paypalReader.login();
+    } catch {
+      this.error.set('Inloggningen på PayPal gick inte. Försök igen.');
+    }
+    await this.readStatus();
+  }
+
+  async settings() {
+    try {
+      await paypalReader.settings();
+    } finally {
+      await this.readStatus();
+    }
+  }
+
+  /**
+   * Skickar beloppet till läsaren. Läsarens egen vy visas medan kunden betalar. Köpet bokförs inte
+   * här utan när det syns i kassan (samma väg som ett köp i PayPal-appen), så kortet bokförs en gång.
+   */
+  async charge() {
+    this.charging.set(true);
+    this.error.set('');
+    try {
+      await paypalReader.charge({
+        amount: kronorOf(this.data.total),
+        // Unik per försök: SDK:n använder referensen för att hitta betalningen igen.
+        reference: `${this.data.cardCode}-${Date.now().toString(36)}`,
+      });
+      this.charged.set(true);
+    } catch (e) {
+      const text = (e as { message?: string })?.message ?? '';
+      this.error.set(
+        /cancel|avbr/i.test(text)
+          ? 'Betalningen avbröts. Inget drogs.'
+          : `Betalningen på läsaren gick inte igenom${text ? `: ${text}` : '.'}`,
+      );
+    } finally {
+      this.charging.set(false);
+    }
   }
 
   goods(s: PosSale) {

@@ -140,18 +140,19 @@ export class Scanner {
    */
   async startForNewCar(regNo: string): Promise<void> {
     const { NewCarDialog } = await import('./new-car-dialog');
-    const choice = await firstValueFrom(
+    const picked = await firstValueFrom(
       this.dialog
         .open(NewCarDialog, { width: '420px', maxWidth: '96vw', autoFocus: false, data: { regNo } })
         .afterClosed(),
     );
-    if (choice === 'storage') return this.go(['/storage/new'], { regNo });
-    if (choice === 'quote') return this.go(['/quotes/new'], { regNo });
-    if (choice === 'order') return this.startOrderFor(regNo);
+    if (!picked) return;
+    if (picked.choice === 'storage') return this.go(['/storage/new'], { regNo });
+    if (picked.choice === 'quote') return this.go(['/quotes/new'], { regNo });
+    return this.startOrderFor(regNo, picked.job);
   }
 
   /** Inlämningen (Ny order) med skylten ifylld. */
-  async startOrderFor(regNo: string): Promise<void> {
+  async startOrderFor(regNo: string, job?: string): Promise<void> {
     const { QuickIntake } = await import('../../features/work-orders/quick-intake/quick-intake');
     const r = await firstValueFrom(
       this.dialog
@@ -159,7 +160,7 @@ export class Scanner {
           width: '520px',
           maxWidth: '100vw',
           autoFocus: false,
-          data: { regNo },
+          data: { regNo, job },
         })
         .afterClosed(),
     );
