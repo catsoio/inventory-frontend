@@ -1,11 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { Booking } from '../../core/models';
+import { Booking, WorkOrder } from '../../core/models';
+import { Scanner } from '../../core/scan/scanner';
 import { GlobalSearch } from '../../core/search/global-search';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
-import { columns, kronor } from '../../shared/chart/chart-kit';
-import { ACCENT, OTHER, STATUS } from '../../shared/chart/chart-theme';
-import { delta } from '../../shared/stat/stat';
 import { HomeData } from './home-data';
 
 const hhmm = (iso: string) =>
@@ -14,28 +12,41 @@ const hhmm = (iso: string) =>
 /** Så många kommande tider visas direkt; resten finns under Tider. */
 const MAX_COMING = 6;
 
+/** Så många order visas på Hem; resten finns under Arbetsorder. */
+const MAX_ORDERS = 5;
+
 /**
- * Hem på mobil: det man gör i farten. Sök direkt, fyra genvägar, dagens tider med en knapp för att
- * checka in bilen och det som väntar. Inga tabeller och ingen planering.
+ * Hem på mobil: det man gör i farten. Sök eller skanna direkt (regnummer, etikett, streckkod), fyra
+ * genvägar och dagens tider med en knapp för att checka in bilen. Ingen ekonomi, ingen att göra-lista
+ * (det som väntar syns som prickar i "Mer") och ingen planering.
  */
 @Component({
   selector: 'app-home-mobile',
   standalone: false,
   host: { class: 'flex flex-col gap-5 pb-4' },
   template: `
-    <button
-      type="button"
-      class="flex h-12 w-full items-center gap-3 rounded-xl bg-white px-4 text-left text-gray-500 shadow-sm ring-1 ring-gray-200 active:bg-gray-50"
-      (click)="search.open()"
-    >
-      <mat-icon class="text-gray-400">search</mat-icon>
-      <span class="truncate text-[15px]">Sök regnr, kund eller order…</span>
-    </button>
+    <div class="flex gap-2.5">
+      <button
+        type="button"
+        class="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-xl bg-white px-4 text-left text-gray-500 shadow-sm ring-1 ring-gray-200 active:bg-gray-50"
+        (click)="search.open()"
+      >
+        <mat-icon class="text-gray-400">search</mat-icon>
+        <span class="truncate text-[15px]">Sök regnr eller kund…</span>
+      </button>
+      <button
+        type="button"
+        class="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-brand px-4 text-[15px] font-semibold text-white shadow-sm active:opacity-90"
+        (click)="scanner.openDialog()"
+      >
+        <mat-icon>qr_code_scanner</mat-icon> Skanna
+      </button>
+    </div>
 
-    <div class="grid grid-cols-2 gap-2.5">
+    <div class="grid grid-cols-4 gap-2.5">
       @for (a of actions; track a.label) {
         @if (a.link) {
-          <a [routerLink]="a.link" [queryParams]="a.params" class="action">
+          <a [routerLink]="a.link" class="action">
             <mat-icon>{{ a.icon }}</mat-icon>
             <span>{{ a.label }}</span>
           </a>
@@ -154,51 +165,81 @@ const MAX_COMING = 6;
       </div>
     </section>
 
-    <app-panel title="Att göra" icon="task_alt">
-      <app-attention-list [items]="data.attention()" [ready]="data.attentionReady()" />
-    </app-panel>
-
-    @if (data.admin) {
-      <div class="grid grid-cols-2 gap-2.5">
-        <app-stat
-          label="Försäljning, veckan"
-          [value]="weekSold()"
-          [delta]="weekDelta()"
-          [trend]="weekTrend()"
-          hint="exkl. moms"
-          link="/finance"
-        />
-        <app-stat
-          label="Obetalt"
-          [value]="data.unpaid() ? kr(data.unpaid()!.amount) : '–'"
-          [hint]="data.unpaid() ? data.unpaid()!.count + ' fakturor' : ''"
-          [status]="data.unpaid()?.count ? 'warn' : 'none'"
-          link="/sales"
-          [params]="{ show: 'unpaid' }"
-        />
-      </div>
+    @if (data.workOrdersOn && data.ordersLoaded()) {
+      <section>
+        <div class="mb-2 flex items-baseline gap-2 px-1">
+          <h2 class="text-sm font-semibold">Order på gång</h2>
+          <span class="text-xs text-gray-500">{{ data.orders().length }} st</span>
+          <span class="flex-1"></span>
+          <a routerLink="/workorders" class="text-xs font-medium text-brand">Alla order</a>
+        </div>
+        <div class="flex flex-col gap-2">
+          @for (o of ordersShown(); track o.id) {
+            <a
+              [routerLink]="['/workorders', o.id]"
+              class="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 active:bg-gray-50"
+            >
+              <app-reg-plate [value]="o.regNo" size="sm" class="shrink-0" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-[15px] font-medium">{{ o.vehicle || '–' }}</span>
+                <span class="block truncate text-sm text-gray-600"
+                  >{{ o.customerName }}{{ o.resourceName ? ' · ' + o.resourceName : '' }}</span
+                >
+                @if (late(o)) {
+                  <span class="block text-xs font-medium text-red-700">Försenad</span>
+                } @else if (o.pickupAt) {
+                  <span class="block text-xs text-gray-500">Klar senast {{ due(o.pickupAt) }}</span>
+                }
+              </span>
+              @if (o.status === 'waiting_parts' || o.hasMissing) {
+                <app-pill tone="amber">Del saknas</app-pill>
+              } @else if (o.status === 'in_progress') {
+                <app-pill tone="blue">Pågår</app-pill>
+              } @else {
+                <app-pill tone="gray">Öppen</app-pill>
+              }
+            </a>
+          } @empty {
+            <p class="rounded-xl bg-white p-4 text-sm text-gray-500 shadow-sm ring-1 ring-black/5">
+              Inga order på gång.
+            </p>
+          }
+          @if (ordersHidden() > 0) {
+            <a
+              routerLink="/workorders"
+              class="flex h-11 items-center justify-center rounded-xl bg-white text-sm font-medium text-brand shadow-sm ring-1 ring-black/5 active:bg-gray-50"
+              >+ {{ ordersHidden() }} till, se alla order</a
+            >
+          }
+        </div>
+      </section>
     }
   `,
   styles: `
     .action {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
-      min-height: 56px;
-      padding: 0 14px;
-      border-radius: 14px;
+      justify-content: center;
+      gap: 6px;
+      aspect-ratio: 1;
+      padding: 6px 4px;
+      border-radius: var(--radius-ui, 12px);
       background: #fff;
       box-shadow: 0 0 0 1px rgb(15 23 42 / 0.06);
-      font-size: 14.5px;
+      font-size: 12.5px;
       font-weight: 600;
-      text-align: left;
-      line-height: 1.2;
+      text-align: center;
+      line-height: 1.15;
     }
     .action:active {
       background: #f3f4f6;
     }
     .action mat-icon {
       flex: none;
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
       color: var(--mat-sys-primary);
     }
   `,
@@ -206,24 +247,60 @@ const MAX_COMING = 6;
 export class HomeMobile {
   readonly data = inject(HomeData);
   readonly search = inject(GlobalSearch);
+  readonly scanner = inject(Scanner);
   private readonly dialog = inject(MatDialog);
   readonly hhmm = hhmm;
-  readonly kr = kronor;
 
   readonly actions: {
     label: string;
     icon: string;
     link: string | null;
-    params?: Record<string, string | number>;
   }[] = [
-    { label: 'Ny arbetsorder', icon: 'handyman', link: '/workorders/new' },
+    { label: 'Ny order', icon: 'handyman', link: '/workorders/new' },
     { label: 'Ny bokning', icon: 'event', link: null },
-    { label: 'Ny försäljning', icon: 'point_of_sale', link: '/sales/new' },
-    { label: 'Sök däck i lager', icon: 'tire_repair', link: '/inventory', params: { focus: 1 } },
+    { label: 'Sälj', icon: 'point_of_sale', link: '/sales/new' },
+    { label: 'Ta emot', icon: 'move_to_inbox', link: '/inventory/receive' },
   ];
 
   constructor() {
-    this.data.loadMoney();
+    this.data.loadOrders(true);
+  }
+
+  // --- order på gång: försenade först, sedan den som ska vara klar först ---
+
+  private readonly sorted = computed(() =>
+    this.data
+      .orders()
+      .filter(
+        (o) => o.status === 'open' || o.status === 'in_progress' || o.status === 'waiting_parts',
+      )
+      .sort(
+        (a, b) =>
+          Number(this.late(b)) - Number(this.late(a)) ||
+          (a.pickupAt ?? '9999').localeCompare(b.pickupAt ?? '9999') ||
+          a.receivedAt.localeCompare(b.receivedAt),
+      ),
+  );
+  readonly ordersShown = computed(() => this.sorted().slice(0, MAX_ORDERS));
+  readonly ordersHidden = computed(() => Math.max(this.sorted().length - MAX_ORDERS, 0));
+
+  late(o: WorkOrder): boolean {
+    return !!o.pickupAt && new Date(o.pickupAt).getTime() < this.data.now();
+  }
+
+  /** "idag 15:00", "i morgon 09:00" eller datum. */
+  due(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date(this.data.now());
+    const days = Math.round(
+      (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+        new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+        864e5,
+    );
+    const t = hhmm(iso);
+    if (days === 0) return `idag ${t}`;
+    if (days === 1) return `i morgon ${t}`;
+    return `${d.toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')} ${t}`;
   }
 
   newBooking() {
@@ -251,15 +328,4 @@ export class HomeMobile {
     ...this.coming().slice(0, MAX_COMING),
   ]);
   readonly hidden = computed(() => Math.max(this.coming().length - MAX_COMING, 0));
-
-  // --- pengar (ägaren) ---
-  readonly weekSold = computed(() => {
-    const w = this.data.week();
-    return w ? kronor(w.sold[w.sold.length - 1]) : '–';
-  });
-  readonly weekDelta = computed(() => {
-    const w = this.data.week();
-    return w ? delta(w.sold[w.sold.length - 1], w.sold[w.sold.length - 2]) : null;
-  });
-  readonly weekTrend = computed(() => this.data.week()?.sold.slice(-8) ?? []);
 }

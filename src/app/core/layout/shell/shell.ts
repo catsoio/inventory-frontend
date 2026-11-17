@@ -147,32 +147,32 @@ const MODULE_OF = {
       class="flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center bg-brand pt-[env(safe-area-inset-top)] text-white shadow-sm"
     >
       <div class="flex min-w-0 flex-1 items-center gap-2 pr-2 pl-4 md:gap-3 md:px-6">
-        <!-- Mobil: produktbytet sitter i toppen, eftersom produktfältet bara finns på dator. -->
-        @if (!auth.isMechanic() && products().length > 1) {
+        <!-- Mobil: produktbytet sitter i toppen, eftersom produktfältet bara finns på dator. Bara
+             Verkstad och Däckhotell, alltid med namn; Bilhandel och Bärgning ligger i "Mer". -->
+        @if (!auth.isMechanic() && mobileProducts().length > 1) {
           <div
             class="flex shrink-0 rounded-xl bg-black/15 p-0.5 md:hidden"
             role="tablist"
             aria-label="Produkt"
           >
-            @for (p of products(); track p.id) {
+            @for (p of mobileProducts(); track p.id) {
               <a
                 [routerLink]="p.link"
                 role="tab"
-                class="relative flex h-9 items-center gap-1.5 rounded-[10px] px-3 text-sm font-semibold transition-colors"
+                class="relative flex h-10 items-center gap-1.5 rounded-[10px] px-3.5 text-[15px] font-semibold transition-colors"
                 [class]="
                   nav.product() === p.id
                     ? 'bg-white text-brand'
                     : 'text-white/85 active:bg-white/15'
                 "
                 [attr.aria-selected]="nav.product() === p.id"
-                [attr.aria-label]="p.label"
               >
-                <mat-icon class="!h-[18px] !w-[18px] !text-[18px] !leading-[18px]">{{
-                  p.icon
-                }}</mat-icon>
-                @if (nav.product() === p.id || products().length <= 2) {
-                  {{ p.label }}
+                @if (mobileProducts().length <= 2) {
+                  <mat-icon class="!h-[18px] !w-[18px] !text-[18px] !leading-[18px]">{{
+                    p.icon
+                  }}</mat-icon>
                 }
+                {{ p.label }}
                 @if (nav.product() !== p.id && waiting()[p.id]; as u) {
                   <span
                     class="absolute top-1 right-1 h-2 w-2 rounded-full"
@@ -315,6 +315,15 @@ export class Shell implements OnDestroy {
         group: 3,
       },
     ].filter((p) => this.billing.allows(MODULE_OF[p.id])),
+  );
+  /**
+   * Mobilens produktbyte: Verkstad och Däckhotell, och produkten man är i om det är Bilhandel eller
+   * Bärgning (så man ser var man är). De andra nås från "Mer".
+   */
+  readonly mobileProducts = computed(() =>
+    this.products().filter(
+      (p) => p.id === 'axle' || p.id === 'dack' || p.id === this.nav.product(),
+    ),
   );
   /** Flikarna i grupper (Verkstad och Däckhotell, Bilhandel, Bärgning), var grupp i en egen ruta. */
   readonly productGroups = computed(() => {

@@ -9,13 +9,20 @@ import {
 } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { SharedModule } from '../../shared/shared-module';
+import { Auth } from '../auth/auth';
+import { PlateTracker, platesIn } from './plate';
+import { plateReaderAvailable, readLines } from './plate-reader';
 import { Scanner } from './scanner';
 
 interface Detector {
   detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
 }
 
-/** Kameraskannern: öppnas från skanna-ikonen, startar kameran direkt och slår upp första koden den ser. */
+/**
+ * Kameraskannern: öppnas från skanna-ikonen, startar kameran direkt och slår upp första koden den
+ * ser. I appen läser den också registreringsskyltar, hela tiden medan kameran är öppen: så fort
+ * samma nummer setts i två bildrutor i rad slås bilen upp, utan att man tar någon bild.
+ */
 @Component({
   selector: 'app-scan-dialog',
   standalone: true,
@@ -26,7 +33,13 @@ interface Detector {
       @if (error()) {
         <p class="rounded-xl bg-gray-50 p-3 text-sm text-gray-700">{{ error() }}</p>
       } @else {
-        <p class="text-sm text-gray-600">Rikta kameran mot streckkoden eller etiketten.</p>
+        <p class="text-sm text-gray-600">
+          {{
+            plates
+              ? 'Rikta kameran mot registreringsskylten, streckkoden eller etiketten.'
+              : 'Rikta kameran mot streckkoden eller etiketten.'
+          }}
+        </p>
       }
       <video
         #video
@@ -48,6 +61,10 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
   private readonly scanner = inject(Scanner);
   private readonly ref = inject(MatDialogRef<ScanDialog>);
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
+  private readonly auth = inject(Auth);
+
+  /** Appen kan läsa skyltar. Mekanikern skannar bara delar, så för den rollen läses inga skyltar. */
+  readonly plates = plateReaderAvailable() && !this.auth.isMechanic();
 
   readonly busy = signal(false);
   readonly error = signal('');
@@ -60,6 +77,7 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
    */
   private stream: MediaStream | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private plateTimer: ReturnType<typeof setInterval> | null = null;
   private lastCode = '';
   private lastAt = 0;
 
@@ -148,11 +166,36 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
         busy = false;
       }
     }, 350);
+    if (this.plates) this.readPlates(el);
+  }
+
+  /**
+   * Skyltläsningen går bredvid streckkodsläsningen på samma kamerabild. En sida som väntar på en
+   * skanning (hylla, inventering) vill ha koder och inga bilar, så då läses inga skyltar.
+   */
+  private readPlates(el: HTMLVideoElement) {
+    const canvas = document.createElement('canvas');
+    const tracker = new PlateTracker();
+    let busy = false;
+    this.plateTimer = setInterval(async () => {
+      if (busy || this.busy() || this.scanner.capturing || el.readyState < 2) return;
+      busy = true;
+      try {
+        const plate = tracker.push(platesIn(await readLines(el, canvas)));
+        if (plate) void this.submit(plate);
+      } catch {
+        // En bildruta som inte gick att läsa är normalt.
+      } finally {
+        busy = false;
+      }
+    }, 400);
   }
 
   stopCamera() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    if (this.plateTimer) clearInterval(this.plateTimer);
+    this.plateTimer = null;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.camera.set(false);

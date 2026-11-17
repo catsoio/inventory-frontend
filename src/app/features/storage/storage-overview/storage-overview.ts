@@ -88,7 +88,7 @@ const SHARED_MENUS = ['/inventory', '/sales', '/purchases', '/finance', '/financ
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-3">
-      <app-panel title="Att göra" icon="task_alt">
+      <app-panel title="Att göra" icon="task_alt" class="max-md:hidden">
         <a actions mat-button routerLink="/storage/new" class="max-md:!hidden">
           <mat-icon>add</mat-icon> Ny inlämning
         </a>
