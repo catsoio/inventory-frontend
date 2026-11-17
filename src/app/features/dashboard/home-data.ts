@@ -16,6 +16,7 @@ import {
   Resource,
   Summary,
   WorkOrder,
+  WorkOrderStatus,
 } from '../../core/models';
 import { environment } from '../../../environments/environment';
 
@@ -62,6 +63,8 @@ export class HomeData {
   // Bara datorvyn
   readonly orders = signal<WorkOrder[]>([]);
   readonly ordersLoaded = signal(false);
+  /** Klara order som kunden ännu inte hämtat (mobilen visar dem med en ring-knapp). */
+  readonly doneOrders = signal<WorkOrder[]>([]);
   /** Alla aktiva artiklar (delas med Lager via `Insights`) och de senaste lagerrörelserna. */
   readonly articles = signal<Article[]>([]);
   readonly movements = signal<Movement[]>([]);
@@ -165,6 +168,43 @@ export class HomeData {
       .movements({ limit: 8 })
       .pipe(catchError(() => of({ items: [] as Movement[] })))
       .subscribe((p) => this.movements.set(p.items));
+  }
+
+  /** Hämtar mobilens orderlista på nytt, t.ex. efter att en order skapats. */
+  reloadOrders() {
+    this.ordersLoaded.set(false);
+    this.loadOrders(true);
+    this.loadDone();
+  }
+
+  /** De senast klara orderna som inte fakturerats (alltså inte hämtade och betalda än). */
+  loadDone() {
+    if (!this.workOrdersOn) return;
+    this.orderApi
+      .list({ status: 'done', limit: 20 })
+      .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
+      .subscribe((p) => this.doneOrders.set(p.items.filter((o) => !o.locked)));
+  }
+
+  /**
+   * Byter status på en order direkt i listan och tar tillbaka det om servern säger nej (t.ex. att
+   * mätarställning krävs för Klar). Klar bokar lagerdelarna som en försäljning, så den som anropar
+   * har frågat först.
+   */
+  setOrderStatus(o: WorkOrder, status: WorkOrderStatus) {
+    const before = o.status;
+    const apply = (s: WorkOrderStatus) =>
+      this.orders.update((l) => l.map((x) => (x.id === o.id ? { ...x, status: s } : x)));
+    apply(status);
+    this.orderApi.update(o.id, { status }).subscribe({
+      next: () => status === 'done' && this.loadDone(),
+      error: (err) => {
+        apply(before);
+        this.snack.open(err?.error?.message ?? 'Kunde inte ändra status', 'Stäng', {
+          duration: 5000,
+        });
+      },
+    });
   }
 
   /**

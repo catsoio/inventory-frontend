@@ -1,6 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { Booking, WorkOrder } from '../../core/models';
+import { Router } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { Booking, WorkOrder, WorkOrderStatus } from '../../core/models';
+import { Confirm } from '../../shared/confirm';
 import { Scanner } from '../../core/scan/scanner';
 import { GlobalSearch } from '../../core/search/global-search';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
@@ -51,7 +54,11 @@ const MAX_ORDERS = 5;
             <span>{{ a.label }}</span>
           </a>
         } @else {
-          <button type="button" class="action" (click)="newBooking()">
+          <button
+            type="button"
+            class="action"
+            (click)="a.id === 'order' ? newOrder() : newBooking()"
+          >
             <mat-icon>{{ a.icon }}</mat-icon>
             <span>{{ a.label }}</span>
           </button>
@@ -175,30 +182,74 @@ const MAX_ORDERS = 5;
         </div>
         <div class="flex flex-col gap-2">
           @for (o of ordersShown(); track o.id) {
-            <a
-              [routerLink]="['/workorders', o.id]"
-              class="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 active:bg-gray-50"
-            >
-              <app-reg-plate [value]="o.regNo" size="sm" class="shrink-0" />
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-[15px] font-medium">{{ o.vehicle || '–' }}</span>
-                <span class="block truncate text-sm text-gray-600"
-                  >{{ o.customerName }}{{ o.resourceName ? ' · ' + o.resourceName : '' }}</span
-                >
-                @if (late(o)) {
-                  <span class="block text-xs font-medium text-red-700">Försenad</span>
-                } @else if (o.pickupAt) {
-                  <span class="block text-xs text-gray-500">Klar senast {{ due(o.pickupAt) }}</span>
+            <div class="rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+              <a
+                [routerLink]="['/workorders', o.id]"
+                class="flex items-center gap-3 p-3 active:bg-gray-50"
+              >
+                <app-reg-plate [value]="o.regNo" size="sm" class="shrink-0" />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-[15px] font-medium">{{ o.vehicle || '–' }}</span>
+                  <span class="block truncate text-sm text-gray-600"
+                    >{{ o.customerName }}{{ o.resourceName ? ' · ' + o.resourceName : '' }}</span
+                  >
+                  @if (late(o)) {
+                    <span class="block text-xs font-medium text-red-700">Försenad</span>
+                  } @else if (o.pickupAt) {
+                    <span class="block text-xs text-gray-500"
+                      >Klar senast {{ due(o.pickupAt) }}</span
+                    >
+                  }
+                </span>
+                @if (o.status === 'waiting_parts' || o.hasMissing) {
+                  <app-pill tone="amber">Del saknas</app-pill>
+                } @else if (o.status === 'in_progress') {
+                  <app-pill tone="blue">Pågår</app-pill>
+                } @else {
+                  <app-pill tone="gray">Öppen</app-pill>
                 }
-              </span>
-              @if (o.status === 'waiting_parts' || o.hasMissing) {
-                <app-pill tone="amber">Del saknas</app-pill>
-              } @else if (o.status === 'in_progress') {
-                <app-pill tone="blue">Pågår</app-pill>
-              } @else {
-                <app-pill tone="gray">Öppen</app-pill>
-              }
-            </a>
+              </a>
+              <!-- Snabba byten: det man gör med en hand vid bilen. -->
+              <div class="flex gap-2 border-t border-gray-100 p-2">
+                @switch (o.status) {
+                  @case ('open') {
+                    <button
+                      type="button"
+                      class="qbtn qbtn-main"
+                      (click)="setStatus(o, 'in_progress')"
+                    >
+                      <mat-icon>play_arrow</mat-icon> Starta
+                    </button>
+                  }
+                  @case ('in_progress') {
+                    <button type="button" class="qbtn qbtn-main" (click)="finish(o)">
+                      <mat-icon>check</mat-icon> Klar
+                    </button>
+                    <button type="button" class="qbtn" (click)="setStatus(o, 'waiting_parts')">
+                      <mat-icon>hourglass_empty</mat-icon> Del saknas
+                    </button>
+                  }
+                  @case ('waiting_parts') {
+                    <button
+                      type="button"
+                      class="qbtn qbtn-main"
+                      (click)="setStatus(o, 'in_progress')"
+                    >
+                      <mat-icon>play_arrow</mat-icon> Fortsätt
+                    </button>
+                  }
+                }
+                @if (o.phone) {
+                  <a
+                    [href]="'tel:' + o.phone"
+                    class="grid h-11 w-12 shrink-0 place-items-center rounded-lg bg-gray-100 text-gray-700 active:bg-gray-200"
+                    [attr.aria-label]="'Ring ' + o.customerName"
+                  >
+                    <mat-icon>call</mat-icon>
+                  </a>
+                }
+              </div>
+            </div>
           } @empty {
             <p class="rounded-xl bg-white p-4 text-sm text-gray-500 shadow-sm ring-1 ring-black/5">
               Inga order på gång.
@@ -210,6 +261,41 @@ const MAX_ORDERS = 5;
               class="flex h-11 items-center justify-center rounded-xl bg-white text-sm font-medium text-brand shadow-sm ring-1 ring-black/5 active:bg-gray-50"
               >+ {{ ordersHidden() }} till, se alla order</a
             >
+          }
+        </div>
+      </section>
+    }
+
+    @if (readyOrders().length) {
+      <section>
+        <div class="mb-2 flex items-baseline gap-2 px-1">
+          <h2 class="text-sm font-semibold">Klara, redo att hämtas</h2>
+          <span class="text-xs text-gray-500">{{ readyOrders().length }} st</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          @for (o of readyOrders(); track o.id) {
+            <div
+              class="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5"
+            >
+              <a
+                [routerLink]="['/workorders', o.id]"
+                class="flex min-w-0 flex-1 items-center gap-3"
+              >
+                <app-reg-plate [value]="o.regNo" size="sm" class="shrink-0" />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-[15px] font-medium">{{ o.customerName }}</span>
+                  <span class="block truncate text-sm text-gray-600">{{ o.vehicle || '–' }}</span>
+                </span>
+              </a>
+              @if (o.phone) {
+                <a
+                  [href]="'tel:' + o.phone"
+                  class="flex h-11 shrink-0 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white active:opacity-90"
+                >
+                  <mat-icon class="!h-5 !w-5 !text-xl">call</mat-icon> Ring
+                </a>
+              }
+            </div>
           }
         </div>
       </section>
@@ -232,6 +318,30 @@ const MAX_ORDERS = 5;
       text-align: center;
       line-height: 1.15;
     }
+    .qbtn {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 44px;
+      border-radius: 10px;
+      background: #f3f4f6;
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+    }
+    .qbtn:active {
+      background: #e5e7eb;
+    }
+    .qbtn-main {
+      background: var(--mat-sys-primary);
+      color: #fff;
+    }
+    .qbtn-main:active {
+      opacity: 0.9;
+      background: var(--mat-sys-primary);
+    }
     .action:active {
       background: #f3f4f6;
     }
@@ -249,21 +359,26 @@ export class HomeMobile {
   readonly search = inject(GlobalSearch);
   readonly scanner = inject(Scanner);
   private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
+  private readonly snack = inject(MatSnackBar);
+  private readonly confirm = inject(Confirm);
   readonly hhmm = hhmm;
 
   readonly actions: {
     label: string;
     icon: string;
     link: string | null;
+    id?: 'order' | 'booking';
   }[] = [
-    { label: 'Ny order', icon: 'handyman', link: '/workorders/new' },
-    { label: 'Ny bokning', icon: 'event', link: null },
+    { label: 'Ny order', icon: 'handyman', link: null, id: 'order' },
+    { label: 'Ny bokning', icon: 'event', link: null, id: 'booking' },
     { label: 'Sälj', icon: 'point_of_sale', link: '/sales/new' },
     { label: 'Ta emot', icon: 'move_to_inbox', link: '/inventory/receive' },
   ];
 
   constructor() {
     this.data.loadOrders(true);
+    this.data.loadDone();
   }
 
   // --- order på gång: försenade först, sedan den som ska vara klar först ---
@@ -284,6 +399,16 @@ export class HomeMobile {
   readonly ordersShown = computed(() => this.sorted().slice(0, MAX_ORDERS));
   readonly ordersHidden = computed(() => Math.max(this.sorted().length - MAX_ORDERS, 0));
 
+  /** Klara de senaste sju dagarna som kunden kan ringas om, den som blev klar senast först. */
+  readonly readyOrders = computed(() => {
+    const since = this.data.now() - 7 * 864e5;
+    return this.data
+      .doneOrders()
+      .filter((o) => new Date(o.doneAt ?? o.pickupAt ?? o.receivedAt).getTime() >= since)
+      .sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''))
+      .slice(0, 4);
+  });
+
   late(o: WorkOrder): boolean {
     return !!o.pickupAt && new Date(o.pickupAt).getTime() < this.data.now();
   }
@@ -301,6 +426,41 @@ export class HomeMobile {
     if (days === 0) return `idag ${t}`;
     if (days === 1) return `i morgon ${t}`;
     return `${d.toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')} ${t}`;
+  }
+
+  /** En bil kommer in: skylten, kunden och vad som ska göras, och ordern är skapad. */
+  async newOrder() {
+    const { QuickIntake } = await import('../work-orders/quick-intake/quick-intake');
+    this.dialog
+      .open(QuickIntake, { width: '520px', maxWidth: '100vw', autoFocus: false })
+      .afterClosed()
+      .subscribe((r) => {
+        if (!r) return;
+        if (r.open) {
+          void this.router.navigate(['/workorders', r.id]);
+          return;
+        }
+        this.data.reloadOrders();
+        this.snack
+          .open(`${r.code} skapad`, 'Öppna', { duration: 6000 })
+          .onAction()
+          .subscribe(() => void this.router.navigate(['/workorders', r.id]));
+      });
+  }
+
+  setStatus(o: WorkOrder, status: WorkOrderStatus) {
+    this.data.setOrderStatus(o, status);
+  }
+
+  /** Klar bokar lagerdelarna som en försäljning, så det frågas en gång. */
+  finish(o: WorkOrder) {
+    this.confirm
+      .ask({
+        title: `Markera ${o.code} som klar?`,
+        message: 'Delarna på ordern tas ut ur lagret och bokas som en försäljning.',
+        confirmText: 'Markera klar',
+      })
+      .subscribe((ok) => ok && this.data.setOrderStatus(o, 'done'));
   }
 
   newBooking() {

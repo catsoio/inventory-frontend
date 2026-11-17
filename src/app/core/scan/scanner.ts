@@ -61,6 +61,22 @@ export class Scanner {
     });
   }
 
+  /**
+   * Öppnar kameran som bara läser en registreringsskylt och ger tillbaka numret, eller null när
+   * man stängde utan att något lästes. Bara i appen (`plateReaderAvailable`).
+   */
+  async pickPlate(): Promise<string | null> {
+    const { ScanDialog } = await import('./scan-dialog');
+    const ref = this.dialog.open(ScanDialog, {
+      width: '460px',
+      maxWidth: '96vw',
+      ariaLabel: 'Skanna skylt',
+      autoFocus: false,
+      data: { plateOnly: true },
+    });
+    return (await firstValueFrom(ref.afterClosed())) ?? null;
+  }
+
   /** Skalet matar in varje tangent. Fält tar hand om sin egen text. */
   onKey(e: KeyboardEvent): void {
     // Mekanikern skannar bara delar till en order: utan en sida som väntar på koden händer inget.

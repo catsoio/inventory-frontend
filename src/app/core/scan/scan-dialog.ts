@@ -7,12 +7,17 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { SharedModule } from '../../shared/shared-module';
 import { Auth } from '../auth/auth';
 import { PlateTracker, platesIn } from './plate';
 import { plateReaderAvailable, readLines } from './plate-reader';
 import { Scanner } from './scanner';
+
+/** `plateOnly`: läser bara skyltar och lämnar numret tillbaka till den som öppnade dialogen. */
+export interface ScanDialogData {
+  plateOnly?: boolean;
+}
 
 interface Detector {
   detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
@@ -28,16 +33,18 @@ interface Detector {
   standalone: true,
   imports: [SharedModule],
   template: `
-    <h2 mat-dialog-title>Skanna</h2>
+    <h2 mat-dialog-title>{{ plateOnly ? 'Skanna skylt' : 'Skanna' }}</h2>
     <mat-dialog-content class="flex flex-col gap-3">
       @if (error()) {
         <p class="rounded-xl bg-gray-50 p-3 text-sm text-gray-700">{{ error() }}</p>
       } @else {
         <p class="text-sm text-gray-600">
           {{
-            plates
-              ? 'Rikta kameran mot registreringsskylten, streckkoden eller etiketten.'
-              : 'Rikta kameran mot streckkoden eller etiketten.'
+            plateOnly
+              ? 'Rikta kameran mot registreringsskylten.'
+              : plates
+                ? 'Rikta kameran mot registreringsskylten, streckkoden eller etiketten.'
+                : 'Rikta kameran mot streckkoden eller etiketten.'
           }}
         </p>
       }
@@ -62,9 +69,11 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
   private readonly ref = inject(MatDialogRef<ScanDialog>);
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private readonly auth = inject(Auth);
+  private readonly data = inject<ScanDialogData | null>(MAT_DIALOG_DATA, { optional: true });
+  readonly plateOnly = !!this.data?.plateOnly;
 
   /** Appen kan läsa skyltar. Mekanikern skannar bara delar, så för den rollen läses inga skyltar. */
-  readonly plates = plateReaderAvailable() && !this.auth.isMechanic();
+  readonly plates = plateReaderAvailable() && (this.plateOnly || !this.auth.isMechanic());
 
   readonly busy = signal(false);
   readonly error = signal('');
@@ -143,6 +152,10 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
     if (!el || !this.stream) return;
     el.srcObject = this.stream;
     void el.play();
+    if (this.plateOnly) {
+      this.readPlates(el);
+      return;
+    }
     const native = (window as unknown as { BarcodeDetector?: new (o?: object) => Detector })
       .BarcodeDetector;
     const Ctor =
@@ -178,11 +191,18 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
     const tracker = new PlateTracker();
     let busy = false;
     this.plateTimer = setInterval(async () => {
-      if (busy || this.busy() || this.scanner.capturing || el.readyState < 2) return;
+      if (busy || this.busy() || (this.scanner.capturing && !this.plateOnly) || el.readyState < 2)
+        return;
       busy = true;
       try {
         const plate = tracker.push(platesIn(await readLines(el, canvas)));
-        if (plate) void this.submit(plate);
+        if (plate && this.plateOnly) {
+          this.scanner.beep(true);
+          this.stopCamera();
+          this.ref.close(plate);
+        } else if (plate) {
+          void this.submit(plate);
+        }
       } catch {
         // En bildruta som inte gick att läsa är normalt.
       } finally {
