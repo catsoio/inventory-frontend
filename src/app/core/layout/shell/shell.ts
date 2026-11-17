@@ -17,6 +17,7 @@ import { Pricing } from '../../pricing';
 import { Billing } from '../../billing/billing';
 import { quickGroupsOf, type QuickAction } from '../../search/quick-actions';
 import { GlobalSearch } from '../../search/global-search';
+import { Push } from '../../push/push';
 import { Scanner } from '../../scan/scanner';
 import { Settings } from '../../settings';
 import { Todo } from '../../todo';
@@ -376,6 +377,11 @@ export class Shell implements OnDestroy {
     effect(() => {
       const id = this.auth.garage()?.id;
       if (id && !this.auth.isMechanic()) untracked(() => pricing.load());
+    });
+    // Push i appen: enheten anmäls efter inloggning (i en webbläsare gör det ingenting).
+    const push = inject(Push);
+    effect(() => {
+      if (this.auth.garage()?.id) untracked(() => void push.start());
     });
   }
 

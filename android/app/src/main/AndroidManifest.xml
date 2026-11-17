@@ -40,6 +40,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Kameraskannern (getUserMedia i webbvyn) kräver behörigheten, annars nekas kameran på Android. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Android 13 och senare frågar användaren innan appen får visa notiser. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Kameran är valfri: appen går att installera och använda med en streckkodsläsare utan kamera. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />

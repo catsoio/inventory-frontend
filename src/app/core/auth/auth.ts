@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { Observable, finalize, map, shareReplay, tap } from 'rxjs';
 import { API_URL, AxleApi } from '../api/axle-api';
 import { AuthTokens, AuthUser, Company, Garage, GarageListItem, Role } from '../models';
+import { registeredPushDevice, setRegisteredPushDevice } from '../push/device';
 
 const KEY = 'garagestock.auth';
 const ACTING_KEY = 'garagestock.actingGarage';
@@ -216,6 +217,12 @@ export class Auth {
     const refreshToken = this.state()?.refreshToken;
     if (refreshToken)
       this.http.post(`${this.url}/logout`, { refreshToken }).subscribe({ error: () => {} });
+    // Den som loggar ut ska inte få sina meddelanden kvar på den här enheten.
+    const device = registeredPushDevice();
+    if (device) {
+      this.http.delete(`${API_URL}/users/me/devices/${device}`).subscribe({ error: () => {} });
+      setRegisteredPushDevice(null);
+    }
     this.clear();
   }
 
