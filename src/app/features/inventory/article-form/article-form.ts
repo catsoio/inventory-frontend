@@ -102,8 +102,8 @@ const categoryOf = (t: ArticleType | undefined): Category =>
             </div>
             @if (!id && fromCatalog(); as from) {
               <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
-                Uppgifterna är hämtade ur däckkatalogen ({{ from }}). Kontrollera
-                försäljningspriset och skriv hur många du har hemma.
+                Uppgifterna är hämtade ur däckkatalogen ({{ from }}). Kontrollera försäljningspriset
+                och skriv hur många du har hemma.
               </p>
             }
             @if (types().length) {
@@ -470,6 +470,8 @@ export class ArticleForm {
   readonly admin = inject(Auth).isAdmin();
   private readonly fb = inject(FormBuilder);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  /** Kommer från Ta emot varor när en skannad kod inte fanns: koden blir artikelns streckkod. */
+  private readonly prefillEan = inject(ActivatedRoute).snapshot.queryParamMap.get('ean');
   readonly seasons = Object.entries(SEASON_LABELS);
   readonly materials = Object.entries(RIM_MATERIAL_LABELS);
   readonly busy = signal(false);
@@ -630,6 +632,7 @@ export class ArticleForm {
 
   /** Typer och lager är laddade: fyll i kortet. */
   private start() {
+    if (!this.id && this.prefillEan) this.form.controls.ean.setValue(this.prefillEan);
     if (this.id) {
       this.form.controls.initialQuantity.disable();
       this.api.article(this.id).subscribe((a) => {

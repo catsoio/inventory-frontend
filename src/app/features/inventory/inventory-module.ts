@@ -9,6 +9,7 @@ import { StockCountList } from './stock-counts/stock-count-list';
 import { StockCountPage } from './stock-counts/stock-count-page';
 import { StockCountStartDialog } from './stock-counts/stock-count-start-dialog';
 import { StockOverview } from './stock-overview/stock-overview';
+import { StockReceive } from './stock-receive/stock-receive';
 
 @NgModule({
   declarations: [
@@ -18,6 +19,7 @@ import { StockOverview } from './stock-overview/stock-overview';
     ArticleForm,
     StockActionDialog,
     StockCountList,
+    StockReceive,
     StockCountPage,
     StockCountStartDialog,
   ],
@@ -28,6 +30,7 @@ import { StockOverview } from './stock-overview/stock-overview';
       { path: 'overview', title: 'Lager: översikt', component: StockOverview },
       { path: 'counts', title: 'Inventering', component: StockCountList },
       { path: 'counts/:id', title: 'Inventering', component: StockCountPage },
+      { path: 'receive', title: 'Ta emot varor', component: StockReceive },
       { path: 'new', title: 'Ny artikel', component: ArticleForm },
       { path: ':id', title: 'Artikel', component: ArticleDetail },
       { path: ':id/edit', title: 'Ändra artikel', component: ArticleForm },

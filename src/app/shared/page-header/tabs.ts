@@ -5,6 +5,7 @@ export const STOCK_TABS: SectionTab[] = [
   { path: '/inventory', label: 'Artiklar', exact: true },
   { path: '/inventory/overview', label: 'Översikt' },
   { path: '/reports', label: 'Lagerlogg' },
+  { path: '/inventory/receive', label: 'Ta emot' },
   { path: '/inventory/counts', label: 'Inventering' },
 ];
 
