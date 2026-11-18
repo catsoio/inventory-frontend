@@ -61,67 +61,183 @@ const dayKey = (d: Date) =>
 @Component({
   selector: 'app-booking-calendar',
   standalone: false,
-  host: { class: 'flex h-full flex-col' },
-  template: `
-    <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-      <app-booking-views [value]="mode()" [mobile]="mobile" (pick)="setMode($event)" />
-
-      @if (mode() !== 'list') {
-        <div class="flex items-center gap-1">
-          <button mat-icon-button (click)="step(-1)" aria-label="Föregående">
-            <mat-icon>chevron_left</mat-icon>
-          </button>
-          <button mat-stroked-button (click)="today()">Idag</button>
-          <button mat-icon-button (click)="step(1)" aria-label="Nästa">
-            <mat-icon>chevron_right</mat-icon>
-          </button>
-          <span class="ml-2 text-lg font-semibold first-letter:uppercase">{{ title() }}</span>
-        </div>
+  host: { class: 'flex h-full flex-col', '[class.m-day]': "mobile && mode() === 'day'" },
+  styles: `
+    /* Mobil, dagvy: veckoremsan ovanför ersätter kalenderns egen dagrubrik. */
+    :host(.m-day) ::ng-deep .sx__week-header-content {
+      display: none;
+    }
+    @media (max-width: 767px) {
+      :host ::ng-deep .sx__calendar-wrapper {
+        border: 0;
       }
-
-      <span class="flex-1"></span>
-
-      @if (mode() !== 'list') {
-        <mat-form-field
-          class="w-40 max-md:min-w-40 max-md:flex-1 max-md:basis-40"
-          subscriptSizing="dynamic"
-        >
-          <mat-label>Visa</mat-label>
-          <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
-            <mat-option value="">Alla</mat-option>
+    }
+  `,
+  template: `
+    @if (mobile) {
+      <div class="mb-2 shrink-0 space-y-2">
+        <div class="flex items-center gap-1">
+          <span
+            class="min-w-0 flex-1 truncate text-[28px] font-bold leading-tight first-letter:uppercase"
+            >{{ monthTitle() }}</span
+          >
+          @if (mode() !== 'list') {
+            <button
+              mat-icon-button
+              [matMenuTriggerFor]="who"
+              aria-label="Visa"
+              [class.!text-teal-700]="!!filter()"
+            >
+              <mat-icon>{{ filter() ? 'person' : 'filter_list' }}</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              class="relative"
+              (click)="toggleInbox()"
+              aria-label="Att planera"
+            >
+              <mat-icon>inbox</mat-icon>
+              @if (toPlan()) {
+                <span
+                  class="absolute right-0.5 top-0.5 grid min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white"
+                  >{{ toPlan() }}</span
+                >
+              }
+            </button>
+          }
+          <button
+            mat-icon-button
+            class="!bg-teal-700 !text-white"
+            (click)="create(newStart(), newEnd())"
+            aria-label="Ny bokning"
+          >
+            <mat-icon>add</mat-icon>
+          </button>
+          <mat-menu #who="matMenu">
+            <button mat-menu-item (click)="setFilter('')">Alla</button>
             @for (r of resources(); track r.id) {
-              <mat-option [value]="r.id">{{ r.name }}{{ mine(r) ? ' (jag)' : '' }}</mat-option>
+              <button mat-menu-item (click)="setFilter(r.id)">
+                {{ r.name }}{{ mine(r) ? ' (jag)' : '' }}
+              </button>
             }
-          </mat-select>
-        </mat-form-field>
+          </mat-menu>
+        </div>
+
+        <app-booking-views [value]="mode()" [mobile]="mobile" (pick)="setMode($event)" />
+
+        @if (mode() === 'day') {
+          <div
+            class="grid grid-cols-7 text-center"
+            (touchstart)="swipeStart($event)"
+            (touchend)="swipeEnd($event)"
+          >
+            @for (d of weekDays(); track d.key) {
+              <button
+                type="button"
+                class="flex flex-col items-center gap-0.5 py-1"
+                (click)="pickDay(d.date)"
+              >
+                <span class="text-[11px] font-semibold uppercase text-gray-500">{{ d.label }}</span>
+                <span
+                  class="grid h-9 w-9 place-items-center rounded-full text-lg"
+                  [class]="
+                    d.selected
+                      ? 'bg-teal-700 font-semibold text-white'
+                      : d.today
+                        ? 'font-bold text-teal-700'
+                        : 'text-gray-900'
+                  "
+                  >{{ d.n }}</span
+                >
+              </button>
+            }
+          </div>
+          <div class="flex items-center justify-between px-1 text-sm text-gray-600">
+            <span class="first-letter:uppercase">{{ title() }}</span>
+            @if (!isToday()) {
+              <button type="button" class="font-semibold text-teal-700" (click)="today()">
+                Idag
+              </button>
+            }
+          </div>
+        }
+        @if (mode() !== 'day' && mode() !== 'list') {
+          <div class="flex items-center justify-between">
+            <button mat-icon-button (click)="step(-1)" aria-label="Föregående">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <button type="button" class="text-sm font-semibold text-teal-700" (click)="today()">
+              Idag
+            </button>
+            <button mat-icon-button (click)="step(1)" aria-label="Nästa">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+        <app-booking-views [value]="mode()" [mobile]="mobile" (pick)="setMode($event)" />
+
+        @if (mode() !== 'list') {
+          <div class="flex items-center gap-1">
+            <button mat-icon-button (click)="step(-1)" aria-label="Föregående">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+            <button mat-stroked-button (click)="today()">Idag</button>
+            <button mat-icon-button (click)="step(1)" aria-label="Nästa">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+            <span class="ml-2 text-lg font-semibold first-letter:uppercase">{{ title() }}</span>
+          </div>
+        }
+
+        <span class="flex-1"></span>
+
+        @if (mode() !== 'list') {
+          <mat-form-field
+            class="w-40 max-md:min-w-40 max-md:flex-1 max-md:basis-40"
+            subscriptSizing="dynamic"
+          >
+            <mat-label>Visa</mat-label>
+            <mat-select [value]="filter()" (selectionChange)="setFilter($event.value)">
+              <mat-option value="">Alla</mat-option>
+              @for (r of resources(); track r.id) {
+                <mat-option [value]="r.id">{{ r.name }}{{ mine(r) ? ' (jag)' : '' }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <button
+            mat-stroked-button
+            class="whitespace-nowrap"
+            [class.!bg-teal-50]="inboxOpen()"
+            [attr.aria-pressed]="inboxOpen()"
+            (click)="toggleInbox()"
+          >
+            <mat-icon>inbox</mat-icon>
+            <span class="max-2xl:hidden">Att planera</span>
+            <span class="ml-1 rounded-full bg-gray-200 px-2 text-xs font-semibold">{{
+              toPlan()
+            }}</span>
+          </button>
+        }
 
         <button
-          mat-stroked-button
+          mat-flat-button
+          color="primary"
           class="whitespace-nowrap"
-          [class.!bg-teal-50]="inboxOpen()"
-          [attr.aria-pressed]="inboxOpen()"
-          (click)="toggleInbox()"
+          (click)="create(newStart(), newEnd())"
         >
-          <mat-icon>inbox</mat-icon>
-          <span class="max-2xl:hidden">Att planera</span>
-          <span class="ml-1 rounded-full bg-gray-200 px-2 text-xs font-semibold">{{
-            toPlan()
-          }}</span>
+          <mat-icon>add</mat-icon> Ny<span class="max-md:hidden">&nbsp;bokning</span>
         </button>
-      }
-
-      <button
-        mat-flat-button
-        color="primary"
-        class="whitespace-nowrap"
-        (click)="create(newStart(), newEnd())"
-      >
-        <mat-icon>add</mat-icon> Ny<span class="max-md:hidden">&nbsp;bokning</span>
-      </button>
-    </div>
+      </div>
+    }
 
     <div class="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl bg-white p-3 shadow-sm">
+      <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl bg-white p-3 shadow-sm max-md:-mx-1 max-md:rounded-lg max-md:p-0"
+      >
         @if (mode() === 'list') {
           <app-booking-list class="min-h-0 flex-1" [embedded]="true" />
         } @else if (mode() === 'board') {
@@ -142,11 +258,14 @@ const dayKey = (d: Date) =>
         }
       </div>
 
+      @if (mobile && inboxOpen() && mode() !== 'list') {
+        <div class="fixed inset-0 z-40 bg-black/40" (click)="toggleInbox()"></div>
+      }
       <app-booking-inbox
-        class="rounded-xl bg-white shadow-sm max-lg:order-first max-lg:max-h-72 lg:w-72 lg:shrink-0"
+        class="rounded-xl bg-white shadow-sm max-lg:order-first max-lg:max-h-72 lg:w-72 lg:shrink-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50 max-md:max-h-[75vh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:shadow-2xl"
         [class.hidden]="!inboxOpen() || mode() === 'list'"
         [refresh]="refresh()"
-        (plan)="planOrder($event)"
+        (plan)="planOrder($event); mobile && inboxOpen() && toggleInbox()"
         (openBooking)="open($event)"
         (dragging)="dragged.set($event)"
         (counted)="toPlan.set($event)"
@@ -218,6 +337,7 @@ export class BookingCalendar implements OnInit {
   }
 
   private startInbox(): boolean {
+    if (this.mobile) return false;
     try {
       const saved = localStorage.getItem('garagestock.bookingInbox');
       if (saved) return saved === '1';
@@ -229,6 +349,7 @@ export class BookingCalendar implements OnInit {
 
   toggleInbox() {
     this.inboxOpen.update((v) => !v);
+    if (this.mobile) return;
     try {
       localStorage.setItem('garagestock.bookingInbox', this.inboxOpen() ? '1' : '0');
     } catch {
@@ -256,6 +377,7 @@ export class BookingCalendar implements OnInit {
     } else {
       this.$app.calendarState.setView(m, plain(this.date()));
       this.title.set(this.titleFor());
+      this.scrollToWork();
     }
   }
 
@@ -295,8 +417,8 @@ export class BookingCalendar implements OnInit {
         views: [createViewDay(), createViewWeek(), createViewMonthGrid()],
         defaultView: this.mode() as CalView,
         selectedDate: plain(this.date()),
-        dayBoundaries: { start: '06:00', end: '19:00' },
-        weekOptions: { gridHeight: 832, gridStep: 30 } as never,
+        dayBoundaries: { start: '00:00', end: '24:00' },
+        weekOptions: { gridHeight: 1536, gridStep: 30 } as never,
         calendars,
         callbacks: {
           beforeRender: ($app: any) => {
@@ -331,6 +453,19 @@ export class BookingCalendar implements OnInit {
     );
     this.app.set(app);
     this.title.set(this.titleFor());
+    this.scrollToWork();
+  }
+
+  /** Hela dygnet visas, men vyn börjar vid arbetsdagen (eller en timme före klockan nu). */
+  private scrollToWork() {
+    const go = (tries: number) => {
+      const el = document.querySelector<HTMLElement>('.sx__week-grid');
+      if (!el) return tries > 0 ? void setTimeout(() => go(tries - 1), 100) : undefined;
+      const now = new Date();
+      const hour = dayKey(this.date()) === dayKey(now) ? Math.max(0, now.getHours() - 1) : 7;
+      el.scrollTop = (el.scrollHeight / 24) * hour;
+    };
+    go(10);
   }
 
   step(dir: 1 | -1) {
@@ -343,6 +478,61 @@ export class BookingCalendar implements OnInit {
 
   today() {
     this.goTo(new Date());
+  }
+
+  /** Mobilens rubrik: månad (och år när det inte är i år), som i Apples kalender. */
+  monthTitle() {
+    const d = this.date();
+    return d.toLocaleDateString(appLocale(), {
+      month: 'long',
+      ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' as const }),
+    });
+  }
+
+  isToday() {
+    return dayKey(this.date()) === dayKey(new Date());
+  }
+
+  /** Veckan som visas som en remsa med dagar (mån–sön). */
+  weekDays() {
+    const sel = this.date();
+    const from = new Date(
+      sel.getFullYear(),
+      sel.getMonth(),
+      sel.getDate() - ((sel.getDay() + 6) % 7),
+    );
+    const today = dayKey(new Date());
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
+      return {
+        date: d,
+        key: dayKey(d),
+        n: d.getDate(),
+        label: d.toLocaleDateString(appLocale(), { weekday: 'narrow' }),
+        selected: dayKey(d) === dayKey(sel),
+        today: dayKey(d) === today,
+      };
+    });
+  }
+
+  pickDay(d: Date) {
+    this.goTo(d);
+  }
+
+  private swipeX = 0;
+  private swipeY = 0;
+  swipeStart(e: TouchEvent) {
+    this.swipeX = e.changedTouches[0].clientX;
+    this.swipeY = e.changedTouches[0].clientY;
+  }
+  /** Svep i veckoremsan: förra eller nästa vecka, samma veckodag. */
+  swipeEnd(e: TouchEvent) {
+    const dx = e.changedTouches[0].clientX - this.swipeX;
+    const dy = e.changedTouches[0].clientY - this.swipeY;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    const d = new Date(this.date());
+    d.setDate(d.getDate() + (dx < 0 ? 7 : -7));
+    this.goTo(d);
   }
 
   private goTo(d: Date) {
