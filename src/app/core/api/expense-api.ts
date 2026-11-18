@@ -197,8 +197,9 @@ export class ExpenseApi {
     });
   }
 
-  markExported(from: string, to: string): Observable<{ marked: number }> {
-    return this.http.post<{ marked: number }>(`${this.base}/mark-exported`, { from, to });
+  /** De valda utläggen, eller alla öppna i en period. */
+  markExported(sel: { ids: string[] } | { from: string; to: string }): Observable<{ marked: number }> {
+    return this.http.post<{ marked: number }>(`${this.base}/mark-exported`, sel);
   }
 
   /** `?force=true` bara för ägaren; servern ignorerar det för alla andra. */

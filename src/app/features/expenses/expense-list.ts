@@ -1,7 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { addMonths, endOfMonth, format, startOfMonth } from 'date-fns';
+import { FormControl } from '@angular/forms';
+import { format } from 'date-fns';
 import {
   EXPENSE_PAID_WITH_LABELS,
   EXPENSE_STATUS_LABELS,
@@ -11,7 +12,6 @@ import {
   ExpenseStatus,
   ExpenseSummary,
 } from '../../core/api/expense-api';
-import { appLocale } from '../../core/i18n/locale';
 import { saveFile } from '../../core/save-file';
 import { Confirm } from '../../shared/confirm';
 import { DtCol } from '../../shared/data-table/data-table';
@@ -63,8 +63,8 @@ const COLS: DtCol<Expense>[] = [
 ];
 
 /**
- * Ekonomi → Utlägg: kvitton för saker som köpts vid sidan av, så som revisorn behöver dem. En månad
- * i taget med summa och moms per sats, och två handlingar mot revisorn: Exportera (en zip med
+ * Ekonomi → Utlägg: kvitton för saker som köpts vid sidan av, så som revisorn behöver dem. Ett valfritt
+ * datumintervall med summa och moms per sats, och två handlingar mot revisorn: Exportera (en zip med
  * kvittobilderna och ett kalkylblad) och Markera som överlämnat (låser utlägget så att det inte ändras
  * i smyg). Heter Utlägg och inte Kvitton: Kvitton är försäljningskvitton. Bara ägaren; personal och
  * mekaniker lägger till utlägg på arbetsordern.
@@ -91,10 +91,13 @@ const COLS: DtCol<Expense>[] = [
         mat-stroked-button
         type="button"
         class="max-md:!hidden"
-        [disabled]="!!orderId() || busy() || !openCount()"
+        [disabled]="busy() || !selectedOpen().length"
+        [title]="selectedOpen().length ? '' : 'Kryssa först i de utlägg som ska markeras'"
         (click)="markExported()"
       >
-        <mat-icon>task_alt</mat-icon> Markera som överlämnat
+        <mat-icon>task_alt</mat-icon> Markera som överlämnat{{
+          selectedOpen().length ? ' (' + selectedOpen().length + ')' : ''
+        }}
       </button>
       <button
         actions
@@ -131,31 +134,25 @@ const COLS: DtCol<Expense>[] = [
         (rowClick)="edit($event)"
       >
         @if (!orderId()) {
-          <div filters class="inline-flex items-center gap-1">
-            <button
-              mat-stroked-button
-              type="button"
-              class="btn-icon"
-              title="Föregående månad"
-              aria-label="Föregående månad"
-              (click)="shift(-1)"
-            >
-              <mat-icon>chevron_left</mat-icon>
-            </button>
-            <span class="min-w-36 px-1 text-center text-sm font-medium capitalize">{{
-              monthLabel()
-            }}</span>
-            <button
-              mat-stroked-button
-              type="button"
-              class="btn-icon"
-              title="Nästa månad"
-              aria-label="Nästa månad"
-              [disabled]="isCurrentMonth()"
-              (click)="shift(1)"
-            >
-              <mat-icon>chevron_right</mat-icon>
-            </button>
+          <div filters class="inline-flex items-center gap-2">
+            <span class="w-40">
+              <app-date-field label="Från" subscript="dynamic" [formControl]="fromCtl" [max]="toCtl.value" />
+            </span>
+            <span class="w-40">
+              <app-date-field label="Till" subscript="dynamic" [formControl]="toCtl" [min]="fromCtl.value" />
+            </span>
+            @if (fromCtl.value || toCtl.value) {
+              <button
+                mat-stroked-button
+                type="button"
+                class="btn-icon"
+                title="Rensa datum"
+                aria-label="Rensa datum"
+                (click)="clearDates()"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
           </div>
         }
         <app-segmented
@@ -169,26 +166,26 @@ const COLS: DtCol<Expense>[] = [
           [value]="status()"
           (valueChange)="setStatus($any($event))"
         />
-        <app-filter-button
+        <app-segmented
           filters
-          [count]="paidWith() === 'all' ? 0 : 1"
-          (clear)="setPaidWith('all')"
+          label="Betalat med"
+          [options]="[
+            { value: 'all', label: 'Alla betalsätt' },
+            { value: 'company_card', label: 'Företagskort' },
+            { value: 'private', label: 'Privat' },
+          ]"
+          [value]="paidWith()"
+          (valueChange)="setPaidWith($any($event))"
+        />
+        <button
+          tools
+          mat-stroked-button
+          type="button"
+          [disabled]="!items().length"
+          (click)="toggleAll()"
         >
-          <div>
-            <div class="sec mb-1">Betalat med</div>
-            <app-segmented
-              [fill]="true"
-              label="Betalat med"
-              [options]="[
-                { value: 'all', label: 'Alla' },
-                { value: 'company_card', label: 'Företagskort' },
-                { value: 'private', label: 'Privat' },
-              ]"
-              [value]="paidWith()"
-              (valueChange)="setPaidWith($any($event))"
-            />
-          </div>
-        </app-filter-button>
+          {{ allSelected() ? 'Avmarkera alla' : 'Markera alla' }}
+        </button>
         <button
           tools
           mat-stroked-button
@@ -239,7 +236,14 @@ const COLS: DtCol<Expense>[] = [
         <ng-template #cell let-e="row" let-col="col" let-text="text">
           @switch (col.key) {
             @case ('code') {
-              <span class="font-medium">{{ e.code }}</span>
+              <span class="inline-flex items-center gap-2" (click)="$event.stopPropagation()">
+                <mat-checkbox
+                  [checked]="selected().has(e.id)"
+                  [aria-label]="'Markera ' + e.code"
+                  (change)="toggle(e.id)"
+                />
+                <span class="font-medium">{{ e.code }}</span>
+              </span>
             }
             @case ('paidWith') {
               <app-pill [tone]="e.paidWith === 'private' ? 'amber' : 'gray'">{{ text }}</app-pill>
@@ -261,7 +265,7 @@ const COLS: DtCol<Expense>[] = [
       <button
         mat-menu-item
         type="button"
-        [disabled]="!!orderId() || busy() || !openCount()"
+        [disabled]="busy() || !selectedOpen().length"
         (click)="markExported()"
       >
         <mat-icon>task_alt</mat-icon> Markera som överlämnat
@@ -280,11 +284,8 @@ export class ExpenseList {
   readonly paidLabel = (w: ExpensePaidWith) => EXPENSE_PAID_WITH_LABELS[w];
 
   private readonly params = this.route.snapshot.queryParamMap;
-  readonly month = signal(
-    /^\d{4}-\d{2}$/.test(this.params.get('month') ?? '')
-      ? new Date(`${this.params.get('month')}-01T12:00:00`)
-      : startOfMonth(new Date()),
-  );
+  readonly fromCtl = new FormControl(this.params.get('from') ?? '', { nonNullable: true });
+  readonly toCtl = new FormControl(this.params.get('to') ?? '', { nonNullable: true });
   readonly status = signal<ExpenseStatus | 'all'>(
     (this.params.get('status') as ExpenseStatus) || 'all',
   );
@@ -300,17 +301,17 @@ export class ExpenseList {
   readonly loading = signal(true);
   readonly busy = signal(false);
 
-  readonly from = computed(() => ymd(startOfMonth(this.month())));
-  readonly to = computed(() => ymd(endOfMonth(this.month())));
-  readonly monthLabel = computed(() =>
-    this.month().toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' }),
+  /** De kryssade utläggen; töms när listan hämtas om. */
+  readonly selected = signal<ReadonlySet<string>>(new Set());
+  readonly selectedOpen = computed(() =>
+    this.items().filter((e) => this.selected().has(e.id) && e.status === 'open'),
   );
-  readonly isCurrentMonth = computed(() => this.from() >= ymd(startOfMonth(new Date())));
+  readonly allSelected = computed(
+    () => this.items().length > 0 && this.items().every((e) => this.selected().has(e.id)),
+  );
   readonly orderCode = computed(
     () => this.items().find((e) => e.workOrder)?.workOrder?.code ?? null,
   );
-
-  readonly openCount = computed(() => this.summary()?.byStatus.open ?? 0);
 
   readonly summaryText = computed(() => {
     const s = this.summary();
@@ -345,14 +346,37 @@ export class ExpenseList {
   });
 
   constructor() {
+    this.fromCtl.valueChanges.subscribe(() => this.dateChanged());
+    this.toCtl.valueChanges.subscribe(() => this.dateChanged());
     this.load();
+  }
+
+  private dateChanged() {
+    this.remember();
+    this.load();
+  }
+
+  clearDates() {
+    this.fromCtl.setValue('', { emitEvent: false });
+    this.toCtl.setValue('', { emitEvent: false });
+    this.dateChanged();
+  }
+
+  toggle(id: string) {
+    const next = new Set(this.selected());
+    if (!next.delete(id)) next.add(id);
+    this.selected.set(next);
+  }
+
+  toggleAll() {
+    this.selected.set(this.allSelected() ? new Set() : new Set(this.items().map((e) => e.id)));
   }
 
   load() {
     this.loading.set(true);
     const filter = {
-      from: this.orderId() ? undefined : this.from(),
-      to: this.orderId() ? undefined : this.to(),
+      from: this.orderId() ? undefined : this.fromCtl.value || undefined,
+      to: this.orderId() ? undefined : this.toCtl.value || undefined,
       workOrderId: this.orderId() ?? undefined,
       q: this.query() || undefined,
       status: this.status() === 'all' ? undefined : (this.status() as ExpenseStatus),
@@ -361,6 +385,7 @@ export class ExpenseList {
     this.api.list(filter).subscribe({
       next: (p) => {
         this.items.set(p.items);
+        this.selected.set(new Set());
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -371,7 +396,8 @@ export class ExpenseList {
   private remember() {
     void this.router.navigate([], {
       queryParams: {
-        month: this.orderId() ? null : format(this.month(), 'yyyy-MM'),
+        from: this.orderId() ? null : this.fromCtl.value || null,
+        to: this.orderId() ? null : this.toCtl.value || null,
         status: this.status() === 'all' ? null : this.status(),
         paidWith: this.paidWith() === 'all' ? null : this.paidWith(),
         workOrderId: this.orderId(),
@@ -384,12 +410,6 @@ export class ExpenseList {
   searched(q: string) {
     if (q === this.query()) return;
     this.query.set(q);
-    this.load();
-  }
-
-  shift(by: number) {
-    this.month.set(addMonths(this.month(), by));
-    this.remember();
     this.load();
   }
 
@@ -421,29 +441,40 @@ export class ExpenseList {
 
   // --- till revisorn ---
 
+  /** Intervallet som exporteras: det som är valt, annars det listan täcker. */
+  private exportRange(): { from: string; to: string } | null {
+    const dates = this.items().map((e) => e.date).sort();
+    const from = this.fromCtl.value || dates[0];
+    const to = this.toCtl.value || dates[dates.length - 1];
+    return from && to ? { from, to } : null;
+  }
+
   exportZip() {
+    const r = this.exportRange();
+    if (!r) return;
     this.busy.set(true);
-    this.api.exportPeriod(this.from(), this.to(), 'zip').subscribe({
+    this.api.exportPeriod(r.from, r.to, 'zip').subscribe({
       next: async (blob) => {
         this.busy.set(false);
-        await saveFile(blob, `utlagg_${this.from()}_${this.to()}.zip`);
+        await saveFile(blob, `utlagg_${r.from}_${r.to}.zip`);
       },
       error: () => this.busy.set(false),
     });
   }
 
   markExported() {
-    const n = this.openCount();
+    const picked = this.selectedOpen();
+    if (!picked.length) return;
     this.confirm
       .ask({
         title: 'Markera som överlämnat?',
-        message: `${n} utlägg i ${this.monthLabel()} markeras som överlämnade till revisorn. De går inte att ändra efter det utan ditt uttryckliga val.`,
+        message: `${picked.length} valda utlägg markeras som överlämnade till revisorn. De går inte att ändra efter det utan ditt uttryckliga val.`,
         confirmText: 'Markera',
       })
       .subscribe((ok) => {
         if (!ok) return;
         this.busy.set(true);
-        this.api.markExported(this.from(), this.to()).subscribe({
+        this.api.markExported({ ids: picked.map((e) => e.id) }).subscribe({
           next: (r) => {
             this.busy.set(false);
             this.snack.open(`${r.marked} utlägg markerades som överlämnade.`, undefined, {
