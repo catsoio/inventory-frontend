@@ -3,15 +3,22 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, of } from 'rxjs';
 import { BookingApi } from '../../core/api/booking-api';
 import { AxleApi } from '../../core/api/axle-api';
+import { PurchaseCardApi } from '../../core/api/purchase-card-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
-import { Auth } from '../../core/auth/auth';
-import { addDays, startOfDay, ymd } from '../../core/insights/dates';
+import { addDays, startOfDay } from '../../core/insights/dates';
 import { Insights } from '../../core/insights/insights';
-import { WeeklySeries, weeklySeries } from '../../core/insights/sales';
-import { Settings } from '../../core/settings';
 import { Todo, toneOf } from '../../core/todo';
-import { Booking, BookingStatus, Report, Resource, Summary, WorkOrder } from '../../core/models';
+import {
+  Article,
+  Booking,
+  BookingStatus,
+  Movement,
+  Resource,
+  Summary,
+  WorkOrder,
+  WorkOrderStatus,
+} from '../../core/models';
 import { environment } from '../../../environments/environment';
 
 /** En rad under "Att göra": något som väntar på någon. */
@@ -29,25 +36,21 @@ const LIVE: BookingStatus[] = ['booked', 'arrived', 'done'];
 
 /**
  * Det startsidan visar, hämtat en gång för både dator- och mobilvyn. Bokningar och
- * lager hämtas alltid; arbetsorder och pengar bara av datorvyn (`loadDesktop`). Alla anrop
+ * lager hämtas alltid; arbetsorder, artiklar och lagerrörelser bara av datorvyn (`loadDesktop`). Alla anrop
  * tål fel var för sig: en sida utan behörighet eller utan nät ger tomma siffror, inte en tom sida.
  */
 @Injectable()
 export class HomeData {
-  private readonly auth = inject(Auth);
   private readonly bookingApi = inject(BookingApi);
   private readonly inventory = inject(AxleApi);
+  private readonly purchases = inject(PurchaseCardApi);
   private readonly orderApi = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly insights = inject(Insights);
   private readonly todo = inject(Todo);
   private readonly snack = inject(MatSnackBar);
 
-  /** Försäljning och pengar är bara för ägaren. */
-  readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   readonly workOrdersOn = environment.workOrders;
-  /** Perioden för nyckeltalen under Pengar väljs under Inställningar. */
-  readonly days = inject(Settings).value().dashboardDays;
 
   /** Klockan, uppdaterad varje minut så att "kvar" och "nästa" följer dagen. */
   readonly now = signal(Date.now());
@@ -58,17 +61,18 @@ export class HomeData {
   /** Alla bokningar från idag och 14 dagar framåt (inte avbokade). */
   readonly bookings = signal<Booking[]>([]);
   readonly bookingsLoaded = signal(false);
-  readonly drafts: Signal<number> = this.todo.drafts;
-  readonly unpaid = computed(() => {
-    const i = this.todo.invoices();
-    return i ? { count: i.unpaid, amount: i.amount, more: i.more } : null;
-  });
 
   // Bara datorvyn
   readonly orders = signal<WorkOrder[]>([]);
-  readonly week = signal<WeeklySeries | null>(null);
-  readonly cur = signal<Report | null>(null);
-  readonly prev = signal<Report | null>(null);
+  readonly ordersLoaded = signal(false);
+  /** Klara order som kunden ännu inte hämtat (mobilen visar dem med en ring-knapp). */
+  readonly doneOrders = signal<WorkOrder[]>([]);
+  /** Alla aktiva artiklar (delas med Lager via `Insights`) och de senaste lagerrörelserna. */
+  readonly articles = signal<Article[]>([]);
+  /** Beställt hos en leverantör och inte kommit, per artikel: räknas av i Att beställa. */
+  readonly onOrder = signal<Record<string, number>>({});
+  readonly movements = signal<Movement[]>([]);
+  readonly stockLoaded = signal(false);
 
   /** Sant när det som väntar hämtats, så att "Allt under kontroll" inte blinkar fram för tidigt. */
   readonly attentionReady = this.todo.ready;
@@ -152,39 +156,78 @@ export class HomeData {
     this.loadBookings();
   }
 
-  /** Arbetsorder och pengar: bara datorvyn behöver dem. */
+  /** Arbetsorder, artiklar och lagerrörelser: bara datorvyn behöver dem. */
   loadDesktop() {
     if (this.desktop()) return;
     this.desktop.set(true);
-    if (this.workOrdersOn) {
-      this.orderApi
-        .list({ limit: 100 })
-        .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
-        .subscribe((p) => this.orders.set(p.items));
-    }
-    if (!this.admin) return;
-    this.loadMoney();
-    const now = new Date(this.now());
-    const d = this.days;
-    const day = (offset: number) => ymd(addDays(now, offset));
+    this.loadOrders(false);
+    this.insights
+      .articles()
+      .pipe(catchError(() => of([] as Article[])))
+      .subscribe((a) => {
+        this.articles.set(a);
+        this.stockLoaded.set(true);
+      });
+    this.purchases
+      .onOrder()
+      .pipe(catchError(() => of({} as Record<string, number>)))
+      .subscribe((m) => this.onOrder.set(m));
     this.inventory
-      .report(day(-(d - 1)), day(0))
-      .pipe(catchError(() => of(null)))
-      .subscribe((r) => this.cur.set(r));
-    this.inventory
-      .report(day(-(2 * d - 1)), day(-d))
-      .pipe(catchError(() => of(null)))
-      .subscribe((r) => this.prev.set(r));
+      .movements({ limit: 8 })
+      .pipe(catchError(() => of({ items: [] as Movement[] })))
+      .subscribe((p) => this.movements.set(p.items));
   }
 
-  /** Försäljning och inköp per vecka (ägaren), för kurvorna. Både dator och mobil. */
-  loadMoney() {
-    if (!this.admin || this.week()) return;
-    const now = new Date(this.now());
-    this.insights
-      .weekly(now, 12)
-      .pipe(catchError(() => of(null)))
-      .subscribe((r) => this.week.set(weeklySeries(r, now, 12)));
+  /** Hämtar mobilens orderlista på nytt, t.ex. efter att en order skapats. */
+  reloadOrders() {
+    this.ordersLoaded.set(false);
+    this.loadOrders(true);
+    this.loadDone();
+  }
+
+  /** De senast klara orderna som inte fakturerats (alltså inte hämtade och betalda än). */
+  loadDone() {
+    if (!this.workOrdersOn) return;
+    this.orderApi
+      .list({ status: 'done', limit: 20 })
+      .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
+      .subscribe((p) => this.doneOrders.set(p.items.filter((o) => !o.locked)));
+  }
+
+  /**
+   * Byter status på en order direkt i listan och tar tillbaka det om servern säger nej (t.ex. att
+   * mätarställning krävs för Klar). Klar bokar lagerdelarna som en försäljning, så den som anropar
+   * har frågat först.
+   */
+  setOrderStatus(o: WorkOrder, status: WorkOrderStatus) {
+    const before = o.status;
+    const apply = (s: WorkOrderStatus) =>
+      this.orders.update((l) => l.map((x) => (x.id === o.id ? { ...x, status: s } : x)));
+    apply(status);
+    this.orderApi.update(o.id, { status }).subscribe({
+      next: () => status === 'done' && this.loadDone(),
+      error: (err) => {
+        apply(before);
+        this.snack.open(err?.error?.message ?? 'Kunde inte ändra status', 'Stäng', {
+          duration: 5000,
+        });
+      },
+    });
+  }
+
+  /**
+   * Arbetsorder. Datorn tar även klara (tavlan visar dem idag); mobilen bara de pågående och
+   * lämnar listan ifred om datorvyn redan hämtat den.
+   */
+  loadOrders(onlyActive: boolean) {
+    if (!this.workOrdersOn || (onlyActive && this.ordersLoaded())) return;
+    this.orderApi
+      .list(onlyActive ? { active: true, limit: 30 } : { limit: 100 })
+      .pipe(catchError(() => of({ items: [] as WorkOrder[] })))
+      .subscribe((p) => {
+        this.orders.set(p.items);
+        this.ordersLoaded.set(true);
+      });
   }
 
   /** Bokningarna från idag och 14 dagar framåt. */

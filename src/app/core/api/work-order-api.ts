@@ -83,7 +83,10 @@ export class WorkOrderApi {
       status?: WorkOrderStatus;
       lines?: { id: string; done: boolean }[];
       add?: {
-        description: string;
+        /** Krävs om ingen artikel anges (en skannad artikel namnger sin egen rad). */
+        description?: string;
+        /** En lagerartikel, t.ex. en skannad del: läggs utan pris och räknas upp om den redan finns. */
+        articleId?: string;
         type?: WorkOrderLineType;
         quantity?: number;
         toOrder?: boolean;
@@ -91,6 +94,11 @@ export class WorkOrderApi {
     },
   ): Observable<WorkOrderDetail> {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/progress`, body);
+  }
+
+  /** Mekanikern tar en order som ingen fått än; ordern blir hens. */
+  claim(id: string): Observable<WorkOrderDetail> {
+    return this.http.post<WorkOrderDetail>(`${this.base}/${id}/claim`, {});
   }
 
   /** Lämnar ett kostnadsförslag: beloppen frysas med giltighet och tillåten avvikelse. */

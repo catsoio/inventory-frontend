@@ -8,6 +8,10 @@ import { ApiError } from '../models';
 const MESSAGES: Record<string, string> = {
   INSUFFICIENT_STOCK: 'Det finns inte tillräckligt i lager.',
   DUPLICATE_SKU: 'Koden finns redan på en annan artikel.',
+  DUPLICATE_CODE: 'Koden hör redan till en annan artikel.',
+  MECHANIC_NOT_LINKED:
+    'Din inloggning är inte kopplad till en mekaniker. Be ägaren koppla den under Mekaniker och platser.',
+  ORDER_TAKEN: 'Ordern har redan fått en annan mekaniker.',
   ARTICLE_HAS_STOCK: 'Artikeln kan inte arkiveras eftersom det finns lager kvar.',
   CONCURRENT_MODIFICATION: 'Någon annan har ändrat artikeln. Ladda om sidan och försök igen.',
   INVALID_QUANTITY: 'Ogiltigt antal. Ange ett heltal på minst 1.',
@@ -40,6 +44,9 @@ const MESSAGES: Record<string, string> = {
   ACCOUNT_NOT_ACTIVE: 'Kontot är inte aktiverat. Verifiera med engångskod först.',
 };
 
+const isLoginAttempt = (url: string) =>
+  /\/auth\/(email\/login|login|email\/otp\/verify)$/.test(url.split('?')[0]);
+
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const snack = inject(MatSnackBar);
   const injector = inject(Injector);
@@ -56,7 +63,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
             : err.status === 404
               ? 'Hittades inte.'
               : err.status === 401
-                ? 'Sessionen har gått ut.'
+                ? isLoginAttempt(req.url)
+                  ? req.url.includes('/otp/')
+                    ? 'Fel eller utgången kod.'
+                    : MESSAGES['INVALID_CREDENTIALS']
+                  : 'Sessionen har gått ut.'
                 : err.status === 400 && e?.message
                   ? `Ogiltiga uppgifter: ${e.message}`
                   : 'Något gick fel. Försök igen.');
@@ -71,7 +82,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           billing.openPlans();
         }
       } else if (
-        err.status !== 401 &&
+        // 401 från en inloggning (fel lösenord, fel kod) ska synas; 401 från övriga anrop är en
+        // utgången session som hanteras tyst av token-interceptorn.
+        (err.status !== 401 || isLoginAttempt(req.url)) &&
         code !== 'NO_GARAGE' &&
         // Inläsningsdialogen provar nyckeln själv när den öppnas och förklarar nekandet i dialogen.
         code !== 'BLOCKET_READ_REFUSED' &&

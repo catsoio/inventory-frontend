@@ -104,20 +104,29 @@ export function seasonUnits(articles: Article[]): SeasonUnits {
 /** Det som är slut eller under beställningspunkten, mest akut först (störst brist mot punkten). */
 export interface Reorder {
   article: Article;
-  /** Antal som saknas upp till beställningspunkten. */
+  /** Antal som saknas upp till beställningspunkten, när det som är beställt har räknats av. */
   missing: number;
+  /** Beställt hos en leverantör och inte kommit. */
+  onOrder: number;
   /** Lager i förhållande till beställningspunkten, 0..1. */
   ratio: number;
 }
 
-export function toOrder(articles: Article[]): Reorder[] {
+/**
+ * Det som ska beställas. Det som redan är beställt och väntas räknas som lager: en artikel som
+ * leveransen lyfter över beställningspunkten behöver inget mer, och bristen räknas efter leveransen.
+ */
+export function toOrder(articles: Article[], onOrder: Record<string, number> = {}): Reorder[] {
   return articles
     .filter((a) => a.active && (a.stockLevel === 'low' || a.stockLevel === 'out'))
+    .filter((a) => a.quantity + (onOrder[a.id] ?? 0) <= a.reorderLevel || a.reorderLevel <= 0)
     .map((article) => {
+      const coming = onOrder[article.id] ?? 0;
       const level = Math.max(article.reorderLevel, 1);
       return {
         article,
-        missing: Math.max(article.reorderLevel - article.quantity, 0),
+        onOrder: coming,
+        missing: Math.max(article.reorderLevel - article.quantity - coming, 0),
         ratio: Math.min(Math.max(article.quantity / level, 0), 1),
       };
     })

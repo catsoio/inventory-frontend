@@ -4,12 +4,14 @@ import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
 import { PurchaseCardPage } from './purchase-card';
 import { PurchaseList } from './purchase-list';
+import { PurchaseReceive } from './purchase-receive';
 import { TradeLedger } from './trade-ledger';
 
 @NgModule({
   declarations: [PurchaseCardPage, TradeLedger],
   imports: [
     SharedModule,
+    PurchaseReceive,
     RouterModule.forChild([
       { path: '', component: PurchaseList },
       { path: 'documents', title: 'Äldre inköp', component: TradeLedger },

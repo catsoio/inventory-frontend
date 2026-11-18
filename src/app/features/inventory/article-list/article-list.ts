@@ -213,6 +213,9 @@ const COLS: Col[] = [
             }
           </mat-menu>
         }
+        <a mat-stroked-button routerLink="receive">
+          <mat-icon>qr_code_scanner</mat-icon> Ta emot varor
+        </a>
         <a mat-flat-button color="primary" routerLink="new"><mat-icon>add</mat-icon> Ny artikel</a>
       </div>
     </app-page-header>

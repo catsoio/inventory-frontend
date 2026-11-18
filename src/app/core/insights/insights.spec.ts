@@ -193,6 +193,20 @@ describe('lager', () => {
     expect(order.map((o) => o.article.quantity)).toEqual([0, 2]);
     expect(order[0].ratio).toBe(0);
   });
+
+  it('räknar det som redan är beställt som lager: en leverans som lyfter över punkten behöver inget mer', () => {
+    const withIds = stock.map((a, i) => ({ ...a, id: `a${i}` }));
+    const [soldOut, low] = toOrder(withIds);
+    const onOrder = { [soldOut.article.id]: soldOut.article.reorderLevel + 1 };
+    // Det som slut-artikeln får räcker över beställningspunkten: den försvinner ur listan.
+    expect(toOrder(withIds, onOrder).map((o) => o.article.id)).toEqual([low.article.id]);
+    // En leverans som inte räcker lämnar den kvar, med bristen efter leveransen.
+    const some = toOrder(withIds, { [low.article.id]: 1 }).find(
+      (o) => o.article.id === low.article.id,
+    )!;
+    expect(some.onOrder).toBe(1);
+    expect(some.missing).toBe(Math.max(low.article.reorderLevel - low.article.quantity - 1, 0));
+  });
 });
 
 describe('försäljning', () => {

@@ -1,12 +1,16 @@
 import { MatDialog } from '@angular/material/dialog';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Auth } from '../../auth/auth';
+import { Billing } from '../../billing/billing';
+import { Todo } from '../../todo';
 import { GARAGE_ROLE_LABELS } from '../../models';
 import { Nav } from '../nav';
+import type { Product } from '../products';
 
 /**
  * Mobilens bottenfält med det som görs i farten (Hem, Tider, Hotell, Lager) och "Mer", som öppnar
- * ett blad underifrån med resten: kunder, bilar, försäljning, inköp, ekonomi, inställningar.
+ * ett blad underifrån med resten: kunder, bilar, försäljning, inköp, ekonomi, register,
+ * inställningar och de andra produkterna (Bilhandel, Bärgning; Verkstad och Däckhotell ligger i toppen).
  */
 @Component({
   selector: 'app-mobile-nav',
@@ -167,6 +171,24 @@ import { Nav } from '../nav';
             </button>
           </div>
 
+          @if (others().length) {
+            <div class="sec px-4 pt-4 pb-2">Andra delar</div>
+            <div class="grid grid-cols-3 gap-2 px-4">
+              @for (o of others(); track o.id) {
+                <a [routerLink]="o.link" class="tile relative" (click)="open.set(false)">
+                  <mat-icon>{{ o.icon }}</mat-icon>
+                  {{ o.label }}
+                  @if (waiting()[o.id]; as u) {
+                    <span
+                      class="absolute top-2 right-2 h-2.5 w-2.5 rounded-full ring-2 ring-[#f3f4f6]"
+                      [class]="u === 'urgent' ? 'bg-red-500' : 'bg-amber-500'"
+                    ></span>
+                  }
+                </a>
+              }
+            </div>
+          }
+
           <div class="mt-3 border-t border-gray-100 px-2 pt-2">
             @if (auth.isSuperAdmin()) {
               <button type="button" class="row" [matMenuTriggerFor]="gm.menu">
@@ -188,6 +210,39 @@ export class MobileNav {
   readonly auth = inject(Auth);
   readonly nav = inject(Nav);
   private readonly dialog = inject(MatDialog);
+  private readonly billing = inject(Billing);
+  readonly waiting = inject(Todo).urgencyOf;
+
+  /** Produkterna som inte ligger i toppen och som garaget har: Bilhandel och Bärgning (utom den man är i). */
+  readonly others = computed(() =>
+    (
+      [
+        {
+          id: 'hall',
+          label: 'Bilhandel',
+          icon: 'directions_car',
+          link: '/dealership',
+          module: 'bilhandel',
+        },
+        {
+          id: 'towing',
+          label: 'Bärgning',
+          icon: 'local_shipping',
+          link: '/towing/home',
+          module: 'bargning',
+        },
+      ] as const satisfies readonly {
+        id: Product;
+        label: string;
+        icon: string;
+        link: string;
+        module: string;
+      }[]
+    ).filter(
+      (p) =>
+        !this.auth.isMechanic() && p.id !== this.nav.product() && this.billing.allows(p.module),
+    ),
+  );
 
   openSettings(): void {
     this.open.set(false);
@@ -203,11 +258,12 @@ export class MobileNav {
   );
 
   /** Något under "Mer" väntar på någon (gul eller röd prick), så att det syns utan att öppna bladet. */
-  readonly moreAttention = computed(() =>
-    this.nav.more().some((m) => {
-      const dot = this.nav.badges()[m.path]?.dot;
-      return dot === 'bg-amber-500' || dot === 'bg-red-500';
-    }),
+  readonly moreAttention = computed(
+    () =>
+      this.nav.more().some((m) => {
+        const dot = this.nav.badges()[m.path]?.dot;
+        return dot === 'bg-amber-500' || dot === 'bg-red-500';
+      }) || this.others().some((o) => this.waiting()[o.id]),
   );
 
   readonly who = computed(() => {

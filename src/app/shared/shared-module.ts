@@ -53,6 +53,7 @@ import { ChartView } from './chart/chart';
 import { FinanceTabs } from './finance-tabs/finance-tabs';
 import { MixBar } from './mix-bar/mix-bar';
 import { Panel } from './panel/panel';
+import { Section } from './section/section';
 import { ProductFilter } from './product-filter/product-filter';
 import { PageHeader } from './page-header/page-header';
 import { Spark } from './spark/spark';
@@ -126,6 +127,7 @@ const MATERIAL = [
     FinanceTabs,
     MixBar,
     Panel,
+    Section,
     ProductFilter,
     PageHeader,
     SearchField,
@@ -180,6 +182,7 @@ const MATERIAL = [
     FinanceTabs,
     MixBar,
     Panel,
+    Section,
     ProductFilter,
     PageHeader,
     SearchField,

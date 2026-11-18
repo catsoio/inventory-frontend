@@ -13,7 +13,16 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { format } from 'date-fns';
-import { catchError, debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  firstValueFrom,
+  forkJoin,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { AxleApi } from '../../core/api/axle-api';
 import { PurchaseCardApi } from '../../core/api/purchase-card-api';
 import { SupplierCatalogApi } from '../../core/api/supplier-catalog-api';
@@ -24,6 +33,8 @@ import { HasUnsaved } from '../../core/unsaved-guard';
 import { Confirm } from '../../shared/confirm';
 import { QuickArticleDialog } from '../../shared/quick-article-dialog/quick-article-dialog';
 import { TradeDocumentDialog } from '../../shared/trade-document-dialog/trade-document-dialog';
+import { shrinkImage } from '../../core/image-resize';
+import type { DocumentReadResult } from './document-read-dialog';
 import { normalizeUrl } from '../../shared/web-link';
 
 /** En rad som den redigeras: priset i kronor inkl. moms, som man skriver av leverantörens faktura. */
@@ -59,17 +70,18 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
     >
       <div actions class="flex items-center gap-2">
         @if (card(); as c) {
-          @if (c.status === 'draft') {
+          @if (c.status === 'draft' || (c.status === 'ordered' && !c.receipts.length)) {
             <button
               mat-icon-button
               class="!text-red-700"
-              aria-label="Ta bort"
-              matTooltip="Ta bort"
+              [attr.aria-label]="c.status === 'draft' ? 'Ta bort' : 'Avbryt beställningen'"
+              [matTooltip]="c.status === 'draft' ? 'Ta bort' : 'Avbryt beställningen'"
               (click)="remove()"
             >
               <mat-icon>delete_outline</mat-icon>
             </button>
-          } @else {
+          }
+          @if (c.documentNumber != null) {
             <button mat-stroked-button type="button" (click)="openDocument()">
               <mat-icon>receipt_long</mat-icon> Visa inköpsdokument
             </button>
@@ -84,8 +96,22 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
 
       @if (card()?.status === 'posted') {
         <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
-          <b>Bokfört som {{ card()!.documentCode }}.</b>
-          Raderna ligger i lagret och kortet är låst: ett bokfört inköp ändras inte i efterhand.
+          @if (card()!.receipts.length) {
+            <b>Beställningen är klar.</b>
+            {{ card()!.receivedUnits }} av {{ card()!.units }} st togs emot i
+            {{ card()!.receipts.length }}
+            {{ card()!.receipts.length === 1 ? 'leverans' : 'leveranser' }} och kortet är låst.
+          } @else {
+            <b>Bokfört som {{ card()!.documentCode }}.</b>
+            Raderna ligger i lagret och kortet är låst: ett bokfört inköp ändras inte i efterhand.
+          }
+        </p>
+      }
+      @if (card()?.status === 'ordered') {
+        <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+          <b>Beställd {{ card()!.orderedAt | date: 'yyyy-MM-dd' }}.</b>
+          Raderna är det som beställdes. Skanna varorna när de kommer, så kontrolleras leveransen
+          mot ordern.
         </p>
       }
 
@@ -132,290 +158,358 @@ const noonOf = (day: string) => new Date(`${day}T12:00:00`).toISOString();
         </div>
       </section>
 
-      <section class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-3 text-base font-semibold">Rader</h2>
+      @if (card()?.status === 'ordered') {
+        <app-purchase-receive [card]="card()!" (changed)="load()" />
+      } @else {
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-3 text-base font-semibold">Rader</h2>
 
-        @if (!readOnly()) {
-          <div class="relative mb-3">
-            <mat-icon class="pointer-events-none absolute top-2.5 left-3 text-gray-400"
-              >search</mat-icon
-            >
-            <input
-              #searchEl
-              type="search"
-              [formControl]="search"
-              (keydown.enter)="addFirst()"
-              (keydown.escape)="clearSearch()"
-              placeholder="Lägg till artikel: namn, storlek, märke, artikelnummer… eller skriv ett nytt namn"
-              class="h-11 w-full pr-3 pl-11 field"
-            />
-            @if (query().trim()) {
-              <div
-                class="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-xl bg-white shadow-lg"
+          @if (!readOnly()) {
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="reading()"
+                (click)="paper.click()"
               >
-                @for (a of results(); track a.id) {
-                  <button
-                    type="button"
-                    class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left"
-                    (click)="add(a)"
-                  >
-                    <span class="flex min-w-0 items-center gap-3">
-                      <app-item-icon [kind]="kind(a)" />
-                      <span class="min-w-0">
-                        <span class="block truncate font-medium">{{ title(a) }}</span>
-                        <span class="block truncate text-sm text-gray-500">{{ subtitle(a) }}</span>
-                      </span>
-                    </span>
-                    <span class="flex shrink-0 items-center gap-3 text-sm">
-                      <span class="text-gray-600">{{ a.quantity }} st</span>
-                      <span class="font-medium">{{
-                        pricing.costIncl(a.averageCost ?? 0) | kr
-                      }}</span>
-                    </span>
-                  </button>
-                }
-                @if (catalogOn()) {
-                  <div
-                    class="bg-gray-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase"
-                  >
-                    Däck i katalogen
-                  </div>
-                  @if (catalogLoading()) {
-                    <p class="px-4 py-3 text-sm text-gray-500">Söker däck…</p>
-                  }
-                  @for (h of catalogRest(); track h.sourceId) {
+                <mat-icon>document_scanner</mat-icon>
+                {{ reading() ? 'Läser…' : 'Läs kvitto eller följesedel' }}
+              </button>
+              <input
+                #paper
+                type="file"
+                hidden
+                accept="image/*,application/pdf"
+                (change)="readPaper($event)"
+              />
+              <span class="text-xs text-gray-500"
+                >Ta ett foto, så fylls raderna i. Du kontrollerar dem innan de läggs till.</span
+              >
+            </div>
+            <div class="relative mb-3">
+              <mat-icon class="pointer-events-none absolute top-2.5 left-3 text-gray-400"
+                >search</mat-icon
+              >
+              <input
+                #searchEl
+                type="search"
+                [formControl]="search"
+                (keydown.enter)="addFirst()"
+                (keydown.escape)="clearSearch()"
+                placeholder="Lägg till artikel: namn, storlek, märke, artikelnummer… eller skriv ett nytt namn"
+                class="h-11 w-full pr-3 pl-11 field"
+              />
+              @if (query().trim()) {
+                <div
+                  class="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-xl bg-white shadow-lg"
+                >
+                  @for (a of results(); track a.id) {
                     <button
                       type="button"
                       class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left"
-                      [disabled]="busy()"
-                      (click)="addHit(h)"
+                      (click)="add(a)"
                     >
-                      <app-catalog-hit [hit]="h" class="contents" />
+                      <span class="flex min-w-0 items-center gap-3">
+                        <app-item-icon [kind]="kind(a)" />
+                        <span class="min-w-0">
+                          <span class="block truncate font-medium">{{ title(a) }}</span>
+                          <span class="block truncate text-sm text-gray-500">{{
+                            subtitle(a)
+                          }}</span>
+                        </span>
+                      </span>
+                      <span class="flex shrink-0 items-center gap-3 text-sm">
+                        <span class="text-gray-600">{{ a.quantity }} st</span>
+                        <span class="font-medium">{{
+                          pricing.costIncl(a.averageCost ?? 0) | kr
+                        }}</span>
+                      </span>
                     </button>
                   }
-                }
-                <button
-                  type="button"
-                  class="hover:bg-brand-soft text-brand flex w-full items-center gap-2 px-4 py-3 text-left font-medium"
-                  (click)="newArticle()"
+                  @if (catalogOn()) {
+                    <div
+                      class="bg-gray-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-gray-500 uppercase"
+                    >
+                      Däck i katalogen
+                    </div>
+                    @if (catalogLoading()) {
+                      <p class="px-4 py-3 text-sm text-gray-500">Söker däck…</p>
+                    }
+                    @for (h of catalogRest(); track h.sourceId) {
+                      <button
+                        type="button"
+                        class="hover:bg-brand-soft flex w-full items-center justify-between gap-3 border-b px-4 py-2 text-left"
+                        [disabled]="busy()"
+                        (click)="addHit(h)"
+                      >
+                        <app-catalog-hit [hit]="h" class="contents" />
+                      </button>
+                    }
+                  }
+                  <button
+                    type="button"
+                    class="hover:bg-brand-soft text-brand flex w-full items-center gap-2 px-4 py-3 text-left font-medium"
+                    (click)="newArticle()"
+                  >
+                    <mat-icon>add</mat-icon> Ny artikel "{{ query().trim() }}"
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          @if (rows().length) {
+            <div class="flex flex-col gap-3 md:hidden">
+              @for (r of rows(); track r.key; let i = $index) {
+                <div class="rounded-lg border border-gray-200 p-3">
+                  <div class="flex items-start gap-3">
+                    <app-item-icon [kind]="kind(r.a)" />
+                    <div class="min-w-0 flex-1">
+                      <div class="font-medium">{{ title(r.a) }}</div>
+                      <div class="truncate text-xs text-gray-500">{{ subtitle(r.a) }}</div>
+                      <div class="text-xs text-gray-500">{{ r.a.quantity }} st i lager</div>
+                    </div>
+                    @if (!readOnly()) {
+                      <button
+                        mat-icon-button
+                        type="button"
+                        (click)="removeRow(i)"
+                        aria-label="Ta bort raden"
+                      >
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    }
+                  </div>
+                  <div class="mt-2 grid grid-cols-2 gap-3">
+                    <label class="flex flex-col gap-0.5 text-xs text-gray-500">
+                      Antal
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        inputmode="numeric"
+                        class="h-10 px-2 text-right text-gray-900 field"
+                        [disabled]="readOnly()"
+                        [value]="r.qty"
+                        (focus)="$any($event.target).select()"
+                        (input)="edit(i, { qty: $any($event.target).valueAsNumber })"
+                      />
+                    </label>
+                    <label class="flex flex-col gap-0.5 text-xs text-gray-500">
+                      Inköpspris/st
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputmode="decimal"
+                        class="h-10 px-2 text-right text-gray-900 field"
+                        [disabled]="readOnly()"
+                        [value]="r.price"
+                        (focus)="$any($event.target).select()"
+                        (input)="edit(i, { price: $any($event.target).valueAsNumber })"
+                      />
+                    </label>
+                  </div>
+                  <div class="mt-2 flex justify-between border-t pt-2 text-sm">
+                    <span class="text-gray-600">Summa</span>
+                    <b class="tabular-nums">{{ lineOre(r) | kr }}</b>
+                  </div>
+                </div>
+              }
+            </div>
+            <div class="overflow-x-auto max-md:hidden">
+              <table class="w-full min-w-[640px] text-left text-sm">
+                <thead
+                  class="border-b border-gray-100 text-xs font-medium tracking-wide text-gray-500 uppercase"
                 >
-                  <mat-icon>add</mat-icon> Ny artikel "{{ query().trim() }}"
+                  <tr>
+                    <th class="py-2">Artikel</th>
+                    <th class="w-20 py-2 text-right">I lager</th>
+                    <th class="w-24 py-2 text-right">Antal</th>
+                    <th class="w-36 py-2 text-right">Inköpspris/st</th>
+                    <th class="w-28 py-2 text-right">Summa</th>
+                    <th class="w-10 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  @for (r of rows(); track r.key; let i = $index) {
+                    <tr class="align-top">
+                      <td class="py-2 pr-2">
+                        <div class="flex items-center gap-3 py-1">
+                          <app-item-icon [kind]="kind(r.a)" />
+                          <div class="min-w-0">
+                            <div class="truncate font-medium">{{ title(r.a) }}</div>
+                            <div class="truncate text-xs text-gray-500">{{ subtitle(r.a) }}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="py-2 pr-2 text-right tabular-nums">
+                        <div class="py-2">{{ r.a.quantity }}</div>
+                      </td>
+                      <td class="py-2 pr-2 text-right">
+                        @if (readOnly()) {
+                          <div class="py-2 tabular-nums">{{ r.qty }}</div>
+                        } @else {
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputmode="numeric"
+                            class="h-10 w-full px-2 text-right field"
+                            [value]="r.qty"
+                            (focus)="$any($event.target).select()"
+                            (input)="edit(i, { qty: $any($event.target).valueAsNumber })"
+                          />
+                          @if (!qtyOk(r)) {
+                            <div class="text-xs text-red-600">Helt antal, minst 1.</div>
+                          }
+                        }
+                      </td>
+                      <td class="py-2 pr-2 text-right">
+                        @if (readOnly()) {
+                          <div class="py-2 tabular-nums">{{ r.price * 100 | kr }}</div>
+                        } @else {
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputmode="decimal"
+                            class="h-10 w-full px-2 text-right field"
+                            [value]="r.price"
+                            (focus)="$any($event.target).select()"
+                            (input)="edit(i, { price: $any($event.target).valueAsNumber })"
+                          />
+                        }
+                      </td>
+                      <td class="py-2 text-right tabular-nums">
+                        <div class="py-2">{{ lineOre(r) | kr }}</div>
+                      </td>
+                      <td class="py-2 text-right">
+                        @if (!readOnly()) {
+                          <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeRow(i)"
+                            aria-label="Ta bort raden"
+                          >
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <p class="mt-2 text-xs text-gray-500">
+              Inköpspriset skrivs inkl. moms, som på fakturan.
+            </p>
+          } @else {
+            <p class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+              Inga rader än. Sök efter det du köper in ovan. Finns det inte, skriv namnet och välj
+              Ny artikel.
+            </p>
+          }
+        </section>
+
+        <div class="grid items-start gap-4 lg:grid-cols-2">
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <h2 class="mb-2 text-base font-semibold">Anteckning</h2>
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+              <mat-label>Intern anteckning</mat-label>
+              <input
+                matInput
+                [disabled]="readOnly()"
+                [value]="note()"
+                (input)="note.set($any($event.target).value); touch()"
+              />
+            </mat-form-field>
+          </section>
+
+          <section class="rounded-xl bg-white p-5 shadow-sm">
+            <div class="ml-auto max-w-sm text-sm">
+              <div class="flex justify-between py-0.5 text-gray-600">
+                <span>Antal</span><span class="tabular-nums">{{ units() }} st</span>
+              </div>
+              <div class="flex justify-between py-0.5 text-gray-600">
+                <span>Exkl. moms</span
+                ><span class="tabular-nums">{{ pricing.costNet(totalOre()) | kr }}</span>
+              </div>
+              <div class="flex justify-between py-0.5 text-gray-600">
+                <span>Ingående moms {{ pricing.value().purchaseVatRate }} %</span
+                ><span class="tabular-nums">{{
+                  totalOre() - pricing.costNet(totalOre()) | kr
+                }}</span>
+              </div>
+              <div class="mt-1 flex justify-between border-t pt-2 text-lg font-semibold">
+                <span>Totalt inkl. moms</span
+                ><span class="tabular-nums">{{ totalOre() | kr }}</span>
+              </div>
+              @if (!readOnly()) {
+                <mat-form-field class="mt-3 w-full" subscriptSizing="dynamic">
+                  <mat-label>Summa på kvittot (kr, inkl. moms)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    inputmode="decimal"
+                    step="0.01"
+                    [value]="docTotal() == null ? '' : docTotal()! / 100"
+                    (input)="setDocTotal($any($event.target).valueAsNumber)"
+                  />
+                </mat-form-field>
+              } @else if (docTotal() != null) {
+                <div class="flex justify-between py-0.5 text-gray-600">
+                  <span>Summa på pappret</span
+                  ><span class="tabular-nums">{{ docTotal()! | kr }}</span>
+                </div>
+              }
+              @if (totalCheck(); as c) {
+                <p class="mt-2 text-sm" [class]="c.cls">{{ c.text }}</p>
+              }
+            </div>
+          </section>
+        </div>
+
+        @if (card(); as c) {
+          @if (c.status === 'draft') {
+            <section class="rounded-xl bg-white p-5 shadow-sm">
+              <h2 class="mb-1 text-base font-semibold">Bokför</h2>
+              <p class="mb-3 text-sm text-gray-600">
+                Vid bokföring läggs raderna in i lagret och inköpet får sitt nummer (INK-). Därefter
+                går kortet inte att ändra. Delar som väntar på en arbetsorder blir tillgängliga
+                direkt.
+              </p>
+              <div class="flex flex-wrap items-center gap-3">
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="busy() || !valid() || !rows().length"
+                  (click)="post()"
+                >
+                  Bokför inköp
+                </button>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="busy() || !valid() || !rows().length || !supplierCtl.value"
+                  (click)="order()"
+                >
+                  <mat-icon>local_shipping</mat-icon> Markera som beställd
                 </button>
               </div>
-            }
-          </div>
-        }
-
-        @if (rows().length) {
-          <div class="flex flex-col gap-3 md:hidden">
-            @for (r of rows(); track r.key; let i = $index) {
-              <div class="rounded-lg border border-gray-200 p-3">
-                <div class="flex items-start gap-3">
-                  <app-item-icon [kind]="kind(r.a)" />
-                  <div class="min-w-0 flex-1">
-                    <div class="font-medium">{{ title(r.a) }}</div>
-                    <div class="truncate text-xs text-gray-500">{{ subtitle(r.a) }}</div>
-                    <div class="text-xs text-gray-500">{{ r.a.quantity }} st i lager</div>
-                  </div>
-                  @if (!readOnly()) {
-                    <button
-                      mat-icon-button
-                      type="button"
-                      (click)="removeRow(i)"
-                      aria-label="Ta bort raden"
-                    >
-                      <mat-icon>close</mat-icon>
-                    </button>
-                  }
-                </div>
-                <div class="mt-2 grid grid-cols-2 gap-3">
-                  <label class="flex flex-col gap-0.5 text-xs text-gray-500">
-                    Antal
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      inputmode="numeric"
-                      class="h-10 px-2 text-right text-gray-900 field"
-                      [disabled]="readOnly()"
-                      [value]="r.qty"
-                      (focus)="$any($event.target).select()"
-                      (input)="edit(i, { qty: $any($event.target).valueAsNumber })"
-                    />
-                  </label>
-                  <label class="flex flex-col gap-0.5 text-xs text-gray-500">
-                    Inköpspris/st
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputmode="decimal"
-                      class="h-10 px-2 text-right text-gray-900 field"
-                      [disabled]="readOnly()"
-                      [value]="r.price"
-                      (focus)="$any($event.target).select()"
-                      (input)="edit(i, { price: $any($event.target).valueAsNumber })"
-                    />
-                  </label>
-                </div>
-                <div class="mt-2 flex justify-between border-t pt-2 text-sm">
-                  <span class="text-gray-600">Summa</span>
-                  <b class="tabular-nums">{{ lineOre(r) | kr }}</b>
-                </div>
-              </div>
-            }
-          </div>
-          <div class="overflow-x-auto max-md:hidden">
-            <table class="w-full min-w-[640px] text-left text-sm">
-              <thead
-                class="border-b border-gray-100 text-xs font-medium tracking-wide text-gray-500 uppercase"
-              >
-                <tr>
-                  <th class="py-2">Artikel</th>
-                  <th class="w-20 py-2 text-right">I lager</th>
-                  <th class="w-24 py-2 text-right">Antal</th>
-                  <th class="w-36 py-2 text-right">Inköpspris/st</th>
-                  <th class="w-28 py-2 text-right">Summa</th>
-                  <th class="w-10 py-2"></th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                @for (r of rows(); track r.key; let i = $index) {
-                  <tr class="align-top">
-                    <td class="py-2 pr-2">
-                      <div class="flex items-center gap-3 py-1">
-                        <app-item-icon [kind]="kind(r.a)" />
-                        <div class="min-w-0">
-                          <div class="truncate font-medium">{{ title(r.a) }}</div>
-                          <div class="truncate text-xs text-gray-500">{{ subtitle(r.a) }}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="py-2 pr-2 text-right tabular-nums">
-                      <div class="py-2">{{ r.a.quantity }}</div>
-                    </td>
-                    <td class="py-2 pr-2 text-right">
-                      @if (readOnly()) {
-                        <div class="py-2 tabular-nums">{{ r.qty }}</div>
-                      } @else {
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          inputmode="numeric"
-                          class="h-10 w-full px-2 text-right field"
-                          [value]="r.qty"
-                          (focus)="$any($event.target).select()"
-                          (input)="edit(i, { qty: $any($event.target).valueAsNumber })"
-                        />
-                        @if (!qtyOk(r)) {
-                          <div class="text-xs text-red-600">Helt antal, minst 1.</div>
-                        }
-                      }
-                    </td>
-                    <td class="py-2 pr-2 text-right">
-                      @if (readOnly()) {
-                        <div class="py-2 tabular-nums">{{ r.price * 100 | kr }}</div>
-                      } @else {
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          inputmode="decimal"
-                          class="h-10 w-full px-2 text-right field"
-                          [value]="r.price"
-                          (focus)="$any($event.target).select()"
-                          (input)="edit(i, { price: $any($event.target).valueAsNumber })"
-                        />
-                      }
-                    </td>
-                    <td class="py-2 text-right tabular-nums">
-                      <div class="py-2">{{ lineOre(r) | kr }}</div>
-                    </td>
-                    <td class="py-2 text-right">
-                      @if (!readOnly()) {
-                        <button
-                          mat-icon-button
-                          type="button"
-                          (click)="removeRow(i)"
-                          aria-label="Ta bort raden"
-                        >
-                          <mat-icon>close</mat-icon>
-                        </button>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          <p class="mt-2 text-xs text-gray-500">Inköpspriset skrivs inkl. moms, som på fakturan.</p>
+              <p class="mt-2 text-xs text-gray-500">
+                Är varorna beställda men inte levererade? Markera inköpet som beställt, så tas det
+                emot när varorna kommer: skanna dem mot raderna, och det som saknas väntar på nästa
+                leverans.
+              </p>
+            </section>
+          }
         } @else {
-          <p class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-            Inga rader än. Sök efter det du köper in ovan. Finns det inte, skriv namnet och välj Ny
-            artikel.
+          <p class="text-sm text-gray-600">
+            Spara kortet för att få ett nummer. Därefter kan du bokföra inköpet in i lagret.
           </p>
         }
-      </section>
-
-      <div class="grid items-start gap-4 lg:grid-cols-2">
-        <section class="rounded-xl bg-white p-5 shadow-sm">
-          <h2 class="mb-2 text-base font-semibold">Anteckning</h2>
-          <mat-form-field class="w-full" subscriptSizing="dynamic">
-            <mat-label>Intern anteckning</mat-label>
-            <input
-              matInput
-              [disabled]="readOnly()"
-              [value]="note()"
-              (input)="note.set($any($event.target).value); touch()"
-            />
-          </mat-form-field>
-        </section>
-
-        <section class="rounded-xl bg-white p-5 shadow-sm">
-          <div class="ml-auto max-w-sm text-sm">
-            <div class="flex justify-between py-0.5 text-gray-600">
-              <span>Antal</span><span class="tabular-nums">{{ units() }} st</span>
-            </div>
-            <div class="flex justify-between py-0.5 text-gray-600">
-              <span>Exkl. moms</span
-              ><span class="tabular-nums">{{ pricing.costNet(totalOre()) | kr }}</span>
-            </div>
-            <div class="flex justify-between py-0.5 text-gray-600">
-              <span>Ingående moms {{ pricing.value().purchaseVatRate }} %</span
-              ><span class="tabular-nums">{{ totalOre() - pricing.costNet(totalOre()) | kr }}</span>
-            </div>
-            <div class="mt-1 flex justify-between border-t pt-2 text-lg font-semibold">
-              <span>Totalt inkl. moms</span><span class="tabular-nums">{{ totalOre() | kr }}</span>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      @if (card(); as c) {
-        @if (c.status === 'draft') {
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-1 text-base font-semibold">Bokför</h2>
-            <p class="mb-3 text-sm text-gray-600">
-              Vid bokföring läggs raderna in i lagret och inköpet får sitt nummer (INK-). Därefter
-              går kortet inte att ändra. Delar som väntar på en arbetsorder blir tillgängliga
-              direkt.
-            </p>
-            <button
-              mat-flat-button
-              color="primary"
-              type="button"
-              [disabled]="busy() || !valid() || !rows().length"
-              (click)="post()"
-            >
-              Bokför inköp
-            </button>
-          </section>
-        }
-      } @else {
-        <p class="text-sm text-gray-600">
-          Spara kortet för att få ett nummer. Därefter kan du bokföra inköpet in i lagret.
-        </p>
       }
     </app-card-page>
   `,
@@ -438,7 +532,16 @@ export class PurchaseCardPage implements HasUnsaved {
   readonly card = signal<PurchaseCard | null>(null);
   readonly busy = signal(false);
   readonly dirty = signal(false);
-  readonly readOnly = computed(() => this.card()?.status === 'posted');
+  /** Ett bokfört inköp och en beställning (raderna är vad som beställdes) ändras inte här. */
+  readonly readOnly = computed(() => {
+    const status = this.card()?.status;
+    return !!status && status !== 'draft';
+  });
+  /** Summan på kvittot eller pappret (öre inkl. moms), som raderna kontrolleras mot. */
+  readonly docTotal = signal<number | null>(null);
+  readonly reading = signal(false);
+  /** Foton som sparas på inköpet när kortet sparas. */
+  private readonly pendingPapers: File[] = [];
 
   readonly supplierCtl = new FormControl<string | null>(null);
   readonly reference = signal('');
@@ -464,6 +567,19 @@ export class PurchaseCardPage implements HasUnsaved {
   readonly units = computed(() => this.rows().reduce((n, r) => n + (r.qty || 0), 0));
   readonly totalOre = computed(() => this.rows().reduce((n, r) => n + this.lineOre(r), 0));
   readonly valid = computed(() => this.rows().every((r) => this.qtyOk(r) && r.price >= 0));
+  /** Raderna mot summan på pappret: stämmer det, eller vad skiljer. */
+  readonly totalCheck = computed(() => {
+    const paper = this.docTotal();
+    if (paper == null || !this.rows().length) return null;
+    const diff = this.totalOre() - paper;
+    const kr = (ore: number) => `${(Math.abs(ore) / 100).toLocaleString('sv-SE')} kr`;
+    return Math.abs(diff) <= Math.max(100, this.rows().length * 20)
+      ? { cls: 'text-green-800', text: 'Raderna stämmer med summan på pappret.' }
+      : {
+          cls: 'text-amber-800',
+          text: `Raderna avviker ${kr(diff)} från pappret. En rad kan saknas eller ha fel pris.`,
+        };
+  });
 
   constructor() {
     // En skannad vara läggs till som en rad (en gång till = ett till); en okänd vara blir en ny artikel.
@@ -558,6 +674,7 @@ export class PurchaseCardPage implements HasUnsaved {
       this.url.set(c.url ?? '');
       this.note.set(c.note ?? '');
       if (c.purchasedAt) this.day.set(format(new Date(c.purchasedAt), 'yyyy-MM-dd'));
+      this.docTotal.set(c.documentTotal);
       this.rows.set(
         c.lines
           .filter((l) => l.article)
@@ -569,7 +686,7 @@ export class PurchaseCardPage implements HasUnsaved {
             price: this.pricing.costIncl(l.unitCost) / 100,
           })),
       );
-      if (c.status === 'posted') this.supplierCtl.disable({ emitEvent: false });
+      if (c.status !== 'draft') this.supplierCtl.disable({ emitEvent: false });
       this.dirty.set(false);
     });
   }
@@ -665,6 +782,7 @@ export class PurchaseCardPage implements HasUnsaved {
       url: normalizeUrl(this.url()) ?? null,
       note: this.note().trim() || null,
       purchasedAt: this.day() ? noonOf(this.day()) : null,
+      documentTotal: this.docTotal(),
       lines: this.rows().map((r) => ({
         id: r.id,
         articleId: r.a.id,
@@ -687,15 +805,24 @@ export class PurchaseCardPage implements HasUnsaved {
     const req = this.id ? this.cards.update(this.id, this.body()) : this.cards.create(this.body());
     req.subscribe({
       next: (c) => {
-        this.busy.set(false);
-        this.dirty.set(false);
-        if (!this.id) {
-          void this.router.navigate(['/purchases', c.id], { replaceUrl: true });
-          return;
-        }
-        this.snack.open('Sparat', undefined, { duration: 2000 });
-        this.load();
-        after?.();
+        // Fotona på pappret sparas på inköpet nu när det finns, innan sidan byts.
+        const papers = this.pendingPapers.splice(0);
+        const uploaded = papers.length
+          ? forkJoin(
+              papers.map((f) => this.cards.addAttachment(c.id, f).pipe(catchError(() => of(null)))),
+            )
+          : of([]);
+        uploaded.subscribe(() => {
+          this.busy.set(false);
+          this.dirty.set(false);
+          if (!this.id) {
+            void this.router.navigate(['/purchases', c.id], { replaceUrl: true });
+            return;
+          }
+          this.snack.open('Sparat', undefined, { duration: 2000 });
+          this.load();
+          after?.();
+        });
       },
       error: () => this.busy.set(false),
     });
@@ -727,11 +854,14 @@ export class PurchaseCardPage implements HasUnsaved {
   }
 
   remove() {
+    const ordered = this.card()?.status === 'ordered';
     this.confirm
       .ask({
-        title: 'Ta bort utkastet?',
-        message: 'Utkastet och dess rader tas bort. Inget har lagts in i lagret.',
-        confirmText: 'Ta bort',
+        title: ordered ? 'Avbryta beställningen?' : 'Ta bort utkastet?',
+        message: ordered
+          ? 'Beställningen tas bort. Inget har kommit och inget har lagts in i lagret.'
+          : 'Utkastet och dess rader tas bort. Inget har lagts in i lagret.',
+        confirmText: ordered ? 'Avbryt beställningen' : 'Ta bort',
         danger: true,
       })
       .subscribe((ok) => {
@@ -741,6 +871,97 @@ export class PurchaseCardPage implements HasUnsaved {
           void this.router.navigate(['/purchases']);
         });
       });
+  }
+
+  setDocTotal(v: number) {
+    this.docTotal.set(Number.isNaN(v) ? null : Math.round(v * 100));
+    this.touch();
+  }
+
+  /** Lägger inköpet hos leverantören: det blir en beställning som tas emot när varorna kommer. */
+  order() {
+    const place = () => {
+      this.busy.set(true);
+      this.cards.order(this.id!).subscribe({
+        next: () => {
+          this.busy.set(false);
+          this.snack.open('Beställningen är lagd. Ta emot den när varorna kommer.', 'OK', {
+            duration: 4000,
+          });
+          this.load();
+        },
+        error: () => this.busy.set(false),
+      });
+    };
+    if (!this.id) {
+      // Kortet måste finnas för att kunna beställas.
+      this.save(place);
+      return;
+    }
+    if (this.dirty()) this.save(place);
+    else place();
+  }
+
+  /** Läser ett kvitto eller en följesedel: raderna kontrolleras i en dialog innan de läggs till. */
+  async readPaper(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+    const small = await shrinkImage(file);
+    this.reading.set(true);
+    this.cards.readDocument(small).subscribe({
+      next: async (proposal) => {
+        this.reading.set(false);
+        if (!proposal.lines.length) {
+          this.snack.open('Inga rader gick att läsa. Prova ett skarpare foto.', 'OK', {
+            duration: 4000,
+          });
+          return;
+        }
+        const { DocumentReadDialog } = await import('./document-read-dialog');
+        const result = await firstValueFrom(
+          this.dialog
+            .open<unknown, unknown, DocumentReadResult>(DocumentReadDialog, {
+              width: '720px',
+              maxWidth: '100vw',
+              autoFocus: false,
+              data: { proposal },
+            })
+            .afterClosed(),
+        );
+        if (result) this.applyRead(result, small);
+      },
+      error: () => this.reading.set(false),
+    });
+  }
+
+  private applyRead(r: DocumentReadResult, file: File) {
+    for (const row of r.rows) this.addFromPaper(row.article, row.quantity, row.priceKr);
+    if (!this.supplierCtl.value && r.supplierId) this.supplierCtl.setValue(r.supplierId);
+    if (!this.reference() && r.documentNo) this.reference.set(r.documentNo);
+    if (r.date) this.day.set(r.date);
+    if (r.totalInclVat != null) this.docTotal.set(r.totalInclVat);
+    this.pendingPapers.push(file);
+    // Ett nummer på pappret som man kopplat till en artikel för hand lärs in till nästa gång.
+    for (const t of r.taught) {
+      this.api.addArticleCode(t.articleId, t.code, 'supplier').subscribe({ error: () => {} });
+    }
+    this.touch();
+    this.snack.open(`${r.rows.length} rader lades till. Kontrollera och spara.`, undefined, {
+      duration: 3500,
+    });
+  }
+
+  /** En rad ur pappret: priset är det på pappret (inkl. moms), och en artikel som redan är med räknas upp. */
+  private addFromPaper(a: Article, qty: number, priceKr: number) {
+    this.rows.update((rs) => {
+      const i = rs.findIndex((r) => r.a.id === a.id);
+      if (i >= 0) {
+        return rs.map((r, j) => (j === i ? { ...r, qty: r.qty + qty, price: priceKr } : r));
+      }
+      return [...rs, { key: key(), a, qty, price: priceKr }];
+    });
   }
 
   openDocument() {

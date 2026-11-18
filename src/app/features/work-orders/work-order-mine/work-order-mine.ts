@@ -1,6 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { ActivatedRoute } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
+import { plateReaderAvailable } from '../../../core/scan/plate-reader';
+import { Scanner } from '../../../core/scan/scanner';
 import {
   WORK_ORDER_LINE_LABELS,
   WORK_ORDER_STATUS_LABELS,
@@ -27,7 +31,20 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
   host: { class: 'block' },
   template: `
     <div class="mx-auto max-w-xl">
-      <h1 class="mb-3 text-2xl font-bold">Mina arbetsorder</h1>
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <h1 class="text-2xl font-bold">Mina arbetsorder</h1>
+        @if (canScanCar) {
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            class="!h-12"
+            (click)="scanner.scanCar()"
+          >
+            <mat-icon>qr_code_scanner</mat-icon> Skanna bil
+          </button>
+        }
+      </div>
       <mat-button-toggle-group
         class="mb-4 w-full"
         hideSingleSelectionIndicator
@@ -88,6 +105,15 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
                 </ul>
 
                 @if (mine()) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="!mt-3 !min-h-12 w-full"
+                    [disabled]="busy()"
+                    (click)="scanner.openDialog()"
+                  >
+                    <mat-icon>qr_code_scanner</mat-icon> Skanna del
+                  </button>
                   <div class="mt-3 flex gap-2">
                     <input
                       #extra
@@ -160,9 +186,16 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
                     }
                   </div>
                 } @else {
-                  <p class="mt-3 text-sm text-gray-500">
-                    Ej tilldelad. Be admin tilldela dig ordern för att arbeta på den.
-                  </p>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    class="!mt-3 !min-h-14 w-full !text-base"
+                    [disabled]="busy()"
+                    (click)="take(d)"
+                  >
+                    Ta ordern
+                  </button>
                 }
                 <a mat-button class="mt-2" [routerLink]="['/workorders', o.id, 'print']"
                   ><mat-icon>print</mat-icon> Utskrift</a
@@ -182,6 +215,7 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
 export class WorkOrderMine implements OnInit {
   private readonly api = inject(WorkOrderApi);
   private readonly snack = inject(MatSnackBar);
+  readonly scanner = inject(Scanner);
 
   readonly tones = TONES;
   readonly statuses = WORK_ORDER_STATUS_LABELS;
@@ -195,8 +229,83 @@ export class WorkOrderMine implements OnInit {
   /** Uppfälld order är mekanikerns egen (tilldelad), inte en ej tilldelad. */
   readonly mine = signal(true);
 
+  /** Koder som kom medan en annan skanning sparades; ingen ska gå förlorad med en läsare i handen. */
+  private readonly waiting: string[] = [];
+
+  /** Kameran läser skyltar bara i appen. */
+  readonly canScanCar = plateReaderAvailable();
+
+  private readonly route = inject(ActivatedRoute);
+  /** Ordern bilbladet skickade hit (`?open=`), som ska fällas ut när listan är hämtad. */
+  private openWanted: string | null = null;
+
+  constructor() {
+    // En skannad del läggs på ordern som är uppfälld, utan pris: ägaren prissätter den sedan.
+    const release = this.scanner.capture((code) => void this.onScan(code));
+    inject(DestroyRef).onDestroy(release);
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((q) => {
+      this.openWanted = q.get('open');
+      // Sidan är redan öppen när man kommer från bladet: hämta om, så en just tagen order finns med.
+      if (this.openWanted && !this.loading()) this.load();
+    });
+  }
+
   ngOnInit() {
     this.load();
+  }
+
+  private async onScan(code: string) {
+    if (this.busy()) {
+      this.waiting.push(code);
+      return;
+    }
+    // Servern svarar mekanikern med en del eller en bil; allt annat är okänt.
+    const hit = await this.scanner.resolve(code);
+    if (!hit) return;
+    // En bil (en skylt): bladet med mina order på den.
+    if (hit.kind === 'vehicle') {
+      this.scanner.open(hit);
+      return;
+    }
+    const d = this.open();
+    if (hit.kind !== 'article' || !d || !this.mine()) {
+      this.scanner.beep(false);
+      this.snack.open(
+        hit.kind === 'article'
+          ? 'Öppna en av dina order först och skanna sedan delen'
+          : `Ingen del med koden ${code}`,
+        undefined,
+        { duration: 3500 },
+      );
+      return;
+    }
+    this.scanner.beep(true);
+    this.run(d, { add: [{ articleId: hit.id }] }, () =>
+      this.snack.open(`${hit.label} lades till`, undefined, { duration: 2000 }),
+    );
+  }
+
+  /** Mekanikern tar en order som ingen fått: den blir hens, och fälls ut bland Mina. */
+  take(o: { id: string }) {
+    this.busy.set(true);
+    this.api.claim(o.id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.scope.set('mine');
+        this.openWanted = o.id;
+        this.load();
+      },
+      error: () => this.busy.set(false),
+    });
+  }
+
+  /** Fäller ut ordern som bladet skickade hit, när den finns i listan. */
+  private showWanted() {
+    const id = this.openWanted;
+    if (!id) return;
+    this.openWanted = null;
+    const o = this.items().find((x) => x.id === id);
+    if (o && this.open()?.id !== id) this.toggle(o);
   }
 
   load() {
@@ -218,6 +327,7 @@ export class WorkOrderMine implements OnInit {
             .sort((a, b) => rank[a.status] - rank[b.status]),
         );
         this.loading.set(false);
+        this.showWanted();
       },
       error: () => this.loading.set(false),
     });
@@ -267,9 +377,12 @@ export class WorkOrderMine implements OnInit {
         this.open.set(r);
         this.busy.set(false);
         after?.();
+        const next = this.waiting.shift();
+        if (next) void this.onScan(next);
       },
       error: () => {
         this.busy.set(false);
+        this.waiting.length = 0;
         this.snack.open('Kunde inte spara. Försök igen.', undefined, { duration: 3000 });
       },
     });

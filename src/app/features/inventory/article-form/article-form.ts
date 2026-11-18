@@ -17,9 +17,11 @@ import {
 } from 'rxjs';
 import { CatalogApi } from '../../../core/api/catalog-api';
 import { AxleApi } from '../../../core/api/axle-api';
+import { PurchaseCardApi } from '../../../core/api/purchase-card-api';
 import { SupplierCatalogApi } from '../../../core/api/supplier-catalog-api';
 import {
   Article,
+  ArticleCode,
   ArticleField,
   ArticleInput,
   ArticleType,
@@ -102,8 +104,8 @@ const categoryOf = (t: ArticleType | undefined): Category =>
             </div>
             @if (!id && fromCatalog(); as from) {
               <p class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
-                Uppgifterna är hämtade ur däckkatalogen ({{ from }}). Kontrollera
-                försäljningspriset och skriv hur många du har hemma.
+                Uppgifterna är hämtade ur däckkatalogen ({{ from }}). Kontrollera försäljningspriset
+                och skriv hur många du har hemma.
               </p>
             }
             @if (types().length) {
@@ -203,6 +205,26 @@ const categoryOf = (t: ArticleType | undefined): Category =>
                   <input matInput formControlName="supplier" autocomplete="off" />
                   <mat-error>Krävs för {{ type()?.name }}</mat-error>
                 </mat-form-field>
+              }
+              @if (codes().length) {
+                <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+                  <span class="text-sm text-gray-600">Känns också igen på</span>
+                  @for (c of codes(); track c.code) {
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-1 pr-1 pl-3 text-sm"
+                    >
+                      <span class="font-mono">{{ c.code }}</span>
+                      <button
+                        type="button"
+                        class="grid h-6 w-6 place-items-center rounded-full hover:bg-gray-200"
+                        [attr.aria-label]="'Ta bort koden ' + c.code"
+                        (click)="removeCode(c.code)"
+                      >
+                        <mat-icon class="!h-4 !w-4 !text-base">close</mat-icon>
+                      </button>
+                    </span>
+                  }
+                </div>
               }
               <mat-form-field class="sm:col-span-2">
                 <mat-label>Anteckning</mat-label>
@@ -406,6 +428,17 @@ const categoryOf = (t: ArticleType | undefined): Category =>
                   <mat-error>Heltal</mat-error>
                 </mat-form-field>
               }
+              @if (onOrder() > 0) {
+                <p class="rounded-lg bg-blue-50 p-2.5 text-sm text-blue-900 sm:col-span-2">
+                  <b>{{ onOrder() }} st på beställning.</b>
+                  <a
+                    routerLink="/purchases"
+                    [queryParams]="{ status: 'ordered' }"
+                    class="ml-1 underline"
+                    >Visa beställningarna</a
+                  >
+                </p>
+              }
               @if (form.controls.stocked.value) {
                 <mat-form-field>
                   <mat-label>Påminn när det är kvar (st)</mat-label>
@@ -456,6 +489,7 @@ const categoryOf = (t: ArticleType | undefined): Category =>
 })
 export class ArticleForm {
   private readonly api = inject(AxleApi);
+  private readonly purchases = inject(PurchaseCardApi);
   private readonly supplierCatalog = inject(SupplierCatalogApi);
   /** Text om vad uppgifterna hämtades ur, när de kommer från grossistens katalog. */
   readonly fromCatalog = signal<string | null>(null);
@@ -470,6 +504,14 @@ export class ArticleForm {
   readonly admin = inject(Auth).isAdmin();
   private readonly fb = inject(FormBuilder);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  /** Kommer från Ta emot varor när en skannad kod inte fanns: koden blir artikelns streckkod. */
+  private readonly prefillEan = inject(ActivatedRoute).snapshot.queryParamMap.get('ean');
+  /** Kommer från skanningsbladet när en okänd kod var ett leverantörsnummer: koden blir artikelnumret. */
+  private readonly prefillSku = inject(ActivatedRoute).snapshot.queryParamMap.get('sku');
+  /** Koder artikeln lärt sig vid skanning (kartongens streckkod, leverantörens nummer). */
+  readonly codes = signal<ArticleCode[]>([]);
+  /** Hur många som är beställda hos en leverantör och inte kommit. */
+  readonly onOrder = signal(0);
   readonly seasons = Object.entries(SEASON_LABELS);
   readonly materials = Object.entries(RIM_MATERIAL_LABELS);
   readonly busy = signal(false);
@@ -628,12 +670,25 @@ export class ArticleForm {
     });
   }
 
+  /** Glömmer en kod som lärts in av misstag; sparas direkt, utan att formuläret rörs. */
+  removeCode(code: string) {
+    if (!this.id) return;
+    this.api.removeArticleCode(this.id, code).subscribe((a) => this.codes.set(a.codes ?? []));
+  }
+
   /** Typer och lager är laddade: fyll i kortet. */
   private start() {
+    if (!this.id && this.prefillEan) this.form.controls.ean.setValue(this.prefillEan);
+    if (!this.id && this.prefillSku) this.form.controls.sku.setValue(this.prefillSku);
     if (this.id) {
       this.form.controls.initialQuantity.disable();
+      this.purchases.onOrder().subscribe({
+        next: (m) => this.onOrder.set(m[this.id!] ?? 0),
+        error: () => {},
+      });
       this.api.article(this.id).subscribe((a) => {
         this.savedQuantity = a.quantity;
+        this.codes.set(a.codes ?? []);
         // Äldre artiklar utan typ får den som passar kategorin.
         const typeId =
           a.typeId && this.types().some((t) => t.id === a.typeId)

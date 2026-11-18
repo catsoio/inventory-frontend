@@ -465,6 +465,11 @@ export class CustomerVehiclePicker implements ControlValueAccessor {
       this.vehicle.setValue('', { emitEvent: false });
       return;
     }
+    // Ett skannat regnummer som inte finns än: står som text, bilen skapas när formuläret sparas.
+    if (!v.vehicleId && !v.customerId && v.pending?.regNo) {
+      this.vehicle.setValue(v.pending.regNo.trim().toUpperCase(), { emitEvent: false });
+      return;
+    }
     // Bara en kund (ingen bil): hämta kunden och hennes bilar.
     if (!v.vehicleId && v.customerId) {
       this.api.customer(v.customerId).subscribe((c) => {

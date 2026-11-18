@@ -16,7 +16,15 @@ const kr = new KrPipe();
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString(appLocale()) : '–';
 
-const statusOf = (c: PurchaseCard) => (c.status === 'draft' ? 'Utkast' : 'Bokfört');
+const statusOf = (c: PurchaseCard) =>
+  c.status === 'draft'
+    ? 'Utkast'
+    : c.status === 'ordered'
+      ? `Beställd, ${c.receivedUnits} av ${c.units}`
+      : 'Bokfört';
+
+/** Utkast och beställningar som väntar är gula, bokfört är grönt. */
+const toneOf = (c: PurchaseCard) => (c.status === 'posted' ? 'green' : 'amber');
 
 const COLS: DtCol<PurchaseCard>[] = [
   { key: 'code', label: 'Nr', value: (c) => c.number },
@@ -41,7 +49,7 @@ const COLS: DtCol<PurchaseCard>[] = [
   { key: 'status', label: 'Status', value: statusOf },
 ];
 
-type Filter = 'all' | 'draft' | 'posted';
+type Filter = 'all' | 'draft' | 'ordered' | 'posted';
 
 /** Tidigare beställningar hos Gummigrossen: välj en, så blir den ett inköpsutkast med raderna. */
 @Component({
@@ -51,9 +59,10 @@ type Filter = 'all' | 'draft' | 'posted';
     <h2 mat-dialog-title>Beställningar hos Gummigrossen</h2>
     <mat-dialog-content>
       <p class="mb-3 text-sm text-gray-600">
-        Välj en beställning som ni redan har fått. Den blir ett inköpsutkast med artiklarna och
-        priserna ni betalade, och artiklar som saknas läggs in med uppgifter från katalogen. Inget
-        bokförs förrän ni gör det på inköpskortet.
+        Välj en beställning. Den blir en beställning att ta emot, med artiklarna och priserna ni
+        betalade, och artiklar som saknas läggs in med uppgifter från katalogen. Inget läggs i
+        lagret förrän ni tar emot varorna på inköpskortet: skanna dem när de kommer, eller välj Ta
+        emot allt om de redan är här.
       </p>
       @if (loading() && !orders().length) {
         <mat-progress-bar mode="indeterminate" />
@@ -201,15 +210,13 @@ export class GummigrossenOrdersDialog {
           </div>
           <div class="shrink-0 text-right">
             <div class="font-semibold tabular-nums">{{ kr(c.total) }}</div>
-            <app-pill class="mt-1 inline-block" [tone]="c.status === 'draft' ? 'amber' : 'green'">{{
-              statusOf(c)
-            }}</app-pill>
+            <app-pill class="mt-1 inline-block" [tone]="toneOf(c)">{{ statusOf(c) }}</app-pill>
           </div>
         </div>
       </ng-template>
       <ng-template #cell let-c="row" let-col="col" let-text="text">
         @if (col.key === 'status') {
-          <app-pill [tone]="c.status === 'draft' ? 'amber' : 'green'">{{ text }}</app-pill>
+          <app-pill [tone]="toneOf(c)">{{ text }}</app-pill>
         } @else if (col.key === 'code') {
           {{ c.code }}
         } @else if (col.key === 'supplier' || col.key === 'reference') {
@@ -226,6 +233,7 @@ export class PurchaseList {
   readonly router = inject(Router);
   readonly cols = COLS;
   readonly statusOf = statusOf;
+  readonly toneOf = toneOf;
   readonly kr = (ore: number) => kr.transform(ore);
   readonly dateOf = (c: PurchaseCard) => day(c.purchasedAt ?? c.createdAt);
   private readonly dialog = inject(MatDialog);
@@ -237,6 +245,7 @@ export class PurchaseList {
   readonly filterOptions: SegmentOption[] = [
     { value: 'all', label: 'Alla' },
     { value: 'draft', label: 'Utkast' },
+    { value: 'ordered', label: 'Att ta emot' },
     { value: 'posted', label: 'Bokförda' },
   ];
   readonly items = signal<PurchaseCard[]>([]);
@@ -269,7 +278,7 @@ export class PurchaseList {
 
   private initialFilter(): Filter {
     const v = inject(ActivatedRoute).snapshot.queryParamMap.get('show');
-    return v === 'draft' || v === 'posted' ? v : 'all';
+    return v === 'draft' || v === 'ordered' || v === 'posted' ? v : 'all';
   }
 
   load() {

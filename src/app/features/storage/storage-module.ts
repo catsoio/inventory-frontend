@@ -4,6 +4,7 @@ import { SharedModule } from '../../shared/shared-module';
 import { StorageActionDialog } from './storage-action-dialog/storage-action-dialog';
 import { StorageDetail } from './storage-detail/storage-detail';
 import { StorageForm } from './storage-form/storage-form';
+import { StorageHomeMobile } from './storage-home-mobile';
 import { StorageList } from './storage-list/storage-list';
 import { StorageOverview } from './storage-overview/storage-overview';
 import { StorageRecallDialog } from './storage-recall-dialog/storage-recall-dialog';
@@ -19,6 +20,7 @@ import { StorageRecallDialog } from './storage-recall-dialog/storage-recall-dial
   ],
   imports: [
     SharedModule,
+    StorageHomeMobile,
     RouterModule.forChild([
       { path: '', component: StorageList },
       // Hem är översikten med det som väntar; den gamla adressen leder dit.

@@ -313,6 +313,12 @@ export const MOBILE_MORE_DACK: NavItem[] = [
     adminOnly: true,
     match: ['/finance', '/bookkeeping'],
   },
+  {
+    path: '/register',
+    label: 'Register',
+    icon: 'dataset',
+    match: ['/register', '/article-types', '/warehouses', '/suppliers', '/activity'],
+  },
 ];
 
 /**
@@ -382,6 +388,14 @@ export const MOBILE_MORE: NavItem[] = [
     icon: 'account_balance_wallet',
     adminOnly: true,
     match: ['/finance', '/bookkeeping'],
+  },
+  { path: '/resources', label: 'Mekaniker och platser', icon: 'engineering' },
+  { path: '/service-types', label: 'Åtgärder', icon: 'build' },
+  {
+    path: '/register',
+    label: 'Register',
+    icon: 'dataset',
+    match: ['/register', '/article-types', '/warehouses', '/suppliers', '/activity'],
   },
 ];
 
