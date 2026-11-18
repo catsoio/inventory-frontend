@@ -26,6 +26,11 @@ import { TillPanel } from './till-panel';
       { path: '', component: FinanceOverview },
       { path: 'invoices', title: 'Fakturor', component: InvoiceList },
       { path: 'receipts', title: 'Kvitton', component: ReceiptList },
+      {
+        path: 'expenses',
+        title: 'Utlägg',
+        loadComponent: () => import('../expenses/expense-list').then((m) => m.ExpenseList),
+      },
       { path: 'register', title: 'Kassa', component: RegisterPage },
       {
         path: 'invoices/new',

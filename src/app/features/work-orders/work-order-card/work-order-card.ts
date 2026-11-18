@@ -816,6 +816,16 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
         }
       </form>
 
+      <!-- Utlägg är internt: avsnittet ligger här och aldrig i utskriften eller i något kunden ser. -->
+      @if (card(); as c) {
+        <app-order-expenses
+          class="mt-4"
+          [workOrderId]="c.id"
+          [workOrderCode]="c.code"
+          [vehicleId]="c.vehicleId"
+        />
+      }
+
       <!-- En rad: i jobbläget med kod, pris och rabatt; annars som checklista. -->
       <ng-template #rowTpl let-row let-i="i" let-fixed="fixed" let-part="part">
         @let short = shortage(row);
