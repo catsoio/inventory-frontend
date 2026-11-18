@@ -114,6 +114,14 @@ const TONES: Record<string, 'blue' | 'amber' | 'green' | 'gray'> = {
                   >
                     <mat-icon>qr_code_scanner</mat-icon> Skanna del
                   </button>
+                  <!-- Mekanikern ser bara sina egna utlägg, utan summor. -->
+                  <app-order-expenses
+                    class="!mt-3"
+                    [flat]="true"
+                    [workOrderId]="d.id"
+                    [workOrderCode]="d.code"
+                    [vehicleId]="d.vehicleId"
+                  />
                   <div class="mt-3 flex gap-2">
                     <input
                       #extra

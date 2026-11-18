@@ -4,7 +4,7 @@ import { Nav } from '../../core/layout/nav';
 import type { SectionTab } from '../page-header/page-header';
 
 /**
- * Sidhuvudet för Ekonomi, på dator och mobil: Översikt, Fakturor, Kvitton, Kassaregister och Moms
+ * Sidhuvudet för Ekonomi, på dator och mobil: Översikt, Fakturor, Kvitton, Utlägg, Kassaregister och Moms
  * och bokföring är flikar här, och Ekonomi är ett enda menyval i sidomenyn. Sidans åtgärd (en
  * "Ny …"-knapp) läggs i `[actions]` och hamnar till höger i samma rad.
  */
@@ -30,12 +30,14 @@ export class FinanceTabs {
     ? [
         { path: '/dealership/finance', label: 'Översikt', exact: true },
         { path: '/finance/invoices', label: 'Fakturor' },
+        { path: '/finance/expenses', label: 'Utlägg' },
         { path: '/bookkeeping', label: 'Moms och bokföring' },
       ]
     : [
         { path: '/finance', label: 'Översikt', exact: true },
         { path: '/finance/invoices', label: 'Fakturor' },
         { path: '/finance/receipts', label: 'Kvitton' },
+        { path: '/finance/expenses', label: 'Utlägg' },
         { path: '/finance/register', label: 'Kassaregister' },
         { path: '/bookkeeping', label: 'Moms och bokföring' },
       ]

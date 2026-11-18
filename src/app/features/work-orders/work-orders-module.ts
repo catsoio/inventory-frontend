@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { unsavedGuard } from '../../core/unsaved-guard';
 import { SharedModule } from '../../shared/shared-module';
+import { OrderExpenses } from '../expenses/order-expenses';
 import { WorkOrderCard } from './work-order-card/work-order-card';
 import { WorkOrderQuick } from './work-order-quick/work-order-quick';
 import { WorkOrderMine } from './work-order-mine/work-order-mine';
@@ -24,6 +25,7 @@ import { WorkOrderQuote } from './work-order-quote/work-order-quote';
   ],
   imports: [
     SharedModule,
+    OrderExpenses,
     RouterModule.forChild([
       { path: '', component: WorkOrderList },
       { path: 'mine', title: 'Mina arbetsorder', component: WorkOrderMine },

@@ -7,6 +7,8 @@ import { Confirm } from '../../shared/confirm';
 import { Scanner } from '../../core/scan/scanner';
 import { GlobalSearch } from '../../core/search/global-search';
 import { openBooking } from '../../shared/booking-dialog/open-booking';
+import { Billing } from '../../core/billing/billing';
+import { ExpenseOpener } from '../expenses/open-expense';
 import { HomeData } from './home-data';
 
 const hhmm = (iso: string) =>
@@ -69,6 +71,20 @@ const MAX_ORDERS = 5;
         }
       }
     </div>
+
+    @if (billing.allows('bokforing')) {
+      <!-- Fota ett kvitto direkt: kameran öppnas av tryck, sedan läses kvittot i ett blad. -->
+      <label
+        class="-mt-2 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl bg-white px-4 py-2 shadow-sm ring-1 ring-gray-200 active:bg-gray-50"
+      >
+        <mat-icon class="text-brand">receipt_long</mat-icon>
+        <span class="flex min-w-0 flex-1 flex-col leading-tight">
+          <span class="text-[15px] font-medium">Fota kvitto</span>
+          <span class="text-xs text-gray-500">Utlägg till bokföringen</span>
+        </span>
+        <input type="file" hidden accept="image/*,application/pdf" (change)="receipt($event)" />
+      </label>
+    }
 
     <section>
       <div class="mb-2 flex items-baseline gap-2 px-1">
@@ -366,6 +382,8 @@ export class HomeMobile {
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
   private readonly confirm = inject(Confirm);
+  private readonly expenses = inject(ExpenseOpener);
+  readonly billing = inject(Billing);
   readonly hhmm = hhmm;
 
   readonly actions: {
@@ -383,6 +401,14 @@ export class HomeMobile {
   constructor() {
     this.data.loadOrders(true);
     this.data.loadDone();
+  }
+
+  /** Ett fotat kvitto: bladet för utlägget öppnas och läser det direkt. */
+  receipt(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (file) void this.expenses.open({ file });
   }
 
   // --- order på gång: försenade först, sedan den som ska vara klar först ---
