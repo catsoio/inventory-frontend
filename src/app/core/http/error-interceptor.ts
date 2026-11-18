@@ -8,6 +8,10 @@ import { ApiError } from '../models';
 const MESSAGES: Record<string, string> = {
   INSUFFICIENT_STOCK: 'Det finns inte tillräckligt i lager.',
   DUPLICATE_SKU: 'Koden finns redan på en annan artikel.',
+  DUPLICATE_CODE: 'Koden hör redan till en annan artikel.',
+  MECHANIC_NOT_LINKED:
+    'Din inloggning är inte kopplad till en mekaniker. Be ägaren koppla den under Mekaniker och platser.',
+  ORDER_TAKEN: 'Ordern har redan fått en annan mekaniker.',
   ARTICLE_HAS_STOCK: 'Artikeln kan inte arkiveras eftersom det finns lager kvar.',
   CONCURRENT_MODIFICATION: 'Någon annan har ändrat artikeln. Ladda om sidan och försök igen.',
   INVALID_QUANTITY: 'Ogiltigt antal. Ange ett heltal på minst 1.',

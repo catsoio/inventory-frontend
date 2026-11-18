@@ -9,7 +9,6 @@ import {
 } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { SharedModule } from '../../shared/shared-module';
-import { Auth } from '../auth/auth';
 import { PlateTracker, plateOf, platesIn } from './plate';
 import { plateReaderAvailable, readLines } from './plate-reader';
 import { Scanner } from './scanner';
@@ -17,6 +16,8 @@ import { Scanner } from './scanner';
 /** `plateOnly`: läser bara skyltar och lämnar numret tillbaka till den som öppnade dialogen. */
 export interface ScanDialogData {
   plateOnly?: boolean;
+  /** Rubrik när dialogen ska säga vad som skannas, t.ex. "Skanna hyllan". */
+  title?: string;
 }
 
 interface Detector {
@@ -33,7 +34,7 @@ interface Detector {
   standalone: true,
   imports: [SharedModule],
   template: `
-    <h2 mat-dialog-title>{{ plateOnly ? 'Skanna skylt' : 'Skanna' }}</h2>
+    <h2 mat-dialog-title>{{ data?.title ?? (plateOnly ? 'Skanna skylt' : 'Skanna') }}</h2>
     <mat-dialog-content class="flex flex-col gap-3">
       @if (error()) {
         <p class="rounded-xl bg-gray-50 p-3 text-sm text-gray-700">{{ error() }}</p>
@@ -68,12 +69,11 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
   private readonly scanner = inject(Scanner);
   private readonly ref = inject(MatDialogRef<ScanDialog>);
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
-  private readonly auth = inject(Auth);
-  private readonly data = inject<ScanDialogData | null>(MAT_DIALOG_DATA, { optional: true });
+  readonly data = inject<ScanDialogData | null>(MAT_DIALOG_DATA, { optional: true });
   readonly plateOnly = !!this.data?.plateOnly;
 
-  /** Appen kan läsa skyltar. Mekanikern skannar bara delar, så för den rollen läses inga skyltar. */
-  readonly plates = plateReaderAvailable() && (this.plateOnly || !this.auth.isMechanic());
+  /** Appen kan läsa skyltar (personalen skannar bilar och mekanikern sina egna order på dem). */
+  readonly plates = plateReaderAvailable();
 
   readonly busy = signal(false);
   readonly error = signal('');
@@ -126,8 +126,10 @@ export class ScanDialog implements AfterViewInit, OnDestroy {
       return;
     }
     if (hit.kind === 'none') {
-      this.error.set(`Hittar ingen träff på ${code}.`);
-      this.scanner.beep(false);
+      // Ingen artikel eller etikett med koden: bladet låter en välja vad den är eller skanna om.
+      this.stopCamera();
+      this.ref.close();
+      void this.scanner.unknownCode(code);
       return;
     }
     this.stopCamera();

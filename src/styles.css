@@ -495,3 +495,40 @@ sx-calendar > div {
   flex: revert-layer;
   min-height: revert-layer;
 }
+
+/* Mobil: fält är minst 16 px (iOS zoomar annars in vid fokus) och 44 px höga, kortens luft minskar,
+   och en dialog utan rubrik (sökningen) hamnar under statusfältet. */
+@media (max-width: 767px) {
+  input.field,
+  textarea.field,
+  app-work-order-card input,
+  app-work-order-card textarea {
+    font-size: 16px !important;
+  }
+  input.field {
+    min-height: 44px;
+  }
+  app-work-order-card section.rounded-xl {
+    padding: 12px;
+  }
+  /* Rutnätets enda kolumn får inte bli bredare än skärmen: annars skjuter innehållet ut åt höger. */
+  app-work-order-card form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  app-work-order-card form > *,
+  app-work-order-card section > *,
+  app-work-order-card .min-w-56 {
+    min-width: 0;
+  }
+  app-work-order-card .min-w-48 {
+    min-width: min(12rem, 100%);
+  }
+  app-work-order-card .mat-button-toggle-group {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .mat-mdc-dialog-panel:not(:has(app-confirm-dialog)):not(:has(.mat-mdc-dialog-title))
+    .mat-mdc-dialog-surface {
+    padding-top: env(safe-area-inset-top);
+  }
+}

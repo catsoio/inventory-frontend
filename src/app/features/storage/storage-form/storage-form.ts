@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ensureValid } from '../../../shared/form-guard';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable, catchError, of, switchMap } from 'rxjs';
 import { WorkshopApi } from '../../../core/api/workshop-api';
 import {
   LinkResolver,
@@ -19,6 +19,7 @@ import {
   DepositCondition,
   PAYMENT_METHOD_LABELS,
   PaymentMethod,
+  Vehicle,
   RIM_MATERIAL_LABELS,
   SEASON_LABELS,
   STORAGE_CONTENTS_LABELS,
@@ -28,6 +29,7 @@ import {
   StorageDepositInput,
   Warehouse,
 } from '../../../core/models';
+import { plateReaderAvailable } from '../../../core/scan/plate-reader';
 import { Scanner } from '../../../core/scan/scanner';
 import { Settings } from '../../../core/settings';
 import type { PickerValue } from '../../../shared/customer-vehicle-picker/customer-vehicle-picker';
@@ -78,63 +80,72 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
         <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">Spara</button>
       </div>
 
-      <form [formGroup]="form" (ngSubmit)="save()" class="grid items-start gap-4 xl:grid-cols-2">
-        <div class="flex flex-col gap-4">
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
-              <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
-                ><mat-icon class="!h-5 !w-5 !text-xl">directions_car</mat-icon></span
+      <form [formGroup]="form" (ngSubmit)="save()" class="mx-auto flex max-w-2xl flex-col gap-4">
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
+            <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
+              ><mat-icon class="!h-5 !w-5 !text-xl">directions_car</mat-icon></span
+            >
+            Bil och kund
+          </h2>
+          @if (!id && canScanPlate) {
+            <button
+              type="button"
+              mat-stroked-button
+              class="mb-3 !h-12 w-full"
+              (click)="scanPlate()"
+            >
+              <mat-icon>qr_code_scanner</mat-icon> Skanna skylt
+            </button>
+          }
+          <app-customer-vehicle-picker formControlName="link" [legacy]="legacy()" />
+          @if (sameCar() > 0) {
+            <p class="mt-1 text-sm text-amber-700">Bilen har redan {{ sameCar() }} inlagrat set</p>
+          }
+          @if (legacy() && !form.controls.link.value) {
+            <p class="mt-3 text-sm text-gray-600">
+              Den här inlämningen gjordes innan kund- och bilregistret fanns. Välj kund och bil ovan
+              för att koppla den, eller ändra uppgifterna nedan som förut.
+            </p>
+            <div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Registreringsnummer</mat-label>
+                <input matInput formControlName="regNo" appRegNo class="uppercase" />
+                <mat-error>Obligatoriskt</mat-error>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic"
+                ><mat-label>Bilmärke</mat-label><input matInput formControlName="make"
+              /></mat-form-field>
+              <mat-form-field subscriptSizing="dynamic"
+                ><mat-label>Bilmodell</mat-label><input matInput formControlName="vehicleModel"
+              /></mat-form-field>
+              <mat-form-field subscriptSizing="dynamic">
+                <mat-label>Kundens namn</mat-label>
+                <input matInput formControlName="name" />
+                <mat-error>Obligatoriskt</mat-error>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic"
+                ><mat-label>Telefon</mat-label><input matInput type="tel" formControlName="phone"
+              /></mat-form-field>
+              <mat-form-field subscriptSizing="dynamic"
+                ><mat-label>E-post</mat-label
+                ><input matInput type="email" formControlName="email" />
+                <mat-error>Ogiltig e-postadress</mat-error></mat-form-field
               >
-              Kund och bil
-            </h2>
-            <app-customer-vehicle-picker formControlName="link" [legacy]="legacy()" />
-            @if (sameCar() > 0) {
-              <p class="mt-1 text-sm text-amber-700">
-                Bilen har redan {{ sameCar() }} inlagrat set
-              </p>
-            }
-            @if (legacy() && !form.controls.link.value) {
-              <p class="mt-3 text-sm text-gray-600">
-                Den här inlämningen gjordes innan kund- och bilregistret fanns. Välj kund och bil
-                ovan för att koppla den, eller ändra uppgifterna nedan som förut.
-              </p>
-              <div class="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>Registreringsnummer</mat-label>
-                  <input matInput formControlName="regNo" appRegNo class="uppercase" />
-                  <mat-error>Obligatoriskt</mat-error>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic"
-                  ><mat-label>Bilmärke</mat-label><input matInput formControlName="make"
-                /></mat-form-field>
-                <mat-form-field subscriptSizing="dynamic"
-                  ><mat-label>Bilmodell</mat-label><input matInput formControlName="vehicleModel"
-                /></mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                  <mat-label>Kundens namn</mat-label>
-                  <input matInput formControlName="name" />
-                  <mat-error>Obligatoriskt</mat-error>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic"
-                  ><mat-label>Telefon</mat-label><input matInput type="tel" formControlName="phone"
-                /></mat-form-field>
-                <mat-form-field subscriptSizing="dynamic"
-                  ><mat-label>E-post</mat-label
-                  ><input matInput type="email" formControlName="email" />
-                  <mat-error>Ogiltig e-postadress</mat-error></mat-form-field
-                >
-              </div>
-            }
-          </section>
+            </div>
+          }
+        </section>
 
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
-              <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
-                ><mat-icon class="!h-5 !w-5 !text-xl">tire_repair</mat-icon></span
-              >
-              Vad lämnas in?
-            </h2>
-            <div class="grid grid-cols-6 gap-x-3 gap-y-3">
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
+            <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
+              ><mat-icon class="!h-5 !w-5 !text-xl">tire_repair</mat-icon></span
+            >
+            Hjulen
+          </h2>
+          <div class="grid grid-cols-6 gap-x-3 gap-y-3">
+            @if (contents() !== 'complete_wheels') {
+              <!-- En äldre inlämning med bara däck eller bara fälgar: samma val som förut. -->
               <mat-button-toggle-group
                 formControlName="contents"
                 hideSingleSelectionIndicator
@@ -144,151 +155,88 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                   <mat-button-toggle [value]="c[0]" class="flex-1">{{ c[1] }}</mat-button-toggle>
                 }
               </mat-button-toggle-group>
-
-              @if (contents() !== 'rims') {
-                <div formGroupName="tyres" class="contents">
-                  <mat-button-toggle-group
-                    formControlName="season"
-                    hideSingleSelectionIndicator
-                    class="col-span-6 w-full"
-                  >
-                    @for (s of seasons; track s[0]) {
-                      <mat-button-toggle [value]="s[0]" class="flex-1">{{
-                        s[1]
-                      }}</mat-button-toggle>
+            }
+            @if (contents() !== 'rims') {
+              <div formGroupName="tyres" class="contents">
+                <mat-button-toggle-group
+                  formControlName="season"
+                  hideSingleSelectionIndicator
+                  class="col-span-6 w-full"
+                >
+                  @for (s of seasons; track s[0]) {
+                    <mat-button-toggle [value]="s[0]" class="flex-1">{{ s[1] }}</mat-button-toggle>
+                  }
+                </mat-button-toggle-group>
+                <mat-form-field subscriptSizing="dynamic" class="col-span-2"
+                  ><mat-label>Bredd (mm)</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="width" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic" class="col-span-2"
+                  ><mat-label>Profil</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="profile" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic" class="col-span-2"
+                  ><mat-label>Fälg (tum)</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="rimDiameter" />
+                  @if (form.controls.tyres.errors?.['size']) {
+                    <mat-error>Ange hela storleken eller ingenting</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+            }
+            @if (contents() !== 'tyres' && contents() !== 'complete_wheels') {
+              <div formGroupName="rims" class="contents">
+                <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                  ><mat-label>Fälgtyp</mat-label>
+                  <mat-select formControlName="material">
+                    @for (m of materials; track m[0]) {
+                      <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
                     }
-                  </mat-button-toggle-group>
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                    ><mat-label>Däckmärke</mat-label><input matInput formControlName="brand"
-                  /></mat-form-field>
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                    ><mat-label>Däckmodell</mat-label><input matInput formControlName="model"
-                  /></mat-form-field>
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-2"
-                    ><mat-label>Bredd (mm)</mat-label>
-                    <input matInput type="number" inputmode="numeric" formControlName="width" />
-                  </mat-form-field>
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-2"
-                    ><mat-label>Profil</mat-label>
-                    <input matInput type="number" inputmode="numeric" formControlName="profile" />
-                  </mat-form-field>
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-2"
-                    ><mat-label>Fälg (tum)</mat-label>
-                    <input
-                      matInput
-                      type="number"
-                      inputmode="numeric"
-                      formControlName="rimDiameter"
-                    />
-                    @if (form.controls.tyres.errors?.['size']) {
-                      <mat-error>Ange hela storleken eller ingenting</mat-error>
-                    }
-                  </mat-form-field>
-                </div>
-              }
+                  </mat-select></mat-form-field
+                >
+                <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                  ><mat-label>Fälgdiameter (tum)</mat-label>
+                  <input matInput type="number" inputmode="numeric" formControlName="diameter" />
+                </mat-form-field>
+              </div>
+            }
+          </div>
+        </section>
 
-              @if (contents() !== 'tyres') {
-                <div formGroupName="rims" class="contents">
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                    ><mat-label>Fälgtyp</mat-label>
-                    <mat-select formControlName="material">
-                      @for (m of materials; track m[0]) {
-                        <mat-option [value]="m[0]">{{ m[1] }}</mat-option>
-                      }
-                    </mat-select></mat-form-field
-                  >
-                  @if (contents() === 'rims') {
-                    <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                      ><mat-label>Fälgdiameter (tum)</mat-label>
-                      <input
-                        matInput
-                        type="number"
-                        inputmode="numeric"
-                        formControlName="diameter"
-                      />
-                    </mat-form-field>
-                  }
-                </div>
-              }
-              @if (contents() !== 'rims' && season() !== 'summer') {
-                <div formGroupName="tyres" class="field col-span-3 flex h-11 items-center px-3">
-                  <mat-slide-toggle formControlName="studded">Dubbade</mat-slide-toggle>
-                </div>
-              }
+        <section class="rounded-xl bg-white p-5 shadow-sm">
+          <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
+            <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
+              ><mat-icon class="!h-5 !w-5 !text-xl">warehouse</mat-icon></span
+            >
+            Förvaring
+          </h2>
+          <button
+            type="button"
+            mat-flat-button
+            color="primary"
+            class="!h-12 w-full"
+            (click)="scanShelf()"
+          >
+            <mat-icon>qr_code_scanner</mat-icon> Skanna hylla
+          </button>
+          @if (placeLabel(); as p) {
+            <p
+              class="mt-3 flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-900"
+            >
+              <mat-icon class="!h-5 !w-5 !text-xl">check_circle</mat-icon> {{ p }}
+            </p>
+          } @else {
+            <p class="mt-3 text-sm text-gray-500">Ingen hylla vald än.</p>
+          }
+          @if (summaryLine()) {
+            <p class="mt-2 text-sm text-gray-600">{{ summaryLine() }}</p>
+          }
 
-              <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                ><mat-label>Skick vid inlämning</mat-label>
-                <mat-select formControlName="conditionGrade">
-                  @for (c of conditions; track c[0]) {
-                    <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
-                  }
-                </mat-select></mat-form-field
-              >
-              <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                ><mat-label>Anmärkning på skicket</mat-label
-                ><input
-                  matInput
-                  formControlName="condition"
-                  placeholder="t.ex. kantskada på höger fram"
-              /></mat-form-field>
-
-              <details class="col-span-6">
-                <summary class="cursor-pointer py-1 text-sm font-medium text-gray-600 select-none">
-                  Fler uppgifter
-                </summary>
-                <div class="mt-3 grid grid-cols-6 gap-x-3 gap-y-3">
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                    ><mat-label>Antal (st)</mat-label>
-                    <input matInput type="number" inputmode="numeric" formControlName="quantity" />
-                    <mat-error>1–12</mat-error></mat-form-field
-                  >
-                  @if (contents() !== 'rims') {
-                    <div formGroupName="tyres" class="contents">
-                      <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                        ><mat-label>Mönsterdjup (mm)</mat-label>
-                        <input
-                          matInput
-                          type="number"
-                          inputmode="decimal"
-                          step="0.5"
-                          formControlName="treadDepthMm"
-                        />
-                      </mat-form-field>
-                    </div>
-                  }
-                  @if (contents() !== 'tyres') {
-                    <div formGroupName="rims" class="contents">
-                      <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                        ><mat-label>Fälgmärke</mat-label><input matInput formControlName="brand"
-                      /></mat-form-field>
-                    </div>
-                  }
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-6">
-                    <mat-label>Medföljande tillbehör</mat-label>
-                    <mat-select formControlName="accessories" multiple>
-                      @for (a of accessories; track a[0]) {
-                        <mat-option [value]="a[0]">{{ a[1] }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field subscriptSizing="dynamic" class="col-span-6"
-                    ><mat-label>Anteckningar</mat-label><input matInput formControlName="notes"
-                  /></mat-form-field>
-                </div>
-              </details>
-            </div>
-          </section>
-        </div>
-
-        <div class="flex flex-col gap-4">
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
-              <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
-                ><mat-icon class="!h-5 !w-5 !text-xl">warehouse</mat-icon></span
-              >
-              Förvaring
-            </h2>
-            <div class="grid grid-cols-6 gap-x-3 gap-y-3">
+          <details class="mt-3">
+            <summary class="cursor-pointer py-1 text-sm font-medium text-gray-600 select-none">
+              Fler uppgifter
+            </summary>
+            <div class="mt-3 grid grid-cols-6 gap-x-3 gap-y-3">
               <mat-form-field subscriptSizing="dynamic" class="col-span-3">
                 <mat-label>Lager</mat-label>
                 <mat-select formControlName="warehouseId">
@@ -307,16 +255,17 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                   }
                 </mat-select>
               </mat-form-field>
-              @if (touch) {
-                <button
-                  mat-stroked-button
-                  type="button"
-                  class="col-span-6 !h-12"
-                  (click)="scanShelf()"
-                >
-                  <mat-icon>qr_code_scanner</mat-icon> Skanna hylla
-                </button>
+              @if (!warehouses().length) {
+                <p class="col-span-6 text-sm text-gray-500">
+                  Lägg till ett lager för kundgods under Register → Lager, så kan du välja plats
+                  här.
+                </p>
+              } @else if (legacyLocation()) {
+                <p class="col-span-6 text-sm text-gray-500">
+                  Tidigare plats: {{ legacyLocation() }}
+                </p>
               }
+
               <app-date-field
                 class="col-span-3"
                 subscript="dynamic"
@@ -333,29 +282,74 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                 [error]="form.errors?.['pickup'] ? 'Före inlämningsdatumet' : ''"
                 formControlName="expectedPickupAt"
               />
-              @if (!warehouses().length) {
-                <p class="col-span-6 text-sm text-gray-500">
-                  Lägg till ett lager för kundgods under Register → Lager, så kan du välja plats
-                  här.
-                </p>
-              } @else if (legacyLocation()) {
-                <p class="col-span-6 text-sm text-gray-500">
-                  Tidigare plats: {{ legacyLocation() }}
-                </p>
-              }
-            </div>
-          </section>
 
-          <section class="rounded-xl bg-white p-5 shadow-sm">
-            <h2 class="mb-4 flex items-center gap-2 text-base font-semibold">
-              <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand"
-                ><mat-icon class="!h-5 !w-5 !text-xl">payments</mat-icon></span
-              >
-              Avgift per år
-            </h2>
-            <div class="grid grid-cols-6 gap-x-3 gap-y-3">
               <mat-form-field subscriptSizing="dynamic" class="col-span-3"
-                ><mat-label>Avgift (kr, inkl. moms)</mat-label>
+                ><mat-label>Antal (st)</mat-label>
+                <input matInput type="number" inputmode="numeric" formControlName="quantity" />
+                <mat-error>1–12</mat-error></mat-form-field
+              >
+              @if (contents() !== 'rims') {
+                <div formGroupName="tyres" class="contents">
+                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                    ><mat-label>Mönsterdjup (mm)</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      inputmode="decimal"
+                      step="0.5"
+                      formControlName="treadDepthMm"
+                    />
+                  </mat-form-field>
+                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                    ><mat-label>Däckmärke</mat-label><input matInput formControlName="brand"
+                  /></mat-form-field>
+                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                    ><mat-label>Däckmodell</mat-label><input matInput formControlName="model"
+                  /></mat-form-field>
+                  @if (season() !== 'summer') {
+                    <div class="field col-span-3 flex h-11 items-center px-3">
+                      <mat-slide-toggle formControlName="studded">Dubbade</mat-slide-toggle>
+                    </div>
+                  }
+                </div>
+              }
+              @if (contents() !== 'tyres' && contents() !== 'complete_wheels') {
+                <div formGroupName="rims" class="contents">
+                  <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                    ><mat-label>Fälgmärke</mat-label><input matInput formControlName="brand"
+                  /></mat-form-field>
+                </div>
+              }
+
+              <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                ><mat-label>Skick vid inlämning</mat-label>
+                <mat-select formControlName="conditionGrade">
+                  @for (c of conditions; track c[0]) {
+                    <mat-option [value]="c[0]">{{ c[1] }}</mat-option>
+                  }
+                </mat-select></mat-form-field
+              >
+              <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                ><mat-label>Anmärkning på skicket</mat-label
+                ><input
+                  matInput
+                  formControlName="condition"
+                  placeholder="t.ex. kantskada på höger fram"
+              /></mat-form-field>
+              <mat-form-field subscriptSizing="dynamic" class="col-span-6">
+                <mat-label>Medföljande tillbehör</mat-label>
+                <mat-select formControlName="accessories" multiple>
+                  @for (a of accessories; track a[0]) {
+                    <mat-option [value]="a[0]">{{ a[1] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field subscriptSizing="dynamic" class="col-span-6"
+                ><mat-label>Anteckningar</mat-label><input matInput formControlName="notes"
+              /></mat-form-field>
+
+              <mat-form-field subscriptSizing="dynamic" class="col-span-3"
+                ><mat-label>Avgift per år (kr, inkl. moms)</mat-label>
                 <input
                   matInput
                   type="number"
@@ -400,8 +394,8 @@ const normalizeReg = (s: string) => s.toUpperCase().replace(/[^A-Z0-9ÅÄÖ]/g, 
                 formControlName="nextPaymentAt"
               />
             </div>
-          </section>
-        </div>
+          </details>
+        </section>
       </form>
     </app-card-page>
   `,
@@ -417,8 +411,8 @@ export class StorageForm {
   private readonly fb = inject(FormBuilder);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
   private readonly scanner = inject(Scanner);
-  /** På telefon fylls platsen i genom att skanna hyllans etikett med kameran. */
-  readonly touch = window.matchMedia('(pointer: coarse)').matches;
+  /** Skylten läses med kameran i appen; annars väljs bilen ur registret. */
+  readonly canScanPlate = plateReaderAvailable();
 
   /** Säsongen och avgiften kommer från Inställningar. */
   private readonly settings = inject(Settings);
@@ -437,6 +431,16 @@ export class StorageForm {
   /** Lager för kundgods (däckhotell) med sina platser. */
   readonly warehouses = signal<Warehouse[]>([]);
   readonly warehouseId = signal<string | null>(null);
+  readonly locationId = signal<string | null>(null);
+  /** "Däckhotellet · Hylla H-12" när en hylla är vald, annars en äldre fritext, annars tomt. */
+  readonly placeLabel = computed(() => {
+    const w = this.warehouses().find((x) => x.id === this.warehouseId());
+    const l = w?.locations.find((x) => x.id === this.locationId());
+    if (w && l) return `${w.name} · ${l.name}`;
+    return this.legacyLocation() ? `Tidigare plats: ${this.legacyLocation()}` : '';
+  });
+  /** Avgift och hämtdatum på en rad, så de syns utan att fällas ut. */
+  readonly summaryLine = signal('');
   readonly places = computed(
     () => this.warehouses().find((w) => w.id === this.warehouseId())?.locations ?? [],
   );
@@ -522,24 +526,11 @@ export class StorageForm {
     },
   );
 
-  /** Skannar en hylla med kameran och väljer dess lager och plats. */
+  /** Kameran läser hyllans etikett och väljer lager och plats. */
   async scanShelf() {
-    let release = () => {};
-    const done = new Promise<string>((resolve) => {
-      release = this.scanner.capture(resolve);
-    });
-    const ref = await this.scanner.openDialog();
-    if (!ref) return release();
-    // Dialogen stängs med eller utan skanning; utan skanning avslutas väntan här.
-    const code = await Promise.race([
-      done,
-      new Promise<null>((r) => ref.afterClosed().subscribe(() => setTimeout(() => r(null), 50))),
-    ]);
-    release();
-    if (!code) return;
-    const hit = await this.scanner.resolve(code);
+    const hit = await this.scanner.pickShelf();
     if (!hit) return;
-    if (hit.kind !== 'location' || hit.warehouseKind !== 'customer') {
+    if (hit.warehouseKind !== 'customer') {
       this.scanner.beep(false);
       this.snack.open('Det där är inte en hylla i däckhotellet.', undefined, { duration: 3500 });
       return;
@@ -548,6 +539,40 @@ export class StorageForm {
     c.warehouseId.setValue(hit.warehouseId);
     c.locationId.setValue(hit.locationId);
     this.snack.open(`Plats: ${hit.label}`, undefined, { duration: 2500 });
+  }
+
+  /** Kameran läser skylten: bilen och kunden väljs, eller en ny bil läggs upp när man sparar. */
+  async scanPlate() {
+    const plate = await this.scanner.pickPlate();
+    if (plate) this.applyPlate(normalizeReg(plate));
+  }
+
+  private applyPlate(reg: string) {
+    this.workshop
+      .vehicles({ q: reg, limit: 5 })
+      .pipe(catchError(() => of({ items: [] as Vehicle[] })))
+      .subscribe((p) => {
+        const v = p.items.find((x) => normalizeReg(x.regNo) === reg);
+        this.form.controls.link.setValue(
+          v
+            ? { customerId: v.customerId, vehicleId: v.id }
+            : { customerId: '', vehicleId: '', pending: { regNo: reg } },
+        );
+      });
+  }
+
+  private updateSummary() {
+    const v = this.form.getRawValue();
+    this.summaryLine.set(
+      [
+        v.fee
+          ? `Avgift ${v.fee} kr per år, ${v.paymentStatus === 'paid' ? 'betald' : 'obetald'}`
+          : '',
+        v.expectedPickupAt ? `hämtas ${v.expectedPickupAt}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    );
   }
 
   constructor() {
@@ -569,6 +594,8 @@ export class StorageForm {
       this.applyDefaultPlace();
       this.warehouseId.set(c.warehouseId.value);
     });
+    c.locationId.valueChanges.pipe(takeUntilDestroyed()).subscribe((l) => this.locationId.set(l));
+    this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.updateSummary());
     c.warehouseId.valueChanges.pipe(takeUntilDestroyed()).subscribe((w) => {
       this.warehouseId.set(w);
       if (!this.warehouses().length) return;
@@ -623,8 +650,17 @@ export class StorageForm {
       c.link.setValue({ customerId: fromCustomer, vehicleId: fromVehicle });
     }
     const scanned = qp.get('regNo');
-    if (!this.id && scanned && !fromVehicle) {
-      c.link.setValue({ customerId: '', vehicleId: '', pending: { regNo: scanned } });
+    if (!this.id && scanned && !fromVehicle) this.applyPlate(normalizeReg(scanned));
+    // En hylla som redan är vald (från hyllbladet eller Hem) behålls; förvalet fyller bara i tomma.
+    const shelfW = qp.get('warehouseId');
+    const shelfL = qp.get('locationId');
+    if (!this.id && shelfW && shelfL) {
+      c.warehouseId.setValue(shelfW);
+      c.locationId.setValue(shelfL);
+    }
+    // Från Hem börjar en inlämning med kameran på skylten, sedan hyllan.
+    if (!this.id && qp.get('scan') && !fromVehicle && !scanned && this.canScanPlate) {
+      setTimeout(() => void this.scanPlate());
     }
     const fromOrder = qp.get('orderCode');
     if (!this.id && fromOrder) c.notes.setValue(`Från ${fromOrder}`);

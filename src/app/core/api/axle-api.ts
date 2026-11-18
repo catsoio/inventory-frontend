@@ -7,6 +7,7 @@ import {
   PricingSettings,
   StorageDefaults,
   Article,
+  ArticleCode,
   ArticleInput,
   ArticleQuery,
   ArticleUpdate,
@@ -133,6 +134,16 @@ export class AxleApi {
 
   updateArticle(id: string, body: ArticleUpdate): Observable<Article> {
     return this.http.patch<Article>(`${this.base}/articles/${id}`, body);
+  }
+
+  /** Lär artikeln en kod till (en skanning som ingen kände igen), så nästa skanning hittar den. */
+  addArticleCode(id: string, code: string, type?: ArticleCode['type']): Observable<Article> {
+    return this.http.post<Article>(`${this.base}/articles/${id}/codes`, { code, type });
+  }
+
+  /** Glömmer en av artikelns extra koder. */
+  removeArticleCode(id: string, code: string): Observable<Article> {
+    return this.http.delete<Article>(`${this.base}/articles/${id}/codes`, { params: { code } });
   }
 
   archiveArticle(id: string): Observable<unknown> {

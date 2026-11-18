@@ -161,6 +161,21 @@ describe('bilhandel', () => {
     expect(items.every((i) => i.product === 'hall')).toBe(true);
   });
 
+  it('en beställning att ta emot är vanligt jobb på Inköp, grått och utan fel', () => {
+    const items = buildTodo(input({ toReceive: 2 }));
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      key: 'to-receive',
+      urgency: 'wait',
+      link: '/purchases',
+      params: { status: 'ordered' },
+    });
+    expect(todoBadges(items)['/purchases']).toMatchObject({
+      text: '2 att ta emot',
+      dot: 'bg-gray-400',
+    });
+  });
+
   it('bilhandelns saker visas inte i verkstadens meny, och tvärtom', () => {
     const items = buildTodo(
       input({

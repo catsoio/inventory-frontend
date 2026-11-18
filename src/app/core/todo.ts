@@ -86,6 +86,8 @@ export interface TodoInput {
   hotel: StorageSummary | null;
   /** Säljkort som väntar på att bokföras (verkstadens, utan bil). */
   drafts: number;
+  /** Beställningar hos en leverantör vars varor inte alla kommit: vanligt jobb, att ta emot. */
+  toReceive?: number;
   /** Klara arbetsorder att fakturera (ingen faktura påbörjad), och hur många som är sena. */
   toInvoice?: ToInvoiceSummary | null;
   /** Verkstadens obetalda fakturor. */
@@ -353,6 +355,22 @@ export function buildTodo(i: TodoInput): TodoItem[] {
       params: { show: 'draft' },
     });
   }
+  if ((i.toReceive ?? 0) > 0) {
+    const n = i.toReceive!;
+    out.push({
+      key: 'to-receive',
+      product: 'axle',
+      urgency: 'wait',
+      tone: 'neutral',
+      menus: ['/purchases'],
+      badgeCount: n,
+      badgeNoun: ['att ta emot', 'att ta emot'],
+      text: `${n} ${plural(n, 'beställning', 'beställningar')} att ta emot`,
+      icon: 'local_shipping',
+      link: '/purchases',
+      params: { status: 'ordered' },
+    });
+  }
   if ((i.hallDrafts ?? 0) > 0) {
     const n = i.hallDrafts!;
     out.push({
@@ -445,6 +463,7 @@ export function todoInputOf(s: TodoSnapshot, today = new Date()): TodoInput {
     stock: s.stock,
     hotel: s.hotel,
     drafts: s.drafts ?? 0,
+    toReceive: s.toReceive ?? 0,
     toInvoice: s.toInvoice ? toInvoiceSummary(s.toInvoice.customers, today) : null,
     invoices: s.invoices ? unpaidOf(s.invoices, today) : null,
     partsOrders: s.partsOrders ?? 0,

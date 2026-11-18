@@ -96,6 +96,11 @@ export class WorkOrderApi {
     return this.http.patch<WorkOrderDetail>(`${this.base}/${id}/progress`, body);
   }
 
+  /** Mekanikern tar en order som ingen fått än; ordern blir hens. */
+  claim(id: string): Observable<WorkOrderDetail> {
+    return this.http.post<WorkOrderDetail>(`${this.base}/${id}/claim`, {});
+  }
+
   /** Lämnar ett kostnadsförslag: beloppen frysas med giltighet och tillåten avvikelse. */
   giveQuote(id: string): Observable<WorkOrderDetail> {
     return this.http.post<WorkOrderDetail>(`${this.base}/${id}/quote`, {});

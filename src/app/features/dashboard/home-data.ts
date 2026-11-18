@@ -3,6 +3,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { catchError, of } from 'rxjs';
 import { BookingApi } from '../../core/api/booking-api';
 import { AxleApi } from '../../core/api/axle-api';
+import { PurchaseCardApi } from '../../core/api/purchase-card-api';
 import { WorkOrderApi } from '../../core/api/work-order-api';
 import { WorkshopApi } from '../../core/api/workshop-api';
 import { addDays, startOfDay } from '../../core/insights/dates';
@@ -42,6 +43,7 @@ const LIVE: BookingStatus[] = ['booked', 'arrived', 'done'];
 export class HomeData {
   private readonly bookingApi = inject(BookingApi);
   private readonly inventory = inject(AxleApi);
+  private readonly purchases = inject(PurchaseCardApi);
   private readonly orderApi = inject(WorkOrderApi);
   private readonly workshop = inject(WorkshopApi);
   private readonly insights = inject(Insights);
@@ -67,6 +69,8 @@ export class HomeData {
   readonly doneOrders = signal<WorkOrder[]>([]);
   /** Alla aktiva artiklar (delas med Lager via `Insights`) och de senaste lagerrörelserna. */
   readonly articles = signal<Article[]>([]);
+  /** Beställt hos en leverantör och inte kommit, per artikel: räknas av i Att beställa. */
+  readonly onOrder = signal<Record<string, number>>({});
   readonly movements = signal<Movement[]>([]);
   readonly stockLoaded = signal(false);
 
@@ -164,6 +168,10 @@ export class HomeData {
         this.articles.set(a);
         this.stockLoaded.set(true);
       });
+    this.purchases
+      .onOrder()
+      .pipe(catchError(() => of({} as Record<string, number>)))
+      .subscribe((m) => this.onOrder.set(m));
     this.inventory
       .movements({ limit: 8 })
       .pipe(catchError(() => of({ items: [] as Movement[] })))

@@ -1,5 +1,7 @@
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { Component, computed, inject, signal } from '@angular/core';
-import { catchError, forkJoin, of } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { catchError, forkJoin, map, of } from 'rxjs';
 import { StorageApi } from '../../../core/api/storage-api';
 import { appLocale } from '../../../core/i18n/locale';
 import { addDays, startOfDay } from '../../../core/insights/dates';
@@ -26,6 +28,8 @@ import type { PanelTable } from '../../../shared/panel/panel';
 import type { Attention } from '../../dashboard/home-data';
 import { Todo, toneOf } from '../../../core/todo';
 
+const MOBILE = '(max-width: 767.98px)';
+
 const MIX_COLORS = {
   winter: SEASON.winter,
   summer: SEASON.summer,
@@ -45,290 +49,296 @@ const SHARED_MENUS = ['/inventory', '/sales', '/purchases', '/finance', '/financ
   standalone: false,
   host: { class: 'block' },
   template: `
-    <a
-      mat-flat-button
-      color="primary"
-      routerLink="/storage/new"
-      class="mb-4 !flex w-full md:!hidden"
-    >
-      <mat-icon>add</mat-icon> Ny inlämning
-    </a>
-
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <app-stat
-        label="Inlagrade set"
-        [value]="summary()?.stored ?? '–'"
-        [hint]="summary() ? summary()!.units + ' däck och fälgar' : ''"
-        link="/storage"
-        [params]="{ status: 'stored' }"
-      />
-      <app-stat
-        label="Hämtas inom två veckor"
-        [value]="soon()"
-        [hint]="soonHint()"
-        link="/storage"
-        [params]="{ status: 'stored' }"
-      />
-      <app-stat
-        label="Skulle ha hämtats"
-        [value]="summary()?.overdue ?? '–'"
-        hint="har passerat hämtdatum"
-        [status]="summary()?.overdue ? 'bad' : 'none'"
-        link="/storage"
-        [params]="{ status: 'stored', overdue: true }"
-      />
-      <app-stat
-        label="Obetalda avgifter"
-        [value]="summary()?.unpaid ?? '–'"
-        [hint]="summary() ? kr(summary()!.unpaidAmount) + ' exkl. moms' : ''"
-        [status]="summary()?.unpaid ? 'warn' : 'none'"
-        link="/storage"
-        [params]="{ status: 'stored', paymentStatus: 'unpaid' }"
-      />
-    </div>
-
-    <div class="mt-4 grid gap-4 xl:grid-cols-3">
-      <app-panel title="Att göra" icon="task_alt" class="max-md:hidden">
-        <a actions mat-button routerLink="/storage/new" class="max-md:!hidden">
-          <mat-icon>add</mat-icon> Ny inlämning
-        </a>
-        <app-attention-list [items]="attention()" [ready]="ready()" />
-      </app-panel>
-
-      <app-panel
-        title="Skulle ha hämtats"
-        [subtitle]="overdue().length ? 'De som väntat längst först. Ring direkt från raden.' : ''"
+    @if (mobile()) {
+      <app-storage-home-mobile
+        [deposits]="deposits()"
+        [summary]="summary()"
         [loading]="loading()"
-      >
-        @if (overdue().length) {
-          <ul class="divide-y divide-gray-100">
-            @for (o of overdueTop(); track o.deposit.id) {
-              <li class="flex items-center gap-3 py-2">
-                <app-reg-plate [value]="o.deposit.vehicle.regNo" size="sm" />
-                <a [routerLink]="['/storage', o.deposit.id]" class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-medium">{{
-                    o.deposit.customer.name
-                  }}</span>
-                  <span class="block truncate text-xs text-gray-500"
-                    >{{ o.deposit.code }} · {{ o.deposit.location || 'Ingen plats' }}</span
-                  >
+      />
+    } @else {
+      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <app-stat
+          label="Inlagrade set"
+          [value]="summary()?.stored ?? '–'"
+          [hint]="summary() ? summary()!.units + ' däck och fälgar' : ''"
+          link="/storage"
+          [params]="{ status: 'stored' }"
+        />
+        <app-stat
+          label="Hämtas inom två veckor"
+          [value]="soon()"
+          [hint]="soonHint()"
+          link="/storage"
+          [params]="{ status: 'stored' }"
+        />
+        <app-stat
+          label="Skulle ha hämtats"
+          [value]="summary()?.overdue ?? '–'"
+          hint="har passerat hämtdatum"
+          [status]="summary()?.overdue ? 'bad' : 'none'"
+          link="/storage"
+          [params]="{ status: 'stored', overdue: true }"
+        />
+        <app-stat
+          label="Obetalda avgifter"
+          [value]="summary()?.unpaid ?? '–'"
+          [hint]="summary() ? kr(summary()!.unpaidAmount) + ' exkl. moms' : ''"
+          [status]="summary()?.unpaid ? 'warn' : 'none'"
+          link="/storage"
+          [params]="{ status: 'stored', paymentStatus: 'unpaid' }"
+        />
+      </div>
+
+      <div class="mt-4 grid gap-4 xl:grid-cols-3">
+        <app-panel title="Att göra" icon="task_alt" class="max-md:hidden">
+          <a actions mat-button routerLink="/storage/new" class="max-md:!hidden">
+            <mat-icon>add</mat-icon> Ny inlämning
+          </a>
+          <app-attention-list [items]="attention()" [ready]="ready()" />
+        </app-panel>
+
+        <app-panel
+          title="Skulle ha hämtats"
+          [subtitle]="overdue().length ? 'De som väntat längst först. Ring direkt från raden.' : ''"
+          [loading]="loading()"
+        >
+          @if (overdue().length) {
+            <ul class="divide-y divide-gray-100">
+              @for (o of overdueTop(); track o.deposit.id) {
+                <li class="flex items-center gap-3 py-2">
+                  <app-reg-plate [value]="o.deposit.vehicle.regNo" size="sm" />
+                  <a [routerLink]="['/storage', o.deposit.id]" class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium">{{
+                      o.deposit.customer.name
+                    }}</span>
+                    <span class="block truncate text-xs text-gray-500"
+                      >{{ o.deposit.code }} · {{ o.deposit.location || 'Ingen plats' }}</span
+                    >
+                    <span
+                      class="inline-flex items-center gap-1 text-xs font-medium text-red-700 md:hidden"
+                    >
+                      <mat-icon class="!h-4 !w-4 !text-sm !leading-4">schedule</mat-icon>
+                      {{ o.days }} {{ o.days === 1 ? 'dag' : 'dagar' }} sedan
+                    </span>
+                  </a>
                   <span
-                    class="inline-flex items-center gap-1 text-xs font-medium text-red-700 md:hidden"
+                    class="inline-flex items-center gap-1 text-xs font-medium text-red-700 max-md:hidden"
                   >
-                    <mat-icon class="!h-4 !w-4 !text-sm !leading-4">schedule</mat-icon>
+                    <mat-icon class="!h-4 !w-4 !text-sm">schedule</mat-icon>
                     {{ o.days }} {{ o.days === 1 ? 'dag' : 'dagar' }} sedan
                   </span>
-                </a>
-                <span
-                  class="inline-flex items-center gap-1 text-xs font-medium text-red-700 max-md:hidden"
-                >
-                  <mat-icon class="!h-4 !w-4 !text-sm">schedule</mat-icon>
-                  {{ o.days }} {{ o.days === 1 ? 'dag' : 'dagar' }} sedan
-                </span>
-                @if (o.deposit.customer.phone; as tel) {
-                  <a
-                    [href]="'tel:' + tel"
-                    class="grid h-9 w-9 place-items-center rounded-full text-brand hover:bg-brand-soft"
-                    [attr.aria-label]="'Ring ' + o.deposit.customer.name"
-                  >
-                    <mat-icon>call</mat-icon>
-                  </a>
-                }
-              </li>
-            }
-          </ul>
-          @if (overdue().length > overdueTop().length) {
-            <a
-              routerLink="/storage"
-              [queryParams]="{ status: 'stored', overdue: true }"
-              class="mt-2 inline-block text-sm font-medium text-brand hover:underline"
-              >Visa alla {{ overdue().length }}</a
-            >
-          }
-        } @else if (!loading()) {
-          <p class="py-4 text-sm text-gray-500">Inga set har passerat hämtdatum.</p>
-        }
-      </app-panel>
-
-      <app-panel
-        title="Vad ligger i hotellet"
-        subtitle="Inlagrade set"
-        [loading]="loading()"
-        [empty]="!loading() && !deposits().length"
-      >
-        <div class="mb-2 text-xs font-medium text-gray-500">Säsong</div>
-        <app-mix-bar [parts]="mix()" unit="set" />
-        <div class="mt-6 mb-2 text-xs font-medium text-gray-500">Avgift för året</div>
-        <app-mix-bar [parts]="payment()" unit="set" />
-      </app-panel>
-    </div>
-
-    <div class="mt-4 grid gap-4 xl:grid-cols-3">
-      <app-panel
-        class="xl:col-span-2"
-        title="Hyllor"
-        [subtitle]="shelfNote()"
-        [loading]="loading()"
-        [table]="shelfTable()"
-      >
-        @for (g of shelfGroups(); track g.name) {
-          @if (g.name) {
-            <div class="mb-1.5 text-xs font-medium text-gray-500">{{ g.name }}</div>
-          }
-          <div class="mb-3 grid grid-cols-[repeat(auto-fill,minmax(68px,1fr))] gap-1">
-            @for (s of g.shelves; track s.place) {
+                  @if (o.deposit.customer.phone; as tel) {
+                    <a
+                      [href]="'tel:' + tel"
+                      class="grid h-9 w-9 place-items-center rounded-full text-brand hover:bg-brand-soft"
+                      [attr.aria-label]="'Ring ' + o.deposit.customer.name"
+                    >
+                      <mat-icon>call</mat-icon>
+                    </a>
+                  }
+                </li>
+              }
+            </ul>
+            @if (overdue().length > overdueTop().length) {
               <a
-                [routerLink]="['/storage']"
-                [queryParams]="{ status: 'stored', q: s.query }"
-                class="flex h-14 flex-col items-center justify-center rounded-lg leading-tight transition hover:ring-2 hover:ring-gray-900/20"
-                [style.background]="bg(s)"
-                [style.color]="fg(s)"
-                [title]="s.place + ': ' + s.sets + ' set (' + s.units + ' däck och fälgar)'"
+                routerLink="/storage"
+                [queryParams]="{ status: 'stored', overdue: true }"
+                class="mt-2 inline-block text-sm font-medium text-brand hover:underline"
+                >Visa alla {{ overdue().length }}</a
               >
-                <span class="max-w-full truncate px-1 text-[11px] opacity-85">{{
-                  short(s.place)
-                }}</span>
-                <b class="text-base font-semibold tabular-nums">{{ s.sets }}</b>
-              </a>
             }
-          </div>
-        } @empty {
-          <p class="py-6 text-center text-sm text-gray-500">Inga inlagrade set.</p>
-        }
-        @if (shelfList().length) {
-          <div class="flex items-center gap-2 text-xs text-gray-500">
-            <span>1 set</span>
-            <span class="h-2 w-28 rounded-full" [style.background]="scale"></span>
-            <span>{{ maxSets() }} set</span>
-          </div>
-        }
-      </app-panel>
+          } @else if (!loading()) {
+            <p class="py-4 text-sm text-gray-500">Inga set har passerat hämtdatum.</p>
+          }
+        </app-panel>
 
-      <app-panel
-        title="Vanligaste storlekarna"
-        subtitle="Däck i inlagrade set. Det som kommer tillbaka till vår eller höst."
-        [loading]="loading()"
-        [table]="sizeTable()"
-        [empty]="!loading() && !sizes().length"
-        emptyText="Inga inlagrade set med däckstorlek."
-      >
-        <div class="h-64">
-          <app-chart [config]="sizeChart()" label="Vanligaste däckstorlekarna i hotellet" />
-        </div>
-      </app-panel>
-    </div>
+        <app-panel
+          title="Vad ligger i hotellet"
+          subtitle="Inlagrade set"
+          [loading]="loading()"
+          [empty]="!loading() && !deposits().length"
+        >
+          <div class="mb-2 text-xs font-medium text-gray-500">Säsong</div>
+          <app-mix-bar [parts]="mix()" unit="set" />
+          <div class="mt-6 mb-2 text-xs font-medium text-gray-500">Avgift för året</div>
+          <app-mix-bar [parts]="payment()" unit="set" />
+        </app-panel>
+      </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-3">
-      <app-panel
-        class="xl:col-span-2"
-        title="Hämtas per vecka"
-        subtitle="Inlagrade set efter hämtdatum. Röd stapel: har redan passerat hämtdatum."
-        [loading]="loading()"
-        [table]="pickupTable()"
-        [empty]="!loading() && !deposits().length"
-      >
-        <div class="h-64">
-          <app-chart [config]="pickupChart()" label="Set som ska hämtas per vecka" />
-        </div>
-      </app-panel>
-
-      <app-panel
-        title="Mönsterdjup"
-        subtitle="Däck i inlagrade set, mätt vid inlämning."
-        [loading]="loading()"
-        [table]="treadTable()"
-        [empty]="!loading() && !treadTotal()"
-        emptyText="Inga däck har mätts än."
-      >
-        <div class="h-56">
-          <app-chart [config]="treadChart()" label="Mönsterdjup på däcken i hotellet" />
-        </div>
-      </app-panel>
-    </div>
-
-    <div class="mt-4 grid gap-4 xl:grid-cols-3">
-      <app-panel
-        class="xl:col-span-2"
-        title="Slitna däck"
-        [subtitle]="worn().length ? 'Under 4 mm. Dags att erbjuda nya, de slitnaste först.' : ''"
-        [loading]="loading()"
-      >
-        @if (worn().length) {
-          <ul class="divide-y divide-gray-100">
-            @for (w of wornTop(); track w.deposit.id) {
-              <li class="flex items-center gap-3 py-2">
-                <app-reg-plate [value]="w.deposit.vehicle.regNo" size="sm" />
-                <a [routerLink]="['/storage', w.deposit.id]" class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-medium">{{
-                    w.deposit.customer.name
+      <div class="mt-4 grid gap-4 xl:grid-cols-3">
+        <app-panel
+          class="xl:col-span-2"
+          title="Hyllor"
+          [subtitle]="shelfNote()"
+          [loading]="loading()"
+          [table]="shelfTable()"
+        >
+          @for (g of shelfGroups(); track g.name) {
+            @if (g.name) {
+              <div class="mb-1.5 text-xs font-medium text-gray-500">{{ g.name }}</div>
+            }
+            <div class="mb-3 grid grid-cols-[repeat(auto-fill,minmax(68px,1fr))] gap-1">
+              @for (s of g.shelves; track s.place) {
+                <a
+                  [routerLink]="['/storage']"
+                  [queryParams]="{ status: 'stored', q: s.query }"
+                  class="flex h-14 flex-col items-center justify-center rounded-lg leading-tight transition hover:ring-2 hover:ring-gray-900/20"
+                  [style.background]="bg(s)"
+                  [style.color]="fg(s)"
+                  [title]="s.place + ': ' + s.sets + ' set (' + s.units + ' däck och fälgar)'"
+                >
+                  <span class="max-w-full truncate px-1 text-[11px] opacity-85">{{
+                    short(s.place)
                   }}</span>
-                  <span class="block truncate text-xs text-gray-500">{{ wornText(w) }}</span>
+                  <b class="text-base font-semibold tabular-nums">{{ s.sets }}</b>
                 </a>
-                <span
-                  class="inline-flex items-center gap-1 text-xs font-medium"
-                  [class]="w.mm < 3 ? 'text-red-700' : 'text-amber-800'"
-                >
-                  <mat-icon class="!h-4 !w-4 !text-sm !leading-4">{{
-                    w.mm < 3 ? 'error' : 'warning'
-                  }}</mat-icon>
-                  {{ mmText(w.mm) }} mm
-                </span>
-                @if (w.deposit.customer.phone; as tel) {
-                  <a
-                    [href]="'tel:' + tel"
-                    class="grid h-9 w-9 place-items-center rounded-full text-brand hover:bg-brand-soft"
-                    [attr.aria-label]="'Ring ' + w.deposit.customer.name"
-                  >
-                    <mat-icon>call</mat-icon>
+              }
+            </div>
+          } @empty {
+            <p class="py-6 text-center text-sm text-gray-500">Inga inlagrade set.</p>
+          }
+          @if (shelfList().length) {
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+              <span>1 set</span>
+              <span class="h-2 w-28 rounded-full" [style.background]="scale"></span>
+              <span>{{ maxSets() }} set</span>
+            </div>
+          }
+        </app-panel>
+
+        <app-panel
+          title="Vanligaste storlekarna"
+          subtitle="Däck i inlagrade set. Det som kommer tillbaka till vår eller höst."
+          [loading]="loading()"
+          [table]="sizeTable()"
+          [empty]="!loading() && !sizes().length"
+          emptyText="Inga inlagrade set med däckstorlek."
+        >
+          <div class="h-64">
+            <app-chart [config]="sizeChart()" label="Vanligaste däckstorlekarna i hotellet" />
+          </div>
+        </app-panel>
+      </div>
+
+      <div class="mt-4 grid gap-4 xl:grid-cols-3">
+        <app-panel
+          class="xl:col-span-2"
+          title="Hämtas per vecka"
+          subtitle="Inlagrade set efter hämtdatum. Röd stapel: har redan passerat hämtdatum."
+          [loading]="loading()"
+          [table]="pickupTable()"
+          [empty]="!loading() && !deposits().length"
+        >
+          <div class="h-64">
+            <app-chart [config]="pickupChart()" label="Set som ska hämtas per vecka" />
+          </div>
+        </app-panel>
+
+        <app-panel
+          title="Mönsterdjup"
+          subtitle="Däck i inlagrade set, mätt vid inlämning."
+          [loading]="loading()"
+          [table]="treadTable()"
+          [empty]="!loading() && !treadTotal()"
+          emptyText="Inga däck har mätts än."
+        >
+          <div class="h-56">
+            <app-chart [config]="treadChart()" label="Mönsterdjup på däcken i hotellet" />
+          </div>
+        </app-panel>
+      </div>
+
+      <div class="mt-4 grid gap-4 xl:grid-cols-3">
+        <app-panel
+          class="xl:col-span-2"
+          title="Slitna däck"
+          [subtitle]="worn().length ? 'Under 4 mm. Dags att erbjuda nya, de slitnaste först.' : ''"
+          [loading]="loading()"
+        >
+          @if (worn().length) {
+            <ul class="divide-y divide-gray-100">
+              @for (w of wornTop(); track w.deposit.id) {
+                <li class="flex items-center gap-3 py-2">
+                  <app-reg-plate [value]="w.deposit.vehicle.regNo" size="sm" />
+                  <a [routerLink]="['/storage', w.deposit.id]" class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium">{{
+                      w.deposit.customer.name
+                    }}</span>
+                    <span class="block truncate text-xs text-gray-500">{{ wornText(w) }}</span>
                   </a>
-                }
+                  <span
+                    class="inline-flex items-center gap-1 text-xs font-medium"
+                    [class]="w.mm < 3 ? 'text-red-700' : 'text-amber-800'"
+                  >
+                    <mat-icon class="!h-4 !w-4 !text-sm !leading-4">{{
+                      w.mm < 3 ? 'error' : 'warning'
+                    }}</mat-icon>
+                    {{ mmText(w.mm) }} mm
+                  </span>
+                  @if (w.deposit.customer.phone; as tel) {
+                    <a
+                      [href]="'tel:' + tel"
+                      class="grid h-9 w-9 place-items-center rounded-full text-brand hover:bg-brand-soft"
+                      [attr.aria-label]="'Ring ' + w.deposit.customer.name"
+                    >
+                      <mat-icon>call</mat-icon>
+                    </a>
+                  }
+                </li>
+              }
+            </ul>
+            @if (worn().length > wornTop().length) {
+              <p class="mt-2 text-xs text-gray-500">
+                {{ worn().length - wornTop().length }} set till under 4 mm.
+              </p>
+            }
+          } @else if (!loading()) {
+            <p class="py-4 text-sm text-gray-500">Inga inlagrade däck är under 4 mm.</p>
+          }
+        </app-panel>
+
+        <app-panel
+          title="Att hämta"
+          subtitle="De närmaste 14 dagarna."
+          icon="event"
+          [loading]="loading()"
+          [empty]="!loading() && !upcoming().length"
+          emptyText="Inget ska hämtas de närmaste två veckorna."
+        >
+          <ul class="divide-y divide-gray-100">
+            @for (d of upcoming(); track d.id) {
+              <li>
+                <a
+                  [routerLink]="['/storage', d.id]"
+                  class="flex min-h-12 items-center gap-3 rounded-lg py-2 hover:bg-gray-50"
+                >
+                  <app-reg-plate [value]="d.vehicle.regNo" size="sm" />
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate text-sm font-medium">{{ d.customer.name }}</span>
+                    <span class="block truncate text-xs text-gray-500"
+                      >{{ d.code }}{{ d.location ? ' · ' + d.location : '' }}</span
+                    >
+                  </span>
+                  <span class="shrink-0 text-sm tabular-nums text-gray-600">{{
+                    pickupDay(d.expectedPickupAt)
+                  }}</span>
+                </a>
               </li>
             }
           </ul>
-          @if (worn().length > wornTop().length) {
-            <p class="mt-2 text-xs text-gray-500">
-              {{ worn().length - wornTop().length }} set till under 4 mm.
-            </p>
-          }
-        } @else if (!loading()) {
-          <p class="py-4 text-sm text-gray-500">Inga inlagrade däck är under 4 mm.</p>
-        }
-      </app-panel>
-
-      <app-panel
-        title="Att hämta"
-        subtitle="De närmaste 14 dagarna."
-        icon="event"
-        [loading]="loading()"
-        [empty]="!loading() && !upcoming().length"
-        emptyText="Inget ska hämtas de närmaste två veckorna."
-      >
-        <ul class="divide-y divide-gray-100">
-          @for (d of upcoming(); track d.id) {
-            <li>
-              <a
-                [routerLink]="['/storage', d.id]"
-                class="flex min-h-12 items-center gap-3 rounded-lg py-2 hover:bg-gray-50"
-              >
-                <app-reg-plate [value]="d.vehicle.regNo" size="sm" />
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-medium">{{ d.customer.name }}</span>
-                  <span class="block truncate text-xs text-gray-500"
-                    >{{ d.code }}{{ d.location ? ' · ' + d.location : '' }}</span
-                  >
-                </span>
-                <span class="shrink-0 text-sm tabular-nums text-gray-600">{{
-                  pickupDay(d.expectedPickupAt)
-                }}</span>
-              </a>
-            </li>
-          }
-        </ul>
-      </app-panel>
-    </div>
+        </app-panel>
+      </div>
+    }
   `,
 })
 export class StorageOverview {
+  /** Mobilen har en egen Hem: knapparna vid hyllorna, inte diagram. */
+  readonly mobile = toSignal(
+    inject(BreakpointObserver)
+      .observe(MOBILE)
+      .pipe(map((r) => r.matches)),
+    { initialValue: window.matchMedia(MOBILE).matches },
+  );
   private readonly insights = inject(Insights);
   private readonly storage = inject(StorageApi);
   private readonly now = new Date();

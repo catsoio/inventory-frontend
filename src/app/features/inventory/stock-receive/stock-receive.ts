@@ -7,10 +7,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { catchError, firstValueFrom, of } from 'rxjs';
 import { AxleApi } from '../../../core/api/axle-api';
+import { CatalogApi } from '../../../core/api/catalog-api';
+import type { ScanHit } from '../../../core/api/stock-count-api';
 import { Pricing } from '../../../core/pricing';
 import { Scanner } from '../../../core/scan/scanner';
 import { Confirm } from '../../../shared/confirm';
@@ -63,11 +66,32 @@ interface Feedback {
         >
           <span class="min-w-0 flex-1">{{ f.text }}</span>
           @if (f.unknownCode; as code) {
+            <button mat-stroked-button type="button" (click)="linkArticle(code)">
+              <mat-icon>link</mat-icon> Koppla till artikel
+            </button>
             <button mat-stroked-button type="button" (click)="createArticle(code)">
               <mat-icon>add</mat-icon> Skapa artikel
             </button>
           }
         </div>
+      }
+      @if (shelf(); as s) {
+        <p class="mt-2 flex items-center gap-2 rounded-lg bg-green-50 p-2.5 text-sm text-green-900">
+          <mat-icon class="!h-5 !w-5 !text-xl">warehouse</mat-icon>
+          <span class="min-w-0 flex-1">Varorna läggs på {{ s.label }}</span>
+          <button
+            type="button"
+            class="grid h-7 w-7 place-items-center rounded-full hover:bg-green-100"
+            aria-label="Ta bort hyllan"
+            (click)="shelf.set(null)"
+          >
+            <mat-icon class="!h-4 !w-4 !text-base">close</mat-icon>
+          </button>
+        </p>
+      } @else {
+        <p class="mt-2 text-xs text-gray-500">
+          Skanna en hylla för att lägga varorna där de tas emot.
+        </p>
       }
     </div>
 
@@ -203,6 +227,8 @@ export class StockReceive implements OnDestroy {
   private readonly snack = inject(MatSnackBar);
   private readonly confirm = inject(Confirm);
   private readonly pricing = inject(Pricing);
+  private readonly dialog = inject(MatDialog);
+  private readonly catalog = inject(CatalogApi);
   readonly scanner = inject(Scanner);
   readonly draft = inject(ReceiveDraft);
   readonly tabs = STOCK_TABS;
@@ -213,6 +239,25 @@ export class StockReceive implements OnDestroy {
   readonly feedback = signal<Feedback | null>(null);
   readonly touched = signal<string | null>(null);
   readonly busy = signal(false);
+  /** Hyllan varorna läggs på när de tas emot (en skannad hylla, eller den man kom från). */
+  readonly shelf = signal<{ warehouseId: string; locationId: string; label: string } | null>(null);
+
+  constructor() {
+    // Från hyllbladet ("Ta emot här"): hyllan är redan vald.
+    const q = inject(ActivatedRoute).snapshot.queryParamMap;
+    const warehouseId = q.get('warehouseId');
+    const locationId = q.get('locationId');
+    if (warehouseId && locationId) {
+      this.catalog
+        .warehouses()
+        .pipe(catchError(() => of([])))
+        .subscribe((all) => {
+          const w = all.find((x) => x.id === warehouseId);
+          const l = w?.locations.find((x) => x.id === locationId);
+          if (w && l) this.shelf.set({ warehouseId, locationId, label: `${w.name} · ${l.name}` });
+        });
+    }
+  }
 
   ngOnDestroy() {
     this.release();
@@ -233,21 +278,53 @@ export class StockReceive implements OnDestroy {
       this.scanner.beep(false);
       return this.say('err', `Hittar ingen artikel med koden ${hit.code}.`, hit.code);
     }
+    if (hit.kind === 'location') return this.setShelf(hit);
     if (hit.kind !== 'article') {
       this.scanner.beep(false);
       return this.say('warn', 'Det där är inte en artikel. Skanna varans streckkod.');
     }
+    this.take(hit.id, hit.label, hit.code);
+  }
+
+  /** En artikel räknas upp på listan (en skanning = en till). */
+  private take(id: string, label: string, code: string | null) {
     const line = this.draft.add({
-      articleId: hit.id,
-      label: hit.label,
-      code: hit.code,
+      articleId: id,
+      label,
+      code,
       unitCost: '',
       loaded: false,
     });
-    this.touched.set(hit.id);
+    this.touched.set(id);
     this.scanner.beep(true);
-    this.say('ok', `${hit.label} – ${line.quantity} st`);
-    if (!line.loaded) void this.fill(hit.id);
+    this.say('ok', `${label} – ${line.quantity} st`);
+    if (!line.loaded) void this.fill(id);
+  }
+
+  private setShelf(hit: Extract<ScanHit, { kind: 'location' }>) {
+    if (hit.warehouseKind !== 'own') {
+      this.scanner.beep(false);
+      return this.say('warn', 'Det där är en hylla i däckhotellet, inte i lagret.');
+    }
+    this.shelf.set(hit);
+    this.scanner.beep(true);
+    this.say('ok', `Hylla: ${hit.label}`);
+  }
+
+  /** En kod som ingen känner: koppla den till en artikel man har, så hittas den nästa gång. */
+  async linkArticle(code: string) {
+    const { ArticleLinkDialog } = await import('../../../core/scan/article-link-dialog');
+    const article = await firstValueFrom(
+      this.dialog
+        .open(ArticleLinkDialog, {
+          width: '460px',
+          maxWidth: '96vw',
+          autoFocus: false,
+          data: { code },
+        })
+        .afterClosed(),
+    );
+    if (article) this.take(article.id, article.label, article.code);
   }
 
   /** Hämtar artikeln för att förfylla senast betalda pris och leverantör. */
@@ -314,6 +391,18 @@ export class StockReceive implements OnDestroy {
             reference,
           }),
         );
+        // Är en hylla vald läggs varan där; det är en bekvämlighet, så ett fel stoppar inget.
+        const shelf = this.shelf();
+        if (shelf) {
+          await firstValueFrom(
+            this.api
+              .updateArticle(l.articleId, {
+                warehouseId: shelf.warehouseId,
+                locationId: shelf.locationId,
+              })
+              .pipe(catchError(() => of(null))),
+          );
+        }
         this.draft.remove(l.articleId);
         done++;
       } catch {

@@ -99,7 +99,7 @@ public class PayPalReaderPlugin: CAPPlugin, CAPBridgedPlugin {
             let tipping = IZSDKTippingConfiguration(
                 zettleReaderTippingStyle: .none, paypalReaderTippingStyle: .none)
             iZettleSDK.shared().charge(
-                amount, tippingConfiguration: tipping, reference: reference,
+                amount: amount, tippingConfiguration: tipping, reference: reference,
                 payPalPartnerPayeePricingTierId: nil, presentFrom: vc
             ) { info, error in
                 if let error = error {

@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { AxleApi } from '../../../core/api/axle-api';
+import { PurchaseCardApi } from '../../../core/api/purchase-card-api';
 import { Auth } from '../../../core/auth/auth';
 import { Insights } from '../../../core/insights/insights';
 import {
@@ -221,6 +222,7 @@ const day = (iso: string) =>
 export class StockOverview {
   private readonly insights = inject(Insights);
   private readonly api = inject(AxleApi);
+  private readonly purchases = inject(PurchaseCardApi);
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
   private readonly now = new Date();
@@ -362,10 +364,16 @@ export class StockOverview {
   });
 
   // --- att beställa ---
-  readonly orders = computed<Reorder[]>(() => toOrder(this.articles()));
+  /** Beställt hos en leverantör och inte kommit, per artikel: räknas av i Att beställa. */
+  readonly onOrder = signal<Record<string, number>>({});
+  readonly orders = computed<Reorder[]>(() => toOrder(this.articles(), this.onOrder()));
   readonly ordersTop = computed(() => this.orders().slice(0, 10));
 
   constructor() {
+    this.purchases
+      .onOrder()
+      .pipe(catchError(() => of({} as Record<string, number>)))
+      .subscribe((m) => this.onOrder.set(m));
     forkJoin({
       articles: this.insights.articles(true).pipe(catchError(() => of([] as Article[]))),
       summary: this.api.summary().pipe(catchError(() => of(null))),

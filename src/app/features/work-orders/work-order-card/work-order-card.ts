@@ -15,6 +15,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { WorkOrderApi } from '../../../core/api/work-order-api';
 import { AxleApi } from '../../../core/api/axle-api';
+import { PurchaseCardApi } from '../../../core/api/purchase-card-api';
 import { QuoteApi } from '../../../core/api/quote-api';
 import { SalesCardApi } from '../../../core/api/sales-card-api';
 import { WorkshopApi } from '../../../core/api/workshop-api';
@@ -440,14 +441,16 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                 [class.bg-green-50]="w?.value.done"
               >
                 <div
-                  class="flex items-center gap-2 px-4 py-2 transition-colors"
+                  class="flex flex-wrap items-center gap-2 px-4 py-2 transition-colors"
                   [class.bg-gray-50]="!w?.value.done"
                   [class.bg-green-100]="w?.value.done"
                 >
                   <span class="text-xs font-semibold tracking-wide text-teal-800 uppercase">
                     Jobb {{ j + 1 }}
                   </span>
-                  <span class="min-w-0 flex-1 truncate text-sm text-gray-700">
+                  <span
+                    class="min-w-0 flex-1 truncate text-sm text-gray-700 max-sm:basis-full max-sm:order-last"
+                  >
                     @if (job.value.title) {
                       <span class="font-medium text-gray-900">{{ job.value.title }}</span>
                     }
@@ -464,14 +467,17 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                       Klar
                     </mat-checkbox>
                   }
-                  <span class="text-sm text-gray-500">Summa jobbet</span>
+                  <span class="text-sm text-gray-500 max-sm:hidden">Summa jobbet</span>
                   <span class="text-sm font-semibold tabular-nums">
                     {{ live().jobTotals[job.value.id] ?? 0 | kr }}
                   </span>
                 </div>
                 <div class="p-4">
                   <div class="flex flex-wrap items-end gap-2">
-                    <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
+                    <mat-form-field
+                      class="min-w-48 flex-1 max-sm:min-w-full"
+                      subscriptSizing="dynamic"
+                    >
                       <mat-label>Vad ska göras</mat-label>
                       <input
                         matInput
@@ -497,7 +503,9 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                     </mat-form-field>
                     @if (w) {
                       <div [formGroup]="w" class="contents">
-                        <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+                        <label
+                          class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500 max-sm:min-w-20 max-sm:flex-1 max-sm:shrink"
+                        >
                           Arbete (kr)
                           <input
                             type="number"
@@ -505,10 +513,12 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                             step="0.01"
                             formControlName="unitPrice"
                             (focus)="$any($event.target).select()"
-                            class="h-10 w-28 px-2 text-right text-gray-900 field"
+                            class="h-10 w-28 max-sm:w-full px-2 text-right text-gray-900 field"
                           />
                         </label>
-                        <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+                        <label
+                          class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500 max-sm:min-w-20 max-sm:flex-1 max-sm:shrink"
+                        >
                           Rabatt %
                           <input
                             type="number"
@@ -517,7 +527,7 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                             step="1"
                             formControlName="discountPercent"
                             (focus)="$any($event.target).select()"
-                            class="h-10 w-16 px-2 text-right text-gray-900 field"
+                            class="h-10 w-16 max-sm:w-full px-2 text-right text-gray-900 field"
                           />
                         </label>
                       </div>
@@ -785,10 +795,10 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                 formControlName="description"
                 autocomplete="off"
                 placeholder="Vad ska göras, t.ex. Byt bromsbelägg fram"
-                class="h-10 min-w-48 flex-1 px-3 field"
+                class="h-10 max-sm:min-w-full min-w-48 flex-1 px-3 field"
               />
             } @else {
-              <div class="relative min-w-48 flex-1">
+              <div class="relative max-sm:min-w-full min-w-48 flex-1">
                 <mat-icon class="pointer-events-none absolute top-2 left-2 text-gray-400"
                   >search</mat-icon
                 >
@@ -823,19 +833,23 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
               </div>
             }
             @if (part !== false) {
-              <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+              <label
+                class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500 max-sm:min-w-20 max-sm:flex-1 max-sm:shrink"
+              >
                 Antal
                 <input
                   type="number"
                   min="0"
                   step="0.25"
                   formControlName="quantity"
-                  class="h-10 w-16 px-2 text-center text-gray-900 field"
+                  class="h-10 w-16 max-sm:w-full px-2 text-center text-gray-900 field"
                 />
               </label>
             }
             @if (linesMode()) {
-              <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+              <label
+                class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500 max-sm:min-w-20 max-sm:flex-1 max-sm:shrink"
+              >
                 À-pris
                 <input
                   type="number"
@@ -844,10 +858,12 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                   formControlName="unitPrice"
                   (focus)="$any($event.target).select()"
                   aria-label="À-pris"
-                  class="h-10 w-28 px-2 text-right text-gray-900 field"
+                  class="h-10 w-28 max-sm:w-full px-2 text-right text-gray-900 field"
                 />
               </label>
-              <label class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500">
+              <label
+                class="flex shrink-0 flex-col gap-0.5 text-xs text-gray-500 max-sm:min-w-20 max-sm:flex-1 max-sm:shrink"
+              >
                 Rabatt %
                 <input
                   type="number"
@@ -856,7 +872,7 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                   step="1"
                   formControlName="discountPercent"
                   (focus)="$any($event.target).select()"
-                  class="h-10 w-16 px-2 text-right text-gray-900 field"
+                  class="h-10 w-16 max-sm:w-full px-2 text-right text-gray-900 field"
                 />
               </label>
               <span
@@ -922,6 +938,11 @@ const WHEEL_SEARCH = /\d{3}\s*\/\s*\d{2}|\br\s?\d{2}\b|däck|fälg|vinter|sommar
                       reservedOn(row) ? ' (' + reservedOn(row) + ' reserverad på andra order)' : ''
                     }}, ordern behöver {{ needs(row.value.articleId) }}. Resten måste beställas.
                   }
+                  @if (onOrderOf(row); as n) {
+                    <b class="block text-xs font-medium">
+                      {{ n }} st är redan beställda och väntas.
+                    </b>
+                  }
                 </span>
                 <button mat-stroked-button type="button" (click)="orderPart(row)">
                   <mat-icon>shopping_cart_checkout</mat-icon> Beställ
@@ -945,6 +966,7 @@ export class WorkOrderCard implements OnInit {
   readonly admin = this.auth.isAdmin() || this.auth.isSuperAdmin();
   readonly pricing = inject(Pricing);
   private readonly api = inject(WorkOrderApi);
+  private readonly purchases = inject(PurchaseCardApi);
   private readonly salesApi = inject(SalesCardApi);
   private readonly bookingApi = inject(BookingApi);
   private readonly quotes = inject(QuoteApi);
@@ -1639,6 +1661,9 @@ export class WorkOrderCard implements OnInit {
   /** Delar som andra öppna order redan lovat, per artikel. */
   private readonly reservedElsewhere = signal<Record<string, number>>({});
 
+  /** Delar som är beställda hos en leverantör och inte kommit, per artikel. */
+  private readonly onOrder = signal<Record<string, number>>({});
+
   /** Hämtar reservationerna för artiklarna på ordern (utan ordern själv). */
   private refreshReserved() {
     const ids = [
@@ -1648,6 +1673,12 @@ export class WorkOrderCard implements OnInit {
     ] as string[];
     if (!ids.length) return;
     this.api.reserved(ids, this.id ?? undefined).subscribe((m) => this.reservedElsewhere.set(m));
+    this.purchases.onOrder().subscribe({ next: (m) => this.onOrder.set(m), error: () => {} });
+  }
+
+  /** Hur många av artikeln raden pekar på som redan är beställda och väntas. */
+  onOrderOf(row: FormGroup) {
+    return this.onOrder()[row.value.articleId as string] ?? 0;
   }
 
   /** Hur många av artikeln hela ordern behöver (flera rader med samma artikel summeras). */

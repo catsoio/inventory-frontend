@@ -244,17 +244,6 @@ const MODULE_OF = {
           >
             <mat-icon [class.animate-spin]="refresh.busy()">refresh</mat-icon>
           </button>
-          @if (!auth.isMechanic()) {
-            <button
-              type="button"
-              class="hdr-btn grid place-items-center"
-              (click)="scanner.openDialog()"
-              aria-label="Skanna"
-              matTooltip="Skanna en etikett eller streckkod"
-            >
-              <mat-icon>qr_code_scanner</mat-icon>
-            </button>
-          }
         }
       </div>
     </header>

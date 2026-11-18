@@ -189,6 +189,9 @@ const REORDER_ROWS = 6;
                       o.article.quantity <= 0 ? 'error' : 'warning'
                     }}</mat-icon>
                     {{ o.article.quantity <= 0 ? 'Slut' : o.article.quantity + ' kvar' }}
+                    @if (o.onOrder) {
+                      <span class="font-normal text-gray-600">· {{ o.onOrder }} på väg</span>
+                    }
                   </span>
                   <a
                     mat-stroked-button
@@ -381,7 +384,7 @@ export class HomeDesktop {
 
   // --- att beställa ---
 
-  readonly reorders = computed<Reorder[]>(() => toOrder(this.data.articles()));
+  readonly reorders = computed<Reorder[]>(() => toOrder(this.data.articles(), this.data.onOrder()));
   readonly reorderTop = computed(() => this.reorders().slice(0, REORDER_ROWS));
 
   kind(a: Article) {

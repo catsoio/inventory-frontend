@@ -24,6 +24,8 @@ export interface QuickIntakeData {
   regNo?: string;
   /** Åtgärden är redan vald (Däckbyte eller en åtgärd ur skanningens val). */
   job?: string;
+  /** Man har redan valt Ny order för en bil som har en på gång: fråga inte om en dubblett igen. */
+  forceNew?: boolean;
 }
 
 export interface QuickIntakeResult {
@@ -349,6 +351,7 @@ export class QuickIntake implements OnInit {
       .pipe(catchError(() => of([] as ServiceType[])))
       .subscribe((list) => this.services.set(list.filter((s) => s.active !== false)));
     if (this.data?.job) this.job.setValue(this.data.job);
+    if (this.data?.forceNew) this.forceNew.set(true);
     if (this.data?.regNo) {
       this.regNo.setValue(this.data.regNo);
       return;
@@ -379,7 +382,7 @@ export class QuickIntake implements OnInit {
     this.car.set(null);
     this.picked.set(null);
     this.matches.set([]);
-    this.forceNew.set(false);
+    this.forceNew.set(!!this.data?.forceNew);
     this.error.set('');
     this.plate.set(regNo);
     if (regNo.length < 5) {

@@ -42,7 +42,11 @@ const MAX_ORDERS = 5;
         class="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-brand px-4 text-[15px] font-semibold text-white shadow-sm active:opacity-90"
         (click)="scanner.openDialog()"
       >
-        <mat-icon>qr_code_scanner</mat-icon> Skanna
+        <mat-icon>qr_code_scanner</mat-icon>
+        <span class="flex flex-col text-left leading-tight">
+          <span>Skanna</span>
+          <span class="text-[11px] font-normal opacity-80">skylt eller kod</span>
+        </span>
       </button>
     </div>
 

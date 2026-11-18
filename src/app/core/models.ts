@@ -121,6 +121,8 @@ export interface Article {
   ean: string | null;
   /** Id hos en grossists katalog, t.ex. { gummigrossen: '371383' }. */
   externalIds: Record<string, string> | null;
+  /** Fler koder en skanning hittar artikeln på (kartongens streckkod, leverantörens nummer). */
+  codes?: ArticleCode[];
   /** null för personal: inköpspris visas bara för ägare. */
   averageCost: number | null;
   sellPrice: number;
@@ -159,6 +161,12 @@ export interface ArticleInput {
 }
 
 export type ArticleUpdate = Partial<Omit<ArticleInput, 'initialQuantity'>>;
+
+/** En kod utöver EAN och artikelnumret som en skanning hittar artikeln på. */
+export interface ArticleCode {
+  code: string;
+  type: 'barcode' | 'supplier';
+}
 
 export interface ArticleQuery {
   q?: string;
@@ -612,6 +620,8 @@ export interface TodoSnapshot {
   stock: Summary | null;
   hotel: StorageSummary | null;
   drafts: number | null;
+  /** Beställningar hos en leverantör vars varor inte alla kommit. */
+  toReceive?: number | null;
   requests: number | null;
   partsOrders: number | null;
   quotes: { approved: number; waiting: number } | null;
@@ -2687,31 +2697,69 @@ export interface SiteSettings {
 export interface PurchaseCardLine {
   id: string;
   articleId: string;
+  /** Vad som köptes eller beställdes. */
   quantity: number;
   unitCost: number;
+  /** Hur många som kommit (en beställning); ett bokfört inköp har tagit in allt. */
+  received: number;
+  /** Vad som återstår att få. */
+  remaining: number;
+  /** Mer än beställt kom. */
+  extra: number;
   /** Artikeln som den ser ut nu (bara när kortet öppnas, inte i listan). */
   article: Article | null;
 }
 
-/** Inköpskortet: ett inköp som utkast tills det bokförs in i lagret. */
+export type PurchaseCardStatus = 'draft' | 'ordered' | 'posted';
+
+/** En leverans som tagits in i lagret på en beställning. */
+export interface PurchaseReceipt {
+  documentNumber: number;
+  documentCode: string;
+  at: string;
+  lines: { lineId: string; quantity: number }[];
+}
+
+/** Ett foto eller en PDF av leverantörens papper (följesedel, kvitto, faktura). */
+export interface PurchaseAttachment {
+  name: string;
+  label: string;
+  type: string;
+  size: number;
+  addedAt: string;
+}
+
+/**
+ * Inköpskortet: ett inköp som utkast tills det bokförs in i lagret. Ett kort kan också vara en
+ * beställning (`ordered`): lagd hos leverantören och mottagen i delar medan varorna kommer.
+ */
 export interface PurchaseCard {
   id: string;
   /** IK-00042 */
   code: string;
   number: number;
-  status: 'draft' | 'posted';
+  status: PurchaseCardStatus;
   supplierId: string | null;
   supplier: { id: string; code: string; name: string } | null;
-  /** Leverantörens faktura- eller ordernummer. */
+  /** Leverantörens faktura-, följesedel- eller ordernummer. */
   reference: string | null;
   url: string | null;
   note: string | null;
   purchasedAt: string | null;
+  /** När beställningen lades hos leverantören. */
+  orderedAt: string | null;
   lines: PurchaseCardLine[];
+  /** Beställt antal. */
   units: number;
+  /** Hur många av dem som kommit. */
+  receivedUnits: number;
   /** Öre exkl. moms. */
   total: number;
-  /** INK-00007 när kortet är bokfört. */
+  /** Summan på leverantörens papper, öre inkl. moms. */
+  documentTotal: number | null;
+  receipts: PurchaseReceipt[];
+  attachments: PurchaseAttachment[];
+  /** INK-00007 när kortet är bokfört, eller senaste leveransen på en beställning. */
   documentCode: string | null;
   documentNumber: number | null;
   postedAt: string | null;
@@ -2725,7 +2773,38 @@ export interface PurchaseCardInput {
   url?: string | null;
   note?: string | null;
   purchasedAt?: string | null;
+  /** Summan på leverantörens papper, öre inkl. moms; null tar bort den. */
+  documentTotal?: number | null;
   lines?: { id?: string; articleId: string; quantity: number; unitCost: number }[];
+}
+
+/** Hur en rad på ett papper kopplades till en artikel: streckkoden, en kod artikeln känner eller texten. */
+export type DocumentMatchVia = 'ean' | 'code' | 'name';
+
+/** En rad ur ett inläst papper, med artikeln den troligast är. */
+export interface ProposedLine {
+  description: string;
+  articleNo: string | null;
+  ean: string | null;
+  quantity: number;
+  /** Öre inkl. moms. */
+  unitCostIncl: number | null;
+  match: { article: Article; via: DocumentMatchVia } | null;
+  candidates: Article[];
+}
+
+/** Ett inläst papper: raderna, leverantören, numret och summan. Inget är sparat. */
+export interface DocumentProposal {
+  /** Läsningen är avstängd här och det här är ett exempel, inte vad pappret säger. */
+  demo: boolean;
+  supplier: { name: string | null; id: string | null };
+  documentNo: string | null;
+  orderNo: string | null;
+  date: string | null;
+  /** Summan på pappret, öre inkl. moms. */
+  totalInclVat: number | null;
+  linesIncludeVat: boolean;
+  lines: ProposedLine[];
 }
 
 /** Grossistens katalog (Gummigrossen), läst med verkstadens egen inloggning. Pengar i öre. */
