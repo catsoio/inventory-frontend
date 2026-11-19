@@ -237,7 +237,7 @@ interface PayWayOption {
           }
         }
         @if (!readOnly()) {
-          @if (!card()) {
+          @if (!card() || link()?.pending) {
             <button mat-flat-button color="primary" (click)="save()" [disabled]="busy()">
               Spara
             </button>
@@ -2181,7 +2181,12 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     // Köparkortet följer kunden som väljs; skriver man ett nytt namn töms det.
     effect(() => {
       const c = this.customer();
-      untracked(() => this.fillBuyer(c));
+      untracked(() => {
+        // Samma kund igen (t.ex. efter en sparning) fyller inte om fälten: det man skriver ska stå kvar.
+        if (c && c.id === this.buyerFor) return;
+        this.buyerFor = c?.id ?? null;
+        this.fillBuyer(c);
+      });
     });
     this.autosave$
       .pipe(debounceTime(1500), takeUntilDestroyed())
@@ -2280,6 +2285,8 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   hasUnsaved() {
     return this.dirty();
   }
+
+  private buyerFor: string | null = null;
 
   private fillBuyer(c: Customer | null) {
     this.buyer.reset(
@@ -2404,6 +2411,7 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   private readonly autosave$ = new Subject<void>();
   private readonly savedAt = signal<Date | null>(null);
   readonly saveState = computed(() => {
+    if (this.link()?.pending && this.dirty() && !this.busy()) return 'Osparat: tryck Spara';
     if (this.busy() || this.dirty()) return 'Sparar…';
     const at = this.savedAt();
     return at ? `Sparat ${format(at, 'HH:mm')}` : 'Utkast';
@@ -2419,6 +2427,8 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
   private async autoSave() {
     const c = this.card();
     if (!c || c.status !== 'draft' || !this.dirty()) return;
+    // En kund eller bil som bara är skriven skapas först när man sparar för hand, annars blir det en ny kund per paus.
+    if (this.link()?.pending) return;
     if (this.busy() || this.readerWaiting()) {
       this.autosave$.next();
       return;
@@ -2824,11 +2834,16 @@ export class SalesCardPage implements OnInit, OnDestroy, HasUnsaved {
     if (this.hall() && resolved?.customerId) {
       const patch = this.buyerPatch();
       if (Object.keys(patch).length) {
+        const sent = this.buyer.getRawValue();
         const saved = await firstValueFrom(
           this.workshop.updateCustomer(resolved.customerId, patch),
         );
         this.customer.set({ ...this.customer(), ...saved } as Customer);
-        this.fillBuyer(this.customer());
+        // Fälten töms aldrig: bara de som inte ändrats under tiden räknas som sparade.
+        for (const k of Object.keys(patch) as (keyof typeof sent)[]) {
+          const ctl = this.buyer.controls[k];
+          if (ctl.value === sent[k]) ctl.markAsPristine();
+        }
       }
     }
     return {
