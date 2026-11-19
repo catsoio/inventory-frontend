@@ -175,12 +175,12 @@ export type BookingDialogResult = Booking | 'deleted';
           <section class="flex flex-col gap-3 max-md:order-3">
             <h3 class="sec">Vad ska göras</h3>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
-              <mat-label>Åtgärd</mat-label>
+              <mat-label>Åtgärder</mat-label>
               <mat-select
-                formControlName="serviceTypeId"
-                (selectionChange)="pickService($event.value)"
+                formControlName="serviceTypeIds"
+                multiple
+                (selectionChange)="pickServices($event.value)"
               >
-                <mat-option value="">Annat</mat-option>
                 @for (t of serviceOptions(); track t.id) {
                   <mat-option [value]="t.id">{{ t.name }}</mat-option>
                 }
@@ -400,7 +400,7 @@ export class BookingDialog {
           // Gamla bokningar utan kund/bil i registren går att ändra utan att välja om dem.
           this.legacy ? [] : Validators.required,
         ],
-        serviceTypeId: [b?.serviceTypeId ?? ''],
+        serviceTypeIds: [b?.serviceTypeId ? [b.serviceTypeId] : ([] as string[])],
         title: [b?.title ?? '', Validators.required],
         resourceId: [b?.resourceId ?? data.resourceId ?? ''],
         placeId: [b?.placeId ?? data.placeId ?? ''],
@@ -460,29 +460,58 @@ export class BookingDialog {
     this.workshop.vehicle(vehicleId).subscribe((v) => this.vehicle.set(v));
   }
 
+  /** Priset som fyllts i av åtgärderna; ett pris man skrivit själv skrivs aldrig över. */
+  private autoPrice: number | null = null;
+
   /**
-   * Åtgärden fyller i rubrik, tid och pris (bara det som inte redan är ifyllt). Priset följer
-   * bilens klass och fälgstorlek och en pågående kampanj; per hjul skrivs antalet i rubriken.
+   * Åtgärderna fyller i rubrik (en rad per åtgärd), tid (summan) och pris (summan, bara det som inte
+   * redan är ifyllt). Priset följer bilens klass och fälgstorlek och en pågående kampanj; per hjul
+   * skrivs antalet i raden. Text man skrivit själv ligger kvar.
    */
-  pickService(id: string) {
-    const t = this.serviceOptions().find((x) => x.id === id);
-    if (!t) return;
+  pickServices(ids: string[]) {
+    const all = this.serviceOptions();
     const f = this.form.controls;
-    const quoted = priceOfService(t, priceContextOf(this.vehicle()));
-    const previous = this.serviceOptions().find((x) => x.name === f.title.value);
-    if (!f.title.value || previous) f.title.setValue(priceTitle(t.name, quoted));
-    const start = at(f.day.value, f.startTime.value);
-    const finish = new Date(start.getTime() + t.durationMinutes * 60_000);
-    f.endDay.setValue(ymd(finish));
-    f.endTime.setValue(hm(finish));
-    // En prisrad eller en pågående kampanj styr; annars gäller åtgärdens eget spann som förut (till-priset först).
-    const price =
-      quoted && (quoted.basis === 'rule' || quoted.campaign)
-        ? quoted.total
-        : t.prices?.length
-          ? null
-          : (t.priceTo ?? t.priceFrom);
-    if (f.price.value == null && price !== null) f.price.setValue(price / 100);
+    const ours = (line: string) =>
+      all.some((x) => line === x.name || line.startsWith(`${x.name} (`));
+    const keep = String(f.title.value ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !ours(l));
+    let minutes = 0;
+    let total = 0;
+    let priced = false;
+    const lines: string[] = [];
+    for (const id of ids) {
+      const t = all.find((x) => x.id === id);
+      if (!t) continue;
+      const quoted = priceOfService(t, priceContextOf(this.vehicle()));
+      lines.push(priceTitle(t.name, quoted));
+      minutes += t.durationMinutes;
+      // En prisrad eller en pågående kampanj styr; annars gäller åtgärdens eget spann som förut (till-priset först).
+      const price =
+        quoted && (quoted.basis === 'rule' || quoted.campaign)
+          ? quoted.total
+          : t.prices?.length
+            ? null
+            : (t.priceTo ?? t.priceFrom);
+      if (price !== null && price !== undefined) {
+        total += price;
+        priced = true;
+      }
+    }
+    f.title.setValue([...keep, ...lines].join('\n'));
+    f.title.markAsDirty();
+    if (minutes > 0) {
+      const start = at(f.day.value, f.startTime.value);
+      const finish = new Date(start.getTime() + minutes * 60_000);
+      f.endDay.setValue(ymd(finish));
+      f.endTime.setValue(hm(finish));
+    }
+    const current = f.price.value;
+    if (current == null || current === this.autoPrice) {
+      this.autoPrice = priced ? total / 100 : null;
+      f.price.setValue(this.autoPrice);
+    }
   }
 
   /** Order som går att planera; en order som kommer från planeringspanelen finns alltid med. */
@@ -555,7 +584,7 @@ export class BookingDialog {
     const body = {
       resourceId: v.resourceId || null,
       placeId: v.placeId || null,
-      serviceTypeId: v.serviceTypeId || null,
+      serviceTypeId: v.serviceTypeIds[0] || null,
       title: v.title,
       start: range.start.toISOString(),
       end: range.end.toISOString(),
